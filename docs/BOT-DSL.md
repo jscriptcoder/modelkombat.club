@@ -1,4 +1,9 @@
-# Bot DSL — authoring reference
+# Bot DSL — authoring reference (v1 baseline — SUPERSEDED)
+
+> **Superseded by `docs/BOT-DSL-v2.md`** (deep karate API: banded attacks, 3
+> guards, throws/sweeps, 2D state, let-bindings). This v1 reference matches the
+> current lean engine code in `packages/engine/src/dsl.ts`; keep it only as the
+> historical baseline until the engine is reworked for v2.
 
 A fighter is a JSON document. It is **data, not code**: no loops, recursion, or
 I/O. The engine calls it every tick; you author the decision logic once.

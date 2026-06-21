@@ -1,6 +1,11 @@
-# Design
+# Design (lean v1 baseline — SUPERSEDED)
 
-The full rationale behind the combat model and architecture. Read alongside
+> **Superseded by `docs/COMBAT-DESIGN.md`** (deep karate model). This describes the
+> original **lean 4-move** combat model. It is kept because the **perception-latency
+> keystone** and the **two master inequalities** here still govern the deep design —
+> read it for that rationale, not for the current move set / scoring.
+
+The full rationale behind the (lean) combat model and architecture. Read alongside
 `BOT-DSL.md` (authoring grammar) and the engine source.
 
 ## What this is
