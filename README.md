@@ -26,37 +26,39 @@ Bots are **data, not code**. The bot language has no loops, recursion, or I/O, s
 ## Quick start
 
 ```bash
-node scripts/selftest.mjs          # zero-dependency smoke test (validator + interpreter)
-
-cd packages/engine
-npm install
-npm run build                      # tsc
-npm test                           # vitest
+npm install        # once
+npm test           # vitest (test-first; the suite grows with each TDD slice)
+npm run build      # tsc → dist/
+npm run typecheck  # tsc --noEmit
 ```
 
 ## Layout
 
+All code lives under a single top-level `src/` (no monorepo nesting). The target
+structure the TDD build grows into:
+
 ```
-packages/engine/   TypeScript deterministic core (pure, no I/O)
-  src/types.ts       state schema + action grammar + Rules (single source of truth)
-  src/dsl.ts         bot AST, validator, interpreter  ← the trusted computing base
-  src/rules.ts       frame table (scaffold; building out to the deep karate table)
-  src/sim.ts         deterministic fight loop  ← stub
-  examples/          worked bot documents
-services/api/      all-TypeScript orchestration (planned; imports @botbout/engine)
-tools/frame-lab/   React frame-data vs perception-latency tuner (dev tool)
+src/               TypeScript deterministic core (pure, no I/O)
+  types.ts           state schema + action grammar + Rules (single source of truth)
+  dsl.ts             bot AST, validator, interpreter  ← the trusted computing base
+  rules.ts           the deep karate frame table
+  sim.ts             deterministic 2D fight loop
 docs/              DESIGN.md (combat + platform) + BOT-DSL.md (bot API)
+(planned) api/     Vercel serverless functions (import the engine from src/)
 (planned) viewer   Vite + Pixi + SolidJS replay/fight viewer
 ```
+
+The karate move taxonomy + stick-figure rig + Pixi adapter are harvested from the
+dropped Project Pixel Fist (render layer) when those slices land.
 
 ## Status
 
 **Design resolved** for the deep karate model + bot API (`docs/DESIGN.md`,
-`docs/BOT-DSL.md`). The engine under `packages/engine` is early scaffold (validator
-+ interpreter, frame table, example bot — green), built out toward the design via
-TDD. **Next:** story-splitting → planning for the first vertical slice, then the
-TDD build (deep frame table + 2D deterministic sim loop + telemetry result object
-+ viewer).
+`docs/BOT-DSL.md`). **Code is a clean slate** — the old pre-deep-design scaffold
+was removed, so `src/` is built fresh, test-first, from the resolved design.
+**Next:** story-splitting → planning for the first vertical slice, then the TDD
+build (deep frame table + 2D deterministic sim loop + telemetry result object +
+viewer).
 
 See `.claude/CLAUDE.md` for the invariants and current direction, `docs/DESIGN.md`
 for the design rationale.

@@ -5,6 +5,4 @@ dist/
 .env
 .env.*
 /replays/
-__pycache__/
-.venv/
 .vitest/

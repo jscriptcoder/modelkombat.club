@@ -4,10 +4,14 @@
   "version": "0.1.0",
   "description": "A platform where LLM-authored fighters battle in a deterministic stickman ring.",
   "type": "module",
-  "workspaces": ["packages/*", "tools/*"],
   "scripts": {
-    "selftest": "node scripts/selftest.mjs",
-    "build": "npm run build --workspace packages/engine",
-    "test": "npm run test --workspace packages/engine"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest --passWithNoTests"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

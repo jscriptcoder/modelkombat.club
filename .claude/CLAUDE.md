@@ -11,11 +11,11 @@ The project is the **"go deep" karate** design. The canonical design lives in
 **`docs/DESIGN.md`** (combat + platform — 2D fixed-point space, 3 height bands +
 technique-specific *uke* defense, on-contact cancel combos, WKF **points-only**
 scoring with *yame* resets, king-of-the-hill ladder, all-TS platform) and
-**`docs/BOT-DSL.md`** (the bot API). The engine source under `packages/engine`
-(`types.ts`/`rules.ts`/`dsl.ts`/`sim.ts`) is **early scaffold** — it predates the
-deep design and gets built out toward it via the TDD slices, not maintained as a
-separate version. Design tree is resolved; next is `story-splitting` → `planning`
-→ TDD build.
+**`docs/BOT-DSL.md`** (the bot API). The code is a **clean slate**: the old
+pre-deep-design scaffold was removed, so all engine code is (re)built **from the
+resolved design via TDD** under a single top-level **`src/`** (no `packages/`
+nesting). Design tree is resolved; next is `story-splitting` → `planning` → TDD
+build.
 
 ## Non-negotiable invariants
 
@@ -29,7 +29,7 @@ generating code; flag any change that would.
    cross-platform replay. Trig/FK and ragdoll are **render-layer only** (the
    non-authoritative side of the seam).
 2. **Security / TCB.** Untrusted bots are **data, never code.** Never run
-   LLM-authored JS. The trusted computing base is `packages/engine/src/dsl.ts`
+   LLM-authored JS. The trusted computing base is `src/dsl.ts`
    (validator + interpreter). Never add a DSL op that can touch the host,
    network, filesystem, time, or randomness. The allowlists in that file ARE the
    security boundary. Validate before run; reject with structured errors.
@@ -44,29 +44,34 @@ generating code; flag any change that would.
 ## Stack & conventions
 
 - Engine: TypeScript, ESM (`NodeNext`), strict mode, no runtime deps. Tests via
-  vitest. Prefer pure functions; keep the DSL vocabulary small.
-- **Platform: all-TypeScript** (API imports `@botbout/engine`). Viewer: Vite +
-  Pixi + SolidJS. Deploys on Vercel.
-- `packages/engine/src/types.ts` is the **single source of truth** for the
-  state / action / `Rules` contract — don't redeclare it elsewhere.
+  vitest. Prefer pure functions; keep the DSL vocabulary small. All code lives
+  under a single top-level **`src/`**.
+- **Platform: all-TypeScript.** The API is **Vercel serverless functions** that
+  import the engine directly from `src/` (shared `validate`/`runFight` + contract
+  types end-to-end — no cross-language drift). Viewer: Vite + Pixi + SolidJS.
+  Deploys on Vercel.
+- `src/types.ts` is the **single source of truth** for the state / action /
+  `Rules` contract — don't redeclare it elsewhere.
 - Repo layout: see `README.md`. Component & platform decisions: `docs/DESIGN.md`.
 
 ## Status
 
 - DONE (design): the deep-karate combat tree + bot API resolved →
   `docs/DESIGN.md`, `docs/BOT-DSL.md`.
-- SCAFFOLD (build out toward the design via TDD): `types.ts`, `rules.ts`, `dsl.ts`,
-  `sim.ts` stub, `examples/footsie-spacer.json`, `tools/frame-lab`.
+- CLEAN SLATE (code): the old scaffold (`packages/engine`, `scripts/`,
+  `tools/frame-lab`, the Python `services/api` stub) was removed. `src/` is empty,
+  awaiting the first TDD slice. Nothing is "built out toward" — it is built fresh,
+  test-first, from the design.
 - NEXT: `story-splitting` → `planning` for the first vertical slice, then TDD
   build (deep frame table + 2D sim loop + telemetry result object + viewer).
 
 ## Commands
 
 ```bash
-node scripts/selftest.mjs              # zero-install smoke test
-cd packages/engine && npm install      # then:
-npm run build                          # tsc
-npm test                               # vitest
+npm install        # once
+npm test           # vitest (test-first; the suite grows with each TDD slice)
+npm run build      # tsc → dist/
+npm run typecheck  # tsc --noEmit
 ```
 
 **Design source of truth:** `docs/DESIGN.md` (combat + platform; control model,
