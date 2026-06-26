@@ -70,10 +70,15 @@ dropped Project Pixel Fist (render layer) when those slices land.
 - **C4 vertical axis + occupancy** (PRs #17–#21): fixed-point `y`, gravity arc,
   jump/crouch; a croucher vacates `high` and a jumper vacates `low` (a strike can
   **whiff on posture**); `opponent.y` (`L_pos`) + `opponent.posture` (`L_act`) perceived.
+- **C5 parry windows** (PRs #23–#25): a freshly-raised matching-band guard **deflects**
+  (no score + attacker extra recovery) where a stale guard only blocks; a parry opens a
+  **counter window** whose strike scores a `counterBonus`, perceivable live as
+  `self.counterWindow`. First consumer of the **§11 compute-then-apply union**
+  (`computeStrike` + `applyStrike`) — the counter is the first cross-fighter effect.
 
-**191 tests; `sim.ts` mutation ~95%, `dsl.ts` interpreter 100%. Next:** C5 parry
-windows, then C6 cancel combos. See `docs/stories/first-slice-split.md` for the
-roadmap and `.claude/CLAUDE.md` Status for the live detail.
+**206 tests; `sim.ts` mutation ~97%, `dsl.ts` interpreter 100%. Next:** C6 cancel
+combos, then throws. See `docs/stories/first-slice-split.md` for the roadmap and
+`.claude/CLAUDE.md` Status for the live detail.
 
 See `.claude/CLAUDE.md` for the invariants and current direction, `docs/DESIGN.md`
 for the design rationale.

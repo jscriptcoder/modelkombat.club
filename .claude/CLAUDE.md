@@ -101,20 +101,40 @@ generating code; flag any change that would.
   `jumpImpulse`/`gravity`/`lowClearance` are optional in `Rules`; all absent ⇒
   **byte-identical** to C3. `self.y`/`self.vy`/`self.posture` deferred (no consumer until
   air-actions); horizontal jump `dir` validated but applies no displacement (vertical-only).
+- DONE (parry windows — C5, PRs #23–#25): the predict-vs-react skill gradient. The opening
+  `parryWindow` ticks of a matching-band guard **deflect** an absorbed strike (no score) and
+  throw the attacker into `parryRecovery` extra recovery, where a guard held past the window
+  only **blocks** (Slice 1); a parry also opens a **counter window** on the parrying fighter —
+  a strike it lands within `counterWindow` ticks scores an extra `counterBonus` (Slice 2); the
+  live window is perceivable as **`self.counterWindow`** so a bot can time its counter (Slice 3).
+  This is the **first consumer of the §11 effects machinery**: the counter is the first
+  **cross-fighter** effect (it lands on the defender), so resolution graduates to the
+  **compute-then-apply union** — `resolveHit` splits into a pure `computeStrike` (returns a
+  hit/parry outcome from the frozen snapshot) + `applyStrike` (both directions applied
+  atomically), keeping the tick swap-symmetric. Guard age is persisted on the Fighter (like C4's
+  posture). 206 tests; `sim.ts` mutation ~97%. `parryWindow`/`parryRecovery`/`counterWindow`/
+  `counterBonus` are optional in `Rules`; all absent ⇒ **byte-identical** to C4. **The union is
+  adopted deliberately at the first cross-fighter effect — not strictly test-forced** (a guarding
+  fighter is never simultaneously attacking, so the counter never collides same-tick; **throws**
+  are the union's test-forcing consumer). The frozen snapshot is taken **post-intake**; §11.1's
+  pre-intake step-dodge refinement stays deferred, as does parry-aware `phaseRemaining`.
 - NOT YET BUILT (later slices): no real frame table (concrete move numbers live only
-  in test mocks); no horizontal jump displacement or air-actions, parry, cancels,
+  in test mocks); no horizontal jump displacement or air-actions, cancels,
   *yame*/match structure, telemetry object, Vercel API, or Pixi viewer.
-- NEXT: **C5 — parry windows** (then C6 cancel combos). This is the **first consumer of the
-  deferred §11 effects machinery**: the compute-then-apply union, HIT/BLOCK/WHIFF taxonomy,
-  and pre-intake frozen snapshot — because parry/throws are **cross-fighter** (an effect lands
-  on the OTHER fighter), so resolution can no longer stay single-`resolveHit`/self-targeted.
-  (Roadmap capabilities are **C1–C6** — the `C` prefix avoids colliding with `slice/N` git
-  branch names; C1 = walking skeleton shipped as branches `slice/1`–`slice/5`, C2 = perception
-  keystone, C3 = height bands, C4 = vertical axis + occupancy.) The spine is pinned in
-  `docs/DESIGN.md` **§11 (Combat resolution order)**: two-phase compute-then-apply, S1 posture
-  → S2 intake → S3 compute → S4 apply → S5 advance, frozen pre-intake snapshot,
-  `strike > throw > guard` precedence, HIT/BLOCK/WHIFF gate. C5–C6 + throws slot into that
-  spine and bring the deferred §11 effects machinery with their first consumer.
+- NEXT: **C6 — on-contact cancel combos** (then throws/sweeps). A move may **cancel into** a
+  follow-up **only on hit or block, never on whiff** (the no-feint / pure-perception property),
+  escalating the within-exchange score. Needs a `cancelable` state + per-move cancel-route data
+  + a hit-confirm signal (`self.lastAttackConnected`). It builds on the **compute-then-apply
+  union now live from C5**: `CancelEnable` is the deferred S3/S4 effect that fires on hit/block
+  (`docs/DESIGN.md` §11.3 lists it as a documented insertion point). **Throws** (the §11.4
+  throw-triangle rows + knockdown/i-frames) are the genuine **test-forcing** consumer of the
+  union — same-tick mutual dependencies (strike-beats-throw, throw-clash) — and slot in
+  alongside/after C6. (Roadmap capabilities are **C1–C6** — the `C` prefix avoids colliding with
+  `slice/N` git branch names; C1 = walking skeleton (branches `slice/1`–`slice/5`), C2 =
+  perception keystone, C3 = height bands, C4 = vertical axis + occupancy, C5 = parry windows.)
+  The spine is pinned in `docs/DESIGN.md` **§11 (Combat resolution order)**: two-phase
+  compute-then-apply (live from C5), S1 posture → S2 intake → S3 compute → S4 apply → S5
+  advance, `strike > throw > guard` precedence, HIT/BLOCK/WHIFF gate.
   Flow: `planning` → TDD, **PR per capability**.
 
 ## Commands
