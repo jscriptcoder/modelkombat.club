@@ -148,6 +148,14 @@ from the frozen snapshot, apply atomically) to keep swap-symmetry structural. Ea
 decrements the window; S3 scoring adds `counterBonus` to a strike that connects while the
 parrying fighter's `counterRemaining > 0`. Observable in the score / event log. Skipped: the
 bot _reading_ the window (slice 3).
+**Decision (confirmed):** build the union now, as a deliberate adoption of §11 at the first
+cross-fighter effect — acknowledged as **not strictly test-forced** (a guarding/parrying
+fighter is never simultaneously attacking, so the counter's cross-fighter write never
+collides same-tick; **throws** are the union's test-forcing consumer). The frozen snapshot is
+taken **post-intake** (matching where the engine already resolves hits); §11.1's pre-intake
+step-dodge refinement stays deferred. `computeStrike` returns a pure outcome
+(hit/parry/block) read from that snapshot; `applyStrike` applies both directions' outcomes
+atomically.
 **Required implementation skills**: load `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (present + confirm before any code):
 

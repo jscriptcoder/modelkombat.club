@@ -88,6 +88,12 @@ export type Rules = {
   // byte-identical to the pre-parry (C4) engine.
   parryWindow?: number;
   parryRecovery?: number;
+  // Parry counter window (C5). After a parry, the parrying fighter holds a counter
+  // window for `counterWindow` ticks; a strike it lands while the window is open scores
+  // an extra `counterBonus` points (the deflect's payoff). Both absent ⇒ no counter
+  // bonus ⇒ byte-identical to the deflect-only (C5 slice 1) engine.
+  counterWindow?: number;
+  counterBonus?: number;
   // Opponent perception latency (ticks). Self is always live. Absent (or any
   // field absent) ⇒ 0 ⇒ that layer is perceived live (forward-compatible with
   // the L=0 skeleton). Positional fields lag by lPos; action fields by lAct.

@@ -1119,3 +1119,124 @@ describe("runFight — parry windows (a freshly-raised matching guard deflects t
     expect(attackTicks(result.events, "a")).toEqual([0, 20]);
   });
 });
+
+describe("runFight — parry counter window (the deflect pays off)", () => {
+  // Strikes mid every neutral tick; struck once at tick 0, it is parried at tick 4 and
+  // stays committed (parryRecovery 8 ⇒ open through tick 19), a hittable target.
+  const STRIKER = bot([], { type: "attack", move: "strike", band: "mid" });
+
+  // Parries a mid strike (fresh mid guard at tick 4), then throws a counter mid strike
+  // at tick 5 — its active frame lands at tick 9, while the parried attacker is still
+  // committed/open. The counter scores the bonus iff the window is still open then.
+  const parryThenCounter = bot(
+    [
+      {
+        when: {
+          op: "eq",
+          args: [
+            { op: "field", path: "clock.tick" },
+            { op: "const", value: 4 },
+          ],
+        },
+        do: { type: "block", band: "mid" },
+      },
+      {
+        when: {
+          op: "eq",
+          args: [
+            { op: "field", path: "clock.tick" },
+            { op: "const", value: 5 },
+          ],
+        },
+        do: { type: "attack", move: "strike", band: "mid" },
+      },
+    ],
+    { type: "idle" },
+  );
+
+  // Base strike scores 1; the counter adds counterBonus 2. The counter strike connects
+  // at tick 9, by which point the window (set on the tick-4 parry, decremented each
+  // tick) has lost 5 ticks — so it is still open iff counterWindow ≥ 6.
+  const counterRules = (counterWindow?: number): Rules =>
+    getMockRules({
+      startGap: 200000, // within reach (250000)
+      parryWindow: 2,
+      parryRecovery: 8,
+      counterWindow,
+      counterBonus: 2,
+    });
+
+  it("a counter strike landing in the open window scores the bonus", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: counterRules(10), // window wide open at the tick-9 connect
+        botA: STRIKER,
+        botB: parryThenCounter,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores).toEqual({ a: 0, b: 3 }); // base 1 + counterBonus 2
+  });
+
+  it("the counter window has a pinned length: open at counterWindow 6, expired at 5 (either slot)", () => {
+    // The parrying fighter occupies `slot`; report its score. Asserted from both slots
+    // so the per-fighter counter-window countdown is pinned on each side.
+    const counterScore = (counterWindow: number, slot: "a" | "b"): number =>
+      runFight(
+        getMockConfig({
+          rules: counterRules(counterWindow),
+          botA: slot === "a" ? parryThenCounter : STRIKER,
+          botB: slot === "b" ? parryThenCounter : STRIKER,
+          maxTicks: 12,
+        }),
+      ).scores[slot];
+
+    expect(counterScore(6, "b")).toBe(3); // window still open at tick 9 ⇒ base + bonus
+    expect(counterScore(5, "b")).toBe(1); // window expired by tick 9 ⇒ base only
+    expect(counterScore(6, "a")).toBe(3); // same countdown when the counter is fighter A
+    expect(counterScore(5, "a")).toBe(1);
+  });
+
+  it("with no counter config a connecting counter scores base only (byte-identical to slice 1)", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: getMockRules({
+          startGap: 200000,
+          parryWindow: 2,
+          parryRecovery: 8,
+        }), // parry but no counterWindow / counterBonus
+        botA: STRIKER,
+        botB: parryThenCounter,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores).toEqual({ a: 0, b: 1 }); // parry deflect, but no counter bonus
+  });
+
+  it("resolves the counter identically from either slot (swap-symmetric)", () => {
+    const asB = runFight(
+      getMockConfig({
+        rules: counterRules(10),
+        botA: STRIKER,
+        botB: parryThenCounter,
+        maxTicks: 12,
+      }),
+    );
+
+    const asA = runFight(
+      getMockConfig({
+        rules: counterRules(10),
+        botA: parryThenCounter,
+        botB: STRIKER,
+        maxTicks: 12,
+      }),
+    );
+
+    // The parrying fighter earns base + bonus whichever slot it occupies; the deflected
+    // striker scores nothing.
+    expect(asB.scores).toEqual({ a: 0, b: 3 });
+    expect(asA.scores).toEqual({ a: 3, b: 0 });
+  });
+});
