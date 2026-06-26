@@ -44,7 +44,7 @@ today; the rest is the structure the TDD build grows into:
 src/               TypeScript deterministic core (pure, no I/O)
   types.ts        ✅ state schema + action grammar + Rules (single source of truth)
   dsl.ts          ✅ bot AST, validator, interpreter  ← the trusted computing base
-  sim.ts          ✅ deterministic fight loop (1D today; grows to 2D)
+  sim.ts          ✅ deterministic fight loop (x + vertical y; grows to full 2D)
   *.test.ts       ✅ vitest behaviour suites (validate / interpret / fight)
   rules.ts           the deep karate frame table (numbers live in test mocks for now)
 docs/              DESIGN.md (combat + platform) + BOT-DSL.md (bot API)
@@ -58,14 +58,22 @@ dropped Project Pixel Fist (render layer) when those slices land.
 ## Status
 
 **Design resolved** for the deep karate model + bot API (`docs/DESIGN.md`,
-`docs/BOT-DSL.md`). **Walking skeleton done** (PRs #1–#5, all 6 acceptance
-criteria): the headless deterministic core validates a JSON bot, runs two bots for
-N ticks, replays **byte-identically**, and resolves 1D approach + one _mid_ strike
-that can score, be **blocked**, or **trade**. 130 tests; `sim.ts` mutation ~95%.
-**Next:** the perception-latency keystone (history ring buffer + `L>0` delayed
-snapshot), then height bands + _uke_ guards, vertical axis, parry, cancels — each a
-TDD slice with its own PR. See `docs/stories/first-slice-split.md` for the
-sequence.
+`docs/BOT-DSL.md`). Shipped so far — each a TDD slice with its own PR:
+
+- **C1 walking skeleton** (PRs #1–#5): headless deterministic core — validate a JSON
+  bot, run two bots N ticks, replay **byte-identically**, 1D approach + one strike that
+  scores / blocks / trades.
+- **C2 perception-latency keystone** (PRs #7–#11): the opponent is a coherent delayed
+  snapshot (`L_pos`/`L_act`, history ring buffer, dead-reckoning, seeded jitter).
+- **C3 height bands** (PRs #15–#16): `high/mid/low` strike + matching-band guard +
+  `L_act`-delayed `opponent.attackBand`.
+- **C4 vertical axis + occupancy** (PRs #17–#21): fixed-point `y`, gravity arc,
+  jump/crouch; a croucher vacates `high` and a jumper vacates `low` (a strike can
+  **whiff on posture**); `opponent.y` (`L_pos`) + `opponent.posture` (`L_act`) perceived.
+
+**191 tests; `sim.ts` mutation ~95%, `dsl.ts` interpreter 100%. Next:** C5 parry
+windows, then C6 cancel combos. See `docs/stories/first-slice-split.md` for the
+roadmap and `.claude/CLAUDE.md` Status for the live detail.
 
 See `.claude/CLAUDE.md` for the invariants and current direction, `docs/DESIGN.md`
 for the design rationale.
