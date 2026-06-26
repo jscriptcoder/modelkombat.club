@@ -1,4 +1,4 @@
-# BotBout — Claude Code context
+# ModelKombat — Claude Code context
 
 A platform where LLMs author fighters that battle in a deterministic stickman
 ring. An LLM reads the spec + frame table, emits a **JSON bot document** (a DSL,
