@@ -288,7 +288,7 @@ depends on who is "A." Two precedence rulings protect the cycle: **throw beats p
 (a throw is _the_ anti-guard option — a predicted parry still loses to a throw; parry only
 ever answers _strikes_), and the trade/clash above are the _only_ symmetric resolutions.
 
-#### 11.5 C3–C4 scope and deferred slots
+#### 11.5 C3–C5 scope and deferred slots
 
 **C3 (height bands + 3 _uke_ guards) builds:** S1 posture (`guard`/`open`), S2 intake as
 effects, S3 with the **top three contact rows** (HIT / wrong-band-HIT / correct-band-
@@ -302,8 +302,21 @@ results in C3: **HIT / BLOCK / WHIFF**.
 Reachable effects in C3: **`MoveStart`, `Step`, `Score`** (BLOCK = "no score" with stun =
 pushback = 0 until their numerics land).
 
-**Documented insertion points (deferred, bound to this spec):** PARRY branch + counter
-(C5); throw-triangle rows + knockdown/i-frames (throws slice); `CancelEnable` on hit/block
+**C5 (parry windows) makes the BLOCK row two-way and brings the union:** the opening
+`parryWindow` ticks of a matching-band guard **PARRY** (deflect — no score, attacker
+`parryRecovery` extra recovery) instead of BLOCK; a parry also opens a `counterWindow` on the
+parrying fighter, and a strike it lands while the window is open scores `+counterBonus`. The
+counter is the first **cross-fighter** effect (it lands on the OTHER fighter), so resolution
+graduates from C4's single-`resolveHit` to the **compute-then-apply union**: a pure
+`computeStrike` (hit/parry outcome from the frozen snapshot) + `applyStrike` (both directions
+applied atomically), keeping the tick swap-symmetric. The live window is perceivable as
+`self.counterWindow`. _(Engine note: the union is adopted **deliberately** here at the first
+cross-fighter effect — it is **not** strictly forced until **throws** create same-tick mutual
+dependencies (strike-beats-throw, throw-clash); the frozen snapshot is taken **post-intake**, so
+§11.1's pre-intake step-dodge refinement is still deferred, as is parry-aware `phaseRemaining`.)_
+
+**Documented insertion points (deferred, bound to this spec):** throw-triangle rows +
+knockdown/i-frames (throws slice); `CancelEnable` on hit/block
 (C6); blockstun/pushback/extra-recovery numerics (their slices). The procedure is strictly **per-tick**; point accumulation stays raw —
 _yame_ / match-scoring reset (§7) is match structure, **outside** this procedure.
 

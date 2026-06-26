@@ -95,15 +95,15 @@ suite (replay-equality + scoring) and a printed result/event-log trace. No deplo
 > with `slice/N` **git branch names**. The walking skeleton (C1) shipped as branches
 > `slice/1`–`slice/5` — those are PR stages of C1, **not** capabilities C1–C5. Don't read
 > "C3" as "PR #3" or branch `slice/3`. Done: **C1** (PRs #1–#5), **C2** (PRs #7–#11),
-> **C3** (PRs #15–#16), **C4** (PRs #17–#21). Next: **C5**.
+> **C3** (PRs #15–#16), **C4** (PRs #17–#21), **C5** (PRs #23–#25). Next: **C6**.
 
 | Capability                                      | Value                                                   | Includes                                                                                                                                                         | Defers                 | Acceptance example                                                                                     | Release      |
 | ----------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------ | ------------ |
 | **C2. Perception latency keystone** · ✅ done   | Makes frame data _mean_ something; the distinctive meta | Split `L_pos`/`L_act`, per-fighter history ring buffer, one coherent delayed snapshot, dead-reckoned `predictedDistance`, seeded clamped jitter                  | bands, y, parry        | A strike with `startup < L_act+B` **cannot** be reaction-blocked; one with `startup ≥ L_act+B` **can** | dev/headless |
 | **C3. Height bands + 3 _uke_ guards** · ✅ done | Core read/counter game                                  | `high/mid/low` attack band; `block-{high,mid,low}`; wrong-height guard ⇒ hit; band keys scoring; `opponent.attackBand` perceived `L_act`-delayed                 | y-axis, parry, cancels | A `high` strike vs `block-mid` connects; vs `block-high` is blocked                                    | dev/headless |
 | **C4. Vertical axis + occupancy** · ✅ done     | The low/high game becomes physical                      | fixed-point `y`, gravity arc, jump/crouch; band occupancy (croucher vacates `high`, jumper vacates `low`); `opponent.y` (`L_pos`) + `opponent.posture` (`L_act`) | parry, cancels         | A `jodan` (high) kick **whiffs** a croucher; a sweep **whiffs** a jumper                               | dev/headless |
-| **C5. Parry windows** · ← next                  | The skill gradient (predict vs react)                   | opening ticks of a matching guard ⇒ deflect + attacker extra-recovery + counter-hit bonus; later ticks ⇒ normal block                                            | cancels, throws        | A guard raised within the parry window deflects; the same guard raised late only blocks                | dev/headless |
-| **C6. On-contact cancel combos**                | Within-exchange score escalation; the no-feint property | `cancelInto` windows, `canCancel` state, hit-confirm signal (`self.lastAttackConnected`); cancel only on hit/block, never whiff                                  | throws, stamina        | An attack cancelled into a follow-up **on hit** chains; the same attempted **on whiff** does not       | dev/headless |
+| **C5. Parry windows** · ✅ done                 | The skill gradient (predict vs react)                   | opening ticks of a matching guard ⇒ deflect + attacker extra-recovery + counter-hit bonus; later ticks ⇒ normal block                                            | cancels, throws        | A guard raised within the parry window deflects; the same guard raised late only blocks                | dev/headless |
+| **C6. On-contact cancel combos** · ← next       | Within-exchange score escalation; the no-feint property | `cancelInto` windows, `canCancel` state, hit-confirm signal (`self.lastAttackConnected`); cancel only on hit/block, never whiff                                  | throws, stamina        | An attack cancelled into a follow-up **on hit** chains; the same attempted **on whiff** does not       | dev/headless |
 
 ## Parking Lot (later — not pre-enumerated rigidly)
 
@@ -138,14 +138,18 @@ suite (replay-equality + scoring) and a printed result/event-log trace. No deplo
 
 ## Next Step
 
-C1–C4 are shipped (C4 = vertical axis + occupancy: crouch/jump/airborne band
-occupancy + `opponent.y` on `L_pos` and `opponent.posture` on `L_act`, PRs #17–#21),
-and Design gap #1 is pinned (`DESIGN.md` §11). **C5 (parry windows)** is the next
-capability and is **unblocked**. Load **`planning`** on **C5** to stage it into
-PR-sized TDD increments (each: RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR).
+C1–C5 are shipped (C5 = parry windows: deflect + attacker extra-recovery, a post-parry
+counter window scoring `counterBonus`, and the live `self.counterWindow` read surface —
+PRs #23–#25), and Design gap #1 is pinned (`DESIGN.md` §11). **C6 (on-contact cancel
+combos)** is the next capability and is **unblocked**. Load **`planning`** on **C6** to
+stage it into PR-sized TDD increments (each: RED → GREEN → MUTATE → KILL MUTANTS →
+REFACTOR).
 
-> **C5 is the first consumer of the deferred §11 effects machinery.** Parry/throws are
-> **cross-fighter** — an effect (deflect + attacker extra-recovery + counter-hit bonus)
-> lands on the OTHER fighter — so resolution graduates from C4's single-`resolveHit` /
-> self-targeted model into the full **compute-then-apply union** with the HIT/BLOCK/WHIFF
-> taxonomy and a frozen pre-intake snapshot (§11 S1→S5).
+> **The §11 compute-then-apply union is now live (built in C5).** C5 adopted it at the
+> first **cross-fighter** effect (the counter window lands on the OTHER fighter):
+> `resolveHit` split into a pure `computeStrike` (hit/parry outcome from the frozen
+> snapshot) + `applyStrike` (both directions applied atomically). C6 slots its
+> `CancelEnable`-on-hit/block effect into that spine (§11.3 insertion point). **Throws**
+> (the §11.4 throw-triangle rows + knockdown/i-frames) are the union's genuine
+> **test-forcing** consumer — same-tick mutual dependencies (strike-beats-throw,
+> throw-clash) — and slot in alongside/after C6.
