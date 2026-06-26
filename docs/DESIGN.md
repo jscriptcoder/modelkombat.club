@@ -2,7 +2,7 @@
 
 > **Status:** The canonical combat + platform design. The **LOCKED** section is
 > decided; **PROPOSED** sections are recommendations not yet ratified. Paired with
-> `docs/BOT-DSL.md` (the bot API). **Last updated:** 2026-06-21
+> `docs/BOT-DSL.md` (the bot API). **Last updated:** 2026-06-26
 >
 > The **non-negotiable invariants** in `.claude/CLAUDE.md` (determinism, DSL-as-data
 > TCB, integer math, same-snapshot resolution) hold throughout. Karate move design
@@ -185,6 +185,133 @@ Master inequalities, now **per band**:
 > never-blockable at `S ≤ L_act − j`. Built so far at `L_pos`/`L_act` (1D, no band);
 > `y`/`vy`, posture, and the perceived attack _band_ arrive with later slices.
 
+### 11. Combat resolution order — the ordered per-tick procedure
+
+The single, deterministic, **order-independent** procedure that resolves one tick once
+both bots have returned their actions. It composes §2 (band + occupancy), §4 (3 guards),
+§5 (parry), §6 (throw triangle), and §3 (on-contact cancels) into **one fixed order** so
+every mechanic has exactly one home and adding later mechanics never reshapes the spine.
+This closes **combat design gap #1**. _(Pinned via `grill-me`, 2026-06-26.)_
+
+**What is pinned now vs. later.** This section locks the **ordered spine + the
+order-independence contract** for the whole deep model. **Per-stage numerics** (parry
+window length, blockstun/pushback/extra-recovery amounts, knockdown/i-frame durations,
+cancel-window sizes) are **deferred to the slice that builds each stage** — they fill
+documented slots without moving the spine.
+
+#### 11.1 The order-independence contract (the foundation)
+
+Resolution is **two-phase compute-then-apply**:
+
+- **Stages S1–S3 read only the frozen pre-tick snapshot and accumulate _effects_
+  (pure data); they mutate nothing.**
+- **S4 applies all effects atomically; S5 advances clocks. Nothing mutates a fighter
+  outside S4/S5.**
+
+This is what keeps the tick **swap-symmetric** (identical regardless of which fighter is
+"A") even once interactions mutate the _other_ fighter — a throw knocks the **defender**
+down, a parry adds recovery to the **attacker**, a block puts blockstun on the
+**defender**. Because every effect is computed from the same frozen snapshot before any
+is applied, "A-then-B" and "B-then-A" cannot diverge. Order-independence is therefore
+**structural, not hand-proved per interaction** (the property the old single-`resolveHit`
+trick — "each effect lands on its own fighter" — gave up the moment effects cross to the
+opponent). Frozen = **pre-intake**: this tick's movement (steps) are S4 effects taking
+hold next tick, so the whole tick is a pure function of one snapshot + both actions, and
+**there is no same-tick step-dodge of an already-active strike** (you escape danger by
+predicting and moving _earlier_ — consistent with the commitment/perception meta).
+
+#### 11.2 The five stages
+
+| #      | Stage                      | Reads / does                                                                                                                                                                                   | Mutates? |
+| ------ | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| **S1** | **Posture classification** | From the frozen snapshot + both actions, label each fighter `guard(band)` / `parry(band)` (opening window) / `open`. A committed/attacking fighter is `open` — **cannot guard**.               | no       |
+| **S2** | **Intake**                 | For each fighter **free to act**, _emit_ its intent as an effect: `MoveStart` (attack/throw/sweep), `Step`, `GuardRaise`. Locked fighters ignore their action. **Self-targeted effects only.** | no       |
+| **S3** | **Interaction resolution** | From the frozen snapshot: for each fighter whose committed move is in its **active window**, classify contact (11.3) and resolve the **precedence table** (11.4). Emit interaction effects.    | no       |
+| **S4** | **Apply**                  | Apply all S2 + S3 effects atomically: move-starts, steps, scores, blockstun/pushback, knockdown, extra-recovery, cancel-enable.                                                                | **yes**  |
+| **S5** | **Advance clocks**         | Tick each committed fighter's move/stun clock; completed moves → recovery/neutral.                                                                                                             | **yes**  |
+
+S1 is **before** S2 so "a fighter that starts attacking this tick cannot also be
+guarding" holds. A move started in S2 is at `elapsed 0` (startup) so it is **never active
+on its own start tick** — which is exactly why deferring the start to S4 changes no
+outcome (S3 only ever reads _already-committed_ moves). **Free to act** generalizes
+today's `neutral` check: a fighter honors intake only when **not**
+committed/stunned/knocked-down/recovering.
+
+#### 11.3 Contact classification (inside S3)
+
+A strike yields a **three-way result** — the BLOCK vs WHIFF distinction is first-class
+**now** because cancels (§3) fire on **hit or block, never whiff**, and collapsing them
+would force re-plumbing later:
+
+- **HIT** — scores; defender takes the tempo reaction.
+- **BLOCK** — no score; defender blockstun + pushback _(numerics deferred)_. **PARRY**
+  (§5) is the C5 refinement of this branch: deflect + attacker extra-recovery + counter.
+- **WHIFF** — nothing connects; no score, no stun, **no cancel**.
+
+Gate order (short-circuits top to bottom):
+
+```
+1. active window?        no → NONE  (not striking this tick)
+2. reach?                no → WHIFF
+3. occupancy(atk.band)?  no → WHIFF        // e.g. a high strike sails over a croucher
+4. defender guards band == atk.band?
+       yes, in opening window → PARRY       // C5
+       yes, past window       → BLOCK
+       no  (open OR wrong band) → HIT
+```
+
+Two rulings the order encodes: **occupancy is checked before guard** (a high strike vs a
+croucher WHIFFs _regardless of guard_ — it physically misses), and **wrong-band guard ⇒
+HIT** (the core read: a guard at the wrong height does not save you).
+
+#### 11.4 Interaction precedence (the throw triangle, inside S3)
+
+The locked precedence is §6's cycle **strike > throw > guard > strike**. Directed
+resolution (attacker's offensive event this tick × defender's posture):
+
+| Attacker event    | Defender posture                        | Outcome (A→B)                                             |
+| ----------------- | --------------------------------------- | --------------------------------------------------------- |
+| strike active     | open (incl. _attacking_)                | **HIT** — scores (gated by 11.3)                          |
+| strike active     | guard, **wrong** band                   | **HIT** — scores                                          |
+| strike active     | guard, **correct** band, past window    | **BLOCK** — no score; B blockstun + pushback              |
+| strike active     | guard, **correct** band, opening window | **PARRY** — no score; A extra recovery + B counter window |
+| throw grab-active | open **or any guard** (incl. parry)     | **THROW** — scores 3; B knocked down _(throw > guard)_    |
+| throw grab-active | B strike-active **or** B throw-startup  | **strike beats throw** — A's throw fails                  |
+
+**Mirror (both-offensive) cases — the _only_ swap-symmetric outcomes:**
+
+- **strike ∥ strike**, both in range → **trade**, both score.
+- **throw ∥ throw** → **clash**, both whiff _(throw-break detail → throws slice)_.
+
+Every other conflict is broken by the `strike > throw > guard` ordering, so it never
+depends on who is "A." Two precedence rulings protect the cycle: **throw beats parry too**
+(a throw is _the_ anti-guard option — a predicted parry still loses to a throw; parry only
+ever answers _strikes_), and the trade/clash above are the _only_ symmetric resolutions.
+
+#### 11.5 C3 scope and deferred slots
+
+**C3 (height bands + 3 _uke_ guards) builds:** S1 posture (`guard`/`open`), S2 intake as
+effects, S3 with the **top three contact rows** (HIT / wrong-band-HIT / correct-band-
+BLOCK) + the **strike∥strike trade**, S4/S5. **Occupancy is hardwired `true`** (no `y`
+yet — the only posture is standing, which occupies all 3 bands), so step 3 of the gate
+goes live untouched in **C4**. Reachable contact results in C3: **HIT / BLOCK / WHIFF**.
+Reachable effects in C3: **`MoveStart`, `Step`, `Score`** (BLOCK = "no score" with stun =
+pushback = 0 until their numerics land).
+
+**Documented insertion points (deferred, bound to this spec):** PARRY branch + counter
+(C5); occupancy gate going live (C4); throw-triangle rows + knockdown/i-frames (throws
+slice); `CancelEnable` on hit/block (C6); blockstun/pushback/extra-recovery numerics
+(their slices). The procedure is strictly **per-tick**; point accumulation stays raw —
+_yame_ / match-scoring reset (§7) is match structure, **outside** this procedure.
+
+> **C3 planning dependency (tracked separately — _not_ part of this procedure).** C3 is
+> "the read/counter game," but section 11 only governs how bands _resolve_. For a bot to
+> _counter_, it must **perceive the opponent's attack band** (delayed by `L_act`); today
+> `OpponentState.attacking` is a bare boolean with no band. Exposing the perceived band is
+> a **perception / State-contract** change (§9), not a resolution-order change — the
+> procedure is sound without it; the _game_ is not interesting without it. Pull it into C3
+> planning alongside this section.
+
 ---
 
 ## PROPOSED (my recommendation — open for the interview)
@@ -328,6 +455,7 @@ core footwork) rendered as the stick figure in Pixi. Resolved later via the
 - ✓ P8 Platform/meta — **resolved** (all-TS · KotH+lineage · rich telemetry)
 - ◻ P7 Move schema — settled by default (revisit when authoring the frame table at build)
 - → P9 Scope — first vertical slice: hand off to `story-splitting` then `planning`
+- ✓ Combat design gap #1 (ordered resolution procedure) — **resolved** → **§11**
 
 **Design tree resolved.** Next: docs-alignment pass (CLAUDE.md / DESIGN.md /
 BOT-DSL.md / services-api / README reflect deep-karate + all-TS), then
