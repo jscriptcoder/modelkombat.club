@@ -30,6 +30,8 @@ export type FieldPath =
   | "opponent.facing"
   | "opponent.distance"
   | "opponent.attacking"
+  | "opponent.vx"
+  | "opponent.predictedDistance"
   | "ring.width"
   | "clock.tick"
   | "clock.ticksRemaining";
@@ -84,6 +86,8 @@ const FIELD_READERS: Record<FieldPath, (s: State) => number> = {
   "opponent.facing": (s) => s.opponent.facing,
   "opponent.distance": (s) => s.opponent.distance,
   "opponent.attacking": (s) => (s.opponent.attacking ? 1 : 0),
+  "opponent.vx": (s) => s.opponent.vx,
+  "opponent.predictedDistance": (s) => s.opponent.predictedDistance,
   "ring.width": (s) => s.ring.width,
   "clock.tick": (s) => s.clock.tick,
   "clock.ticksRemaining": (s) => s.clock.ticksRemaining,

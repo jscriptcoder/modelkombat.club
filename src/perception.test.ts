@@ -165,3 +165,120 @@ describe("perception latency — delayed action perception (L_act)", () => {
     expect(validate(REACTIVE_BLOCKER).ok).toBe(true);
   });
 });
+
+// ─── slice 3: dead-reckoned predictedDistance ─────────────────────────────────
+
+// Strikes the instant a chosen perceived distance falls to `threshold`.
+const strikeWhen = (
+  path: "opponent.distance" | "opponent.predictedDistance",
+  threshold: number,
+): BotDoc =>
+  bot(
+    [
+      {
+        when: {
+          op: "lte",
+          args: [
+            { op: "field", path },
+            { op: "const", value: threshold },
+          ],
+        },
+        do: { type: "attack", move: "strike", band: "mid" },
+      },
+    ],
+    { type: "idle" },
+  );
+
+const STRIKE_REACH = 100000;
+const STRIKE_ON_RAW = strikeWhen("opponent.distance", STRIKE_REACH);
+
+const STRIKE_ON_PREDICTED = strikeWhen(
+  "opponent.predictedDistance",
+  STRIKE_REACH,
+);
+
+// A stands still and strikes on a perceived-distance threshold; B (ADVANCER) closes
+// the gap by walkSpeed each tick. The true gap 200000 − 4000·t reaches 100000 at
+// t = 25 — far past the latency clamp, so dead reckoning is exact there.
+const spacingConfig = (striker: BotDoc, lPos: number): FightConfig =>
+  getMockConfig({
+    botA: striker,
+    botB: ADVANCER,
+    rules: getMockRules({ perception: { lPos } }),
+    maxTicks: 40,
+  });
+
+const firstAttackTick = (events: FightEvent[]): number | undefined =>
+  events.find((e) => e.a.action.type === "attack")?.tick;
+
+describe("perception latency — dead-reckoned predictedDistance", () => {
+  it("compensates L_pos so predictedDistance tracks the true distance while raw distance lags", () => {
+    const k = 3;
+
+    const live = firstAttackTick(
+      runFight(spacingConfig(STRIKE_ON_RAW, 0)).events,
+    );
+
+    const predicted = firstAttackTick(
+      runFight(spacingConfig(STRIKE_ON_PREDICTED, k)).events,
+    );
+
+    const rawDelayed = firstAttackTick(
+      runFight(spacingConfig(STRIKE_ON_RAW, k)).events,
+    );
+
+    expect(live).toBe(25); // sanity: true gap reaches the threshold at tick 25
+    expect(predicted).toBe(live); // dead reckoning fully compensates the latency
+    expect(rawDelayed).toBe((live ?? 0) + k); // raw delayed distance lags by lPos ticks
+  });
+
+  it("dead-reckons whichever fighter is the moving target (symmetric perception)", () => {
+    const k = 3;
+
+    // Roles swapped vs above: A advances, B strikes on its predicted read of A. The
+    // compensation must use A's perceived velocity, so B still fires at the live
+    // tick 25 (not 25 + k) — exercising the other fighter's velocity history.
+    const swapped = getMockConfig({
+      botA: ADVANCER,
+      botB: STRIKE_ON_PREDICTED,
+      rules: getMockRules({ perception: { lPos: k } }),
+      maxTicks: 40,
+    });
+
+    const bAttack = runFight(swapped).events.find(
+      (e) => e.b.action.type === "attack",
+    )?.tick;
+
+    expect(bAttack).toBe(25);
+  });
+
+  it("accepts a bot reading opponent.vx and opponent.predictedDistance (additive allowlist)", () => {
+    const reader = bot(
+      [
+        {
+          when: {
+            op: "lt",
+            args: [
+              { op: "field", path: "opponent.vx" },
+              { op: "const", value: 0 },
+            ],
+          },
+          do: { type: "idle" },
+        },
+        {
+          when: {
+            op: "lte",
+            args: [
+              { op: "field", path: "opponent.predictedDistance" },
+              { op: "const", value: 1 },
+            ],
+          },
+          do: { type: "idle" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    expect(validate(reader).ok).toBe(true);
+  });
+});

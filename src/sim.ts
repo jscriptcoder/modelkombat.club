@@ -8,11 +8,12 @@
 // same-pre-tick-snapshot rule — both fighters decide against tick T's state,
 // then both actions resolve together. No Math.random / Date.now / wall-clock.
 //
-// Skeleton scope (plan Slices 3–4): movement + one strike with WKF point
-// scoring and on-contact COMMITMENT (a started move runs startup→active→
-// recovery; actions issued while committed are ignored). No perception latency
-// (opponent is live, L = 0), no blocking/parry, no PRNG yet (nothing consumes
-// randomness — it arrives with jitter). Each joins in a later slice.
+// Scope so far: movement + one strike with WKF point scoring, on-contact
+// COMMITMENT (a started move runs startup→active→recovery; actions issued while
+// committed are ignored), guard/block, and PERCEPTION LATENCY — the opponent is a
+// coherent delayed snapshot (positional fields by lPos, action fields by lAct)
+// with dead-reckoned predictedDistance. Still pending: seeded jitter on L (the
+// first PRNG consumer), parry, height bands, and the vertical axis.
 // ============================================================================
 import type {
   State,
@@ -21,6 +22,7 @@ import type {
   Facing,
   MoveId,
   MoveSpec,
+  OpponentState,
 } from "./types.js";
 import { runTick, type BotDoc } from "./dsl.js";
 
@@ -57,13 +59,15 @@ type Fighter = {
 
 // One tick's outward facts, recorded into a fighter's history so the OPPONENT can
 // perceive them delayed (invariant #4: a coherent delayed snapshot). Positional
-// fields (x, facing) and the action field (attacking) carry independent latencies.
-type Frame = { x: number; facing: Facing; attacking: boolean };
+// fields (x, facing, vx) and the action field (attacking) carry independent
+// latencies. `vx` is the displacement since the previous frame (0 on the first).
+type Frame = { x: number; facing: Facing; attacking: boolean; vx: number };
 
-const frameOf = (f: Fighter): Frame => ({
+const frameOf = (f: Fighter, prev: Frame | undefined): Frame => ({
   x: f.x,
   facing: f.facing,
   attacking: f.state.kind === "attacking",
+  vx: prev ? f.x - prev.x : 0,
 });
 
 const initMem = (bot: BotDoc): Record<string, number> => ({
@@ -85,13 +89,34 @@ const totalFrames = (spec: MoveSpec): number =>
 const perceivedFrame = (history: Frame[], tick: number, lPos: number): Frame =>
   history[Math.max(0, tick - lPos)];
 
-// Build one fighter's view of tick T: self is live; the opponent is split across
-// two coherent delayed frames — positional fields from `oppPos` (lPos ticks ago),
-// action fields from `oppAct` (lAct ticks ago). Distance is from oppPos to live self.
-const viewFor = (
-  self: Fighter,
+// The opponent a fighter perceives this tick: positional fields from the lPos-delayed
+// frame, action fields from the lAct-delayed frame (a coherent split snapshot).
+// `distance` is the raw delayed gap to live self; `predictedDistance` dead-reckons
+// the delayed position forward over the lPos gap (oppPos.x + oppPos.vx · lPos) so a
+// constant-velocity opponent reads at its true current distance.
+const perceiveOpponent = (
+  selfX: number,
   oppPos: Frame,
   oppAct: Frame,
+  lPos: number,
+): OpponentState => {
+  const predictedX = oppPos.x + oppPos.vx * lPos;
+
+  return {
+    x: oppPos.x,
+    facing: oppPos.facing,
+    distance: Math.abs(oppPos.x - selfX),
+    attacking: oppAct.attacking,
+    vx: oppPos.vx,
+    predictedDistance: Math.abs(predictedX - selfX),
+  };
+};
+
+// Build one fighter's view of tick T: self is live; the opponent is its already-
+// perceived (delayed) snapshot.
+const viewFor = (
+  self: Fighter,
+  opponent: OpponentState,
   rules: Rules,
   tick: number,
   maxTicks: number,
@@ -111,12 +136,7 @@ const viewFor = (
       canAct: st.kind === "neutral",
       phaseRemaining,
     },
-    opponent: {
-      x: oppPos.x,
-      facing: oppPos.facing,
-      distance: Math.abs(oppPos.x - self.x),
-      attacking: oppAct.attacking,
-    },
+    opponent,
     ring: { width: rules.ring.width },
     clock: { tick, ticksRemaining: maxTicks - tick },
   };
@@ -208,23 +228,33 @@ export function runFight(cfg: FightConfig): FightResult {
     // 1b. Record each fighter's pre-tick frame, then read the opponent split into
     //     two coherent delayed layers: positional (lPos) and action (lAct). At
     //     L = 0 both resolve to this tick's frame ⇒ live perception.
-    histA.push(frameOf(a));
-    histB.push(frameOf(b));
-    const aPos = perceivedFrame(histB, tick, lPos);
-    const aAct = perceivedFrame(histB, tick, lAct);
-    const bPos = perceivedFrame(histA, tick, lPos);
-    const bAct = perceivedFrame(histA, tick, lAct);
+    histA.push(frameOf(a, histA[tick - 1]));
+    histB.push(frameOf(b, histB[tick - 1]));
+
+    const aOpp = perceiveOpponent(
+      a.x,
+      perceivedFrame(histB, tick, lPos),
+      perceivedFrame(histB, tick, lAct),
+      lPos,
+    );
+
+    const bOpp = perceiveOpponent(
+      b.x,
+      perceivedFrame(histA, tick, lPos),
+      perceivedFrame(histA, tick, lAct),
+      lPos,
+    );
 
     // 2. Both fighters decide against one immutable pre-tick snapshot.
     const aAction = runTick(
       botA,
-      viewFor(a, aPos, aAct, rules, tick, maxTicks),
+      viewFor(a, aOpp, rules, tick, maxTicks),
       a.mem,
     );
 
     const bAction = runTick(
       botB,
-      viewFor(b, bPos, bAct, rules, tick, maxTicks),
+      viewFor(b, bOpp, rules, tick, maxTicks),
       b.mem,
     );
 
