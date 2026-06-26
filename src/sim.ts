@@ -24,8 +24,11 @@
 // no longer hardwired open). The arc is fixed-point (y += vy; vy -= gravity). PARRY:
 // the opening `parryWindow` ticks of a matching-band guard DEFLECT an absorbed strike
 // (no score) and throw the attacker into `parryRecovery` extra recovery, where a guard
-// held past the window only blocks. Still pending: the parry counter window + its
-// perception.
+// held past the window only blocks; a parry also opens a COUNTER WINDOW — a strike the
+// parrying fighter lands within `counterWindow` ticks scores an extra `counterBonus`.
+// Strikes resolve via the §11 compute-then-apply union (both outcomes computed from the
+// frozen snapshot, then applied) so the counter's cross-fighter effect stays
+// swap-symmetric. Still pending: perceiving the counter window (self.counterWindow).
 // ============================================================================
 import type {
   State,
@@ -87,6 +90,7 @@ type Fighter = {
   posture: Posture; // last resolved stance, recorded into history for perception
   guardBand: Band | null; // band guarded last tick (null = open), for parry-window age
   guardAge: number; // consecutive ticks the current guard has been held (0 = open)
+  counterRemaining: number; // post-parry counter-window ticks left (0 = closed)
 };
 
 // The perceived-attack-band encoding (invariant #4 layer): height-ordered so a
@@ -280,52 +284,82 @@ const VACATED_BAND: Record<Posture, Band | null> = {
 const occupies = (posture: Posture, band: Band): boolean =>
   VACATED_BAND[posture] !== band;
 
-// During its active window, a strike in reach scores once (per activation) —
-// unless the defender's hurtbox does NOT occupy the attacked band (it whiffs on
-// posture, e.g. a high strike over a croucher) or the defender guards the SAME
-// height band. A matching guard within its opening `parryWindow` ticks DEFLECTS
-// (no score; the attacker is thrown into `parryRecovery` extra recovery); past the
-// window it merely BLOCKS (no score). Gate order is §11.3: active → reach →
-// occupancy → guard, then within guard: parry (fresh) vs block (stale). The
-// deflect's extra recovery lands on the ATTACKER — the fighter this call already
-// owns — so it stays self-targeted (no cross-fighter effect until the C5 counter).
-const resolveHit = (
+// The effect of one strike att→def, computed PURELY from the frozen pre-apply
+// snapshot (§11 compute-then-apply). `null` ⇒ no effect this tick (not active, out of
+// reach, vacated band, already resolved, or a stale-guard BLOCK — block/whiff carry no
+// effect until cancels arrive in C6). A `hit` adds points to the attacker; a `parry`
+// deflects — extra recovery on the attacker AND a counter window on the defender.
+type StrikeOutcome =
+  | { result: "hit"; points: number }
+  | { result: "parry"; extra: number; counter: number };
+
+// Classify the strike att→def from the frozen snapshot. Gate order is §11.3: active →
+// reach → occupancy → guard, then within guard: parry (fresh) vs block (stale). The
+// HIT score folds in the attacker's own counter bonus if its window is open. Pure —
+// reads only; the caller applies the outcome.
+const computeStrike = (
   att: Fighter,
   def: Fighter,
   rules: Rules,
   guardBand: Band | null,
   guardAge: number,
   defPosture: Posture,
-): void => {
+): StrikeOutcome | null => {
   const st = att.state;
-  if (st.kind !== "attacking" || st.scored) return;
+  if (st.kind !== "attacking" || st.scored) return null;
   const spec = rules.moves[st.move];
 
   const inActiveWindow =
     st.elapsed >= spec.startup && st.elapsed < spec.startup + spec.active;
 
-  if (!inActiveWindow) return;
-  if (Math.abs(def.x - att.x) > spec.reach) return;
-  if (!occupies(defPosture, st.band)) return; // vacated band ⇒ whiff (over/under)
+  if (!inActiveWindow) return null;
+  if (Math.abs(def.x - att.x) > spec.reach) return null;
+  if (!occupies(defPosture, st.band)) return null; // vacated band ⇒ whiff (over/under)
 
   if (guardBand === st.band) {
-    // Matching-height guard: a fresh guard (age within the window) parries —
-    // deflecting the strike and adding extra recovery to the attacker; a stale
-    // guard only blocks. Either way the strike resolves with no score. guardAge is
-    // ≥ 1 here (the defender guards st.band), so `guardAge <= window` already makes
-    // an absent/zero window inert — no separate `window > 0` guard is needed.
-    const window = rules.parryWindow ?? 0;
+    // Matching-height guard: a fresh guard (age within the window) parries; a stale
+    // guard only blocks (no effect). guardAge is ≥ 1 here (the defender guards
+    // st.band), so `guardAge <= window` already makes an absent/zero window inert.
+    return guardAge <= (rules.parryWindow ?? 0)
+      ? {
+          result: "parry",
+          extra: rules.parryRecovery ?? 0,
+          counter: rules.counterWindow ?? 0,
+        }
+      : null; // stale guard ⇒ BLOCK, no effect
+  }
 
-    if (guardAge <= window) {
-      st.extra = rules.parryRecovery ?? 0;
-      st.scored = true; // resolved (deflected) — do not re-process while still active
-    }
+  // HIT — base score plus a counter bonus if this attacker's counter window is open.
+  const bonus = att.counterRemaining > 0 ? (rules.counterBonus ?? 0) : 0;
+
+  return { result: "hit", points: spec.score + bonus };
+};
+
+// Apply one strike outcome. A `hit` scores on the attacker; a `parry` lands its
+// CROSS-FIGHTER effect — extra recovery on the attacker, a counter window on the
+// defender. Both directions' outcomes are computed before any are applied, so this
+// stays swap-symmetric even though the parry mutates the other fighter (§11.1).
+const applyStrike = (
+  att: Fighter,
+  def: Fighter,
+  outcome: StrikeOutcome | null,
+): void => {
+  if (outcome === null) return;
+  const st = att.state;
+  if (st.kind !== "attacking") return; // always true when outcome ≠ null
+
+  if (outcome.result === "hit") {
+    att.points += outcome.points;
+    st.scored = true;
 
     return;
   }
 
-  att.points += spec.score;
-  st.scored = true;
+  if (outcome.result === "parry") {
+    st.extra = outcome.extra;
+    st.scored = true; // resolved (deflected) — do not re-process while still active
+    def.counterRemaining = outcome.counter;
+  }
 };
 
 // Advance a committed fighter's clock. A strike ticks its move frames; an
@@ -368,6 +402,7 @@ export function runFight(cfg: FightConfig): FightResult {
     posture: "standing",
     guardBand: null,
     guardAge: 0,
+    counterRemaining: 0,
   };
 
   const b: Fighter = {
@@ -380,6 +415,7 @@ export function runFight(cfg: FightConfig): FightResult {
     posture: "standing",
     guardBand: null,
     guardAge: 0,
+    counterRemaining: 0,
   };
 
   const events: FightEvent[] = [];
@@ -443,10 +479,11 @@ export function runFight(cfg: FightConfig): FightResult {
     );
 
     // 3. Resolve together: read each fighter's guard band and posture from its
-    //    pre-intake state, then honour/ignore intake, then hits, then advance
-    //    clocks. A strike whiffs on a vacated band and is blocked only by a guard
-    //    at its own band. Simultaneous strikes both score — each resolveHit
-    //    touches only its own fighter, so it is order-independent.
+    //    pre-intake state, honour/ignore intake, then resolve strikes via the §11
+    //    compute-then-apply union — both directions' outcomes are COMPUTED from the
+    //    frozen snapshot before either is APPLIED, so cross-fighter effects (a parry
+    //    sets the OTHER fighter's counter window) stay swap-symmetric. Then advance
+    //    clocks and decrement counter windows.
     const aGuardBand = guardBandOf(a, aAction);
     const bGuardBand = guardBandOf(b, bAction);
     // Guard age reads each fighter's guard from LAST tick, so compute it before
@@ -465,10 +502,33 @@ export function runFight(cfg: FightConfig): FightResult {
     b.guardAge = bGuardAge;
     intake(a, aAction, rules);
     intake(b, bAction, rules);
-    resolveHit(a, b, rules, bGuardBand, bGuardAge, bPosture);
-    resolveHit(b, a, rules, aGuardBand, aGuardAge, aPosture);
+
+    // Compute both outcomes from the frozen post-intake snapshot, THEN apply both.
+    const aOutcome = computeStrike(
+      a,
+      b,
+      rules,
+      bGuardBand,
+      bGuardAge,
+      bPosture,
+    );
+
+    const bOutcome = computeStrike(
+      b,
+      a,
+      rules,
+      aGuardBand,
+      aGuardAge,
+      aPosture,
+    );
+
+    applyStrike(a, b, aOutcome);
+    applyStrike(b, a, bOutcome);
     advance(a, rules);
     advance(b, rules);
+    // A counter window ticks down once per tick (clamped at 0) after it has been read.
+    a.counterRemaining = Math.max(0, a.counterRemaining - 1);
+    b.counterRemaining = Math.max(0, b.counterRemaining - 1);
 
     // 4. Record the integer event (the bot's RETURNED action, honoured or not).
     events.push({
