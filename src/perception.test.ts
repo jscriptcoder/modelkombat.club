@@ -282,3 +282,64 @@ describe("perception latency — dead-reckoned predictedDistance", () => {
     expect(validate(reader).ok).toBe(true);
   });
 });
+
+// ─── slice 4: seeded clamped jitter on L ──────────────────────────────────────
+
+// Defender A (REACTIVE_BLOCKER) vs attacker B (ATTACK_ONCE, single active frame),
+// both still and in reach. lPos = 0 isolates lAct; `jitter` wobbles the perceived
+// lAct by ±j per tick from `seed`. Whether the tick-S active frame is blocked turns
+// on A's jittered lAct at that tick — so the boundary moves within its band.
+const jitterConfig = (
+  seed: number,
+  lAct: number,
+  jitter: number,
+  startup: number,
+): FightConfig =>
+  getMockConfig({
+    botA: REACTIVE_BLOCKER,
+    botB: ATTACK_ONCE,
+    seed,
+    rules: getMockRules({
+      perception: { lPos: 0, lAct, jitter },
+      moves: {
+        strike: { startup, active: 1, recovery: 6, score: 1, reach: 250000 },
+      },
+    }),
+    maxTicks: 30,
+  });
+
+describe("perception latency — seeded clamped jitter on L", () => {
+  it("stays byte-identical on replay for the same seed even with jitter", () => {
+    const cfg = jitterConfig(12345, 6, 2, 7);
+    expect(runFight(cfg).events).toEqual(runFight(cfg).events);
+  });
+
+  it("clamps to the band: S ≥ L_act+1+j always blocks, S ≤ L_act−j never blocks", () => {
+    const lAct = 6;
+    const j = 2;
+
+    for (let seed = 1; seed <= 12; seed++) {
+      // Jitter can never delay the tell past the active frame.
+      expect(runFight(jitterConfig(seed, lAct, j, lAct + 1 + j)).scores.b).toBe(
+        0,
+      );
+      // Jitter can never advance the tell early enough to guard in time.
+      expect(runFight(jitterConfig(seed, lAct, j, lAct - j)).scores.b).toBe(1);
+    }
+  });
+
+  it("varies the outcome by seed at the nominal boundary (anti-frame-counting)", () => {
+    const lAct = 6;
+    const j = 2;
+
+    // S = L_act + 1 sits inside the jitter band: some seeds lengthen lAct (blocked),
+    // others shorten it (lands). Without jitter every seed would give the same result.
+    const outcomes = Array.from(
+      { length: 20 },
+      (_, i) => runFight(jitterConfig(i + 1, lAct, j, lAct + 1)).scores.b,
+    );
+
+    expect(outcomes).toContain(0);
+    expect(outcomes).toContain(1);
+  });
+});

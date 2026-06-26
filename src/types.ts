@@ -69,5 +69,7 @@ export type Rules = {
   // Opponent perception latency (ticks). Self is always live. Absent (or any
   // field absent) ⇒ 0 ⇒ that layer is perceived live (forward-compatible with
   // the L=0 skeleton). Positional fields lag by lPos; action fields by lAct.
-  perception?: { lPos?: number; lAct?: number };
+  // `jitter` (amplitude j ≥ 0) wobbles each perceived latency by a seeded integer
+  // in [−j, +j] per tick (clamped at 0); 0 ⇒ no jitter, no PRNG draws.
+  perception?: { lPos?: number; lAct?: number; jitter?: number };
 };

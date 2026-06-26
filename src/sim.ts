@@ -12,8 +12,9 @@
 // COMMITMENT (a started move runs startup→active→recovery; actions issued while
 // committed are ignored), guard/block, and PERCEPTION LATENCY — the opponent is a
 // coherent delayed snapshot (positional fields by lPos, action fields by lAct)
-// with dead-reckoned predictedDistance. Still pending: seeded jitter on L (the
-// first PRNG consumer), parry, height bands, and the vertical axis.
+// with dead-reckoned predictedDistance and seeded, clamped per-tick jitter on the
+// latencies (the sim's first PRNG consumer). Still pending: parry, height bands,
+// and the vertical axis.
 // ============================================================================
 import type {
   State,
@@ -25,6 +26,7 @@ import type {
   OpponentState,
 } from "./types.js";
 import { runTick, type BotDoc } from "./dsl.js";
+import { mulberry32 } from "./prng.js";
 
 export type FighterFrame = { x: number; action: Action; points: number };
 export type FightEvent = { tick: number; a: FighterFrame; b: FighterFrame };
@@ -217,8 +219,17 @@ export function runFight(cfg: FightConfig): FightResult {
   const events: FightEvent[] = [];
   const lPos = rules.perception?.lPos ?? 0;
   const lAct = rules.perception?.lAct ?? 0;
+  const jitter = rules.perception?.jitter ?? 0;
   const histA: Frame[] = [];
   const histB: Frame[] = [];
+
+  // The single seeded PRNG that threads the whole sim. Wobble a latency by a
+  // seeded integer in [−jitter, +jitter], clamped at 0, consuming one draw. When
+  // jitter is off no draw happens, so jitter = 0 is byte-identical to no PRNG.
+  const rng = mulberry32(cfg.seed);
+
+  const jittered = (base: number): number =>
+    jitter > 0 ? Math.max(0, base + (rng() % (2 * jitter + 1)) - jitter) : base;
 
   for (let tick = 0; tick < maxTicks; tick++) {
     // 1. Auto-face from pre-tick positions.
@@ -231,18 +242,25 @@ export function runFight(cfg: FightConfig): FightResult {
     histA.push(frameOf(a, histA[tick - 1]));
     histB.push(frameOf(b, histB[tick - 1]));
 
+    // Per-tick jittered latencies, drawn in a FIXED order (A.lPos, A.lAct, B.lPos,
+    // B.lAct) — this order is part of the replay contract.
+    const aLPos = jittered(lPos);
+    const aLAct = jittered(lAct);
+    const bLPos = jittered(lPos);
+    const bLAct = jittered(lAct);
+
     const aOpp = perceiveOpponent(
       a.x,
-      perceivedFrame(histB, tick, lPos),
-      perceivedFrame(histB, tick, lAct),
-      lPos,
+      perceivedFrame(histB, tick, aLPos),
+      perceivedFrame(histB, tick, aLAct),
+      aLPos,
     );
 
     const bOpp = perceiveOpponent(
       b.x,
-      perceivedFrame(histA, tick, lPos),
-      perceivedFrame(histA, tick, lAct),
-      lPos,
+      perceivedFrame(histA, tick, bLPos),
+      perceivedFrame(histA, tick, bLAct),
+      bLPos,
     );
 
     // 2. Both fighters decide against one immutable pre-tick snapshot.
