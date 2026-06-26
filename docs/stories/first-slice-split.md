@@ -126,19 +126,24 @@ suite (replay-equality + scoring) and a printed result/event-log trace. No deplo
 - **Do not split the skeleton by layer.** "validator", "interpreter", "loop" are
   `planning` **stages within C1**, not independent stories — none is independently
   valuable or demoable alone.
-- **Design gap #1 is still open:** the precise _ordered_ combat-resolution procedure for
-  the deep model (band-match + parry-vs-block + cancels + throw-triangle + occupancy).
-  C1 only needs the thin version; **C3 (bands), C5 (parry), C6 (cancels), and throws
-  (parking lot) need that procedure pinned** — run `find-gaps` (or write it into
-  `DESIGN.md`) before those.
+- **Design gap #1 is RESOLVED** (2026-06-26) → pinned as **`DESIGN.md` §11 — Combat
+  resolution order**: the ordered per-tick procedure (two-phase compute-then-apply;
+  S1 posture → S2 intake → S3 compute → S4 apply → S5 advance; frozen pre-intake
+  snapshot; the `strike > throw > guard` precedence; HIT/BLOCK/WHIFF gate). C3 (bands),
+  C5 (parry), C6 (cancels) and throws all slot into that spine. Per-stage numerics stay
+  deferred to each slice.
 - **P9 implied a Pixi visual in the first slice.** We're deferring it deliberately. If a
   visual milestone is required sooner, pull render forward as its own slice — don't bloat
   the skeleton with it.
 
 ## Next Step
 
-C1 and C2 are shipped. **C3 (height bands + 3 _uke_ guards)** is the next capability,
-but it is **gated on Design gap #1** (the ordered combat-resolution procedure — see
-Warnings). Pin that into `DESIGN.md` first (via `find-gaps` or directly), then load
-**`planning`** on **C3** to stage it into PR-sized TDD increments (each:
+C1 and C2 are shipped, and Design gap #1 is now pinned (`DESIGN.md` §11). **C3 (height
+bands + 3 _uke_ guards)** is the next capability and is **unblocked**. Load **`planning`**
+on **C3** to stage it into PR-sized TDD increments (each:
 RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR).
+
+> **C3 planning must also include** the perceived-attack-band exposure (today
+> `OpponentState.attacking` is a bare boolean) — a perception/State-contract change
+> delayed by `L_act`, _separate from_ §11 but required for the read/counter game to
+> mean anything. See the dependency note at the end of `DESIGN.md` §11.
