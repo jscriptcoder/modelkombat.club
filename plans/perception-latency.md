@@ -3,7 +3,7 @@
 **Branches**: one PR per slice — `feat/perception-lpos` (1), `feat/perception-lact`
 (2), `feat/perception-predicted` (3), `feat/perception-jitter` (4). Each merges to
 `main` before the next branches off it.
-**Status**: Active — slices 1–2 merged (PRs #7, #8); slice 3 in progress
+**Status**: Active — slices 1–3 merged (PRs #7, #8, #9); slice 4 in progress
 
 > Implements Slice 2 of `docs/stories/first-slice-split.md`. Source of truth for
 > the mechanic: `docs/DESIGN.md` §"Control model & the perception keystone" and
