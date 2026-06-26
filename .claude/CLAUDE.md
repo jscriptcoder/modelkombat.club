@@ -88,20 +88,33 @@ generating code; flag any change that would.
   frozen snapshot) was deliberately **deferred** to its first consumer (C5 parry /
   throws): C3 stays self-targeted (score on attacker, guard on self), so resolution
   is still trivially order-independent. No per-move legal-band restriction yet.
+- DONE (vertical axis + occupancy — C4, PRs #17–#21): the low/high game made physical.
+  A `crouch` vacates `high`; a `jump` launches a fixed-point gravity arc (`y += vy;
+  vy -= gravity`), committed (`canAct=0`) until it lands at `y=0`, and an airborne fighter
+  vacates `low` once past `lowClearance` — so a high strike whiffs a croucher and a sweep
+  whiffs a jumper (the §11.3 step-3 **occupancy gate**, no longer hardwired open). Occupancy
+  is a `posture→vacated-band` table **read-only on the defender**, so resolution stays
+  single-`resolveHit` (the §11 effects machinery still waits for C5). The read game:
+  `opponent.y` on the **`L_pos`** layer (anti-air by height) and `opponent.posture`
+  (`0` standing, `1` crouching, `2` airborne) on the **`L_act`** layer (read a croucher,
+  invisible to the height read). 191 tests; `sim.ts` mutation ~95%.
+  `jumpImpulse`/`gravity`/`lowClearance` are optional in `Rules`; all absent ⇒
+  **byte-identical** to C3. `self.y`/`self.vy`/`self.posture` deferred (no consumer until
+  air-actions); horizontal jump `dir` validated but applies no displacement (vertical-only).
 - NOT YET BUILT (later slices): no real frame table (concrete move numbers live only
-  in test mocks); no 2D/vertical axis, parry, cancels, *yame*/match structure,
-  telemetry object, Vercel API, or Pixi viewer.
-- NEXT: **C4 — vertical axis + occupancy** (`docs/stories/first-slice-split.md`):
-  fixed-point `y`, gravity arc, jump/crouch, and **band occupancy** (a croucher
-  vacates `high`, a jumper vacates `low`) — making the §11 step-3 occupancy gate
-  observable (today it is hardwired open). Then C5 parry windows, C6 cancel combos.
-  (Roadmap capabilities are **C1–C6** — the `C` prefix avoids colliding with `slice/N`
-  git branch names; C1 = walking skeleton shipped as branches `slice/1`–`slice/5`,
-  C2 = perception keystone, C3 = height bands.) The spine is pinned in `docs/DESIGN.md`
-  **§11 (Combat resolution order)**: two-phase compute-then-apply, S1 posture → S2
-  intake → S3 compute → S4 apply → S5 advance, frozen pre-intake snapshot,
-  `strike > throw > guard` precedence, HIT/BLOCK/WHIFF gate. C4–C6 + throws slot into
-  that spine and bring the deferred §11 effects machinery with their first consumer.
+  in test mocks); no horizontal jump displacement or air-actions, parry, cancels,
+  *yame*/match structure, telemetry object, Vercel API, or Pixi viewer.
+- NEXT: **C5 — parry windows** (then C6 cancel combos). This is the **first consumer of the
+  deferred §11 effects machinery**: the compute-then-apply union, HIT/BLOCK/WHIFF taxonomy,
+  and pre-intake frozen snapshot — because parry/throws are **cross-fighter** (an effect lands
+  on the OTHER fighter), so resolution can no longer stay single-`resolveHit`/self-targeted.
+  (Roadmap capabilities are **C1–C6** — the `C` prefix avoids colliding with `slice/N` git
+  branch names; C1 = walking skeleton shipped as branches `slice/1`–`slice/5`, C2 = perception
+  keystone, C3 = height bands, C4 = vertical axis + occupancy.) The spine is pinned in
+  `docs/DESIGN.md` **§11 (Combat resolution order)**: two-phase compute-then-apply, S1 posture
+  → S2 intake → S3 compute → S4 apply → S5 advance, frozen pre-intake snapshot,
+  `strike > throw > guard` precedence, HIT/BLOCK/WHIFF gate. C5–C6 + throws slot into that
+  spine and bring the deferred §11 effects machinery with their first consumer.
   Flow: `planning` → TDD, **PR per capability**.
 
 ## Commands
