@@ -176,6 +176,14 @@ const intake = (f: Fighter, action: Action, rules: Rules): void => {
   // idle / block: no positional effect in this slice.
 };
 
+// The height band a fighter guards this tick, or null if it is open. A fighter
+// guards only when free to act (neutral) and choosing `block`; a committed
+// fighter cannot guard. (The free-to-act predicate widens with later states.)
+const guardBandOf = (fighter: Fighter, action: Action): Band | null =>
+  fighter.state.kind === "neutral" && action.type === "block"
+    ? action.band
+    : null;
+
 // During its active window, a strike in reach scores once (per activation) —
 // unless the defender guards the SAME height band this tick, in which case it is
 // blocked. A guard at the wrong height (or none) does not save the defender.
@@ -287,22 +295,13 @@ export function runFight(cfg: FightConfig): FightResult {
       b.mem,
     );
 
-    // 3. Resolve together: honour/ignore intake, then hits, then advance clocks.
-    //    A fighter guards a height band this tick only if it was free to act and
-    //    chose `block` (a committed fighter cannot guard); `null` = not guarding.
-    //    A strike is blocked only by a guard at its own band. Simultaneous strikes
+    // 3. Resolve together: read each fighter's guard band from its pre-intake
+    //    state, then honour/ignore intake, then hits, then advance clocks. A
+    //    strike is blocked only by a guard at its own band. Simultaneous strikes
     //    both score — each resolveHit touches only its own fighter, so it is
     //    order-independent.
-    const aGuardBand: Band | null =
-      a.state.kind === "neutral" && aAction.type === "block"
-        ? aAction.band
-        : null;
-
-    const bGuardBand: Band | null =
-      b.state.kind === "neutral" && bAction.type === "block"
-        ? bAction.band
-        : null;
-
+    const aGuardBand = guardBandOf(a, aAction);
+    const bGuardBand = guardBandOf(b, bAction);
     intake(a, aAction, rules);
     intake(b, bAction, rules);
     resolveHit(a, b, rules, bGuardBand);
