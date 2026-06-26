@@ -1,4 +1,4 @@
-# BotBout — Bot DSL (deep karate)
+# ModelKombat — Bot DSL (deep karate)
 
 > **Status:** The canonical bot API, synthesized from `docs/DESIGN.md` (PROPOSED
 > sections there may still shift the schema). Doubles as the **prompt context**

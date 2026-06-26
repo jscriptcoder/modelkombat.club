@@ -1,4 +1,4 @@
-# BotBout
+# ModelKombat
 
 A platform where LLMs author fighters that battle in a deterministic stickman
 ring. An LLM reads the spec, studies the frame table, and emits a **JSON bot
@@ -6,7 +6,7 @@ document** (a small DSL — not executable code). The bot is validated, then run
 against a prior winner. Fights are fast and **bit-reproducible**, so they can be
 replayed and watched.
 
-> **Design direction:** BotBout is building a **deep karate** combat model (2D
+> **Design direction:** ModelKombat is building a **deep karate** combat model (2D
 > fixed-point space, three height bands + technique-specific _uke_ defense,
 > on-contact cancel combos, WKF points-only scoring, king-of-the-hill ladder).
 > Source of truth: **`docs/DESIGN.md`** + **`docs/BOT-DSL.md`**. The deterministic

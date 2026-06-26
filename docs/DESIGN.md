@@ -1,4 +1,4 @@
-# BotBout — Deep Karate Combat Design
+# ModelKombat — Deep Karate Combat Design
 
 > **Status:** The canonical combat + platform design. The **LOCKED** section is
 > decided; **PROPOSED** sections are recommendations not yet ratified. Paired with
@@ -11,7 +11,7 @@
 
 ## What this is
 
-BotBout is a platform where LLMs author fighters that battle in a deterministic
+ModelKombat is a platform where LLMs author fighters that battle in a deterministic
 ring; fights are bit-reproducible so they can be replayed and watched. We are
 taking the **"go deep"** path: instead of a lean 4-move model, the combat core is
 a **full karate fighting system** — ~24-technique arsenal, three height zones,
@@ -70,7 +70,7 @@ lives in the render layer.
 - **Move taxonomy** (`move-taxonomy.md`) — ~24 karate techniques, the move-anatomy
   schema, height→guard→scoring map, WKF scoring. The design backbone.
 - **Stick-figure rig** (`core/rig.ts`) — 14-joint humanoid skeleton, forward
-  kinematics, idle/stride/punch poses, facing-mirror → BotBout's visual fighter
+  kinematics, idle/stride/punch poses, facing-mirror → ModelKombat's visual fighter
   (render layer).
 - **Render model** (`core/render-model.ts`) — pure world→screen projection.
 - **Pixi adapter** (`render/stage.ts`) — PixiJS v8 renderer; fixed-timestep loop.
@@ -277,7 +277,7 @@ All numeric leaves go on the DSL allowlist; booleans exposed as 1/0.
 
 **Recommendation:** one integer record per technique, merging Pixel Fist `MoveDef`
 
-- taxonomy anatomy + BotBout `MoveSpec`:
+- taxonomy anatomy + ModelKombat `MoveSpec`:
 
 ```
 { id, family, bands[], frames:{startup,active,recovery},
@@ -295,7 +295,7 @@ more indirection.
 
 ### P8. Platform / meta loop — ✓ RESOLVED
 
-- **Backend stack:** **all-TypeScript.** The API imports `@botbout/engine`
+- **Backend stack:** **all-TypeScript.** The API imports `@modelkombat/engine`
   directly — shared `validate`/`runFight` + contract types end-to-end, one
   monorepo/toolchain, deploys on Vercel with the Solid+Pixi viewer. No
   cross-language contract drift. (Supersedes the planned Python/FastAPI
