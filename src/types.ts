@@ -31,8 +31,10 @@ export type SelfState = {
 export type OpponentState = {
   x: number;
   facing: Facing;
-  distance: number;
+  distance: number; // raw (delayed) gap to live self
   attacking: boolean; // is the (perceived) opponent committed to a move?
+  vx: number; // perceived horizontal velocity (sub-units/tick), for dead-reckoning
+  predictedDistance: number; // distance dead-reckoned forward over the L_pos gap
 };
 
 export type RingState = { width: number };
