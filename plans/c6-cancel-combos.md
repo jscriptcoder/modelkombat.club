@@ -50,22 +50,22 @@ before its recovery ends — escalating the within-exchange score — while a st
 
 ## Acceptance Criteria
 
-- [ ] A strike that **HITs**, with the bot returning a legal cancel-route `attack` during the
+- [x] A strike that **HITs**, with the bot returning a legal cancel-route `attack` during the
       cancel window, starts the follow-up **before the first move's recovery ends** — the
-      follow-up's active frame lands earlier than a re-strike-when-free baseline.
-- [ ] The **same** follow-up attempted after a **WHIFF** (out of reach / vacated band) is
-      **ignored** — the move runs full recovery; no early follow-up.
-- [ ] A **parried** strike does **not** become cancelable — the follow-up is ignored and the
-      attacker eats full `parryRecovery` (cancel never rescues a parry).
+      follow-up's active frame lands earlier than a re-strike-when-free baseline. _(Slice 1)_
+- [x] The **same** follow-up attempted after a **WHIFF** (out of reach / vacated band) is
+      **ignored** — the move runs full recovery; no early follow-up. _(Slice 1)_
+- [x] A **parried** strike does **not** become cancelable — the follow-up is ignored and the
+      attacker eats full `parryRecovery` (cancel never rescues a parry). _(Slice 1)_
 - [ ] A strike **BLOCKed** by a stale matching guard becomes cancelable too (block is a
-      first-class connect alongside hit); whiff and parry still do not.
-- [ ] The cancel is gated by the **route list**: with the move's `cancelInto` empty, even a
-      connecting strike + follow-up `attack` does **not** cancel.
+      first-class connect alongside hit); whiff and parry still do not. _(Slice 2)_
+- [x] The cancel is gated by the **route list**: with the move's `cancelInto` empty, even a
+      connecting strike + follow-up `attack` does **not** cancel. _(Slice 1)_
 - [ ] A bot can read its **live cancel window** (`self.cancelWindow`) and hit-confirm — issue
-      the follow-up only when the window is open, choosing a different action on whiff.
-- [ ] With `cancelWindow`/`cancelInto` absent, the engine is **byte-identical** to the C5
-      engine (the standard inertness guarantee).
-- [ ] Cancel timing is **swap-symmetric** (identical whether the canceller is fighter A or B).
+      the follow-up only when the window is open, choosing a different action on whiff. _(Slice 3)_
+- [x] With `cancelWindow`/`cancelInto` absent, the engine is **byte-identical** to the C5
+      engine (the standard inertness guarantee). _(Slice 1; re-verified per later slice)_
+- [x] Cancel timing is **swap-symmetric** (identical whether the canceller is fighter A or B). _(Slice 1)_
 
 ## Slices
 
@@ -75,7 +75,12 @@ failing test. Read `.claude/CLAUDE.md` (invariants #1–#4, determinism/integer-
 
 ---
 
-### Slice 1: A connecting (HIT) strike can cancel its recovery into a follow-up; a whiff cannot
+### Slice 1: A connecting (HIT) strike can cancel its recovery into a follow-up; a whiff cannot · ✅ done
+
+> **Shipped** on `feat/c6-cancel-on-hit` — `feat` (b3cd8c8) + `refactor: extract startAttack`
+> (216e84c). 8 cancel tests (214 suite); `sim.ts` mutation **95.00%** (the window-length test
+> kills the decrement mutant; 3 cancel-region survivors are equivalent type-narrowing guards).
+> `MoveSpec.cancelInto` + `Rules.cancelWindow` added (absent ⇒ byte-identical to C5).
 
 **Value**: A bot author gets real combos — a hit-confirmed follow-up that escalates the
 within-exchange score, with the no-feint property intact (the cancel exists only because the
