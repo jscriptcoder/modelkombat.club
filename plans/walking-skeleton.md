@@ -17,7 +17,7 @@ blocked), read from a **result object + integer event log**.
 
 ## Acceptance Criteria (feature-level)
 
-- [ ] AC1 — A malformed bot (op/field off the allowlist, over-budget, bad version/name,
+- [x] AC1 — A malformed bot (op/field off the allowlist, over-budget, bad version/name,
       proto-pollution key) is rejected with a structured `{path, reason}` issue; the
       fight does not run.
 - [ ] AC2 — Two valid bots + a seed run for N ticks and return a result object with a
@@ -47,7 +47,12 @@ browser/Playwright in this headless engine.
 
 ---
 
-### Slice 1: Bot intake gate — validate a JSON bot, accept or reject with structured errors
+### Slice 1: Bot intake gate — validate a JSON bot, accept or reject with structured errors  ✅ DONE
+
+> ✅ **Done** — 68 tests · mutation 76.6% (residual survivors = error-message wording +
+> equivalent type-narrowing guards) · branch cov 98.3% (`dsl.ts:135-136` = documented
+> defensive budget guards, unreachable until arithmetic ops land). `src/dsl.ts`,
+> `src/validate-bot.test.ts`.
 
 **Value**: a bot author submits a JSON document and learns immediately whether it is
 legal, with fixable `{path, reason}` errors — the security gate (validate **before** run).
