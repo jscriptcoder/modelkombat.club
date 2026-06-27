@@ -20,6 +20,7 @@ export type Action =
   | { type: "crouch" } // grounded posture: vacates the `high` band (a high strike whiffs)
   | { type: "jump"; dir: -1 | 0 | 1 } // gravity arc; airborne ⇒ committed (`dir` reserved, vertical-only for now)
   | { type: "attack"; move: MoveId; band: Band }
+  | { type: "sweep" } // ashi-barai: a low-band strike that knocks down (no score) on hit. Blockable/parryable at `low`, whiffs a jumper. Inert without a `moves.sweep` spec.
   | { type: "throw" } // grapple: beats any guard, grabs a grounded defender ⇒ scores + knockdown
   | { type: "throw-break" }; // per-tick grab escape: voids an opponent's grab-active throw. No commitment, NOT a guard (open to strikes)
 
@@ -73,6 +74,10 @@ export type MoveSpec = {
   // fighter whose move is cancelable may start a follow-up listed here, skipping
   // the rest of its recovery. Absent/empty ⇒ no routes ⇒ this move cannot cancel.
   cancelInto?: MoveId[];
+  // On a HIT, knock the defender DOWN (canAct=0 for knockdownDuration) instead of
+  // scoring (C8 — the §11.4 `onHit.knockdown` flag). A sweep sets this with `score: 0`.
+  // Absent/false ⇒ a hit scores as usual (byte-identical to the pre-knockdown engine).
+  knockdown?: boolean;
 };
 
 // One throw/grapple's frame data (C7). A throw is NOT height-banded — it beats any
@@ -92,7 +97,10 @@ export type Rules = {
   walkSpeed: number; // sub-units travelled per tick while moving
   ring: { width: number }; // ring width in sub-units
   startGap: number; // initial separation between the two fighters (sub-units)
-  moves: Record<MoveId, MoveSpec>; // the frame table
+  // The frame table. `strike` is the base move; `sweep` (C8) is an OPTIONAL low-band
+  // knockdown move — absent ⇒ a `sweep` action is inert ⇒ byte-identical to the
+  // pre-sweep engine. Keyed concretely (not `Record<MoveId, …>`) so `sweep` stays optional.
+  moves: { strike: MoveSpec; sweep?: MoveSpec };
   // Vertical axis (C4). Both absent ⇒ inert (a `jump` launches no arc) ⇒
   // byte-identical to the pre-vertical engine. `jumpImpulse` is the initial
   // upward velocity (sub-units/tick); `gravity` is the per-tick downward delta

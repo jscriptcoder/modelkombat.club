@@ -46,7 +46,6 @@ import type {
   Action,
   Rules,
   Facing,
-  MoveId,
   MoveSpec,
   OpponentState,
   Band,
@@ -84,7 +83,7 @@ type MoveState =
   | { kind: "neutral" }
   | {
       kind: "attacking";
-      move: MoveId;
+      spec: MoveSpec; // the resolved frame data, captured at intake — so no site re-indexes the (optionally-sweep) moves table by a union key
       band: Band;
       elapsed: number;
       scored: boolean; // terminal flag: the strike has resolved (scored OR was deflected)
@@ -209,9 +208,7 @@ const viewFor = (
   // parry `extra` recovery — phaseRemaining's parry-awareness is deferred to its first
   // consumer; commitment itself is authoritatively signalled by `canAct`.
   const phaseRemaining =
-    st.kind === "attacking"
-      ? totalFrames(rules.moves[st.move]) - st.elapsed
-      : 0;
+    st.kind === "attacking" ? totalFrames(st.spec) - st.elapsed : 0;
 
   return {
     self: {
@@ -232,9 +229,9 @@ const viewFor = (
 // A fresh attacking move: startup begins now (elapsed 0), nothing resolved yet, no
 // parry-extended recovery. The single source for "start an attack" — used both when a
 // neutral fighter strikes and when an on-contact cancel interrupts into a follow-up.
-const startAttack = (move: MoveId, band: Band): MoveState => ({
+const startAttack = (spec: MoveSpec, band: Band): MoveState => ({
   kind: "attacking",
-  move,
+  spec,
   band,
   elapsed: 0,
   scored: false,
@@ -252,9 +249,9 @@ const intake = (f: Fighter, action: Action, rules: Rules): void => {
       f.state.kind === "attacking" &&
       f.cancelRemaining > 0 &&
       action.type === "attack" &&
-      (rules.moves[f.state.move].cancelInto ?? []).includes(action.move)
+      (f.state.spec.cancelInto ?? []).includes(action.move)
     ) {
-      f.state = startAttack(action.move, action.band);
+      f.state = startAttack(rules.moves[action.move], action.band);
       f.cancelRemaining = 0; // the fresh move re-opens the window only when IT connects
     }
 
@@ -262,7 +259,12 @@ const intake = (f: Fighter, action: Action, rules: Rules): void => {
   }
 
   if (action.type === "attack") {
-    f.state = startAttack(action.move, action.band);
+    f.state = startAttack(rules.moves[action.move], action.band);
+  } else if (action.type === "sweep" && rules.moves.sweep !== undefined) {
+    // Sweep (C8): a low-band knockdown strike. Commit to an attacking move at band `low`
+    // reading the optional `moves.sweep` spec. Without the spec the action is inert (no state
+    // change) ⇒ byte-identical to the pre-sweep engine.
+    f.state = startAttack(rules.moves.sweep, "low");
   } else if (action.type === "move") {
     f.x = clamp(
       f.x + action.dir * f.facing * rules.walkSpeed,
@@ -335,7 +337,7 @@ const occupies = (posture: Posture, band: Band): boolean =>
 // the defender; a `block` scores nothing but, like a hit, opens the attacker's on-contact
 // cancel window (C6 — block is a first-class connect alongside hit, §11.3).
 type StrikeOutcome =
-  | { result: "hit"; points: number; cancel: number }
+  | { result: "hit"; points: number; cancel: number; knockdown: boolean }
   | { result: "parry"; extra: number; counter: number }
   | { result: "block"; cancel: number };
 
@@ -353,7 +355,7 @@ const computeStrike = (
 ): StrikeOutcome | null => {
   const st = att.state;
   if (st.kind !== "attacking" || st.scored) return null;
-  const spec = rules.moves[st.move];
+  const spec = st.spec;
 
   const inActiveWindow =
     st.elapsed >= spec.startup && st.elapsed < spec.startup + spec.active;
@@ -385,6 +387,7 @@ const computeStrike = (
     result: "hit",
     points: spec.score + bonus,
     cancel: rules.cancelWindow ?? 0,
+    knockdown: spec.knockdown ?? false,
   };
 };
 
@@ -398,31 +401,33 @@ const applyStrike = (
   outcome: StrikeOutcome | null,
 ): void => {
   if (outcome === null) return;
-  const st = att.state;
-  if (st.kind !== "attacking") return; // always true when outcome ≠ null
 
+  // Score + cross-fighter effects apply from the FROZEN outcome regardless of whether `att` was
+  // itself knocked down by the OTHER direction's apply this same tick (a mutual sweep, or a
+  // sweep∥strike trade). Reading these off the precomputed outcome — not live state — is what
+  // keeps the §11 union order-independent now that a HIT can change a fighter's `state.kind`.
   if (outcome.result === "hit") {
     att.points += outcome.points;
-    st.scored = true;
     att.cancelRemaining = outcome.cancel; // a connect opens the cancel window on the attacker
-
-    return;
-  }
-
-  if (outcome.result === "block") {
-    // A block scores nothing and is NOT marked resolved (the strike's later active frames
-    // still resolve normally — preserving the block-then-guard-drop behaviour); it only
-    // opens the cancel window. cancel 0 (unconfigured) ⇒ a no-op ⇒ byte-identical to C5.
+    // A knockdown move (a sweep) downs the defender instead of leaving it standing (C8). The
+    // defender is untargetable while down (computeStrike returns null), so a HIT is always
+    // against a standing defender — no re-down guard needed yet (the finish window is C8 slice 2).
+    if (outcome.knockdown) def.state = { kind: "downed", elapsed: 0 };
+  } else if (outcome.result === "block") {
+    // A block scores nothing and only opens the cancel window; cancel 0 (unconfigured) ⇒ a no-op.
     att.cancelRemaining = outcome.cancel;
-
-    return;
+  } else {
+    def.counterRemaining = outcome.counter; // parry: the counter window lands on the defender
   }
 
-  if (outcome.result === "parry") {
-    st.extra = outcome.extra;
-    st.scored = true; // resolved (deflected) — do not re-process while still active
-    def.counterRemaining = outcome.counter;
-  }
+  // Attacker move-state flags apply only while `att` is still attacking — a mutual knockdown can
+  // have downed it this very tick, leaving no move to flag. A BLOCK never marks the strike
+  // resolved (preserving the block-then-guard-drop edge); a HIT or PARRY resolves it (no re-process
+  // while still active), and a PARRY also adds the deflect's extra recovery.
+  const st = att.state;
+  if (st.kind !== "attacking") return;
+  if (outcome.result === "hit" || outcome.result === "parry") st.scored = true;
+  if (outcome.result === "parry") st.extra = outcome.extra;
 };
 
 // The effect of one throw att→def, computed PURELY from the frozen pre-apply snapshot
@@ -513,8 +518,7 @@ const advance = (f: Fighter, rules: Rules): void => {
 
   if (st.kind === "attacking") {
     const next = st.elapsed + 1;
-    if (next >= totalFrames(rules.moves[st.move]) + st.extra)
-      f.state = { kind: "neutral" };
+    if (next >= totalFrames(st.spec) + st.extra) f.state = { kind: "neutral" };
     else st.elapsed = next;
 
     return;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { runFight, type FightConfig } from "./sim.js";
-import type { BotDoc } from "./dsl.js";
+import type { BotDoc, BoolExpr } from "./dsl.js";
 import type { Rules, Action, Band } from "./types.js";
 
 // ─── factories ───────────────────────────────────────────────────────────────
@@ -2133,7 +2133,13 @@ describe("runFight — strike beats throw (the §11.4 precedence: strike > throw
     const result = runFight(
       getMockConfig({
         rules: collideRules({
-          throw: { startup: 2, active: 1, recovery: 3, reach: 250000, score: 3 },
+          throw: {
+            startup: 2,
+            active: 1,
+            recovery: 3,
+            reach: 250000,
+            score: 3,
+          },
         }),
         botA: throwOnce, // grab-active at tick 2
         botB: STRIKER, // strike still in startup at tick 2
@@ -2152,7 +2158,13 @@ describe("runFight — strike beats throw (the §11.4 precedence: strike > throw
       getMockConfig({
         rules: collideRules({
           startGap: 280000,
-          throw: { startup: 4, active: 1, recovery: 3, reach: 300000, score: 3 },
+          throw: {
+            startup: 4,
+            active: 1,
+            recovery: 3,
+            reach: 300000,
+            score: 3,
+          },
         }),
         botA: throwOnce, // grab-active at tick 4, reaches 300000
         botB: STRIKER, // strike active at tick 4, but only reaches 250000
@@ -2172,7 +2184,13 @@ describe("runFight — strike beats throw (the §11.4 precedence: strike > throw
     const result = runFight(
       getMockConfig({
         rules: collideRules({
-          throw: { startup: 6, active: 1, recovery: 3, reach: 250000, score: 3 },
+          throw: {
+            startup: 6,
+            active: 1,
+            recovery: 3,
+            reach: 250000,
+            score: 3,
+          },
         }),
         botA: throwOnce, // grab-active at tick 6
         botB: STRIKER, // strike active at tick 4 (during A's throw startup)
@@ -2557,5 +2575,251 @@ describe("runFight — throw clash (the §11.4 symmetric outcome: throw ∥ thro
     );
 
     expect(result.events[8].a.points).toBe(3); // second grab (tick 8) whiffs the still-downed B
+  });
+});
+
+describe("runFight — sweeps (a low-band strike that knocks down on hit, no score)", () => {
+  // A sweep: startup 1, active 1 ⇒ active at elapsed 1 (tick 1 for a sweep started at tick 0);
+  // recovery 2 ⇒ total 4. score 0 + knockdown ⇒ a clean hit downs the defender for
+  // knockdownDuration ticks and scores nothing. Reach matches the strike (250000).
+  const sweepRules = (o: Partial<Rules> = {}): Rules =>
+    getMockRules({
+      startGap: 200000, // within sweep reach (250000)
+      knockdownDuration: 6,
+      moves: {
+        strike: { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
+        sweep: {
+          startup: 1,
+          active: 1,
+          recovery: 2,
+          score: 0,
+          reach: 250000,
+          knockdown: true,
+        },
+      },
+      ...o,
+    });
+
+  const atTick = (n: number): BoolExpr => ({
+    op: "eq",
+    args: [
+      { op: "field", path: "clock.tick" },
+      { op: "const", value: n },
+    ],
+  });
+
+  // Sweeps once at tick 0, then idles — the sweeper stays put while we observe the downed fighter.
+  const sweepOnce = bot([{ when: atTick(0), do: { type: "sweep" } }], {
+    type: "idle",
+  });
+
+  it("downs an open opponent and scores nothing", () => {
+    // B advances toward A whenever free; once swept (tick 1, knockdownDuration 6) its movement
+    // freezes for the knockdown, then resumes. The sweep itself scores 0.
+    const result = runFight(
+      getMockConfig({
+        rules: sweepRules(),
+        botA: sweepOnce,
+        botB: AGGRESSOR,
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.scores).toEqual({ a: 0, b: 0 });
+    expect(result.events[6].b.x).toBe(result.events[2].b.x); // downed ticks 2..6 ⇒ frozen
+    expect(result.events[7].b.x).not.toBe(result.events[6].b.x); // wakes ⇒ moves again
+  });
+
+  it("is blocked by a matching low guard (no knockdown) but sweeps a wrong-height guard", () => {
+    // B guards `band` over the active frame (ticks 0–1), then advances when free. A low guard
+    // blocks the sweep ⇒ B is free to move immediately; a high guard is the wrong height ⇒ B is
+    // swept and frozen for the knockdown.
+    const guardThenAdvance = (band: Band): BotDoc =>
+      bot(
+        [
+          {
+            when: {
+              op: "lte",
+              args: [
+                { op: "field", path: "clock.tick" },
+                { op: "const", value: 1 },
+              ],
+            },
+            do: { type: "block", band },
+          },
+        ],
+        { type: "move", dir: 1 },
+      );
+
+    const probeX = (band: Band): number =>
+      runFight(
+        getMockConfig({
+          rules: sweepRules(),
+          botA: sweepOnce,
+          botB: guardThenAdvance(band),
+          maxTicks: 6,
+        }),
+      ).events[4].b.x;
+
+    expect(probeX("low")).not.toBe(bStartX(sweepRules())); // blocked ⇒ not downed ⇒ moves
+    expect(probeX("high")).toBe(bStartX(sweepRules())); // wrong height ⇒ swept ⇒ downed ⇒ frozen
+  });
+
+  it("sweeps a crouching fighter (crouch occupies low ⇒ no dodge)", () => {
+    const crouchThenAdvance = bot(
+      [
+        {
+          when: {
+            op: "lte",
+            args: [
+              { op: "field", path: "clock.tick" },
+              { op: "const", value: 1 },
+            ],
+          },
+          do: { type: "crouch" },
+        },
+      ],
+      { type: "move", dir: 1 },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: sweepRules(),
+        botA: sweepOnce,
+        botB: crouchThenAdvance,
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.events[6].b.x).toBe(result.events[2].b.x); // downed ⇒ frozen
+    expect(result.events[7].b.x).not.toBe(result.events[6].b.x); // wakes ⇒ moves
+  });
+
+  it("whiffs a jumper (airborne vacates low) yet downs a grounded fighter under the same rules", () => {
+    const rules = sweepRules({
+      jumpImpulse: 8000,
+      gravity: 4000,
+      lowClearance: 4000,
+    });
+
+    const jumpOnceThenAdvance = bot(
+      [{ when: atTick(0), do: { type: "jump", dir: 0 } }],
+      { type: "move", dir: 1 },
+    );
+
+    const jumper = runFight(
+      getMockConfig({
+        rules,
+        botA: sweepOnce,
+        botB: jumpOnceThenAdvance,
+        maxTicks: 8,
+      }),
+    );
+
+    const grounded = runFight(
+      getMockConfig({ rules, botA: sweepOnce, botB: AGGRESSOR, maxTicks: 8 }),
+    );
+
+    // Jumper: airborne at the active frame ⇒ the sweep passes under ⇒ never downed; its arc
+    // completes (lands at y=0) and it moves again.
+    expect(jumper.events[5].b.y).toBe(0);
+    expect(jumper.events[5].b.x).not.toBe(jumper.events[4].b.x);
+    // Grounded: swept ⇒ downed ⇒ frozen during the knockdown.
+    expect(grounded.events[6].b.x).toBe(grounded.events[2].b.x);
+  });
+
+  it("stuffs a throw — a sweep is a strike, and strike beats throw (§11.4)", () => {
+    const throwOnce = bot([{ when: atTick(0), do: { type: "throw" } }], {
+      type: "idle",
+    });
+
+    const rules = sweepRules({
+      throw: { startup: 2, active: 1, recovery: 3, reach: 250000, score: 3 },
+    });
+
+    const scoreBvs = (botA: BotDoc): number =>
+      runFight(getMockConfig({ rules, botA, botB: throwOnce, maxTicks: 6 }))
+        .scores.b;
+
+    expect(scoreBvs(IDLE)).toBe(3); // unobstructed grab ⇒ B scores 3
+    expect(scoreBvs(sweepOnce)).toBe(0); // A's sweep hits the winding-up B first ⇒ grab stuffed
+  });
+
+  it("trades with a simultaneous strike — the sweep downs, the strike scores", () => {
+    const rules = sweepRules({
+      moves: {
+        strike: { startup: 1, active: 1, recovery: 1, score: 1, reach: 250000 },
+        sweep: {
+          startup: 1,
+          active: 1,
+          recovery: 2,
+          score: 0,
+          reach: 250000,
+          knockdown: true,
+        },
+      },
+    });
+
+    const strikeThenAdvance = bot(
+      [
+        {
+          when: atTick(0),
+          do: { type: "attack", move: "strike", band: "mid" },
+        },
+      ],
+      { type: "move", dir: 1 },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules,
+        botA: sweepOnce,
+        botB: strikeThenAdvance,
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.scores).toEqual({ a: 0, b: 1 }); // both connect: sweep 0, strike 1
+    expect(result.events[6].b.x).toBe(result.events[2].b.x); // B downed by the sweep ⇒ frozen
+    expect(result.events[7].b.x).not.toBe(result.events[6].b.x); // B wakes ⇒ moves
+  });
+
+  it("two simultaneous sweeps both knock down (mutual knockdown, swap-symmetric)", () => {
+    const sweepThenAdvance = bot([{ when: atTick(0), do: { type: "sweep" } }], {
+      type: "move",
+      dir: 1,
+    });
+
+    const result = runFight(
+      getMockConfig({
+        rules: sweepRules(),
+        botA: sweepThenAdvance,
+        botB: sweepThenAdvance,
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.scores).toEqual({ a: 0, b: 0 });
+    expect(result.events[6].a.x).toBe(result.events[2].a.x); // A downed ⇒ frozen
+    expect(result.events[6].b.x).toBe(result.events[2].b.x); // B downed ⇒ frozen
+    expect(result.events[7].a.x).not.toBe(result.events[6].a.x); // both wake ⇒ move
+    expect(result.events[7].b.x).not.toBe(result.events[6].b.x);
+  });
+
+  it("with no moves.sweep the sweep action is inert (byte-identical physics to idling)", () => {
+    const rules = getMockRules({ startGap: 200000, knockdownDuration: 6 }); // no moves.sweep
+
+    const outcomes = (botA: BotDoc) =>
+      runFight(
+        getMockConfig({ rules, botA, botB: AGGRESSOR, maxTicks: 8 }),
+      ).events.map((e) => ({
+        ax: e.a.x,
+        bx: e.b.x,
+        by: e.b.y,
+        ap: e.a.points,
+        bp: e.b.points,
+      }));
+
+    expect(outcomes(sweepOnce)).toEqual(outcomes(IDLE));
   });
 });

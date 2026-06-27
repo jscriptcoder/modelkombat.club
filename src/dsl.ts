@@ -283,6 +283,8 @@ export function validate(doc: unknown): ValidationResult {
         break;
       case "crouch":
         break;
+      case "sweep":
+        break;
       case "throw":
         break;
       case "throw-break":
