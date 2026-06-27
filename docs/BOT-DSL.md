@@ -43,15 +43,17 @@ whose `when` holds and that carries a `do` returns the tick's single `Action`.
 { "type": "crouch" }                                  // posture: vacates the high band, lowers reach
 { "type": "jump",        "dir": -1|0|1 }              // gravity arc; vacates low, enters airborne band
 { "type": "block",       "band": "high"|"mid"|"low" } // timing decides block vs parry (engine, not bot)
+{ "type": "throw" }                                   // grapple: beats guards, grabs a grounded foe ⇒ scores + knockdown
+{ "type": "sweep" }                                   // ashi-barai: a low-band strike, knocks down on hit (no score)
 { "type": "throw-break" }                             // escape an incoming throw
-{ "type": "attack",      "move": "<moveId>", "band": "high"|"mid"|"low" }  // strikes, kicks, specials, throw, sweep
+{ "type": "attack",      "move": "<moveId>", "band": "high"|"mid"|"low" }  // strikes, kicks, specials
 ```
 
-- **All offense is `attack`** with a frame-table `moveId`; `band` selects the
-  target zone for multi-band moves (ignored for fixed-band moves like a sweep).
-  Throw (`family: throw`, unblockable) and sweep (`family: sweep`, low + knockdown)
-  are `attack` moves — their special resolution comes from their family, not a
-  bespoke action type.
+- **Strikes are `attack`** with a frame-table `moveId`; `band` selects the target
+  zone for multi-band moves. The grapple family has **dedicated actions**: `throw`
+  (unblockable — grabs a grounded foe ⇒ scores + knockdown) and `sweep` (a low-band
+  strike that knocks down instead of scoring — blocked/parried by a low guard,
+  whiffs a jumper, hits a croucher). `throw-break` escapes an incoming throw.
 - **Cancels are implicit.** Returning an `attack` while `self.canCancel == 1` and
   the move is in the current move's `cancelInto` set performs the cancel; the
   engine validates the window. No "cancel" action exists — combos are just
