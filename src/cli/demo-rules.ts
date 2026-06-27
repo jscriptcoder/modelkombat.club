@@ -31,7 +31,7 @@ export const DEMO_RULES: Rules = {
     sweep: {
       startup: 6,
       active: 2,
-      recovery: 12,
+      recovery: 8,
       score: 0,
       reach: 200000,
       knockdown: true,
@@ -41,7 +41,11 @@ export const DEMO_RULES: Rules = {
   // grounded foe in close range for 3, and knocks them down.
   throw: { startup: 3, active: 2, recovery: 14, reach: 130000, score: 3 },
   knockdownDuration: 40,
-  finishWindow: 10, // okizeme: 10-tick guaranteed finish on any knockdown (C8)
+  // okizeme: a wide guaranteed-finish window on any knockdown (C8). Wide enough
+  // that a fighter who lands a sweep (recovery 8) can recover and start a strike
+  // (startup 4) while the downed foe is still finishable — so the sweep -> finish
+  // loop actually closes for the demo.
+  finishWindow: 18,
   // Defensive depth (C5): the first 3 ticks of a matching-band guard parry
   // (deflect + punish), and a parry opens an 8-tick counter worth +2.
   parryWindow: 3,
