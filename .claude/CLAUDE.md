@@ -150,26 +150,48 @@ generating code; flag any change that would.
   create the first same-tick **cross-fighter mutual dependencies** (a throw mutates the *defender* via
   knockdown while a strike mutates the *attacker* via score), which the frozen-snapshot
   **compute-then-apply** split (`computeThrow`/`applyThrow` alongside `computeStrike`/`applyStrike`,
-  live since C5) resolves order-independently. 926 tests; `sim.ts` mutation ~95%, `dsl.ts` interpreter
+  live since C5) resolves order-independently. (The "926 tests" once recorded here was a
+  `.stryker-tmp` pollution artifact — the real suite is **287** after C8.) `sim.ts` mutation ~95%,
+  `dsl.ts` interpreter
   100%. The `throw`/`throw-break` actions are allowlisted in `src/dsl.ts`; `Rules.throw` (a
   `ThrowSpec`) + `knockdownDuration` are optional ⇒ a `throw` is inert when unconfigured ⇒
   **byte-identical** to C6. Deferred to **C8**: sweeps, the one guaranteed **finish window** (okizeme),
   wake-up i-frames, and `opponent.knockdown`.
+- DONE (sweeps + limited okizeme — C8, PRs #35–#38): the ground game on the throw triangle. A `sweep`
+  is a **low-band STRIKE variant** (reusing `computeStrike` + the §11.4 precedence) that on HIT
+  **knocks down** (score 0) instead of scoring — so a low guard blocks/parries it, it whiffs a jumper
+  (low occupancy) and hits a croucher, trades with strikes, and stuffs throws, **all precedence
+  emergent** ("a sweep is a strike", Slice 1). One **uniform knockdown lifecycle** (throw *and* sweep),
+  `downed{ elapsed, finish }`: the opening `finishWindow` ticks of ANY knockdown are a guaranteed
+  **FINISH** window — an opposing active in-range strike scores once, **ignoring band/guard/occupancy**
+  (the target is prone) — then the window closes (**exactly one** finish; never re-downs or extends
+  `knockdownDuration`); the untargetable tail is the wake-up **i-frames** (Slice 2). The okizeme read is
+  split across the two perception layers: the finish window is read **live** as **`self.finishWindow`**
+  (= the live opponent's `downed.finish`, like the counter/cancel windows, Slice 3), while the grounded
+  state is a delayed **`opponent.knockdown`** boolean on the **`L_act`** layer (like `throwing` —
+  invariant #4 — `1` for the *whole* knockdown incl. i-frames, Slice 4) — so `knockdown ∧ finishWindow>0`
+  ⇒ go for the finish, `knockdown ∧ finishWindow==0` ⇒ reset against an invulnerable prone foe. **No new
+  resolution machinery**: sweep + okizeme slot onto the C5 compute-then-apply union (`StrikeOutcome`
+  gains a `finish` variant; the `hit` and throw outcomes carry the finish window to grant on knockdown).
+  287 tests; `sim.ts` mutation ~95% (changed-line 100%), `dsl.ts` interpreter 100%. `MoveSpec.knockdown`
+  + `Rules.finishWindow` + `moves.sweep` are optional ⇒ a `sweep` is inert and a knockdown is
+  unfinishable when unconfigured ⇒ **byte-identical** to C7. Deferred: deeper okizeme wake-up mind-games
+  (multi-option oki), air-actions, *yame*/match structure.
 - NOT YET BUILT (later slices): no real frame table (concrete move numbers live only
-  in test mocks); no horizontal jump displacement or air-actions, **sweeps / okizeme**,
+  in test mocks); no horizontal jump displacement or air-actions,
   *yame*/match structure, telemetry object, Vercel API, or Pixi viewer.
-- NEXT: **sweeps + limited okizeme (C8)** — the ground game on top of the throw triangle. A `sweep`
-  knocks down (low / no score) and is gated by `low`-band **occupancy** (it whiffs a jumper, like a
-  low strike); a knockdown opens **exactly one guaranteed finish window** before wake-up **i-frames**;
-  the okizeme state (likely **`opponent.knockdown`**) becomes perceivable. C7 shipped the throw
-  triangle + knockdown-as-tempo; C8 builds wake-up / finish on top. (Roadmap capabilities are
-  **C1–C7** — the `C` prefix avoids colliding with `slice/N` git branch names; C1 = walking skeleton
-  (branches `slice/1`–`slice/5`), C2 = perception keystone, C3 = height bands, C4 = vertical axis +
-  occupancy, C5 = parry windows, C6 = on-contact cancel combos, C7 = throw triangle + knockdown.) The
-  spine is pinned in `docs/DESIGN.md` **§11 (Combat resolution order)**: two-phase compute-then-apply
-  (live from C5, **strictly forced by C7's throws**), S1 posture → S2 intake → S3 compute → S4 apply →
-  S5 advance, `strike > throw > guard` precedence, HIT/BLOCK/WHIFF gate. Flow: `planning` → TDD,
-  **PR per capability**.
+- NEXT: **capability not yet resolved.** C1–C8 (the resolved combat tree) are shipped; the remaining
+  items are unresolved in design. Candidates from the deferred list: **match structure** (*yame* resets
+  / rounds / WKF win conditions), a **real frame table** (concrete move numbers — today they live only
+  in test mocks), or **air-actions** (air strikes / horizontal jump displacement). Pick one and run
+  **`grill-me` → `planning` → TDD** before any code. (Roadmap capabilities are **C1–C8** — the `C`
+  prefix avoids colliding with `slice/N` git branch names; C1 = walking skeleton (branches
+  `slice/1`–`slice/5`), C2 = perception keystone, C3 = height bands, C4 = vertical axis + occupancy,
+  C5 = parry windows, C6 = on-contact cancel combos, C7 = throw triangle + knockdown, C8 = sweeps +
+  limited okizeme.) The spine is pinned in `docs/DESIGN.md` **§11 (Combat resolution order)**: two-phase
+  compute-then-apply (live from C5, **strictly forced by C7's throws**), S1 posture → S2 intake → S3
+  compute → S4 apply → S5 advance, `strike > throw > guard` precedence, HIT/BLOCK/WHIFF gate. Flow:
+  `grill-me`/`planning` → TDD, **PR per capability**.
 
 ## Commands
 
