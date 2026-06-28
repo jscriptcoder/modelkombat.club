@@ -182,25 +182,30 @@ generating code; flag any change that would.
   + `Rules.finishWindow` + `moves.sweep` are optional ⇒ a `sweep` is inert and a knockdown is
   unfinishable when unconfigured ⇒ **byte-identical** to C7. Deferred: deeper okizeme wake-up mind-games
   (multi-option oki), air-actions, *yame*/match structure.
-- NOT YET BUILT (later slices): no real frame table (concrete move numbers live only
-  in test mocks); no horizontal jump displacement or air-actions,
-  *yame*/match structure, telemetry object, Vercel API, or Pixi viewer.
-- NEXT (IN PROGRESS): **the canonical frame table** — selected from the candidates below, **grilled +
-  planned**. Replaces the provisional `src/cli/demo-rules.ts` with an authoritative engine-level
-  `CANONICAL_RULES` (`src/engine/rules.ts`) whose every number is proven by a behavioral `runFight`
-  test. Decisions → `plans/canonical-frame-table-decisions.md`; the 6-slice PR plan →
-  `plans/canonical-frame-table.md` (Slice 1 = a small additive `finishScore` engine knob; Slices 2–5
-  build + behaviorally verify the table; Slice 6 wires the runner + refreshes docs). **To resume: read
-  that plan (or run `/continue`) and start at Slice 1.** Still-unresolved candidates to tackle AFTER it:
-  **match structure** (*yame* resets / rounds / WKF win conditions) and **air-actions** (air strikes /
-  horizontal jump displacement). (Roadmap capabilities are **C1–C8** — the `C`
-  prefix avoids colliding with `slice/N` git branch names; C1 = walking skeleton (branches
-  `slice/1`–`slice/5`), C2 = perception keystone, C3 = height bands, C4 = vertical axis + occupancy,
-  C5 = parry windows, C6 = on-contact cancel combos, C7 = throw triangle + knockdown, C8 = sweeps +
-  limited okizeme.) The spine is pinned in `docs/DESIGN.md` **§11 (Combat resolution order)**: two-phase
-  compute-then-apply (live from C5, **strictly forced by C7's throws**), S1 posture → S2 intake → S3
-  compute → S4 apply → S5 advance, `strike > throw > guard` precedence, HIT/BLOCK/WHIFF gate. Flow:
-  `grill-me`/`planning` → TDD, **PR per capability**.
+- DONE (canonical frame table — PRs #44–#49): the authoritative `Rules` the platform fights on.
+  `src/engine/rules.ts` exports **`CANONICAL_RULES`** — every number proven by a behavioral
+  `runFight` test in `rules.test.ts` (the design inequalities + WKF scoring, not literals in
+  isolation), built additively across 6 slices: Slice 1 a small additive `finishScore` engine knob;
+  Slices 2–5a build + behaviorally verify the table (strike read-game core → parry/counter/cancel/
+  crouch defenses → throw triangle → sweep + okizeme finish); Slice 5b the jump arc + anti-air
+  occupancy; Slice 6 wires the runner + refreshes docs. The CLI runner (`npm run fight`) now fights on
+  it and the provisional `src/cli/demo-rules.ts` is **deleted** (single source of truth). The knife-
+  edges, all proven: every committed startup = `lAct(6)+1` (reactable), recoveries ≥ `lAct +
+  strike.startup` (whiff-punishable), reach hierarchy `throw(120k) < sweep(180k) < strike(240k)`, a
+  finish = ippon (3) inside `finishWindow(10) < knockdownDuration(30)`, the jump arc apex 24000
+  returning to exactly 0. 354 tests; `rules.ts` mutation 100%. Absent optional fields ⇒ byte-identical
+  to the pre-table engine; the engine `getMockRules` mocks stay independent.
+- NOT YET BUILT (later slices): no horizontal jump displacement or air-actions, *yame*/match
+  structure, telemetry object, Vercel API, or Pixi viewer.
+- NEXT (unresolved — pick one, then `grill-me` → `planning` → TDD): **match structure** (*yame* resets
+  / rounds / WKF win conditions) and **air-actions** (air strikes / horizontal jump displacement). The
+  spine is pinned in `docs/DESIGN.md` **§11 (Combat resolution order)**: two-phase compute-then-apply
+  (live from C5, **strictly forced by C7's throws**), S1 posture → S2 intake → S3 compute → S4 apply →
+  S5 advance, `strike > throw > guard` precedence, HIT/BLOCK/WHIFF gate. (Roadmap capabilities are
+  **C1–C8** — the `C` prefix avoids colliding with `slice/N` git branch names; C1 = walking skeleton
+  (branches `slice/1`–`slice/5`), C2 = perception keystone, C3 = height bands, C4 = vertical axis +
+  occupancy, C5 = parry windows, C6 = on-contact cancel combos, C7 = throw triangle + knockdown, C8 =
+  sweeps + limited okizeme.) Flow: `grill-me`/`planning` → TDD, **PR per capability**.
 
 ## Commands
 

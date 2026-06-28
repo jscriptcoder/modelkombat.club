@@ -27,7 +27,7 @@
             "op": "lte",
             "args": [
               { "op": "field", "path": "opponent.distance" },
-              { "op": "const", "value": 200000 }
+              { "op": "const", "value": 180000 }
             ]
           }
         ]

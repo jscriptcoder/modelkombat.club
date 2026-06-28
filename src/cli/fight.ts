@@ -1,8 +1,8 @@
 /// <reference types="node" />
 // ============================================================================
 // CLI fight runner — the thin imperative shell. Loads two bot documents through
-// the validator gate, runs them against each other with the provisional demo
-// frame table, and prints the tick log + result.
+// the validator gate, runs them against each other on the canonical frame table
+// (`src/engine/rules.ts`), and prints the tick log + result.
 //
 //   npm run fight -- <botA.json> <botB.json> [--seed N] [--ticks N] [--full]
 //
@@ -15,7 +15,7 @@ import { runFight } from "../engine/sim.js";
 import { ValidationError } from "../engine/dsl.js";
 import { loadBotDoc } from "./load.js";
 import { formatFight, type FormatMode } from "./format.js";
-import { DEMO_RULES } from "./demo-rules.js";
+import { CANONICAL_RULES } from "../engine/rules.js";
 
 const USAGE =
   "usage: npm run fight -- <botA.json> <botB.json> [--seed N] [--ticks N] [--full]\n";
@@ -82,7 +82,7 @@ const botA = load(pathA);
 const botB = load(pathB);
 
 const result = runFight({
-  rules: DEMO_RULES,
+  rules: CANONICAL_RULES,
   botA,
   botB,
   maxTicks: ticks,
