@@ -94,9 +94,14 @@ of `CANONICAL_RULES`).
 
 ## Implementation anchors (for resumption after compaction)
 
-**Status: pre-RED.** Skills loaded (`tdd`, `testing`); grounded in conventions; **no
-code written yet**. Next action: write the Slice 1 RED tests below, run to confirm
-failure, then GREEN.
+**Status: Slice 1 SHIPPED** (commit `6dd72f7` on `feat/stamina-economy`) — the meter
+tracer is live (on-commit spend recorded in `FighterFrame.stamina` + the live
+`self.stamina` DSL field), 362 tests green, changed-line mutation 100% (7/7), absent
+`Rules.stamina` ⇒ byte-identical. **Next action: Slice 2** (affordability gate / the
+`[0]` lower bound) — load `tdd`/`testing`/`mutation-testing`/`refactoring`, write the
+B1 boundary RED (`stamina == cost` commits-to-0 vs `cost − 1` degrades to idle), then
+GREEN by wrapping the three `spend` sites with the affordability predicate. The
+historical Slice 1 anchors below are kept for reference.
 
 **Production sites** (`src/engine/`):
 
