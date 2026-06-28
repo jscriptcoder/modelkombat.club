@@ -50,10 +50,10 @@ src/               TypeScript source (pure engine + CLI tooling)
     dsl.ts        ✅ bot AST, validator, interpreter  ← the trusted computing base
     sim.ts        ✅ deterministic fight loop (x + vertical y; grows to full 2D)
     prng.ts       ✅ seeded mulberry32 PRNG (perception jitter; the sim's only RNG)
-    *.test.ts     ✅ vitest behaviour suites (validate / interpret / fight / perception)
-  cli/             ✅ headless fight runner — npm run fight (loads + validates bots, prints the tick log)
-    demo-rules.ts ✅ provisional demo frame table (NOT canonical — real one is a future slice)
-bots/              ✅ example bot documents (aggressor / turtle / counter)
+    rules.ts      ✅ CANONICAL_RULES — the authoritative frame table (every number proven by a runFight test)
+    *.test.ts     ✅ vitest behaviour suites (validate / interpret / fight / perception / rules)
+  cli/             ✅ headless fight runner — npm run fight (loads + validates bots, fights on the canonical table, prints the tick log)
+bots/              ✅ example bot documents (aggressor / counter / grappler / sweeper / turtle)
 docs/              DESIGN.md (combat + platform) + BOT-DSL.md (bot API)
 (planned) api/     Vercel serverless functions (import the engine from src/engine/)
 (planned) viewer   Vite + Pixi + SolidJS replay/fight viewer
@@ -94,9 +94,13 @@ guard` precedence resolves in the union (strike **stuffs**, `throw-break` escape
   (precedence emergent — "a sweep is a strike"); one uniform knockdown lifecycle gives a
   guaranteed **finish window** (exactly once) before wake-up **i-frames**; the okizeme read
   is the live `self.finishWindow` + the `L_act`-delayed `opponent.knockdown`.
+- **Canonical frame table** (PRs #44–#49): the provisional demo rules are replaced by
+  engine-level `CANONICAL_RULES` (`src/engine/rules.ts`) — every number proven by a
+  behavioral `runFight` test (the design inequalities + WKF scoring); the CLI runner
+  fights on it and `src/cli/demo-rules.ts` is gone.
 
-**287 tests; `sim.ts` mutation ~95%, `dsl.ts` interpreter 100%. Next:** capability not yet
-resolved (candidates: match structure, a real frame table, air-actions). See
+**354 tests; `sim.ts` mutation ~95%, `dsl.ts` interpreter 100%, `rules.ts` 100%. Next:**
+capability not yet resolved (candidates: match structure, air-actions). See
 `.claude/CLAUDE.md` Status for the live roadmap and detail.
 
 See `.claude/CLAUDE.md` for the invariants and current direction, `docs/DESIGN.md`
