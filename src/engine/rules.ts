@@ -41,6 +41,23 @@ export const CANONICAL_RULES: Rules = {
       reach: 240000, // 240 units — LOCKED; later reach hierarchy throw < sweep < strike
       cancelInto: ["strike"],
     },
+    // The sweep (C8 ashi-barai) — a LOW-band knockdown strike, on the same startup-7 timing:
+    //   • score 0 + knockdown ⇒ a clean low hit DOWNS the foe (the points live in the okizeme
+    //     finish, not the sweep itself). Blockable / parryable at `low`; whiffs a jumper.
+    //   • startup 7 = lAct (6) + 1 ⇒ a committed move stays reactable (a low guard / jump answers it).
+    //   • recovery 13 ≥ lAct (6) + strike.startup (7) ⇒ a whiffed sweep is punishable.
+    //   • reach 180000 ⇒ throw (120000) < sweep < strike (240000) — the close-to-far hierarchy.
+    //   • cancelInto:["strike"] ⇒ the knockdown is a connect that opens the cancel window, so a
+    //     hit-confirm cancels into the finishing strike (see finishWindow below).
+    sweep: {
+      startup: 7,
+      active: 2,
+      recovery: 13,
+      score: 0,
+      reach: 180000,
+      knockdown: true,
+      cancelInto: ["strike"],
+    },
   },
   // Defensive depth (C5/C6), tuned to the canonical strike's startup-7 timing:
   //   • parryWindow 2 — a matching guard's first 2 ticks (age 1–2) DEFLECT instead of block: a
@@ -70,6 +87,16 @@ export const CANONICAL_RULES: Rules = {
   // carved out of it in a later slice.
   throw: { startup: 7, active: 2, recovery: 14, reach: 120000, score: 3 },
   knockdownDuration: 30,
+  // Okizeme (C8): the first `finishWindow` ticks of ANY knockdown are a guaranteed FINISH —
+  // an opposing strike scores `finishScore`, ignoring band / guard / occupancy (the foe is prone).
+  //   • finishWindow 10 — the sweep→cancel→strike combo lands its finish at knockdown +9 (knockdown
+  //     tick 7 → cancel at the first recovery frame, tick 9 → strike active tick 16); 10 lands it with
+  //     a frame to spare, while an UN-cancelled strike (neutral tick 22, active 29) arrives far too
+  //     late ⇒ the hit-confirm cancel is load-bearing.
+  //   • finishScore 3 — a finish pays the WKF ippon, decoupled from the finishing poke's base score.
+  //   • knockdownDuration (30) > finishWindow (10) ⇒ the remaining ticks are wake-up i-frames.
+  finishWindow: 10,
+  finishScore: 3,
   // The perception keystone (C2): position lags 1 tick, the action tell lags 6, with
   // ±1 seeded jitter. lAct 6 with strike.startup 7 puts the read on the knife-edge
   // (S ≥ lAct + 1 holds with equality), so jitter + sharp timing decide the exchange.
