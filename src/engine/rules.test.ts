@@ -157,6 +157,13 @@ const throwSpec = (): ThrowSpec => {
   return t;
 };
 
+const sweepSpec = (): MoveSpec => {
+  const s = CANONICAL_RULES.moves.sweep;
+  if (!s) throw new Error("CANONICAL_RULES.moves.sweep is not configured");
+
+  return s;
+};
+
 const fight = (o: Partial<FightConfig> = {}): FightConfig => ({
   rules: CANONICAL_RULES,
   botA: IDLE,
@@ -195,6 +202,11 @@ const withThrowStartup = (startup: number): Rules =>
     startGap: 100000, // within grab reach ⇒ a grab can connect or be broken
     throw: { ...throwSpec(), startup },
   });
+
+// Positioned inside SWEEP range (180000) — between grab range and the deterministic() gap —
+// and de-jittered, so an in-range sweep connects on a grounded target.
+const sweepFight = (o: Partial<FightConfig> = {}): FightConfig =>
+  fight({ rules: deterministic({ startGap: 150000 }), ...o });
 
 describe("CANONICAL_RULES — structural shape", () => {
   it("scores a clean strike as a single WKF yuko", () => {
@@ -596,6 +608,156 @@ describe("CANONICAL_RULES — a whiffed throw is punishable", () => {
     );
 
     expect(result.scores.a).toBe(0); // the throw whiffed
+    expect(result.scores.b).toBe(1); // committed in recovery, it couldn't block ⇒ punished
+  });
+});
+
+// ─── Slice 5a: the sweep (low knockdown strike) + the okizeme finish ──────────────
+
+// Sweeps once at tick 0, then idles — a single knockdown to observe.
+const sweepOnce: BotDoc = bot([{ when: clk("eq", 0), do: { type: "sweep" } }], {
+  type: "idle",
+});
+
+// Sweeps at tick 0, then holds a mid guard — so if its sweep does NOT commit it, it
+// blocks the incoming mid punish (the contrast that proves a whiffed sweep is committed).
+const sweepThenGuard: BotDoc = bot(
+  [
+    { when: clk("eq", 0), do: { type: "sweep" } },
+    { when: clk("gte", 1), do: { type: "block", band: "mid" } },
+  ],
+  { type: "idle" },
+);
+
+describe("CANONICAL_RULES — sweep & okizeme structural shape", () => {
+  it("is a low knockdown strike that scores nothing", () => {
+    expect(sweepSpec().score).toBe(0);
+    expect(sweepSpec().knockdown).toBe(true);
+  });
+
+  it("cancels into the strike (the hit-confirm finish route)", () => {
+    expect(sweepSpec().cancelInto).toContain("strike");
+  });
+
+  it("completes the reach hierarchy throw < sweep < strike", () => {
+    expect(throwSpec().reach).toBeLessThan(sweepSpec().reach);
+    expect(sweepSpec().reach).toBeLessThan(strike().reach);
+  });
+
+  it("keeps the sweep reactable (startup = lAct+1) and its whiff punishable", () => {
+    expect(sweepSpec().startup).toBe(lAct() + 1);
+    expect(sweepSpec().recovery).toBeGreaterThanOrEqual(
+      lAct() + strike().startup,
+    );
+  });
+
+  it("pays the finish as an ippon, inside a window shorter than the knockdown", () => {
+    expect(CANONICAL_RULES.finishScore).toBe(3);
+    expect(CANONICAL_RULES.finishWindow ?? 0).toBeGreaterThan(0);
+    expect(CANONICAL_RULES.knockdownDuration ?? 0).toBeGreaterThan(
+      CANONICAL_RULES.finishWindow ?? 0,
+    );
+  });
+});
+
+describe("CANONICAL_RULES — a sweep downs a grounded foe for no score", () => {
+  it("sweeps an advancer: scores 0, freezes it for the knockdown, then it moves again", () => {
+    const knock = sweepSpec().startup; // knockdown on the first active frame (elapsed = startup)
+    const wake = knock + (CANONICAL_RULES.knockdownDuration ?? 0); // neutral again here
+
+    const result = runFight(
+      sweepFight({ botA: sweepOnce, botB: ADVANCER, maxTicks: wake + 5 }),
+    );
+
+    expect(result.scores.a).toBe(0); // a sweep scores nothing
+    expect(result.events[wake - 1].b.x).toBe(result.events[knock + 1].b.x); // frozen while downed
+    expect(result.events[wake].b.x).not.toBe(result.events[wake - 1].b.x); // moves again on wake
+  });
+});
+
+describe("CANONICAL_RULES — a sweep is a low-band strike (banded by occupancy)", () => {
+  // Guards `band` over the sweep's active frame (tick ≤ startup), then advances — so x at two
+  // in-knockdown ticks reveals whether the sweep was blocked (free ⇒ moved) or landed (downed ⇒ frozen).
+  const sweptFrozen = (posture: BotDoc): boolean => {
+    const result = runFight(
+      sweepFight({ botA: sweepOnce, botB: posture, maxTicks: 24 }),
+    );
+
+    return result.events[20].b.x === result.events[9].b.x;
+  };
+
+  // Hold the posture across the sweep's WHOLE active window (ticks startup..startup+active-1),
+  // then advance — dropping it on any active frame would itself be swept.
+  const activeEnd = (): number => sweepSpec().startup + sweepSpec().active;
+
+  const guardThenAdvance = (band: Band): BotDoc =>
+    bot([{ when: clk("lt", activeEnd()), do: { type: "block", band } }], {
+      type: "move",
+      dir: 1,
+    });
+
+  it("a low guard blocks the sweep; a high (wrong-height) guard is swept", () => {
+    expect(sweptFrozen(guardThenAdvance("low"))).toBe(false); // blocked ⇒ free ⇒ moves
+    expect(sweptFrozen(guardThenAdvance("high"))).toBe(true); // wrong height ⇒ swept ⇒ frozen
+  });
+
+  it("sweeps a croucher — crouch occupies low, so it does not dodge", () => {
+    const crouchThenAdvance = bot(
+      [{ when: clk("lt", activeEnd()), do: { type: "crouch" } }],
+      { type: "move", dir: 1 },
+    );
+
+    expect(sweptFrozen(crouchThenAdvance)).toBe(true); // swept ⇒ frozen
+  });
+});
+
+describe("CANONICAL_RULES — sweep → cancel → okizeme finish (3, hit-confirmed)", () => {
+  // Sweep at tick 0 (knockdown at tick 7); then a strike at `strikeTick`. At the first recovery
+  // frame the strike CANCELS the sweep's recovery (rekka) and its active frame lands inside the
+  // finish window; at the first NEUTRAL tick (no cancel) the strike arrives in the i-frame tail.
+  const finishScoreAt = (strikeTick: number): number =>
+    runFight(
+      sweepFight({
+        botA: bot(
+          [
+            { when: clk("eq", 0), do: { type: "sweep" } },
+            {
+              when: clk("eq", strikeTick),
+              do: { type: "attack", move: "strike", band: "mid" },
+            },
+          ],
+          { type: "idle" },
+        ),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    ).scores.a;
+
+  it("a hit-confirm cancel finishes the downed foe for an ippon; the same strike uncancelled is too late", () => {
+    const cancelTick = sweepSpec().startup + sweepSpec().active; // first recovery frame ⇒ cancels
+
+    const neutralTick =
+      sweepSpec().startup + sweepSpec().active + sweepSpec().recovery; // first neutral ⇒ no cancel
+
+    expect(finishScoreAt(cancelTick)).toBe(3); // cancel lands the finish in-window ⇒ ippon
+    expect(finishScoreAt(neutralTick)).toBe(0); // uncancelled ⇒ i-frames ⇒ no finish
+  });
+});
+
+describe("CANONICAL_RULES — a whiffed sweep is punishable", () => {
+  it("a sweep out of range whiffs, and its recovery stops the sweeper defending the punish", () => {
+    // deterministic() positions the pair at 200000: outside sweep reach (180000) but inside
+    // strike reach (240000), so the sweep whiffs and (committed in recovery) cannot block the punish.
+    const result = runFight(
+      fight({
+        rules: deterministic(),
+        botA: sweepThenGuard, // sweep whiffs out of range; then it tries to guard
+        botB: strikeAtTicks([sweepSpec().startup + sweepSpec().active], "mid"),
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0); // the sweep whiffed (and scores 0 anyway)
     expect(result.scores.b).toBe(1); // committed in recovery, it couldn't block ⇒ punished
   });
 });
