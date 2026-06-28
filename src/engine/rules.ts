@@ -32,15 +32,29 @@ export const CANONICAL_RULES: Rules = {
     // The base strike (WKF yuko = 1). It sits on the design's two knife-edges:
     //   • startup 7 = lAct (6) + 1 ⇒ the band tell is reactable — but only just.
     //   • recovery 13 = lAct (6) + startup (7) ⇒ a whiff is punishable — but only just.
-    // (The C6 rekka route `cancelInto:["strike"]` arrives in Slice 3 with cancelWindow.)
+    // cancelInto:["strike"] is the C6 rekka route: a connect lets it hit-confirm into a follow-up.
     strike: {
       startup: 7,
       active: 3,
       recovery: 13,
       score: 1,
       reach: 240000, // 240 units — LOCKED; later reach hierarchy throw < sweep < strike
+      cancelInto: ["strike"],
     },
   },
+  // Defensive depth (C5/C6), tuned to the canonical strike's startup-7 timing:
+  //   • parryWindow 2 — a matching guard's first 2 ticks (age 1–2) DEFLECT instead of block: a
+  //     reaction-precise guard parries, a pre-emptive hold (older) only blocks (the read gradient).
+  //   • parryRecovery 12 — a parried strike eats +12 recovery ⇒ heavily punishable / counterable.
+  //   • counterWindow 10 / counterBonus 1 — after a parry, a counter strike within 10 ticks scores
+  //     an extra yuko (≈ waza-ari, 2 total). 10 ≥ startup(7)+2, so a startup-7 counter lands in time.
+  //   • cancelWindow 6 — a connect (hit/block) opens a 6-tick window to cancel recovery into a
+  //     `cancelInto` follow-up; reaches into recovery so the rekka hit-confirms.
+  parryWindow: 2,
+  parryRecovery: 12,
+  counterWindow: 10,
+  counterBonus: 1,
+  cancelWindow: 6,
   // The perception keystone (C2): position lags 1 tick, the action tell lags 6, with
   // ±1 seeded jitter. lAct 6 with strike.startup 7 puts the read on the knife-edge
   // (S ≥ lAct + 1 holds with equality), so jitter + sharp timing decide the exchange.

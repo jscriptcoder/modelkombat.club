@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runFight, type FightConfig } from "./sim.js";
+import { runFight, type FightConfig, type FightEvent } from "./sim.js";
 import type { BotDoc, BoolExpr } from "./dsl.js";
 import type { Rules, Band, Action, MoveSpec } from "./types.js";
 import { CANONICAL_RULES } from "./rules.js";
@@ -74,7 +74,7 @@ const BAND_MIRROR: BotDoc = bot(
 );
 
 // ─── small expression helpers ────────────────────────────────────────────────
-const clk = (op: "eq" | "gte" | "lte", n: number): BoolExpr => ({
+const clk = (op: "eq" | "gt" | "lt" | "gte" | "lte", n: number): BoolExpr => ({
   op,
   args: [
     { op: "field", path: "clock.tick" },
@@ -83,6 +83,66 @@ const clk = (op: "eq" | "gte" | "lte", n: number): BoolExpr => ({
 });
 
 const all = (...args: BoolExpr[]): BoolExpr => ({ op: "and", args });
+
+// Strikes `band` whenever free to act — so its recorded attack ticks reveal recovery
+// length (the gap between strikes is how long it was committed).
+const restrikeWhenFree = (band: Band): BotDoc =>
+  bot(
+    [
+      {
+        when: {
+          op: "eq",
+          args: [
+            { op: "field", path: "self.canAct" },
+            { op: "const", value: 1 },
+          ],
+        },
+        do: { type: "attack", move: "strike", band },
+      },
+    ],
+    { type: "idle" },
+  );
+
+// Blocks `band` from tick `from` onward — `from` sets the guard's age at the active frame.
+const guardFrom = (from: number, band: Band): BotDoc =>
+  bot([{ when: clk("gte", from), do: { type: "block", band } }], {
+    type: "idle",
+  });
+
+// Crouches (vacating `high`) while tick < until, then stands — ducks a high opener's active
+// frame yet stands later, so a wrongly-cancelled follow-up WOULD land (proving it doesn't).
+const crouchUntil = (until: number): BotDoc =>
+  bot([{ when: clk("lt", until), do: { type: "crouch" } }], { type: "idle" });
+
+// Strikes `band` at each listed tick — a tick-0 opener plus later cancel attempts.
+const strikeAtTicks = (ticks: number[], band: Band): BotDoc =>
+  bot(
+    ticks.map((t) => ({
+      when: clk("eq", t),
+      do: { type: "attack", move: "strike", band },
+    })),
+    { type: "idle" },
+  );
+
+// Strikes mid on every free tick (an attacker that gets parried, then sits in recovery).
+const STRIKER = bot([], { type: "attack", move: "strike", band: "mid" });
+
+// Parries with a fresh mid guard at `parryTick`, then throws a mid counter the next tick.
+const parryThenCounter = (parryTick: number): BotDoc =>
+  bot(
+    [
+      { when: clk("eq", parryTick), do: { type: "block", band: "mid" } },
+      {
+        when: clk("eq", parryTick + 1),
+        do: { type: "attack", move: "strike", band: "mid" },
+      },
+    ],
+    { type: "idle" },
+  );
+
+// The ticks a side started a fresh move (a gap between them is its recovery length).
+const attackTicks = (events: FightEvent[], side: "a" | "b"): number[] =>
+  events.flatMap((e, t) => (e[side].action.type === "attack" ? [t] : []));
 
 // ─── lazy readers of the canonical numbers ────────────────────────────────────
 // Read on call (inside tests/builders), never at module load — so a malformed table
@@ -242,5 +302,134 @@ describe("CANONICAL_RULES — a whiffed strike is punishable", () => {
 
     expect(result.scores.b).toBe(0); // the high strike whiffed over the crouch
     expect(result.scores.a).toBe(1); // and was punished during recovery
+  });
+});
+
+// ─── Slice 3: the strike's defensive answers (parry / counter / cancel / crouch) ──
+
+describe("CANONICAL_RULES — parry deflects and punishes (C5)", () => {
+  // Runs a re-striking attacker into a `from`-aged mid guard; reports when its 2nd strike starts
+  // (a later tick = longer recovery) and whether it scored. Comparing across guard ages — never
+  // against a config-derived constant — is what gives the parry numbers real teeth.
+  const vsGuard = (from: number): { secondStrike: number; scoreA: number } => {
+    const result = runFight(
+      fight({
+        rules: deterministic(),
+        botA: restrikeWhenFree("mid"),
+        botB: guardFrom(from, "mid"),
+        maxTicks: 60,
+      }),
+    );
+
+    return {
+      secondStrike: attackTicks(result.events, "a")[1],
+      scoreA: result.scores.a,
+    };
+  };
+
+  it("a fresh matching guard parries — no score, and the attacker eats extra recovery", () => {
+    const firstActive = strike().startup; // the active window opens at elapsed = startup
+    const fresh = vsGuard(firstActive); // guard up on the active frame ⇒ age 1 ⇒ PARRY
+    const stale = vsGuard(0); // held since tick 0 ⇒ stale ⇒ BLOCK
+
+    expect(fresh.scoreA).toBe(0); // deflected — never scored
+    expect(fresh.secondStrike).toBeGreaterThan(stale.secondStrike); // parry adds recovery
+  });
+
+  it("the parry window is tight: a guard one tick older only blocks", () => {
+    // A guard raised at `from` has age (firstActive − from + 1) on the active frame. With
+    // parryWindow 2: age 2 (from = firstActive−1) parries; age 3 (from = firstActive−2) blocks —
+    // so the younger guard's attacker eats strictly more recovery only at exactly window 2.
+    const firstActive = strike().startup;
+
+    expect(vsGuard(firstActive - 1).secondStrike).toBeGreaterThan(
+      vsGuard(firstActive - 2).secondStrike,
+    );
+  });
+});
+
+describe("CANONICAL_RULES — counter rewards the read (C5)", () => {
+  it("a counter strike after a parry scores base + counterBonus (≈ waza-ari)", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic(),
+        botA: STRIKER, // strikes mid, gets parried, sits in extended recovery
+        botB: parryThenCounter(strike().startup), // parry on the active frame, counter next tick
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores).toEqual({ a: 0, b: 2 }); // base 1 + counterBonus 1
+  });
+});
+
+describe("CANONICAL_RULES — on-contact cancel (C6 rekka)", () => {
+  it("a connecting strike cancels into a follow-up — two hits in one exchange", () => {
+    // Opener at tick 0 connects on its active frame, opening the cancel window; a follow-up `attack`
+    // one tick into recovery cancels into a second strike that also lands ⇒ score 2.
+    const cancelTick = strike().startup + strike().active; // the first recovery frame
+
+    const result = runFight(
+      fight({
+        rules: deterministic(),
+        botA: strikeAtTicks([0, cancelTick], "mid"),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(2); // opener + cancelled follow-up
+  });
+
+  it("a whiffed strike never opens the cancel window (no feint)", () => {
+    // The high opener whiffs over a croucher (never connects), so the cancel attempt is inert. The
+    // croucher stands again from the cancel tick, so a wrongly-enabled cancel's follow-up WOULD
+    // land — proving it does not.
+    const cancelTick = strike().startup + strike().active;
+
+    const result = runFight(
+      fight({
+        rules: deterministic(),
+        botA: strikeAtTicks([0, cancelTick], "high"),
+        botB: crouchUntil(cancelTick),
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0); // whiff ⇒ no cancel ⇒ no follow-up
+  });
+});
+
+describe("CANONICAL_RULES — crouch ducks a high strike (occupancy)", () => {
+  it("a high canonical strike whiffs a croucher", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic(),
+        botA: strikeOnce("high"),
+        botB: crouchUntil(60), // crouches the whole fight ⇒ vacates high
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+});
+
+describe("CANONICAL_RULES — defensive structural shape", () => {
+  it("ships a tight parry window with real extra recovery", () => {
+    expect(CANONICAL_RULES.parryWindow).toBe(2);
+    expect(CANONICAL_RULES.parryRecovery ?? 0).toBeGreaterThan(0);
+  });
+
+  it("ships a counter window wide enough for a startup-7 counter, worth one yuko", () => {
+    expect(CANONICAL_RULES.counterWindow ?? 0).toBeGreaterThan(
+      strike().startup,
+    );
+    expect(CANONICAL_RULES.counterBonus).toBe(1);
+  });
+
+  it("ships a cancel window and a self-rekka route", () => {
+    expect(CANONICAL_RULES.cancelWindow ?? 0).toBeGreaterThan(0);
+    expect(strike().cancelInto).toContain("strike");
   });
 });
