@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { runFight, type FightConfig } from "./sim.js";
 import type { BotDoc, BoolExpr, FieldPath } from "./dsl.js";
-import type { Rules, Action, Band } from "./types.js";
+import type { Rules, Action, Band, MoveId } from "./types.js";
 
 // ─── factories ───────────────────────────────────────────────────────────────
 const bot = (rules: BotDoc["rules"], dflt: Action): BotDoc => ({
@@ -3975,6 +3975,165 @@ describe("runFight — mawashi-geri (the roundhouse: band-dependent score, high 
     );
 
     expect(result.scores.a).toBe(0);
+  });
+});
+
+describe("runFight — cross-move cancels (rekka routes between distinct techniques)", () => {
+  // Cross-move cancel routes use the SAME move-agnostic C6 machinery as the self-cancel — these
+  // are permanent behavior tests proving the rekka combos resolve and preserve the no-feint
+  // property, NOT new behavior (no production change). Timing mirrors the C6 cancel block:
+  // uniform startup 4 / active 2 (active at elapsed 4–5) / recovery 6, cancelWindow 10 — an
+  // opener connects at tick 4, a cancel at tick 6 lands its follow-up at tick 10, far earlier
+  // than a fresh re-attack (which could not start until tick 12, landing ≥ 16).
+  const rekkaRules = (o: Partial<Rules> = {}): Rules =>
+    getMockRules({
+      startGap: 200000, // within reach (250000) ⇒ each technique connects
+      cancelWindow: 10,
+      moves: {
+        strike: { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
+        "kizami-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+          bands: ["high", "mid"],
+          cancelInto: ["gyaku-zuki"],
+        },
+        "gyaku-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+          bands: ["high", "mid"],
+          cancelInto: ["mawashi-geri"],
+        },
+        "mawashi-geri": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+          bands: ["high", "mid"],
+        },
+      },
+      ...o,
+    });
+
+  // A bot that throws a specific named `attack` at each given tick (idle otherwise), so move-
+  // starts and cancel attempts land at known, bounded ticks. Generalizes the C6 `strikeAtTicks`.
+  const comboAtTicks = (
+    steps: { tick: number; move: MoveId; band: Band }[],
+  ): BotDoc =>
+    bot(
+      steps.map((s) => ({
+        when: {
+          op: "eq",
+          args: [
+            { op: "field", path: "clock.tick" },
+            { op: "const", value: s.tick },
+          ],
+        },
+        do: { type: "attack", move: s.move, band: s.band },
+      })),
+      { type: "idle" },
+    );
+
+  // Crouches (vacating `high`) while tick < until, then stands — to whiff a high opener on its
+  // active frame while standing again later, so a wrongly-enabled cancel WOULD land (it must not).
+  const crouchUntil = (until: number): BotDoc =>
+    bot(
+      [
+        {
+          when: {
+            op: "lt",
+            args: [
+              { op: "field", path: "clock.tick" },
+              { op: "const", value: until },
+            ],
+          },
+          do: { type: "crouch" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+  it("a connecting jab cancels into a DIFFERENT technique (gyaku-zuki) during the jab's recovery", () => {
+    // Opener jab at tick 0 connects at tick 4 (opening the cancel window); a gyaku-zuki at tick 6
+    // (jab now in recovery) cancels into the reverse, whose active frame lands at tick 10.
+    const result = runFight(
+      getMockConfig({
+        rules: rekkaRules(),
+        botA: comboAtTicks([
+          { tick: 0, move: "kizami-zuki", band: "mid" },
+          { tick: 6, move: "gyaku-zuki", band: "mid" },
+        ]),
+        botB: IDLE,
+        maxTicks: 16,
+      }),
+    );
+
+    expect(result.events[10].a.points).toBe(2); // the cancelled cross-move follow-up already landed
+    expect(result.scores.a).toBe(2); // jab + cancelled reverse (within-exchange escalation)
+  });
+
+  it("a WHIFFED jab does not open the cross-move cancel — the gyaku-zuki follow-up is ignored (no-feint)", () => {
+    // Jab HIGH into a croucher whiffs (a croucher vacates `high`) on its active frame, so no
+    // cancel window opens. The opponent stands from tick 6, so a wrongly-enabled cancel's reverse
+    // would hit at tick 10 — it does not.
+    const result = runFight(
+      getMockConfig({
+        rules: rekkaRules(),
+        botA: comboAtTicks([
+          { tick: 0, move: "kizami-zuki", band: "high" },
+          { tick: 6, move: "gyaku-zuki", band: "high" },
+        ]),
+        botB: crouchUntil(6),
+        maxTicks: 16,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0); // whiffed opener ⇒ no window ⇒ cross-move follow-up ignored
+  });
+
+  it("a cancel into a configured, in-range move that is NOT in the route list is refused", () => {
+    // The jab's only route is gyaku-zuki. A tick-6 cancel attempt into mawashi-geri — configured
+    // and in range, but not in kizami-zuki.cancelInto — is refused (the jab finishes its
+    // recovery), proving refusal is by ROUTE, not by unconfigured/inert or range.
+    const result = runFight(
+      getMockConfig({
+        rules: rekkaRules(),
+        botA: comboAtTicks([
+          { tick: 0, move: "kizami-zuki", band: "mid" },
+          { tick: 6, move: "mawashi-geri", band: "mid" },
+        ]),
+        botB: IDLE,
+        maxTicks: 16,
+      }),
+    );
+
+    expect(result.scores.a).toBe(1); // jab connected, but mawashi-geri is not a jab route ⇒ no cancel
+  });
+
+  it("chains three distinct techniques via cross-move cancels (jab → reverse → roundhouse)", () => {
+    // Each connect re-opens the window for the next route. Jab(0) connects tick 4; reverse cancel
+    // at tick 6 connects tick 10 (re-opening); roundhouse cancel at tick 12 connects tick 16. A
+    // non-chained sequence at these frames could reach at most 2 within the run.
+    const result = runFight(
+      getMockConfig({
+        rules: rekkaRules(),
+        botA: comboAtTicks([
+          { tick: 0, move: "kizami-zuki", band: "mid" },
+          { tick: 6, move: "gyaku-zuki", band: "mid" },
+          { tick: 12, move: "mawashi-geri", band: "mid" },
+        ]),
+        botB: IDLE,
+        maxTicks: 20,
+      }),
+    );
+
+    expect(result.scores.a).toBe(3); // all three techniques connected via the rekka chain
   });
 });
 
