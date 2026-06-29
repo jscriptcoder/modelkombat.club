@@ -102,6 +102,10 @@ type MoveState =
   | { kind: "throwing"; elapsed: number; stuffed: boolean } // committed grab; `stuffed` once a strike beats it (§11.4) ⇒ cannot grab
   | { kind: "downed"; elapsed: number; finish: number }; // knocked down for rules.knockdownDuration ticks; `finish` = remaining okizeme finish-window ticks (C8, counts down to 0 ⇒ wake-up i-frames)
 
+// The committed-attack variant of MoveState — the type `startAttack` always returns. Naming it
+// lets a caller read the fresh move's `extra` (recovery accumulator) without re-narrowing.
+type AttackingState = Extract<MoveState, { kind: "attacking" }>;
+
 type Fighter = {
   x: number;
   y: number;
@@ -254,7 +258,7 @@ const viewFor = (
 // A fresh attacking move: startup begins now (elapsed 0), nothing resolved yet, no
 // parry-extended recovery. The single source for "start an attack" — used both when a
 // neutral fighter strikes and when an on-contact cancel interrupts into a follow-up.
-const startAttack = (spec: MoveSpec, band: Band): MoveState => ({
+const startAttack = (spec: MoveSpec, band: Band): AttackingState => ({
   kind: "attacking",
   spec,
   band,
@@ -314,6 +318,22 @@ const drawChip = (def: Fighter, chip: number): void => {
   def.stamina = Math.max(0, def.stamina - chip);
 };
 
+// Whether a fighter is GASSED (C10 Story 3): at/below the stepped gas line. Read on the
+// CURRENT (post-spend) stamina — `stamina ≤ gasThreshold`. Absent `gasThreshold` (or no
+// meter) ⇒ never gassed ⇒ byte-identical. Single source for both the recovery penalty
+// (here) and the live `self.gassed` read (a later slice).
+const gassed = (f: Fighter, rules: Rules): boolean =>
+  rules.stamina?.gasThreshold !== undefined &&
+  f.stamina <= rules.stamina.gasThreshold;
+
+// The recovery a fresh commit eats for being GASSED (C10 Story 3): `gasRecoveryPenalty` when
+// at/below the gas line, else 0. The caller adds it to the just-started move's `extra` (the
+// shared recovery accumulator — recovery-only, since `extra` only delays the neutral transition
+// in `advance`; composes additively with a parry's extra). Read POST-SPEND, so the commit that
+// drops you to the line eats the penalty itself. 0 when not gassed / no penalty ⇒ byte-identical.
+const gasRecovery = (f: Fighter, rules: Rules): number =>
+  gassed(f, rules) ? (rules.stamina?.gasRecoveryPenalty ?? 0) : 0;
+
 // Honour a neutral fighter's action (start a move, or step). A committed fighter
 // ignores its action — the move it is locked into continues.
 const intake = (f: Fighter, action: Action, rules: Rules): void => {
@@ -338,8 +358,10 @@ const intake = (f: Fighter, action: Action, rules: Rules): void => {
     action.type === "attack" &&
     affordable(f, rules.moves[action.move], rules)
   ) {
-    f.state = startAttack(rules.moves[action.move], action.band);
+    const move = startAttack(rules.moves[action.move], action.band);
+    f.state = move;
     spend(f, rules.moves[action.move], rules); // C10: a costed move drains stamina on commit
+    move.extra += gasRecovery(f, rules); // C10 Story 3: a commit into the gas line recovers slower
   } else if (
     action.type === "sweep" &&
     rules.moves.sweep !== undefined &&
@@ -348,8 +370,10 @@ const intake = (f: Fighter, action: Action, rules: Rules): void => {
     // Sweep (C8): a low-band knockdown strike. Commit to an attacking move at band `low`
     // reading the optional `moves.sweep` spec. Without the spec the action is inert (no state
     // change) ⇒ byte-identical to the pre-sweep engine. An unaffordable sweep degrades to idle.
-    f.state = startAttack(rules.moves.sweep, "low");
+    const move = startAttack(rules.moves.sweep, "low");
+    f.state = move;
     spend(f, rules.moves.sweep, rules);
+    move.extra += gasRecovery(f, rules); // C10 Story 3: a gassed sweep also recovers slower
   } else if (action.type === "move") {
     f.x = clamp(
       f.x + action.dir * f.facing * rules.walkSpeed,

@@ -3686,7 +3686,8 @@ describe("runFight — guard stamina chip (a block bleeds the defender's stamina
 
     expect(result.events[3].b.stamina).toBe(5); // pre-contact: the small meter is full
     expect(result.events[4].b.stamina).toBe(0); // chip 10 on stamina 5 ⇒ floors at 0, not −5
-    for (const e of result.events) expect(e.b.stamina).toBeGreaterThanOrEqual(0);
+    for (const e of result.events)
+      expect(e.b.stamina).toBeGreaterThanOrEqual(0);
   });
 
   it("draws nothing when the meter is configured without a blockChip (byte-identical to the Story 1 meter)", () => {
@@ -3814,7 +3815,8 @@ describe("runFight — parry stamina chip (a deflect bleeds MORE than a block)",
 
     expect(result.events[3].b.stamina).toBe(5); // pre-parry: the small meter is full
     expect(result.events[4].b.stamina).toBe(0); // chip 20 on stamina 5 ⇒ floors at 0, not −15
-    for (const e of result.events) expect(e.b.stamina).toBeGreaterThanOrEqual(0);
+    for (const e of result.events)
+      expect(e.b.stamina).toBeGreaterThanOrEqual(0);
   });
 
   it("draws nothing when the meter is configured without a parryChip (byte-identical to Slice 2a)", () => {
@@ -3829,5 +3831,117 @@ describe("runFight — parry stamina chip (a deflect bleeds MORE than a block)",
 
     for (const e of result.events) expect(e.b.stamina).toBe(100); // ... but no chip ⇒ no draw
     expect(result.scores.a).toBe(0); // the deflect still works ⇒ resolution unchanged
+  });
+});
+
+describe("runFight — gassing penalty (a gassed fighter's committed move recovers slower)", () => {
+  const STRIKER = bot([], { type: "attack", move: "strike", band: "mid" });
+
+  // A strike on the standard 4/2/6 timing (total 12), with a small on-commit cost so we can
+  // drive a fighter to/below a gas line and watch when it next re-commits (the next step-down).
+  const gasRules = (
+    stamina: NonNullable<Rules["stamina"]>,
+    startGap = 200000,
+  ): Rules =>
+    getMockRules({
+      startGap,
+      stamina,
+      moves: {
+        strike: {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+          staminaCost: 10,
+        },
+      },
+    });
+
+  it("extends a gassed strike's recovery (recovery-only): same active onset, later re-commit", () => {
+    // Both spend to 45 on the tick-0 commit; gassed (45 ≤ 50) ⇒ recovery +5 ⇒ total 17.
+    const gassed = runFight(
+      getMockConfig({
+        rules: gasRules({ max: 55, gasThreshold: 50, gasRecoveryPenalty: 5 }),
+        botA: STRIKER,
+        botB: IDLE,
+        maxTicks: 20,
+      }),
+    );
+
+    // No gasThreshold ⇒ never gassed ⇒ normal recovery (total 12).
+    const control = runFight(
+      getMockConfig({
+        rules: gasRules({ max: 55 }),
+        botA: STRIKER,
+        botB: IDLE,
+        maxTicks: 20,
+      }),
+    );
+
+    // recovery-ONLY: the gassed strike still becomes active on the same tick — startup/active
+    // are untouched, so it scores at tick 4 exactly like the control (only the tail is longer).
+    expect(gassed.events[3].a.points).toBe(0); // tick 3: still in startup
+    expect(gassed.events[4].a.points).toBe(1); // tick 4: active ⇒ scores
+    expect(control.events[4].a.points).toBe(1); // ... identical active onset
+
+    // RECOVERY extended: the control re-commits on schedule at tick 12 (45→35); the gassed
+    // fighter is still recovering then and does not re-commit until 12 + gasRecoveryPenalty.
+    expect(control.events[12].a.stamina).toBe(35); // control re-committed on schedule
+    expect(gassed.events[12].a.stamina).toBe(45); // gassed: still recovering — the extension
+    expect(gassed.events[17].a.stamina).toBe(35); // re-commits exactly at 12 + penalty (5)
+  });
+
+  it("gasses exactly at the threshold (≤): a commit landing on the line is slowed, one above it is not", () => {
+    // cost 10, threshold 50. max 60 ⇒ post-commit 50 (== threshold) ⇒ gassed; max 61 ⇒ 51 ⇒ not.
+    const onLine = runFight(
+      getMockConfig({
+        rules: gasRules(
+          { max: 60, gasThreshold: 50, gasRecoveryPenalty: 5 },
+          300000, // beyond reach ⇒ whiff; timing only, no scoring noise
+        ),
+        botA: STRIKER,
+        botB: IDLE,
+        maxTicks: 14,
+      }),
+    );
+
+    const above = runFight(
+      getMockConfig({
+        rules: gasRules(
+          { max: 61, gasThreshold: 50, gasRecoveryPenalty: 5 },
+          300000,
+        ),
+        botA: STRIKER,
+        botB: IDLE,
+        maxTicks: 14,
+      }),
+    );
+
+    expect(above.events[12].a.stamina).toBe(41); // 51 > 50 ⇒ not gassed ⇒ re-commits at tick 12
+    expect(onLine.events[12].a.stamina).toBe(50); // 50 ≤ 50 ⇒ gassed ⇒ extended, not yet re-committed
+  });
+
+  it("never gasses without a gasThreshold — a declared gasRecoveryPenalty stays inert (byte-identical to Story 2)", () => {
+    const withPenaltyNoThreshold = runFight(
+      getMockConfig({
+        rules: gasRules({ max: 55, gasRecoveryPenalty: 5 }), // penalty present, NO threshold
+        botA: STRIKER,
+        botB: IDLE,
+        maxTicks: 20,
+      }),
+    );
+
+    const plainMeter = runFight(
+      getMockConfig({
+        rules: gasRules({ max: 55 }), // just the meter
+        botA: STRIKER,
+        botB: IDLE,
+        maxTicks: 20,
+      }),
+    );
+
+    // identical event streams ⇒ the penalty does nothing unless a gasThreshold gates it
+    expect(withPenaltyNoThreshold.events).toEqual(plainMeter.events);
   });
 });
