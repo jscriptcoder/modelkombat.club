@@ -243,6 +243,24 @@ describe("validate — bot intake gate", () => {
       expect(validate(doc).ok).toBe(true);
     });
 
+    it("accepts an attack with the gyaku-zuki (reverse punch) move id", () => {
+      const doc = getMockBotDoc({
+        default: { type: "attack", move: "gyaku-zuki", band: "mid" },
+      });
+
+      expect(validate(doc).ok).toBe(true);
+    });
+
+    it("accepts a gyaku-zuki attack at any syntactically valid band (the runtime gate, not the validator, decides legality)", () => {
+      // `low` is out of the reverse's legal bands, but band-legality is a RUNTIME concern —
+      // the validator only checks the move id + band are well-formed. It must still pass.
+      const doc = getMockBotDoc({
+        default: { type: "attack", move: "gyaku-zuki", band: "low" },
+      });
+
+      expect(validate(doc).ok).toBe(true);
+    });
+
     it("rejects a block with an unknown band", () => {
       const doc = {
         ...getMockBotDoc(),

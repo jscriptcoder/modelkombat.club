@@ -118,7 +118,13 @@ const FIELD_READERS: Record<FieldPath, (s: State) => number> = {
 };
 
 const ALLOWED_FIELDS: ReadonlySet<string> = new Set(Object.keys(FIELD_READERS));
-const MOVES: ReadonlySet<string> = new Set<MoveId>(["strike", "kizami-zuki"]);
+
+const MOVES: ReadonlySet<string> = new Set<MoveId>([
+  "strike",
+  "kizami-zuki",
+  "gyaku-zuki",
+]);
+
 const BANDS: ReadonlySet<string> = new Set<Band>(["high", "mid", "low"]);
 const CELL_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,31}$/;
 
