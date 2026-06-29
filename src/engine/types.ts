@@ -12,8 +12,9 @@ export type Band = "high" | "mid" | "low";
 // The flat union of named techniques a bot may `attack` with (C9 arsenal). The abstract
 // `strike` stays as scaffolding (retired into the named roster in a later slice); the
 // WKF roster is added one technique at a time. `kizami-zuki` is the jab (first technique);
-// `gyaku-zuki` is the reverse punch (longer reach, more committed — the reach hierarchy).
-export type MoveId = "strike" | "kizami-zuki" | "gyaku-zuki";
+// `gyaku-zuki` is the reverse punch (longer reach, more committed — the reach hierarchy);
+// `mae-geri` is the front kick (mid-only single-band, 2-point waza-ari, out-reaches the punches).
+export type MoveId = "strike" | "kizami-zuki" | "gyaku-zuki" | "mae-geri";
 
 // ─── Action grammar — a bot returns exactly ONE per tick ─────────────────────
 // `dir` is RELATIVE to facing: +1 = toward opponent, -1 = away, 0 = hold.
@@ -131,6 +132,7 @@ export type Rules = {
     sweep?: MoveSpec;
     "kizami-zuki"?: MoveSpec;
     "gyaku-zuki"?: MoveSpec;
+    "mae-geri"?: MoveSpec;
   };
   // Vertical axis (C4). Both absent ⇒ inert (a `jump` launches no arc) ⇒
   // byte-identical to the pre-vertical engine. `jumpImpulse` is the initial

@@ -3790,6 +3790,99 @@ describe("runFight — gyaku-zuki (the reverse punch: a longer-reach high·mid t
   });
 });
 
+describe("runFight — mae-geri (the front kick: a single-band mid waza-ari technique)", () => {
+  // A ruleset configuring the front kick alongside the baseline strike. The kick's distinct
+  // traits: a SINGLE legal band (mid only — the gate rejects BOTH high and low), a 2-point
+  // (waza-ari) score, and a longer reach than the punches (280000 > reverse 200000).
+  const kickRules = (o: Partial<Rules> = {}): Rules =>
+    getMockRules({
+      startGap: 200000, // within kick reach (280000)
+      moves: {
+        strike: { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
+        "mae-geri": {
+          startup: 4,
+          active: 2,
+          recovery: 12,
+          score: 2,
+          reach: 280000,
+          bands: ["mid"],
+        },
+      },
+      ...o,
+    });
+
+  const kickAt = (band: Band): BotDoc =>
+    bot([], { type: "attack", move: "mae-geri", band });
+
+  it("scores 2 (waza-ari) when a legal in-reach front kick connects at mid", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: kickRules(),
+        botA: kickAt("mid"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(2);
+  });
+
+  it("fizzles to idle at high — the kick strikes only mid (the single-band gate)", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: kickRules(),
+        botA: kickAt("high"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("fizzles to idle at low — the kick strikes only mid (the single-band gate)", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: kickRules(),
+        botA: kickAt("low"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("whiffs beyond its (longer) reach — at a gap even the kick cannot close", () => {
+    // startGap 300000: beyond kick reach (280000).
+    const result = runFight(
+      getMockConfig({
+        rules: kickRules({ startGap: 300000 }),
+        botA: kickAt("mid"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("is inert when the move id is unconfigured in this Rules (degrades to idle, like sweep/throw)", () => {
+    // A strike-only ruleset (no `mae-geri` key); a kick attack references an unconfigured
+    // move ⇒ no spec ⇒ idle ⇒ no score (the `spec !== undefined` guard).
+    const result = runFight(
+      getMockConfig({
+        rules: getMockRules({ startGap: 200000 }),
+        botA: kickAt("mid"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+});
+
 describe("runFight — stamina affordability (an unaffordable move degrades to idle)", () => {
   const STRIKER = bot([], { type: "attack", move: "strike", band: "mid" });
   const THROWER = bot([], { type: "throw" });

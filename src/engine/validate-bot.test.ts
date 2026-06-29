@@ -261,6 +261,24 @@ describe("validate — bot intake gate", () => {
       expect(validate(doc).ok).toBe(true);
     });
 
+    it("accepts an attack with the mae-geri (front kick) move id", () => {
+      const doc = getMockBotDoc({
+        default: { type: "attack", move: "mae-geri", band: "mid" },
+      });
+
+      expect(validate(doc).ok).toBe(true);
+    });
+
+    it("accepts a mae-geri attack at any syntactically valid band (the runtime gate, not the validator, decides legality)", () => {
+      // `high` is out of the kick's single legal band (mid), but band-legality is a RUNTIME
+      // concern — the validator only checks the move id + band are well-formed. It must pass.
+      const doc = getMockBotDoc({
+        default: { type: "attack", move: "mae-geri", band: "high" },
+      });
+
+      expect(validate(doc).ok).toBe(true);
+    });
+
     it("rejects a block with an unknown band", () => {
       const doc = {
         ...getMockBotDoc(),

@@ -123,6 +123,7 @@ const MOVES: ReadonlySet<string> = new Set<MoveId>([
   "strike",
   "kizami-zuki",
   "gyaku-zuki",
+  "mae-geri",
 ]);
 
 const BANDS: ReadonlySet<string> = new Set<Band>(["high", "mid", "low"]);
