@@ -269,17 +269,35 @@ generating code; flag any change that would.
   config-gated), so the **`dsl.ts` interpreter stays 100%**. 400 tests; `sim.ts` changed-line mutation
   100% (4a 5/5, 4b 11/11), `dsl.ts` reader region 100% (16/16, 17/17). `OpponentState.stamina`/`gassed`
   are additive ⇒ absent stamina config ⇒ sentinel `0`/`0` ⇒ **byte-identical** to the pre-Story-4 engine.
-  **Deferred — the consolidated `CANONICAL_RULES` stamina wiring** (the last C10 unit: promote the fixture
-  numbers into the canonical table, each proven by a `runFight` relationship test).
+  **Then shipped — the consolidated `CANONICAL_RULES` stamina wiring** (the last C10 unit; see the next
+  entry).
+- DONE (canonical stamina wiring — C10 final unit, PRs #63–#65): the proven stamina economy promoted into
+  **`CANONICAL_RULES`** so the platform (`npm run fight`, the future API / viewer) fights with conditioning
+  — **C10 is now fully canonical**. Three additive slices, every number proven by a `runFight`
+  *relationship* test in `rules.test.ts` (no literals-in-isolation), the full pre-existing suite kept green
+  under the live meter (numbers chosen so the short canonical fights never hit the affordability wall):
+  Slice 1 (PR #63) the **economy core** — `stamina { max 100, regen 10 }` + per-move `staminaCost`
+  (basic strike 20 < special throw / sweep 40); spend-on-commit (a whiff still costs), regen offsets a paced
+  poke while a free spammer floors the meter to exactly 0 and the next commit degrades to idle. Slice 2
+  (PR #64) the **guard contact-chip** — `blockChip 5 < parryChip 15`; a matching guard that ABSORBS a strike
+  bleeds the DEFENDER (a held block per contact tick, a fresh deflecting parry the larger chip once),
+  non-lethal vs the 100 reserve so a parried defender can still counter. Slice 3 (PR #65) the **gas line** —
+  `gasThreshold 30` / `gasRecoveryPenalty 6` at `basic 20 ≤ 30 < special 40`: a gassed fighter's throw /
+  sweep degrade to idle (the EMERGENT special-lockout riding Story 1's affordability gate) while its strike
+  still commits, and a move committed while gassed eats +6 recovery; with `gasThreshold` wired,
+  `self.gassed` / `opponent.gassed` go live on canonical. 411 tests; `rules.ts` mutation 100% (the data
+  values are pinned by structural-shape `toBe` assertions + proven by the relationship tests — the only
+  Stryker-generated mutant is the `ObjectLiteral` `stamina: {}`, killed by the meter tests). `sim.ts` /
+  `dsl.ts` unchanged (data + tests only). The per-move cost MAGNITUDES are provisional against today's
+  single-strike arsenal — re-tuned additively when C9 spreads costs across the 4-strike roster; the
+  structural INEQUALITIES (basic < special; the gas band) survive C9. **C10 (the stamina economy) is
+  COMPLETE** — both C10 plan files (`c10-canonical-stamina.md`, `c10-stamina-split.md`) deleted.
 - NOT YET BUILT (later slices): no horizontal jump displacement or air-actions, *yame*/match
   structure, telemetry object, Vercel API, or Pixi viewer.
-- NEXT (active thread — C10 stamina): the consolidated **`CANONICAL_RULES` stamina wiring** — the last
-  C10 unit. Promote the fixture numbers (`max`/`regen`/per-move `staminaCost`/`gasThreshold`/
-  `gasRecoveryPenalty`/`blockChip`/`parryChip`) into the canonical table, each proven by a `runFight`
-  relationship test (the cost inequality `specialCost > gasThreshold ≥ basicCost`; regen offsetting a
-  sustainable poke; `parryChip > blockChip`), re-tuned against gas + the C9 arsenal — a `planning` → TDD
-  slice off `plans/c10-stamina-split.md`. After C10: the **C9 arsenal** (resolved,
-  §P7), then the still-unresolved **match structure** (*yame* resets / rounds / WKF win conditions) and
+- NEXT (roadmap — C10 COMPLETE): the **C9 multi-move "real karate" arsenal** (resolved, `docs/DESIGN.md`
+  §P7) — replace the single abstract `strike` with named techniques (own frames / reach / score /
+  legal-bands + cross-move cancel routes), which also re-tunes the C10 per-move stamina costs across the
+  roster. Then the still-unresolved **match structure** (*yame* resets / rounds / WKF win conditions) and
   **air-actions** (air strikes / horizontal jump displacement) — `grill-me` → `planning` → TDD. The
   spine is pinned in `docs/DESIGN.md` **§11 (Combat resolution order)**: two-phase compute-then-apply
   (live from C5, **strictly forced by C7's throws**), S1 posture → S2 intake → S3 compute → S4 apply →
