@@ -4020,3 +4020,107 @@ describe("runFight — self.gassed (a bot reads its own live gas tell)", () => {
     expect(reads.events).toEqual(plain.events); // self.gassed = 0 ⇒ no divergence
   });
 });
+
+describe("runFight — gassed special-lockout (emergent: specialCost > gasThreshold ≥ basicCost)", () => {
+  const STRIKER = bot([], { type: "attack", move: "strike", band: "mid" });
+  const THROWER = bot([], { type: "throw" });
+  const SWEEPER = bot([], { type: "sweep" });
+
+  // The lockout of throw/sweep while gassed is NOT a new mechanic — it falls out of Story 1's
+  // affordability gate the moment the canonical numbers satisfy specialCost > gasThreshold ≥
+  // basicCost. These are guarantee tests pinning that emergent relationship; the numbers live
+  // in the fixture (CANONICAL_RULES promotion is the deferred consolidated-wiring slice).
+  const BASIC = 10;
+  const GAS = 20;
+  const SPECIAL = 30;
+
+  const lockoutRules = (max: number): Rules =>
+    getMockRules({
+      startGap: 100000, // within throw (120000) / sweep (180000) / strike (250000) reach
+      stamina: { max, gasThreshold: GAS },
+      moves: {
+        strike: {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+          staminaCost: BASIC,
+        },
+        sweep: {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 0,
+          reach: 180000,
+          knockdown: true,
+          staminaCost: SPECIAL,
+        },
+      },
+      throw: {
+        startup: 2,
+        active: 2,
+        recovery: 4,
+        reach: 120000,
+        score: 3,
+        staminaCost: SPECIAL,
+      },
+      knockdownDuration: 30, // a clean grab downs the foe ⇒ one grab scores once (no re-grab on the 2nd active frame)
+    });
+
+  it("locks a gassed fighter out of throw and sweep while its basic strike still commits", () => {
+    // The inequality the emergent lockout rests on — asserted structurally, not assumed.
+    expect(SPECIAL).toBeGreaterThan(GAS);
+    expect(GAS).toBeGreaterThanOrEqual(BASIC);
+
+    // max 15 ⇒ born gassed (15 ≤ gasThreshold 20), with 15 ≥ basic (10) but 15 < special (30).
+    const rules = lockoutRules(15);
+
+    const striker = runFight(
+      getMockConfig({ rules, botA: STRIKER, botB: IDLE, maxTicks: 6 }),
+    );
+
+    const thrower = runFight(
+      getMockConfig({ rules, botA: THROWER, botB: IDLE, maxTicks: 6 }),
+    );
+
+    const sweeper = runFight(
+      getMockConfig({ rules, botA: SWEEPER, botB: IDLE, maxTicks: 6 }),
+    );
+
+    // the basic poke still commits while gassed: it spends (15 → 5) and connects.
+    expect(striker.events[0].a.stamina).toBe(5);
+    expect(striker.scores.a).toBe(1);
+
+    // throw and sweep are LOCKED OUT — both degrade to idle: no spend (flat 15), no grab/score.
+    expect(thrower.events[0].a.stamina).toBe(15);
+    expect(thrower.scores.a).toBe(0);
+    expect(sweeper.events[0].a.stamina).toBe(15);
+    expect(sweeper.scores.a).toBe(0);
+  });
+
+  it("a FRESH fighter affords the same throw the gassed one cannot — the lockout is the gas, not the move", () => {
+    // Only `max` differs: fresh (100 > special 30) vs gassed (15 < 30); same throw spec & reach.
+    const fresh = runFight(
+      getMockConfig({
+        rules: lockoutRules(100),
+        botA: THROWER,
+        botB: IDLE,
+        maxTicks: 6,
+      }),
+    );
+
+    const gassed = runFight(
+      getMockConfig({
+        rules: lockoutRules(15),
+        botA: THROWER,
+        botB: IDLE,
+        maxTicks: 6,
+      }),
+    );
+
+    expect(fresh.scores.a).toBe(3); // affords the grab ⇒ the WKF ippon
+    expect(gassed.scores.a).toBe(0); // cannot afford it ⇒ idle, no grab
+    expect(fresh.scores.a).toBeGreaterThan(gassed.scores.a); // the relationship: same move, gated by gas
+  });
+});
