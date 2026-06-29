@@ -178,5 +178,19 @@ export type Rules = {
   // LARGER draw a DEFENDER takes when its fresh guard DEFLECTS the strike (a parry) — the
   // deflect resolves the strike, so it chips once (vs a block's per-contact-tick draw).
   // The design holds `parryChip > blockChip`. Absent ⇒ 0 ⇒ a parry bleeds nothing.
-  stamina?: { max: number; regen?: number; blockChip?: number; parryChip?: number };
+  // `gasThreshold` (C10 Story 3) is the stepped gas line: a fighter at/below it (post-spend,
+  // `stamina ≤ gasThreshold`) is GASSED, and a flat `gasRecoveryPenalty` is added to its
+  // committed move's recovery (recovery-only — startup/active unchanged). Evaluated at
+  // commit (stamina is static through a move, so commit-time ≡ recovery-entry). Absent
+  // `gasThreshold` ⇒ never gassed ⇒ `gasRecoveryPenalty` is inert ⇒ byte-identical to the
+  // Story 2 meter. The lockout of specials while gassed is EMERGENT, not encoded here: it
+  // falls out of the affordability gate when `specialCost > gasThreshold ≥ basicCost`.
+  stamina?: {
+    max: number;
+    regen?: number;
+    blockChip?: number;
+    parryChip?: number;
+    gasThreshold?: number;
+    gasRecoveryPenalty?: number;
+  };
 };
