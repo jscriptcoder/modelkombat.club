@@ -814,3 +814,74 @@ describe("CANONICAL_RULES — the jump arc is a deterministic integer parabola",
     ]);
   });
 });
+
+// ─── Canonical stamina, Slice 1: the conditioning meter paces the fight ────────
+
+// Strikes mid ONLY when the meter is at the cap (self.stamina ≥ 100 = stamina.max,
+// pinned by the structural-shape test) — a self-pacing poke that waits for regen to
+// refill the cost between strikes. A pure read of the live self.stamina field.
+const PACED_POKER: BotDoc = bot(
+  [
+    {
+      when: {
+        op: "gte",
+        args: [
+          { op: "field", path: "self.stamina" },
+          { op: "const", value: 100 },
+        ],
+      },
+      do: { type: "attack", move: "strike", band: "mid" },
+    },
+  ],
+  { type: "idle" },
+);
+
+describe("CANONICAL_RULES — the stamina meter paces the fight", () => {
+  it("a committed strike spends its cost on commit — a whiff still costs", () => {
+    // Idle to tick 4 (the meter sits at the cap), then strike once at tick 5 from the full
+    // start gap (300000 > strike.reach 240000) so it WHIFFS — yet the commit still drains the cost.
+    const result = runFight(
+      fight({ botA: strikeAtTicks([5], "mid"), botB: IDLE, maxTicks: 20 }),
+    );
+
+    const reserve = result.events[4].a.stamina; // idled to tick 4 ⇒ the full reserve (stamina.max)
+
+    expect(reserve).toBe(100);
+    expect(reserve - result.events[5].a.stamina).toBe(20); // a commit drains exactly the strike cost — a whiff still costs
+  });
+
+  it("a paced poke is sustainable while a free spammer runs the meter to empty (regen is load-bearing)", () => {
+    // Same canonical table, same horizon (out of range ⇒ both whiff), differing ONLY in cadence.
+    // The spammer strikes the instant it is free (no room for regen) and floors the meter; the
+    // poker waits for a full reserve (regen refills the cost between strikes) and never runs dry.
+    const staminaSeries = (botA: BotDoc): number[] =>
+      runFight(fight({ botA, botB: IDLE, maxTicks: 150 })).events.map(
+        (e) => e.a.stamina,
+      );
+
+    const spammer = staminaSeries(restrikeWhenFree("mid"));
+    const poker = staminaSeries(PACED_POKER);
+
+    expect(Math.min(...spammer)).toBe(0); // ran the meter to empty (and the gate held it at 0 — never negative)
+    expect(Math.min(...poker)).toBeGreaterThan(0); // regen offset the paced cost ⇒ never dry
+    expect(Math.max(...poker)).toBe(CANONICAL_RULES.stamina?.max ?? 0); // and it recovers to a full reserve
+  });
+});
+
+describe("CANONICAL_RULES — stamina structural shape", () => {
+  it("meters a full reserve that regens only a sub-strike trickle (pacing matters)", () => {
+    expect(CANONICAL_RULES.stamina?.max).toBe(100);
+    expect(CANONICAL_RULES.stamina?.regen).toBe(10);
+    expect(CANONICAL_RULES.stamina?.regen ?? 0).toBeLessThan(
+      strike().staminaCost ?? 0,
+    );
+  });
+
+  it("prices a basic strike below the specials (basic < special)", () => {
+    const basic = strike().staminaCost ?? 0;
+
+    expect(basic).toBe(20);
+    expect(basic).toBeLessThan(throwSpec().staminaCost ?? 0);
+    expect(basic).toBeLessThan(sweepSpec().staminaCost ?? 0);
+  });
+});

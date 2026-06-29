@@ -40,6 +40,7 @@ export const CANONICAL_RULES: Rules = {
       score: 1,
       reach: 240000, // 240 units — LOCKED; later reach hierarchy throw < sweep < strike
       cancelInto: ["strike"],
+      staminaCost: 20, // basic move cost (C10) — half a special; the gas band sits above it
     },
     // The sweep (C8 ashi-barai) — a LOW-band knockdown strike, on the same startup-7 timing:
     //   • score 0 + knockdown ⇒ a clean low hit DOWNS the foe (the points live in the okizeme
@@ -57,6 +58,7 @@ export const CANONICAL_RULES: Rules = {
       reach: 180000,
       knockdown: true,
       cancelInto: ["strike"],
+      staminaCost: 40, // special move cost (C10) — twice the basic strike
     },
   },
   // Defensive depth (C5/C6), tuned to the canonical strike's startup-7 timing:
@@ -85,7 +87,14 @@ export const CANONICAL_RULES: Rules = {
   //   • score 3 — a clean throw is the WKF ippon.
   // knockdownDuration 30: a ~half-second knockdown; the okizeme finish / i-frame split is
   // carved out of it in a later slice.
-  throw: { startup: 7, active: 2, recovery: 14, reach: 120000, score: 3 },
+  throw: {
+    startup: 7,
+    active: 2,
+    recovery: 14,
+    reach: 120000,
+    score: 3,
+    staminaCost: 40, // special move cost (C10) — twice the basic strike
+  },
   knockdownDuration: 30,
   // Okizeme (C8): the first `finishWindow` ticks of ANY knockdown are a guaranteed FINISH —
   // an opposing strike scores `finishScore`, ignoring band / guard / occupancy (the foe is prone).
@@ -114,4 +123,18 @@ export const CANONICAL_RULES: Rules = {
   // ±1 seeded jitter. lAct 6 with strike.startup 7 puts the read on the knife-edge
   // (S ≥ lAct + 1 holds with equality), so jitter + sharp timing decide the exchange.
   perception: { lPos: 1, lAct: 6, jitter: 1 },
+  // The conditioning meter (C10) — the LIGHT layer that paces the fight, never a win
+  // condition. A committed strike / throw / sweep spends `staminaCost` on commit (a whiff
+  // still costs); an UNCOMMITTED fighter (neutral, not guarding) regens `regen`/tick,
+  // clamped to `max`. The numbers:
+  //   • max 100 / regen 10 — a full reserve that trickles back a SUB-strike amount per tick
+  //     (regen 10 < strike cost 20), so a free spammer floors the meter (5 strikes empty it
+  //     to exactly 0) and the next commit degrades to idle, while a fighter that paces
+  //     between strikes lets regen refill the cost and never runs dry. Pacing — not the meter
+  //     alone — is what sustains offense.
+  //   • basic (strike 20) < special (throw / sweep 40) — the cost hierarchy the C10 gas band
+  //     (a later slice) sits inside (specialCost > gasThreshold ≥ basicCost): a gassed fighter
+  //     loses its specials before its strike.
+  // Absent ⇒ no meter simulated ⇒ byte-identical to the pre-stamina engine.
+  stamina: { max: 100, regen: 10 },
 };
