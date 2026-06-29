@@ -3674,6 +3674,122 @@ describe("runFight — kizami-zuki (the jab: a short-reach high·mid technique)"
   });
 });
 
+describe("runFight — gyaku-zuki (the reverse punch: a longer-reach high·mid technique)", () => {
+  // A ruleset configuring all three punches so the reach hierarchy is testable at one gap.
+  // The reverse's distinct traits: a LONGER reach than the jab (200000 > 150000) and a
+  // longer, more-committed recovery (10 > 6); same high·mid legal bands, same 1 point.
+  const reverseRules = (o: Partial<Rules> = {}): Rules =>
+    getMockRules({
+      startGap: 120000, // within reverse reach (200000) AND jab reach (150000)
+      moves: {
+        strike: { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
+        "kizami-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 150000,
+          bands: ["high", "mid"],
+        },
+        "gyaku-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 10,
+          score: 1,
+          reach: 200000,
+          bands: ["high", "mid"],
+        },
+      },
+      ...o,
+    });
+
+  const reverseAt = (band: Band): BotDoc =>
+    bot([], { type: "attack", move: "gyaku-zuki", band });
+
+  const jabAt = (band: Band): BotDoc =>
+    bot([], { type: "attack", move: "kizami-zuki", band });
+
+  it("scores 1 when a legal in-reach reverse connects at mid", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: reverseRules(),
+        botA: reverseAt("mid"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(1);
+  });
+
+  it("fizzles to idle at low — the reverse strikes only high·mid (the band gate)", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: reverseRules(),
+        botA: reverseAt("low"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("reaches where the jab cannot — at a gap beyond jab reach but within reverse reach, the jab whiffs and the reverse hits (the reach hierarchy jab < reverse)", () => {
+    // startGap 175000: beyond jab reach (150000), within reverse reach (200000). Same gap,
+    // two openers — the only difference is which punch is thrown.
+    const jab = runFight(
+      getMockConfig({
+        rules: reverseRules({ startGap: 175000 }),
+        botA: jabAt("mid"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    const reverse = runFight(
+      getMockConfig({
+        rules: reverseRules({ startGap: 175000 }),
+        botA: reverseAt("mid"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(jab.scores.a).toBe(0);
+    expect(reverse.scores.a).toBe(1);
+  });
+
+  it("whiffs beyond its own (longer) reach — at a gap even the reverse cannot close", () => {
+    // startGap 220000: beyond reverse reach (200000).
+    const result = runFight(
+      getMockConfig({
+        rules: reverseRules({ startGap: 220000 }),
+        botA: reverseAt("mid"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("is inert when the move id is unconfigured in this Rules (degrades to idle, like sweep/throw)", () => {
+    // A strike-only ruleset (no `gyaku-zuki` key); a reverse attack references an unconfigured
+    // move ⇒ no spec ⇒ idle ⇒ no score (the `spec !== undefined` guard).
+    const result = runFight(
+      getMockConfig({
+        rules: getMockRules({ startGap: 120000 }),
+        botA: reverseAt("mid"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+});
+
 describe("runFight — stamina affordability (an unaffordable move degrades to idle)", () => {
   const STRIKER = bot([], { type: "attack", move: "strike", band: "mid" });
   const THROWER = bot([], { type: "throw" });
