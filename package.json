@@ -15,7 +15,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "fight": "tsx src/cli/fight.ts",
-    "benchmark": "tsx src/cli/benchmark.ts"
+    "benchmark": "tsx src/cli/benchmark.ts",
+    "gen:spec": "tsx src/cli/write-spec.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

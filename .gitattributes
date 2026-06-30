@@ -1,0 +1,4 @@
+# The generated spec must stay LF in the working tree on every platform, so its
+# byte-match drift test holds. Without this, core.autocrlf=true would check it
+# out as CRLF on Windows while generateSpec() emits LF, failing the test.
+docs/spec.md text eol=lf
