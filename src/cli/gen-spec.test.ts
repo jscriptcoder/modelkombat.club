@@ -42,6 +42,20 @@ const pairingLine = (
     .split("\n")
     .find((l) => l.includes(code(token)) && l.includes(String(value)));
 
+// The body of a `## heading` section, exclusive of the heading and the next
+// `## ` heading — so an assertion targets ONE section's prose (a value cited in
+// the primer is not confused with the same value in the frame table).
+const sectionOf = (spec: string, heading: string): string => {
+  const lines = spec.split("\n");
+  const start = lines.indexOf(heading);
+  if (start < 0) return "";
+
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((l) => l.startsWith("## "));
+
+  return (end < 0 ? rest : rest.slice(0, end)).join("\n");
+};
+
 describe("generateSpec — the factual machine-truth spec", () => {
   it("is pure: byte-stable across calls (no wall-clock)", () => {
     expect(generateSpec()).toBe(generateSpec());
@@ -160,6 +174,73 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(spec).toContain("not allowed");
       expect(spec).toContain("unknown move");
       expect(spec).toContain("undeclared cell");
+    });
+  });
+
+  describe("strategic primer (interpolated from the rules)", () => {
+    const HEADING = "## Strategy primer";
+    const lAct = CANONICAL_RULES.perception?.lAct ?? 0;
+    const gasThreshold = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    // The primer line carrying a given claim — found by a stable concept phrase,
+    // so the asserted value is the one PAIRED with that claim (not a coincidental
+    // match elsewhere in the section).
+    const claimLine = (primer: string, phrase: string): string =>
+      primer.split("\n").find((l) => l.includes(phrase)) ?? "";
+
+    it("is its own section, placed after the frame table and before benchmark rules", () => {
+      const spec = generateSpec();
+      expect(sectionOf(spec, HEADING)).not.toBe("");
+      expect(spec.indexOf("## Frame table")).toBeLessThan(
+        spec.indexOf(HEADING),
+      );
+      expect(spec.indexOf(HEADING)).toBeLessThan(
+        spec.indexOf("## Benchmark rules"),
+      );
+    });
+
+    it("cites the canonical perception, okizeme, and gas constants", () => {
+      const primer = sectionOf(generateSpec(), HEADING);
+      const reactable = claimLine(primer, "reactable iff");
+      expect(reactable).toContain(code(String(lAct)));
+      expect(reactable).toContain(code(String(lAct + 1)));
+      expect(claimLine(primer, "FINISH")).toContain(
+        code(String(CANONICAL_RULES.finishScore)),
+      );
+      expect(claimLine(primer, "GASSED")).toContain(code(String(gasThreshold)));
+    });
+
+    it("interpolates from the rules — a retune updates the prose (no hardcoded literals)", () => {
+      const retuned: Rules = {
+        ...CANONICAL_RULES,
+        perception: { lPos: 2, lAct: 9, jitter: 1 },
+        finishScore: 5,
+        stamina: {
+          ...(CANONICAL_RULES.stamina ?? { max: 100 }),
+          gasThreshold: 25,
+        },
+      };
+
+      const primer = sectionOf(generateSpec(retuned), HEADING);
+      const reactable = claimLine(primer, "reactable iff");
+      expect(reactable).toContain(code("9")); // retuned lAct
+      expect(reactable).toContain(code("10")); // retuned lAct + 1
+      expect(claimLine(primer, "FINISH")).toContain(code("5")); // retuned finishScore
+      expect(claimLine(primer, "GASSED")).toContain(code("25")); // retuned gasThreshold
+    });
+
+    it("collapses absent optional constants to the sentinel `0` — never throws, never renders `undefined`", () => {
+      const bare: Rules = { ...CANONICAL_RULES };
+
+      delete bare.perception;
+      delete bare.throw;
+      delete bare.stamina;
+
+      const primer = sectionOf(generateSpec(bare), HEADING);
+      expect(primer).not.toContain("undefined");
+      expect(claimLine(primer, "reactable iff")).toContain(code("0")); // lAct sentinel
+      expect(claimLine(primer, "triangle")).toContain(code("0")); // throw.reach sentinel
+      expect(claimLine(primer, "GASSED")).toContain(code("0")); // stamina sentinel
     });
   });
 });

@@ -329,7 +329,7 @@ gauntlet) → a thin shell writes a committed **`docs/spec.md`**.
 
 ---
 
-#### Slice 5b: Embed the bot-doc JSON Schema + `validate()`↔schema agreement test
+#### Slice 5b: Embed the bot-doc JSON Schema + `validate()`↔schema agreement test — ✅ DONE (PR #84)
 
 **Value**: The spec carries a standard, machine-consumable JSON Schema for the bot document that
 provably agrees with the real `validate()` gate on the bot corpus — tooling/LLMs can lean on it.
@@ -393,24 +393,47 @@ from `CANONICAL_RULES`**, plus embedded **real example bots** from `bots/` → `
 regenerated → a dogfood bot authored from `spec.md` alone is scored via slice 1.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`;
 `docs-guardian` (agent).
+**Locked decisions (2026-06-30):** (a) embedded examples = **teach-first `jabber`, `vulture`,
+`rekka`** (a poke, a band-reading defender, a cancel-combo bot — spanning the axes; accepts that
+3 of 6 gauntlet opponents are shown, since the gauntlet is already public/versioned and beating
+known opponents with one perception-limited bot is still genuinely strategic); (b) **one PR**
+(the four deliverables are tightly coupled); (c) `docs/BOT-DSL.md` is **deleted** (not a pointer)
+and all live references repointed.
+
 **Acceptance criteria**:
 
-- The primer’s numbers are interpolated (e.g. "reactable iff `S ≥ lAct+1`, and
-  `lAct = {perception.lAct}`") — a `CANONICAL_RULES` change updates the prose; a test asserts no
-  bare magic numbers in the interpolated regions (or that interpolated values equal the rules).
-- Each embedded example bot is the verbatim content of a real `bots/*.json` and is run through
-  `validate()` in a test (a broken example fails CI).
-- The drift snapshot (slice 5) now covers the full `spec.md` incl. primer + examples.
-- **`docs/BOT-DSL.md` is retired**: deleted (or reduced to a one-line pointer to
-  `docs/spec.md`), since the generated, drift-tested `spec.md` is now the single DSL source of
-  truth. Any `docs/DESIGN.md` (§P7) references to `BOT-DSL.md` are repointed to `spec.md`.
+- **`primerSection(rules)` is parameterized by `rules`** (exactly like `frameTableSection(rules)`)
+  so every number is interpolated, never typed. It covers the strategic spine: the perception
+  **master inequality** (`reactable iff S ≥ lAct+1`), the **`strike > throw > guard`** precedence
+  triangle, the **height/occupancy** read-game (crouch vacates `high`, airborne vacates `low`),
+  **parry → counter** + **on-contact cancel** windows, **okizeme** (finish window inside
+  knockdown), and the **stamina/gas** economy (gassed loses kicks, keeps punches). Placed after
+  the frame table, before benchmark rules.
+- **Interpolation is mutation-proven via retune-tracking** (the testable form of "no bare magic
+  numbers", mirroring Slice 3): `primerSection(rules)` run against a deliberately-**retuned** rules
+  fixture produces primer text whose interpolated claims track the new values — a hardcoded literal
+  diverges and fails; plus a positive assertion that key claims equal the `CANONICAL_RULES`-derived
+  values.
+- Each embedded example bot (`jabber`, `vulture`, `rekka`) is the **verbatim** content of its real
+  `bots/*.json` (read from disk at generation time) and is run through `validate()` in a test (a
+  broken example fails CI).
+- The drift snapshot (Slice 5a) now **transitively** covers the full `spec.md` incl. primer +
+  examples (no new drift test). Editing an embedded `bots/*.json` fails the drift test until
+  `spec.md` is regenerated (desirable).
+- **`docs/BOT-DSL.md` is deleted**: the generated, drift-tested `spec.md` is the single DSL source
+  of truth. **Live** references in `docs/DESIGN.md` (§P5/P6/P7) and `README.md` are repointed to
+  `docs/spec.md`; `.claude/CLAUDE.md`'s dated _Status_ log entries are left as the historical
+  record (only its top-of-file "source of truth" line is updated).
 - **Dogfood gate** (checked at PR review, not CI — authoring a bot cold isn't reproducible in
   CI): a bot authored from `spec.md` only (no engine source, no repair round) (a) **validates on
   first generation** (recorded verbatim) AND (b) posts **positive net-points against a majority
-  (> half) of the gauntlet opponents** on the frozen seeds via slice 1. The dogfood bot + its
+  (> half) of the gauntlet opponents** on the frozen seeds via Slice 1. The dogfood bot + its
   full benchmark report are pasted into the PR description as evidence; the bot is committed as a
   fixture whose **validity** is asserted in CI. A miss is a **spec defect** — iterate the
-  primer/examples until a competent author clears the bar, do not lower it.
+  primer/examples until a competent author clears the bar, do not lower it. _(Caveat: the
+  implementing agent has codebase knowledge, so its "cold" authoring is an imperfect proxy —
+  it authors strictly from `spec.md` text and discloses this; the operator may instead run the
+  true dogfood against a fresh model.)_
   **RED**: the interpolation/no-magic-number test + the example-validation test. Mutator watch:
   interpolation falling back to a hardcoded literal.
   **GREEN**: author the primer template + wire example embedding + regenerate `spec.md`.

@@ -8,8 +8,9 @@
 // pins the committed `docs/spec.md` byte-for-byte to this output).
 //
 // `generateSpec()` is PURE and deterministic (no wall-clock): same engine ⇒ same
-// bytes. The hand-authored strategic primer + validated example bots are a later
-// slice; this is only the factual reference.
+// bytes. It also carries a hand-authored strategic primer whose every NUMBER is
+// interpolated from `rules` (so the strategy text can never cite a stale
+// constant). Validated example bots are appended in a later increment of this slice.
 // ============================================================================
 import {
   ACTION_TYPES,
@@ -369,11 +370,41 @@ const jsonSchemaSection = (): string =>
     "```",
   ].join("\n");
 
+// The strategic primer — how to WIN, not merely pass validation. Unlike the
+// factual sections this is hand-authored prose, but EVERY number is interpolated
+// from `rules` (just like the frame table), so a `CANONICAL_RULES` retune updates
+// the strategy text and it can never cite a stale constant. Each claim is one
+// line so its concept and its value stay paired.
+const primerSection = (rules: Rules): string => {
+  const cv = (n: number): string => code(String(n)); // code-spanned value
+  const lPos = rules.perception?.lPos ?? 0;
+  const lAct = rules.perception?.lAct ?? 0;
+  const jitter = rules.perception?.jitter ?? 0;
+  const st = rules.stamina ?? { max: 0 };
+
+  const reach = (id: keyof Rules["moves"]): number =>
+    rules.moves[id]?.reach ?? 0;
+
+  return [
+    "## Strategy primer",
+    "",
+    "How to WIN, not merely pass validation. Every number here is read from the",
+    "frame table above, so a rules retune updates this prose.",
+    "",
+    `- **Perception (the master inequality).** Positional fields lag \`lPos\` = ${cv(lPos)} tick(s); the action tell (\`opponent.attacking\` / \`attackBand\` / \`throwing\` / \`knockdown\`) lags \`lAct\` = ${cv(lAct)}. A committed move is **reactable iff** its startup \`S ≥ lAct + 1\` = ${cv(lAct + 1)} (the \`+1\` is the structural observe-after-commit tick); ±${cv(jitter)} seeded jitter swings the knife-edge.`,
+    `- **The triangle \`strike > throw > guard\`.** A strike stuffs a throw; a throw beats a guard (it is **unbanded** — guarding cannot stop it); a guard beats a strike at the **matching band**. Reach orders the options close-to-far: throw ${cv(rules.throw?.reach ?? 0)} < sweep ${cv(reach("sweep"))} < jab ${cv(reach("kizami-zuki"))} < reverse ${cv(reach("gyaku-zuki"))} < front ${cv(reach("mae-geri"))} < roundhouse ${cv(reach("mawashi-geri"))}.`,
+    `- **Height & occupancy.** A \`crouch\` vacates the \`high\` band (a high strike whiffs a croucher); an airborne fighter vacates \`low\` once past \`lowClearance\` = ${cv(rules.lowClearance ?? 0)} (a sweep whiffs a well-timed jump). The arc is integer \`y += vy; vy -= gravity\` from \`jumpImpulse\` = ${cv(rules.jumpImpulse ?? 0)} / \`gravity\` = ${cv(rules.gravity ?? 0)}.`,
+    `- **Parry, counter, cancel.** A matching guard's first \`parryWindow\` = ${cv(rules.parryWindow ?? 0)} ticks **DEFLECT** (a parry: no score, +${cv(rules.parryRecovery ?? 0)} attacker recovery) rather than merely block — reaction-precise defense out-rewards a pre-emptive hold. A parry opens a \`counterWindow\` = ${cv(rules.counterWindow ?? 0)}-tick window worth +${cv(rules.counterBonus ?? 0)}. A strike that **CONNECTS** (hit or block) opens a \`cancelWindow\` = ${cv(rules.cancelWindow ?? 0)}-tick window to cancel recovery into a \`cancelInto\` follow-up (the rekka hit-confirm).`,
+    `- **Okizeme (the knockdown game).** A throw or sweep knocks the foe **down** for \`knockdownDuration\` = ${cv(rules.knockdownDuration ?? 0)} ticks; the first \`finishWindow\` = ${cv(rules.finishWindow ?? 0)} are a guaranteed **FINISH** worth \`finishScore\` = ${cv(rules.finishScore ?? 0)} (ignoring band / guard / occupancy — the foe is prone); the rest are wake-up **i-frames**. Read the window live as \`self.finishWindow\`.`,
+    `- **Stamina & gas.** Start at \`stamina.max\` = ${cv(st.max)}; an UNCOMMITTED fighter (neutral, not guarding) regens +${cv(st.regen ?? 0)}/tick. A guard bleeds \`blockChip\` = ${cv(st.blockChip ?? 0)} per contact tick (a fresh parry draws \`parryChip\` = ${cv(st.parryChip ?? 0)} once). At or below \`gasThreshold\` = ${cv(st.gasThreshold ?? 0)} a fighter is **GASSED**: every commit eats +${cv(st.gasRecoveryPenalty ?? 0)} recovery, and any move costing more than ${cv(st.gasThreshold ?? 0)} stamina (the kicks / throw / sweep) degrades to idle while the cheaper punches still commit — the emergent special-lockout. PACE your offense: spend only what regen can refill.`,
+  ].join("\n");
+};
+
 /**
  * The committed `docs/spec.md` content — pure, deterministic, drift-tested.
  * `rules` defaults to `CANONICAL_RULES` (the frozen platform table); it is a
- * parameter only so the frame table can be exercised against an alternate
- * ruleset (e.g. one omitting an optional move).
+ * parameter only so the frame table + primer can be exercised against an
+ * alternate ruleset (e.g. one omitting an optional move, or a retune).
  */
 export function generateSpec(rules: Rules = CANONICAL_RULES): string {
   return (
@@ -388,6 +419,7 @@ export function generateSpec(rules: Rules = CANONICAL_RULES): string {
       frameTableSection(rules),
       errorCatalogSection(),
       jsonSchemaSection(),
+      primerSection(rules),
       benchmarkSection(),
     ].join("\n\n") + "\n"
   );
