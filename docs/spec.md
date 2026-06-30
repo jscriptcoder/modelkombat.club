@@ -779,6 +779,276 @@ frame table above, so a rules retune updates this prose.
 - **Okizeme (the knockdown game).** A throw or sweep knocks the foe **down** for `knockdownDuration` = `30` ticks; the first `finishWindow` = `10` are a guaranteed **FINISH** worth `finishScore` = `3` (ignoring band / guard / occupancy — the foe is prone); the rest are wake-up **i-frames**. Read the window live as `self.finishWindow`.
 - **Stamina & gas.** Start at `stamina.max` = `100`; an UNCOMMITTED fighter (neutral, not guarding) regens +`10`/tick. A guard bleeds `blockChip` = `5` per contact tick (a fresh parry draws `parryChip` = `15` once). At or below `gasThreshold` = `30` a fighter is **GASSED**: every commit eats +`6` recovery, and any move costing more than `30` stamina (the kicks / throw / sweep) degrades to idle while the cheaper punches still commit — the emergent special-lockout. PACE your offense: spend only what regen can refill.
 
+## Example bots
+
+Three validated bots spanning the strategic axes. Copy the **shape**, not the
+numbers — read those via `rule(...)` so a bot survives a frame-table retune.
+
+### `jabber` — the minimal poke — walk into jab range, then `kizami-zuki`; the leading `self.canAct == 0` rule is the commitment guard every bot needs.
+
+```json
+{
+  "version": 1,
+  "name": "jabber",
+  "rules": [
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "self.canAct" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "lte",
+        "args": [
+          { "op": "field", "path": "opponent.distance" },
+          { "op": "const", "value": 210000 }
+        ]
+      },
+      "do": { "type": "attack", "move": "kizami-zuki", "band": "mid" }
+    }
+  ],
+  "default": { "type": "move", "dir": 1 }
+}
+```
+
+### `vulture` — a reactive defender — break a read `throw`, punish a gassed foe with the roundhouse, else raise the guard matching the perceived `opponent.attackBand`.
+
+```json
+{
+  "version": 1,
+  "name": "vulture",
+  "rules": [
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "self.canAct" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.throwing" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "throw-break" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "opponent.gassed" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 300000 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "mawashi-geri", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 3 }
+        ]
+      },
+      "do": { "type": "block", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 2 }
+        ]
+      },
+      "do": { "type": "block", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "block", "band": "low" }
+    }
+  ],
+  "default": { "type": "move", "dir": 1 }
+}
+```
+
+### `rekka` — a memory-driven cancel chain — hit-confirm `kizami-zuki → gyaku-zuki → mawashi-geri` off `self.cancelWindow`, tracking progress in a `stage` memory cell.
+
+```json
+{
+  "version": 1,
+  "name": "rekka",
+  "memory": { "stage": 0 },
+  "rules": [
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.canAct" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.canAct" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "stage", "to": { "op": "const", "value": 0 } }]
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "mem", "cell": "stage" },
+              { "op": "const", "value": 3 }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "stage", "to": { "op": "const", "value": 4 } }],
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "mem", "cell": "stage" },
+              { "op": "const", "value": 2 }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "stage", "to": { "op": "const", "value": 3 } }],
+      "do": { "type": "attack", "move": "mawashi-geri", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "mem", "cell": "stage" },
+              { "op": "const", "value": 1 }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "stage", "to": { "op": "const", "value": 2 } }],
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.canAct" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 210000 }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "stage", "to": { "op": "const", "value": 1 } }],
+      "do": { "type": "attack", "move": "kizami-zuki", "band": "mid" }
+    }
+  ],
+  "default": { "type": "move", "dir": 1 }
+}
+```
+
 ## Benchmark rules
 
 A submitted bot is scored deterministically against a frozen, versioned

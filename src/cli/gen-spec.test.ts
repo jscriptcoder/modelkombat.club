@@ -12,6 +12,7 @@ import {
   LIMITS,
   MOVES,
   NUM_OPS,
+  validate,
 } from "../engine/dsl.js";
 import { CANONICAL_RULES } from "../engine/rules.js";
 import type { Rules } from "../engine/types.js";
@@ -241,6 +242,52 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(claimLine(primer, "reactable iff")).toContain(code("0")); // lAct sentinel
       expect(claimLine(primer, "triangle")).toContain(code("0")); // throw.reach sentinel
       expect(claimLine(primer, "GASSED")).toContain(code("0")); // stamina sentinel
+    });
+  });
+
+  describe("example bots (embedded verbatim + validated)", () => {
+    const EXAMPLES = ["jabber", "vulture", "rekka"];
+
+    // The committed (LF) content of a bot fixture — normalized so the assertion
+    // holds regardless of the working-tree EOL (bots/*.json are `i/lf w/crlf` on
+    // Windows; the embed and the LF-pinned spec.md are LF).
+    const readBot = (name: string): string =>
+      readFileSync(
+        fileURLToPath(new URL(`../../bots/${name}.json`, import.meta.url)),
+        "utf8",
+      )
+        .replace(/\r\n/g, "\n")
+        .trim();
+
+    // The ```json fenced blocks inside a markdown section.
+    const jsonBlocks = (md: string): string[] =>
+      md
+        .split("```json")
+        .slice(1)
+        .map((part) => part.slice(0, part.indexOf("```")).trim());
+
+    it("embeds exactly the three examples, each verbatim and validate()-accepted", () => {
+      const blocks = jsonBlocks(sectionOf(generateSpec(), "## Example bots"));
+
+      expect(blocks).toHaveLength(EXAMPLES.length);
+
+      for (const name of EXAMPLES) {
+        const verbatim = readBot(name);
+        expect(blocks, `${name} embedded verbatim`).toContain(verbatim);
+        expect(validate(JSON.parse(verbatim)).ok, `${name} validates`).toBe(
+          true,
+        );
+      }
+    });
+
+    it("places the examples after the strategy primer, before benchmark rules", () => {
+      const spec = generateSpec();
+      expect(spec.indexOf("## Strategy primer")).toBeLessThan(
+        spec.indexOf("## Example bots"),
+      );
+      expect(spec.indexOf("## Example bots")).toBeLessThan(
+        spec.indexOf("## Benchmark rules"),
+      );
     });
   });
 });

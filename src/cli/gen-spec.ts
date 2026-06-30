@@ -7,11 +7,15 @@
 // — nothing is retyped — so the spec CANNOT drift from the engine (a drift test
 // pins the committed `docs/spec.md` byte-for-byte to this output).
 //
-// `generateSpec()` is PURE and deterministic (no wall-clock): same engine ⇒ same
-// bytes. It also carries a hand-authored strategic primer whose every NUMBER is
-// interpolated from `rules` (so the strategy text can never cite a stale
-// constant). Validated example bots are appended in a later increment of this slice.
+// `generateSpec()` is deterministic (no wall-clock; it reads only committed
+// sources — the engine modules + the `bots/` example fixtures), so same repo ⇒
+// same bytes. It also carries a hand-authored strategic primer whose every NUMBER
+// is interpolated from `rules` (so the strategy text can never cite a stale
+// constant) and a set of validated example bots embedded verbatim.
 // ============================================================================
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import {
   ACTION_TYPES,
   ALLOWED_FIELDS,
@@ -400,8 +404,60 @@ const primerSection = (rules: Rules): string => {
   ].join("\n");
 };
 
+// Three curated example bots spanning the strategic axes (a poke, a reactive
+// defender, a memory-driven cancel chain). Each is embedded VERBATIM from its
+// `bots/*.json` fixture (a test re-validates the embedded text), so the spec
+// only ever shows bots the engine actually accepts.
+const EXAMPLE_BOTS: readonly { name: string; caption: string }[] = [
+  {
+    name: "jabber",
+    caption:
+      "the minimal poke — walk into jab range, then `kizami-zuki`; the leading `self.canAct == 0` rule is the commitment guard every bot needs.",
+  },
+  {
+    name: "vulture",
+    caption:
+      "a reactive defender — break a read `throw`, punish a gassed foe with the roundhouse, else raise the guard matching the perceived `opponent.attackBand`.",
+  },
+  {
+    name: "rekka",
+    caption:
+      "a memory-driven cancel chain — hit-confirm `kizami-zuki → gyaku-zuki → mawashi-geri` off `self.cancelWindow`, tracking progress in a `stage` memory cell.",
+  },
+];
+
+// The committed (LF) content of a `bots/*.json` fixture. Normalized CRLF→LF so
+// the embed is byte-identical across platforms (the fixtures are `i/lf w/crlf`
+// on Windows; the generated `docs/spec.md` is pinned LF for the drift test).
+const readExampleBot = (name: string): string =>
+  readFileSync(
+    fileURLToPath(new URL(`../../bots/${name}.json`, import.meta.url)),
+    "utf8",
+  )
+    .replace(/\r\n/g, "\n")
+    .trim();
+
+const examplesSection = (): string =>
+  [
+    "## Example bots",
+    "",
+    "Three validated bots spanning the strategic axes. Copy the **shape**, not the",
+    "numbers — read those via `rule(...)` so a bot survives a frame-table retune.",
+    "",
+    ...EXAMPLE_BOTS.flatMap(({ name, caption }) => [
+      `### \`${name}\` — ${caption}`,
+      "",
+      "```json",
+      readExampleBot(name),
+      "```",
+      "",
+    ]),
+  ]
+    .join("\n")
+    .trimEnd();
+
 /**
- * The committed `docs/spec.md` content — pure, deterministic, drift-tested.
+ * The committed `docs/spec.md` content — deterministic, drift-tested.
  * `rules` defaults to `CANONICAL_RULES` (the frozen platform table); it is a
  * parameter only so the frame table + primer can be exercised against an
  * alternate ruleset (e.g. one omitting an optional move, or a retune).
@@ -420,6 +476,7 @@ export function generateSpec(rules: Rules = CANONICAL_RULES): string {
       errorCatalogSection(),
       jsonSchemaSection(),
       primerSection(rules),
+      examplesSection(),
       benchmarkSection(),
     ].join("\n\n") + "\n"
   );
