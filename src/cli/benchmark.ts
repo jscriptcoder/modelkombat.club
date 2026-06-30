@@ -36,12 +36,21 @@ const loadBot = (path: string) => {
   return loadBotDoc(text);
 };
 
+const readText = (path: string): string => {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    throw new Error(`cannot read reply file: ${path}`);
+  }
+};
+
 const gauntlet = GAUNTLET_NAMES.map((name) =>
   loadBotDoc(readFileSync(botPath(name), "utf8")),
 );
 
 const deps: BenchmarkDeps = {
   loadBot,
+  readText,
   gauntlet,
   rules: CANONICAL_RULES,
   seeds: SEEDS,

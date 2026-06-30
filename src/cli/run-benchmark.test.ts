@@ -36,6 +36,7 @@ const LOSER = named("loser", { type: "idle" });
 
 const deps = (o: Partial<BenchmarkDeps> = {}): BenchmarkDeps => ({
   loadBot: () => SUBMITTED,
+  readText: () => "",
   gauntlet: [LOSER, TRADER],
   rules: MOCK_RULES,
   seeds: [1, 2],
@@ -43,6 +44,13 @@ const deps = (o: Partial<BenchmarkDeps> = {}): BenchmarkDeps => ({
   version: "vtest",
   ...o,
 });
+
+const FENCE = "```";
+
+// A raw model reply that wraps the given bot JSON in a ```json fence, the way a
+// model would (prose around a fenced block). `--from-reply` must extract it.
+const reply = (botJson: string): string =>
+  `Here is my submission:\n${FENCE}json\n${botJson}\n${FENCE}\nGood luck!`;
 
 describe("runBenchmarkCli — report on stdout", () => {
   it("prints the full report: version header, bot name, per-opponent table, and headline net-points + win-rate", () => {
@@ -118,5 +126,133 @@ describe("runBenchmarkCli — stream and exit discipline", () => {
     expect(out.code).toBe(1);
     expect(out.stdout).toBe("");
     expect(out.stderr).toBe("cannot read bot file: missing.json\n");
+  });
+});
+
+describe("runBenchmarkCli — --from-reply (lenient extraction)", () => {
+  // The reply path never touches the strict file loader: a throwing loadBot
+  // proves the scored result came from extracting + validating the reply itself.
+  const replyDeps = (text: string): BenchmarkDeps => ({
+    ...deps(),
+    readText: () => text,
+    loadBot: () => {
+      throw new Error("loadBot must not be called on the --from-reply path");
+    },
+  });
+
+  it("extracts a fenced bot from a prose reply and scores it like a direct submission", () => {
+    const out = runBenchmarkCli(
+      ["--from-reply", "reply.txt"],
+      replyDeps(reply(JSON.stringify(SUBMITTED))),
+    );
+
+    expect(out.code).toBe(0);
+    expect(out.stderr).toBe("");
+    // Byte-identical to the direct-path report for the same bot + gauntlet — the
+    // reply path parses the extracted JSON through the same validate gate.
+    expect(out.stdout).toBe(
+      [
+        "ModelKombat benchmark vtest",
+        "bot: sub",
+        "gauntlet: 2 opponents · 2 seeds · both sides = 8 fights",
+        "",
+        "opponent  net  W  L  D  fights",
+        "loser      +4  4  0  0       4",
+        "trader      0  0  0  4       4",
+        "",
+        "net-points +4   win-rate 50.0%   (4W 0L 4D of 8)",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("rejects a reply with no extractable JSON as a distinct invalid submission", () => {
+    const out = runBenchmarkCli(
+      ["--from-reply", "reply.txt"],
+      replyDeps("Sorry, I can't help with that."),
+    );
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    // Distinct from a low-scoring valid bot: a labelled invalid report + reason.
+    expect(out.stderr).toBe(
+      "invalid submission reply.txt:\n  $: no bot JSON found in reply\n",
+    );
+  });
+
+  it("rejects a reply whose extracted JSON does not parse, capturing the parse error", () => {
+    const out = runBenchmarkCli(
+      ["--from-reply", "reply.txt"],
+      replyDeps(reply("{not valid json}")),
+    );
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    expect(out.stderr).toMatch(/^invalid submission reply\.txt:\n {2}\$: /);
+  });
+
+  it("rejects a reply whose extracted bot fails validation, listing every validator issue on its own line", () => {
+    const out = runBenchmarkCli(
+      ["--from-reply", "reply.txt"],
+      replyDeps(reply('{"version":2,"name":"x"}')),
+    );
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    // Every structured issue, newline-joined under a labelled header.
+    expect(out.stderr).toBe(
+      "invalid submission reply.txt:\n" +
+        "  version: must be 1\n" +
+        "  rules: must be an array\n" +
+        "  default: expected an action\n",
+    );
+  });
+
+  it("captures a safeParse rejection (a forbidden key) as the structured issue, not a generic parse error", () => {
+    const out = runBenchmarkCli(
+      ["--from-reply", "reply.txt"],
+      replyDeps(reply('{"__proto__":1,"version":1,"name":"x"}')),
+    );
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    // The safeParse ValidationError's own issue surfaces verbatim — NOT folded
+    // into a generic "$: ..." parse-error line.
+    expect(out.stderr).toBe(
+      "invalid submission reply.txt:\n  __proto__: forbidden key\n",
+    );
+  });
+
+  it("rejects extracted JSON that parses to a non-object (an array) via the validator", () => {
+    const out = runBenchmarkCli(
+      ["--from-reply", "reply.txt"],
+      replyDeps(reply("[1, 2, 3]")),
+    );
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    expect(out.stderr).toContain("invalid submission reply.txt:");
+  });
+
+  it("exits 1 with just the error message when the reply file cannot be read", () => {
+    const out = runBenchmarkCli(["--from-reply", "missing.txt"], {
+      ...deps(),
+      readText: () => {
+        throw new Error("cannot read reply file: missing.txt");
+      },
+    });
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    expect(out.stderr).toBe("cannot read reply file: missing.txt\n");
+  });
+
+  it("exits 2 with usage (showing the --from-reply form) when --from-reply is given no path", () => {
+    const out = runBenchmarkCli(["--from-reply"], deps());
+
+    expect(out.code).toBe(2);
+    expect(out.stdout).toBe("");
+    expect(out.stderr.toLowerCase()).toContain("usage");
+    expect(out.stderr).toContain("--from-reply <reply.txt>");
   });
 });
