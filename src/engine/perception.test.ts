@@ -1445,3 +1445,73 @@ describe("perception latency — delayed opponent gassed (L_act)", () => {
     expect(validate(BLOCK_ON_GASSED).ok).toBe(true);
   });
 });
+
+// ─── slice 4: live opponent.points (scoreboard read, NOT perception-delayed) ─────
+// opponent.points is a live scoreboard fact — read off the live opponent in `viewFor`,
+// not from the per-fighter perception ring buffer — so it is exposed with ZERO
+// perception delay (only the one structural pre-tick-snapshot tick), consistent with
+// self.points and clock.tick. This contrasts deliberately with the L_act-delayed body
+// tells (attacking / stamina / knockdown).
+describe("opponent.points — live scoreboard read (no perception delay)", () => {
+  // B strikes mid every tick; with startGap 200000 < reach 250000 and an idle A, B's
+  // first active frame lands at tick 4 ⇒ B.points becomes 1 at end of tick 4.
+  const STRIKER = bot([], { type: "attack", move: "gyaku-zuki", band: "mid" });
+
+  // A idles until it PERCEIVES the opponent's score, then guards mid — so the first
+  // block tick is a clean read of WHEN A perceived the opponent's points cross 1.
+  const BLOCK_ON_OPP_SCORED = bot(
+    [
+      {
+        when: {
+          op: "gte",
+          args: [
+            { op: "field", path: "opponent.points" },
+            { op: "const", value: 1 },
+          ],
+        },
+        do: { type: "block", band: "mid" },
+      },
+    ],
+    { type: "idle" },
+  );
+
+  const pointsLive = (perception: {
+    lPos?: number;
+    lAct?: number;
+  }): FightConfig =>
+    getMockConfig({
+      rules: getMockRules({ startGap: 200000, perception }),
+      botA: BLOCK_ON_OPP_SCORED,
+      botB: STRIKER,
+      maxTicks: 12,
+    });
+
+  it("lands the opponent's score at tick 4 (setup precondition)", () => {
+    const events = runFight(pointsLive({ lAct: 0 })).events;
+    expect(events[3].b.points).toBe(0);
+    expect(events[4].b.points).toBe(1);
+  });
+
+  it("reads opponent.points LIVE — the reaction is invariant under action latency (L_act)", () => {
+    // B scores at end of tick 4; A perceives it at tick 5 (the single structural
+    // pre-tick-snapshot tick) and never later — points does NOT ride the L_act layer.
+    expect(firstBlockTick(runFight(pointsLive({ lAct: 0 })).events)).toBe(5);
+    expect(firstBlockTick(runFight(pointsLive({ lAct: 3 })).events)).toBe(5);
+    expect(firstBlockTick(runFight(pointsLive({ lAct: 6 })).events)).toBe(5);
+  });
+
+  it("does not ride the positional latency layer (L_pos) either", () => {
+    expect(
+      firstBlockTick(runFight(pointsLive({ lPos: 6, lAct: 6 })).events),
+    ).toBe(5);
+  });
+
+  it("is additive — a fight reading opponent.points replays byte-identically", () => {
+    const cfg = pointsLive({ lAct: 2 });
+    expect(runFight(cfg).events).toEqual(runFight(cfg).events);
+  });
+
+  it("accepts a bot that reads opponent.points (additive to the allowlist)", () => {
+    expect(validate(BLOCK_ON_OPP_SCORED).ok).toBe(true);
+  });
+});

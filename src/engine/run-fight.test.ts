@@ -4989,6 +4989,7 @@ describe("runFight — rule(path) ruleset reads threaded through the sim", () =>
   // from tick 0, so a reach-gated attacker strikes immediately — but ONLY if the
   // sim threads the rules into runTick (else rule ⇒ 0 and 200000 <= 0 is false).
   const asRules = (r: unknown): BotDoc["rules"] => r as BotDoc["rules"];
+
   const ATTACK_MID: Action = {
     type: "attack",
     move: "gyaku-zuki",

@@ -64,6 +64,7 @@ const getMockState = (o: StateOverrides = {}): State => ({
     predictedDistance: 100,
     stamina: 0,
     gassed: false,
+    points: 0,
     ...o.opponent,
   },
   ring: { width: 600, ...o.ring },
@@ -221,6 +222,7 @@ describe("runTick — numeric reads", () => {
     ],
     ["opponent.stamina", { opponent: { stamina: 42 } }, 42],
     ["opponent.gassed", { opponent: { gassed: true } }, 1],
+    ["opponent.points", { opponent: { points: 4 } }, 4],
     ["ring.width", { ring: { width: 600 } }, 600],
     ["clock.tick", { clock: { tick: 42 } }, 42],
     ["clock.ticksRemaining", { clock: { ticksRemaining: 100 } }, 100],
@@ -258,6 +260,42 @@ describe("runTick — numeric reads", () => {
     expect(runTick(doc, getMockState({ self: { canAct: false } }), {})).toEqual(
       MOVE_IN,
     );
+  });
+});
+
+describe("runTick — score gap (self.points vs opponent.points)", () => {
+  // scoreGap = self.points − opponent.points; press (move) when behind (gap < 0),
+  // hold (idle) otherwise. The subtraction direction is what makes "behind" mean
+  // behind — a flipped operand order would invert the whole endgame.
+  const scoreGapBot = bot(
+    [
+      {
+        when: {
+          op: "lt",
+          args: [
+            {
+              op: "sub",
+              args: [
+                { op: "field", path: "self.points" },
+                { op: "field", path: "opponent.points" },
+              ],
+            },
+            { op: "const", value: 0 },
+          ],
+        },
+        do: MOVE_IN,
+      },
+    ],
+    { type: "idle" },
+  );
+
+  const atGap = (selfPts: number, oppPts: number): State =>
+    getMockState({ self: { points: selfPts }, opponent: { points: oppPts } });
+
+  it("presses when behind and holds when even or ahead — the gap direction drives the branch", () => {
+    expect(runTick(scoreGapBot, atGap(1, 4), {})).toEqual(MOVE_IN); // behind
+    expect(runTick(scoreGapBot, atGap(2, 2), {})).toEqual({ type: "idle" }); // even
+    expect(runTick(scoreGapBot, atGap(4, 1), {})).toEqual({ type: "idle" }); // ahead
   });
 });
 
