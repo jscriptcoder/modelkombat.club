@@ -15,14 +15,13 @@ import {
   type OpponentScore,
 } from "../engine/benchmark.js";
 import {
-  safeParse,
-  validate,
   ValidationError,
   type BotDoc,
   type ValidationIssue,
 } from "../engine/dsl.js";
 import type { Rules } from "../engine/types.js";
 import { extractBotJson } from "./extract.js";
+import { parseBotDoc, type ParsedBot } from "./load.js";
 
 export type LoadBot = (path: string) => BotDoc;
 
@@ -125,45 +124,21 @@ const formatInvalid = (source: string, issues: ValidationIssue[]): string =>
   issues.map((i) => `  ${i.path}: ${i.reason}`).join("\n") +
   "\n";
 
-// A raw reply reduced to either a validated bot or an invalid outcome. Lenient
-// extraction picks the JSON substring, then the SAME safeParse + validate TCB
-// gate the strict loader uses runs — but failures are captured, not thrown.
-type ReplyOutcome =
-  | { kind: "bot"; bot: BotDoc }
-  | { kind: "invalid"; issues: ValidationIssue[] };
-
-const evaluateReply = (text: string): ReplyOutcome => {
+// A raw reply reduced to either a validated bot or the issues that reject it.
+// Lenient extraction picks the JSON substring, then the SAME safeParse + validate
+// TCB gate the strict loader uses runs (via parseBotDoc) — failures captured, not
+// thrown. A reply with no extractable JSON is just another rejected ParsedBot.
+const evaluateReply = (text: string): ParsedBot => {
   const extracted = extractBotJson(text);
 
   if (extracted === null) {
     return {
-      kind: "invalid",
+      ok: false,
       issues: [{ path: "$", reason: "no bot JSON found in reply" }],
     };
   }
 
-  let doc: unknown;
-
-  try {
-    doc = safeParse(extracted);
-  } catch (e) {
-    if (e instanceof ValidationError) {
-      return { kind: "invalid", issues: e.issues };
-    }
-
-    return {
-      kind: "invalid",
-      issues: [
-        { path: "$", reason: e instanceof Error ? e.message : "invalid JSON" },
-      ],
-    };
-  }
-
-  const res = validate(doc);
-  if (!res.ok) return { kind: "invalid", issues: res.issues };
-
-  // Justified: validate ok ⇒ doc matches BotDoc (the guarantee loadBotDoc uses).
-  return { kind: "bot", bot: doc as BotDoc };
+  return parseBotDoc(extracted);
 };
 
 const fromBotFile = (
@@ -218,7 +193,7 @@ const fromReply = (
 
   const outcome = evaluateReply(text);
 
-  if (outcome.kind === "invalid") {
+  if (!outcome.ok) {
     return {
       stdout: "",
       stderr: formatInvalid(replyPath, outcome.issues),
