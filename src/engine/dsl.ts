@@ -125,7 +125,9 @@ const FIELD_READERS: Record<FieldPath, (s: State) => number> = {
   "clock.ticksRemaining": (s) => s.clock.ticksRemaining,
 };
 
-const ALLOWED_FIELDS: ReadonlySet<string> = new Set(Object.keys(FIELD_READERS));
+export const ALLOWED_FIELDS: ReadonlySet<string> = new Set(
+  Object.keys(FIELD_READERS),
+);
 
 // Rule read surface: the frozen-ruleset constants a bot reads symbolically via
 // `rule(path)`. EVERY numeric leaf of the Rules shape ("nothing withheld") — its
@@ -135,7 +137,7 @@ const ALLOWED_FIELDS: ReadonlySet<string> = new Set(Object.keys(FIELD_READERS));
 // (a path is valid by SHAPE, so validate-once / run-on-any-rules holds). Trusted
 // Rules data, not bot input — reads are pure and cannot reach beyond these
 // constants. `satisfies` keeps the literal keys so RulePath derives from them.
-const RULE_READERS = {
+export const RULE_READERS = {
   tickRate: (r: Rules) => r.tickRate,
   walkSpeed: (r: Rules) => r.walkSpeed,
   "ring.width": (r: Rules) => r.ring.width,
@@ -214,16 +216,69 @@ const RULE_READERS = {
 // the allowlist, and the interpreter can never drift.
 export type RulePath = keyof typeof RULE_READERS;
 
-const ALLOWED_RULES: ReadonlySet<string> = new Set(Object.keys(RULE_READERS));
+export const ALLOWED_RULES: ReadonlySet<string> = new Set(
+  Object.keys(RULE_READERS),
+);
 
-const MOVES: ReadonlySet<string> = new Set<MoveId>([
+export const MOVES: ReadonlySet<string> = new Set<MoveId>([
   "kizami-zuki",
   "gyaku-zuki",
   "mae-geri",
   "mawashi-geri",
 ]);
 
-const BANDS: ReadonlySet<string> = new Set<Band>(["high", "mid", "low"]);
+export const BANDS: ReadonlySet<string> = new Set<Band>(["high", "mid", "low"]);
+
+// ─── Grammar allowlists as runtime arrays (for the spec generator) ───────────
+// The validator switches on these op/action discriminants; the spec generator
+// renders them. Each list is the keys of a `Record<Union, true>` table, so a
+// newly-added op/action is a COMPILE error here until listed (completeness),
+// and can never silently drift from the type. Insertion order fixes the order
+// the generated spec lists them in.
+const NUM_OP_TABLE: Record<NumExpr["op"], true> = {
+  const: true,
+  field: true,
+  mem: true,
+  rule: true,
+  add: true,
+  sub: true,
+  mul: true,
+  div: true,
+  min: true,
+  max: true,
+  neg: true,
+  abs: true,
+};
+
+export const NUM_OPS: readonly string[] = Object.keys(NUM_OP_TABLE);
+
+const BOOL_OP_TABLE: Record<BoolExpr["op"], true> = {
+  gt: true,
+  lt: true,
+  gte: true,
+  lte: true,
+  eq: true,
+  neq: true,
+  and: true,
+  or: true,
+  not: true,
+};
+
+export const BOOL_OPS: readonly string[] = Object.keys(BOOL_OP_TABLE);
+
+const ACTION_TYPE_TABLE: Record<Action["type"], true> = {
+  idle: true,
+  move: true,
+  block: true,
+  crouch: true,
+  jump: true,
+  attack: true,
+  sweep: true,
+  throw: true,
+  "throw-break": true,
+};
+
+export const ACTION_TYPES: readonly string[] = Object.keys(ACTION_TYPE_TABLE);
 const CELL_RE = /^[a-zA-Z][a-zA-Z0-9_]{0,31}$/;
 
 const FORBIDDEN_KEYS: ReadonlySet<string> = new Set([

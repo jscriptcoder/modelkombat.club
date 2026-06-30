@@ -308,8 +308,13 @@ gauntlet) → a thin shell writes a committed **`docs/spec.md`**.
   **prominently** with a one-line node-budget note for authors. LIMITS are **unchanged for v1**
   (generous for rule-based bots — eval is cheap integer ops); a real ceiling-hit during the
   slice-6 dogfood is an additive tuning bump carrying a `BENCHMARK_VERSION` note.
-- No engine/TCB/outcome-path change — touches only `src/cli/`, `docs/`, `.prettierignore`, and
-  one npm script.
+- **Behavior-neutral `dsl.ts` exports only** (decided 2026-06-30): the generator renders
+  allowlists from the live source, so 5a `export`s the existing runtime sets (`ALLOWED_FIELDS`,
+  `ALLOWED_RULES`, `MOVES`, `BANDS`) and adds completeness-checked exported arrays for action
+  types + num/bool ops (`Record<Action["type"], true>` trick ⇒ a missing member is a compile
+  error). NO validator/interpreter LOGIC changes ⇒ fights stay **byte-identical** (the existing
+  determinism/replay suite proves it). Otherwise touches only `src/cli/`, `docs/`,
+  `.prettierignore`, and one npm script.
   **RED**: a generator unit test (key sections present, numbers sourced from `CANONICAL_RULES`/
   manifest, allowlists sourced from `dsl.ts`) + the drift snapshot test. Mutator watch: any
   literal in the generator that should be sourced from `Rules`/allowlists.
