@@ -910,6 +910,58 @@ describe("validate — arithmetic numeric ops", () => {
   });
 });
 
+describe("validate — rule(path) ruleset reads", () => {
+  const docWith = (expr: unknown) => ({
+    ...getMockBotDoc(),
+    rules: [
+      {
+        when: { op: "gt", args: [expr, { op: "const", value: 0 }] },
+        do: { type: "idle" },
+      },
+    ],
+  });
+
+  it.each([
+    "tickRate",
+    "walkSpeed",
+    "ring.width",
+    "startGap",
+    "moves.gyaku-zuki.reach",
+    "moves.sweep.startup",
+    "moves.kizami-zuki.staminaCost",
+    "moves.mae-geri.score",
+    "moves.mawashi-geri.scoreByBand.high",
+    "throw.score",
+    "jumpImpulse",
+    "gravity",
+    "lowClearance",
+    "parryWindow",
+    "counterBonus",
+    "cancelWindow",
+    "finishWindow",
+    "perception.lAct",
+    "stamina.gasThreshold",
+  ])("accepts an allowlisted rule path %s (valid by shape)", (path) => {
+    expect(validate(docWith({ op: "rule", path })).ok).toBe(true);
+  });
+
+  it.each([
+    "moves.gyaku-zuki.speed", // unknown stat
+    "moves.fireball.reach", // unknown move
+    "perception.lol", // typo
+    "self.x", // a field path, not a rule path
+    "stamina", // a non-leaf object
+    "moves.gyaku-zuki", // a non-leaf object
+    "", // empty
+  ])("rejects a rule path that is not on the allowlist (%s)", (path) => {
+    expect(validate(docWith({ op: "rule", path })).ok).toBe(false);
+  });
+
+  it("rejects a rule node whose path is not a string", () => {
+    expect(validate(docWith({ op: "rule", path: 42 })).ok).toBe(false);
+  });
+});
+
 describe("safeParse — prototype-pollution-safe intake", () => {
   it("parses a valid JSON document", () => {
     const parsed = safeParse('{"version":1,"name":"ok"}');

@@ -7,9 +7,11 @@ import {
   type FieldPath,
   type NumExpr,
 } from "./dsl.js";
+import { CANONICAL_RULES } from "./rules.js";
 import type {
   State,
   Action,
+  Rules,
   SelfState,
   OpponentState,
   RingState,
@@ -467,5 +469,222 @@ describe("runTick — arithmetic numeric operators", () => {
         args: [{ op: "add", args: [c(intMax), c(1)] }, c(0)],
       }),
     ).toBe(true);
+  });
+});
+
+describe("runTick — rule(path) ruleset reads", () => {
+  // A 3-arg runTick is assignable to this 4-arg (optional-rules) type, so these
+  // tests typecheck during RED; the 4th arg is simply ignored until the
+  // interpreter threads it (GREEN).
+  const withRules: (
+    doc: BotDoc,
+    state: State,
+    mem: Record<string, number>,
+    rules?: Rules,
+  ) => Action = runTick;
+
+  // `rule` isn't in the NumExpr union until GREEN; build it as data.
+  const ruleExpr = (path: string): NumExpr => ({ op: "rule", path }) as NumExpr;
+
+  // Does `rule(path)` evaluate to exactly `expected` under `rules`?
+  const evalsToRule = (
+    path: string,
+    expected: number,
+    rules?: Rules,
+  ): boolean =>
+    withRules(
+      bot([
+        {
+          when: {
+            op: "eq",
+            args: [ruleExpr(path), { op: "const", value: expected }],
+          },
+          do: MOVE_IN,
+        },
+      ]),
+      getMockState(),
+      {},
+      rules,
+    ).type === "move";
+
+  // A rules fixture configuring only the required gyaku-zuki — every optional
+  // constant is absent, so each optional reader's `?.` chain + sentinel fallback
+  // is exercised in the "unconfigured" column below.
+  const MINIMAL_RULES: Rules = {
+    tickRate: 60,
+    walkSpeed: 4000,
+    ring: { width: 600000 },
+    startGap: 300000,
+    moves: {
+      "gyaku-zuki": {
+        startup: 7,
+        active: 3,
+        recovery: 14,
+        score: 1,
+        reach: 240000,
+      },
+    },
+  };
+
+  // Every readable constant under BOTH rulesets: canonical (configured ⇒ the real
+  // value) and minimal (every optional reader absent ⇒ the inert sentinel 0). The
+  // present case pins each reader's value/key; the absent case exercises its
+  // optional-chaining guard. Each move's six stats are mutually distinct, so a
+  // wrong-field read is caught.
+  it.each<[string, number, number]>([
+    // path, value on CANONICAL_RULES, value on MINIMAL_RULES
+    ["tickRate", 60, 60],
+    ["walkSpeed", 4000, 4000],
+    ["ring.width", 600000, 600000],
+    ["startGap", 300000, 300000],
+    ["moves.gyaku-zuki.startup", 7, 7],
+    ["moves.gyaku-zuki.active", 3, 3],
+    ["moves.gyaku-zuki.recovery", 14, 14],
+    ["moves.gyaku-zuki.score", 1, 1],
+    ["moves.gyaku-zuki.reach", 240000, 240000],
+    ["moves.gyaku-zuki.staminaCost", 20, 0],
+    ["moves.sweep.startup", 7, 0],
+    ["moves.sweep.active", 2, 0],
+    ["moves.sweep.recovery", 13, 0],
+    ["moves.sweep.score", 0, 0],
+    ["moves.sweep.reach", 180000, 0],
+    ["moves.sweep.staminaCost", 40, 0],
+    ["moves.kizami-zuki.startup", 7, 0],
+    ["moves.kizami-zuki.active", 2, 0],
+    ["moves.kizami-zuki.recovery", 13, 0],
+    ["moves.kizami-zuki.score", 1, 0],
+    ["moves.kizami-zuki.reach", 210000, 0],
+    ["moves.kizami-zuki.staminaCost", 15, 0],
+    ["moves.mae-geri.startup", 9, 0],
+    ["moves.mae-geri.active", 3, 0],
+    ["moves.mae-geri.recovery", 16, 0],
+    ["moves.mae-geri.score", 2, 0],
+    ["moves.mae-geri.reach", 270000, 0],
+    ["moves.mae-geri.staminaCost", 35, 0],
+    ["moves.mawashi-geri.startup", 11, 0],
+    ["moves.mawashi-geri.active", 3, 0],
+    ["moves.mawashi-geri.recovery", 18, 0],
+    ["moves.mawashi-geri.score", 2, 0],
+    ["moves.mawashi-geri.reach", 300000, 0],
+    ["moves.mawashi-geri.staminaCost", 45, 0],
+    ["moves.mawashi-geri.scoreByBand.high", 3, 0],
+    ["throw.startup", 7, 0],
+    ["throw.active", 2, 0],
+    ["throw.recovery", 14, 0],
+    ["throw.reach", 120000, 0],
+    ["throw.score", 3, 0],
+    ["throw.staminaCost", 40, 0],
+    ["jumpImpulse", 12000, 0],
+    ["gravity", 4000, 0],
+    ["lowClearance", 8000, 0],
+    ["parryWindow", 2, 0],
+    ["parryRecovery", 12, 0],
+    ["counterWindow", 10, 0],
+    ["counterBonus", 1, 0],
+    ["cancelWindow", 6, 0],
+    ["knockdownDuration", 30, 0],
+    ["finishWindow", 10, 0],
+    ["finishScore", 3, 0],
+    ["perception.lPos", 1, 0],
+    ["perception.lAct", 6, 0],
+    ["perception.jitter", 1, 0],
+    ["stamina.max", 100, 0],
+    ["stamina.regen", 10, 0],
+    ["stamina.blockChip", 5, 0],
+    ["stamina.parryChip", 15, 0],
+    ["stamina.gasThreshold", 30, 0],
+    ["stamina.gasRecoveryPenalty", 6, 0],
+  ])(
+    "reads rule(%s): %i on canonical rules, %i when unconfigured",
+    (path, canonical, minimal) => {
+      expect(evalsToRule(path, canonical, CANONICAL_RULES)).toBe(true);
+      expect(evalsToRule(path, minimal, MINIMAL_RULES)).toBe(true);
+    },
+  );
+
+  it("reads scoreByBand.high as 0 when the roundhouse has no scoreByBand", () => {
+    // mawashi-geri PRESENT but scoreByBand absent ⇒ the INNER `?.` must guard it
+    // (the move-level `?.` short-circuit never reaches this branch otherwise).
+    const noBandScore: Rules = {
+      ...MINIMAL_RULES,
+      moves: {
+        ...MINIMAL_RULES.moves,
+        "mawashi-geri": {
+          startup: 11,
+          active: 3,
+          recovery: 18,
+          score: 2,
+          reach: 300000,
+        },
+      },
+    };
+
+    expect(
+      evalsToRule("moves.mawashi-geri.scoreByBand.high", 0, noBandScore),
+    ).toBe(true);
+  });
+
+  it("reads rule(path) as 0 when no rules are supplied to the interpreter", () => {
+    // evalsToRule with no rules arg ⇒ runTick gets undefined ⇒ rule falls back to 0
+    expect(evalsToRule("moves.gyaku-zuki.reach", 0)).toBe(true);
+  });
+
+  it("matches a magic-number twin on canonical rules (equivalence)", () => {
+    const symbolic = bot([
+      {
+        when: {
+          op: "lte",
+          args: [
+            { op: "field", path: "opponent.distance" },
+            ruleExpr("moves.kizami-zuki.reach"),
+          ],
+        },
+        do: { type: "attack", move: "kizami-zuki", band: "mid" },
+      },
+    ]);
+
+    const twin = bot([
+      {
+        when: {
+          op: "lte",
+          args: [
+            { op: "field", path: "opponent.distance" },
+            { op: "const", value: 210000 },
+          ],
+        },
+        do: { type: "attack", move: "kizami-zuki", band: "mid" },
+      },
+    ]);
+
+    // just inside reach: both attack; just outside: both idle.
+    const inRange = getMockState({ opponent: { distance: 210000 } });
+    const outOfRange = getMockState({ opponent: { distance: 210001 } });
+
+    expect(withRules(symbolic, inRange, {}, CANONICAL_RULES)).toEqual(
+      withRules(twin, inRange, {}, CANONICAL_RULES),
+    );
+    expect(withRules(symbolic, outOfRange, {}, CANONICAL_RULES)).toEqual(
+      withRules(twin, outOfRange, {}, CANONICAL_RULES),
+    );
+    expect(withRules(symbolic, inRange, {}, CANONICAL_RULES).type).toBe(
+      "attack",
+    );
+  });
+
+  it("tracks a retuned rules fixture while an inlined twin would not", () => {
+    const retuned: Rules = {
+      ...CANONICAL_RULES,
+      moves: {
+        ...CANONICAL_RULES.moves,
+        "kizami-zuki": {
+          ...CANONICAL_RULES.moves["kizami-zuki"]!,
+          reach: 999000,
+        },
+      },
+    };
+
+    expect(evalsToRule("moves.kizami-zuki.reach", 999000, retuned)).toBe(true);
+    // the old canonical value no longer matches under the retune
+    expect(evalsToRule("moves.kizami-zuki.reach", 210000, retuned)).toBe(false);
   });
 });

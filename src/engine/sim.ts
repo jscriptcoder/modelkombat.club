@@ -845,12 +845,14 @@ export function runFight(cfg: FightConfig): FightResult {
       botA,
       viewFor(a, aOpp, b, rules, tick, maxTicks),
       a.mem,
+      rules,
     );
 
     const bAction = runTick(
       botB,
       viewFor(b, bOpp, a, rules, tick, maxTicks),
       b.mem,
+      rules,
     );
 
     // 3. Resolve together: read each fighter's guard band and posture from its
