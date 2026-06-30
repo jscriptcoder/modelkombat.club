@@ -4982,3 +4982,68 @@ describe("runFight — gassed special-lockout (emergent: specialCost > gasThresh
     expect(fresh.scores.a).toBeGreaterThan(gassed.scores.a); // the relationship: same move, gated by gas
   });
 });
+
+describe("runFight — rule(path) ruleset reads threaded through the sim", () => {
+  // `rule` isn't in the NumExpr union until GREEN; build the rule-gated rules as
+  // data. getMockRules sets gyaku-zuki.reach 250000, startGap 200000 ⇒ in range
+  // from tick 0, so a reach-gated attacker strikes immediately — but ONLY if the
+  // sim threads the rules into runTick (else rule ⇒ 0 and 200000 <= 0 is false).
+  const asRules = (r: unknown): BotDoc["rules"] => r as BotDoc["rules"];
+  const ATTACK_MID: Action = {
+    type: "attack",
+    move: "gyaku-zuki",
+    band: "mid",
+  };
+
+  const ruleAttacker = bot(
+    asRules([
+      {
+        when: {
+          op: "lte",
+          args: [
+            { op: "field", path: "opponent.distance" },
+            { op: "rule", path: "moves.gyaku-zuki.reach" },
+          ],
+        },
+        do: ATTACK_MID,
+      },
+    ]),
+    { type: "idle" },
+  );
+
+  const constAttacker = bot(
+    [
+      {
+        when: {
+          op: "lte",
+          args: [
+            { op: "field", path: "opponent.distance" },
+            { op: "const", value: 250000 },
+          ],
+        },
+        do: ATTACK_MID,
+      },
+    ],
+    { type: "idle" },
+  );
+
+  it("scores a rule(reach)-gated bot byte-identically to its 250000-inlined twin", () => {
+    const symbolic = runFight(
+      getMockConfig({ botA: ruleAttacker, botB: IDLE, maxTicks: 20 }),
+    );
+
+    const twin = runFight(
+      getMockConfig({ botA: constAttacker, botB: IDLE, maxTicks: 20 }),
+    );
+
+    expect(symbolic.events).toEqual(twin.events);
+  });
+
+  it("lets the reach-gated bot attack on tick 0 — proving the sim threaded the rules", () => {
+    const result = runFight(
+      getMockConfig({ botA: ruleAttacker, botB: IDLE, maxTicks: 1 }),
+    );
+
+    expect(result.events[0].a.action).toEqual(ATTACK_MID);
+  });
+});

@@ -15,7 +15,7 @@
 // op/field/move never rejects a previously valid bot).
 // ============================================================================
 
-import type { State, Action, Band, MoveId } from "./types.js";
+import type { State, Action, Band, MoveId, Rules } from "./types.js";
 
 // The DSL read surface: the whitelisted state leaves a bot may read. This is the
 // SINGLE source — the validator's allowlist is derived from FIELD_READERS' keys
@@ -57,7 +57,8 @@ export type NumExpr =
   | { op: "mem"; cell: string }
   | { op: "add" | "mul" | "min" | "max"; args: NumExpr[] }
   | { op: "sub" | "div"; args: [NumExpr, NumExpr] }
-  | { op: "neg" | "abs"; arg: NumExpr };
+  | { op: "neg" | "abs"; arg: NumExpr }
+  | { op: "rule"; path: RulePath };
 
 // ─── Boolean expressions ─────────────────────────────────────────────────────
 export type BoolExpr =
@@ -123,6 +124,95 @@ const FIELD_READERS: Record<FieldPath, (s: State) => number> = {
 };
 
 const ALLOWED_FIELDS: ReadonlySet<string> = new Set(Object.keys(FIELD_READERS));
+
+// Rule read surface: the frozen-ruleset constants a bot reads symbolically via
+// `rule(path)`. EVERY numeric leaf of the Rules shape ("nothing withheld") — its
+// keys ARE the validator allowlist, and the interpreter reads through the same
+// map. An optional/unconfigured constant reads the inert sentinel 0 (never
+// throws), matching the engine's convention; the validator stays rules-agnostic
+// (a path is valid by SHAPE, so validate-once / run-on-any-rules holds). Trusted
+// Rules data, not bot input — reads are pure and cannot reach beyond these
+// constants. `satisfies` keeps the literal keys so RulePath derives from them.
+const RULE_READERS = {
+  tickRate: (r: Rules) => r.tickRate,
+  walkSpeed: (r: Rules) => r.walkSpeed,
+  "ring.width": (r: Rules) => r.ring.width,
+  startGap: (r: Rules) => r.startGap,
+  "moves.gyaku-zuki.startup": (r: Rules) => r.moves["gyaku-zuki"].startup,
+  "moves.gyaku-zuki.active": (r: Rules) => r.moves["gyaku-zuki"].active,
+  "moves.gyaku-zuki.recovery": (r: Rules) => r.moves["gyaku-zuki"].recovery,
+  "moves.gyaku-zuki.score": (r: Rules) => r.moves["gyaku-zuki"].score,
+  "moves.gyaku-zuki.reach": (r: Rules) => r.moves["gyaku-zuki"].reach,
+  "moves.gyaku-zuki.staminaCost": (r: Rules) =>
+    r.moves["gyaku-zuki"].staminaCost ?? 0,
+  "moves.sweep.startup": (r: Rules) => r.moves.sweep?.startup ?? 0,
+  "moves.sweep.active": (r: Rules) => r.moves.sweep?.active ?? 0,
+  "moves.sweep.recovery": (r: Rules) => r.moves.sweep?.recovery ?? 0,
+  "moves.sweep.score": (r: Rules) => r.moves.sweep?.score ?? 0,
+  "moves.sweep.reach": (r: Rules) => r.moves.sweep?.reach ?? 0,
+  "moves.sweep.staminaCost": (r: Rules) => r.moves.sweep?.staminaCost ?? 0,
+  "moves.kizami-zuki.startup": (r: Rules) =>
+    r.moves["kizami-zuki"]?.startup ?? 0,
+  "moves.kizami-zuki.active": (r: Rules) => r.moves["kizami-zuki"]?.active ?? 0,
+  "moves.kizami-zuki.recovery": (r: Rules) =>
+    r.moves["kizami-zuki"]?.recovery ?? 0,
+  "moves.kizami-zuki.score": (r: Rules) => r.moves["kizami-zuki"]?.score ?? 0,
+  "moves.kizami-zuki.reach": (r: Rules) => r.moves["kizami-zuki"]?.reach ?? 0,
+  "moves.kizami-zuki.staminaCost": (r: Rules) =>
+    r.moves["kizami-zuki"]?.staminaCost ?? 0,
+  "moves.mae-geri.startup": (r: Rules) => r.moves["mae-geri"]?.startup ?? 0,
+  "moves.mae-geri.active": (r: Rules) => r.moves["mae-geri"]?.active ?? 0,
+  "moves.mae-geri.recovery": (r: Rules) => r.moves["mae-geri"]?.recovery ?? 0,
+  "moves.mae-geri.score": (r: Rules) => r.moves["mae-geri"]?.score ?? 0,
+  "moves.mae-geri.reach": (r: Rules) => r.moves["mae-geri"]?.reach ?? 0,
+  "moves.mae-geri.staminaCost": (r: Rules) =>
+    r.moves["mae-geri"]?.staminaCost ?? 0,
+  "moves.mawashi-geri.startup": (r: Rules) =>
+    r.moves["mawashi-geri"]?.startup ?? 0,
+  "moves.mawashi-geri.active": (r: Rules) =>
+    r.moves["mawashi-geri"]?.active ?? 0,
+  "moves.mawashi-geri.recovery": (r: Rules) =>
+    r.moves["mawashi-geri"]?.recovery ?? 0,
+  "moves.mawashi-geri.score": (r: Rules) => r.moves["mawashi-geri"]?.score ?? 0,
+  "moves.mawashi-geri.reach": (r: Rules) => r.moves["mawashi-geri"]?.reach ?? 0,
+  "moves.mawashi-geri.staminaCost": (r: Rules) =>
+    r.moves["mawashi-geri"]?.staminaCost ?? 0,
+  "moves.mawashi-geri.scoreByBand.high": (r: Rules) =>
+    r.moves["mawashi-geri"]?.scoreByBand?.high ?? 0,
+  "throw.startup": (r: Rules) => r.throw?.startup ?? 0,
+  "throw.active": (r: Rules) => r.throw?.active ?? 0,
+  "throw.recovery": (r: Rules) => r.throw?.recovery ?? 0,
+  "throw.reach": (r: Rules) => r.throw?.reach ?? 0,
+  "throw.score": (r: Rules) => r.throw?.score ?? 0,
+  "throw.staminaCost": (r: Rules) => r.throw?.staminaCost ?? 0,
+  jumpImpulse: (r: Rules) => r.jumpImpulse ?? 0,
+  gravity: (r: Rules) => r.gravity ?? 0,
+  lowClearance: (r: Rules) => r.lowClearance ?? 0,
+  parryWindow: (r: Rules) => r.parryWindow ?? 0,
+  parryRecovery: (r: Rules) => r.parryRecovery ?? 0,
+  counterWindow: (r: Rules) => r.counterWindow ?? 0,
+  counterBonus: (r: Rules) => r.counterBonus ?? 0,
+  cancelWindow: (r: Rules) => r.cancelWindow ?? 0,
+  knockdownDuration: (r: Rules) => r.knockdownDuration ?? 0,
+  finishWindow: (r: Rules) => r.finishWindow ?? 0,
+  finishScore: (r: Rules) => r.finishScore ?? 0,
+  "perception.lPos": (r: Rules) => r.perception?.lPos ?? 0,
+  "perception.lAct": (r: Rules) => r.perception?.lAct ?? 0,
+  "perception.jitter": (r: Rules) => r.perception?.jitter ?? 0,
+  "stamina.max": (r: Rules) => r.stamina?.max ?? 0,
+  "stamina.regen": (r: Rules) => r.stamina?.regen ?? 0,
+  "stamina.blockChip": (r: Rules) => r.stamina?.blockChip ?? 0,
+  "stamina.parryChip": (r: Rules) => r.stamina?.parryChip ?? 0,
+  "stamina.gasThreshold": (r: Rules) => r.stamina?.gasThreshold ?? 0,
+  "stamina.gasRecoveryPenalty": (r: Rules) =>
+    r.stamina?.gasRecoveryPenalty ?? 0,
+} satisfies Record<string, (r: Rules) => number>;
+
+// The frozen-ruleset read paths — derived from RULE_READERS' keys so the type,
+// the allowlist, and the interpreter can never drift.
+export type RulePath = keyof typeof RULE_READERS;
+
+const ALLOWED_RULES: ReadonlySet<string> = new Set(Object.keys(RULE_READERS));
 
 const MOVES: ReadonlySet<string> = new Set<MoveId>([
   "kizami-zuki",
@@ -268,6 +358,12 @@ export function validate(doc: unknown): ValidationResult {
       case "abs":
         num(e.arg, `${path}.${String(e.op)}`, depth + 1);
         break;
+      case "rule":
+        if (typeof e.path !== "string" || !ALLOWED_RULES.has(e.path)) {
+          fail(path, `rule not allowed: ${String(e.path)}`);
+        }
+
+        break;
       default:
         fail(path, `unknown numeric op: ${String(e.op)}`);
     }
@@ -403,6 +499,7 @@ function evalNum(
   n: NumExpr,
   state: State,
   mem: Record<string, number>,
+  rules: Rules | undefined,
 ): number {
   switch (n.op) {
     case "const":
@@ -411,45 +508,51 @@ function evalNum(
       return FIELD_READERS[n.path](state);
     case "mem":
       return mem[n.cell] ?? 0;
+    case "rule":
+      // Trusted frozen-ruleset constant; sentinel 0 when no rules are threaded.
+      return rules ? RULE_READERS[n.path](rules) : 0;
     case "add":
       return clampInt32(
-        n.args.reduce((acc, a) => acc + evalNum(a, state, mem), 0),
+        n.args.reduce((acc, a) => acc + evalNum(a, state, mem, rules), 0),
       );
     case "mul":
       return clampInt32(
-        n.args.reduce((acc, a) => acc * evalNum(a, state, mem), 1),
+        n.args.reduce((acc, a) => acc * evalNum(a, state, mem, rules), 1),
       );
     case "min":
       return clampInt32(
         n.args.reduce(
-          (acc, a) => Math.min(acc, evalNum(a, state, mem)),
+          (acc, a) => Math.min(acc, evalNum(a, state, mem, rules)),
           Infinity,
         ),
       );
     case "max":
       return clampInt32(
         n.args.reduce(
-          (acc, a) => Math.max(acc, evalNum(a, state, mem)),
+          (acc, a) => Math.max(acc, evalNum(a, state, mem, rules)),
           -Infinity,
         ),
       );
     case "sub":
       return clampInt32(
-        evalNum(n.args[0], state, mem) - evalNum(n.args[1], state, mem),
+        evalNum(n.args[0], state, mem, rules) -
+          evalNum(n.args[1], state, mem, rules),
       );
 
     case "div": {
-      const divisor = evalNum(n.args[1], state, mem);
+      const divisor = evalNum(n.args[1], state, mem, rules);
 
       return divisor === 0
         ? 0
-        : clampInt32(Math.trunc(evalNum(n.args[0], state, mem) / divisor));
+        : clampInt32(
+            Math.trunc(evalNum(n.args[0], state, mem, rules) / divisor),
+          );
     }
 
     case "neg":
-      return clampInt32(-evalNum(n.arg, state, mem));
+      return clampInt32(-evalNum(n.arg, state, mem, rules));
     case "abs":
-      return clampInt32(Math.abs(evalNum(n.arg, state, mem)));
+      return clampInt32(Math.abs(evalNum(n.arg, state, mem, rules)));
   }
 }
 
@@ -457,26 +560,45 @@ function evalBool(
   n: BoolExpr,
   state: State,
   mem: Record<string, number>,
+  rules: Rules | undefined,
 ): boolean {
   switch (n.op) {
     case "gt":
-      return evalNum(n.args[0], state, mem) > evalNum(n.args[1], state, mem);
+      return (
+        evalNum(n.args[0], state, mem, rules) >
+        evalNum(n.args[1], state, mem, rules)
+      );
     case "lt":
-      return evalNum(n.args[0], state, mem) < evalNum(n.args[1], state, mem);
+      return (
+        evalNum(n.args[0], state, mem, rules) <
+        evalNum(n.args[1], state, mem, rules)
+      );
     case "gte":
-      return evalNum(n.args[0], state, mem) >= evalNum(n.args[1], state, mem);
+      return (
+        evalNum(n.args[0], state, mem, rules) >=
+        evalNum(n.args[1], state, mem, rules)
+      );
     case "lte":
-      return evalNum(n.args[0], state, mem) <= evalNum(n.args[1], state, mem);
+      return (
+        evalNum(n.args[0], state, mem, rules) <=
+        evalNum(n.args[1], state, mem, rules)
+      );
     case "eq":
-      return evalNum(n.args[0], state, mem) === evalNum(n.args[1], state, mem);
+      return (
+        evalNum(n.args[0], state, mem, rules) ===
+        evalNum(n.args[1], state, mem, rules)
+      );
     case "neq":
-      return evalNum(n.args[0], state, mem) !== evalNum(n.args[1], state, mem);
+      return (
+        evalNum(n.args[0], state, mem, rules) !==
+        evalNum(n.args[1], state, mem, rules)
+      );
     case "and":
-      return n.args.every((a) => evalBool(a, state, mem));
+      return n.args.every((a) => evalBool(a, state, mem, rules));
     case "or":
-      return n.args.some((a) => evalBool(a, state, mem));
+      return n.args.some((a) => evalBool(a, state, mem, rules));
     case "not":
-      return !evalBool(n.arg, state, mem);
+      return !evalBool(n.arg, state, mem, rules);
   }
 }
 
@@ -485,16 +607,21 @@ function evalBool(
  * whose `when` holds and that carries a `do` returns the tick's Action. A rule
  * with no `do` is a TRACKER: its `set` writes apply and evaluation continues.
  * No rule fires ⇒ `default`. Mutates `mem` in place (the engine owns it).
+ *
+ * `rules` is the fight's frozen frame table, threaded so `rule(path)` reads
+ * resolve; absent (legacy 3-arg callers) ⇒ every `rule(path)` reads the
+ * sentinel 0.
  */
 export function runTick(
   doc: BotDoc,
   state: State,
   mem: Record<string, number>,
+  rules?: Rules,
 ): Action {
   for (const rule of doc.rules) {
-    if (!evalBool(rule.when, state, mem)) continue;
+    if (!evalBool(rule.when, state, mem, rules)) continue;
     if (rule.set)
-      for (const w of rule.set) mem[w.cell] = evalNum(w.to, state, mem);
+      for (const w of rule.set) mem[w.cell] = evalNum(w.to, state, mem, rules);
     if (rule.do) return rule.do;
   }
 

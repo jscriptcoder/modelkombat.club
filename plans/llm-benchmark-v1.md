@@ -64,8 +64,9 @@ neg/abs`; int32-saturating, div truncates toward zero, ÷0:=0). No `let`.
       seeds `1..10` at `maxTicks 600`, **playing each (opponent × seed) twice (bot as A and as
       B)**, and prints a **deterministic** report: Σ net-points (primary), win-rate
       (tiebreaker), and a per-opponent breakdown. _(Slice 1 — PR #79)_
-- [ ] A bot can express integer **arithmetic** (`add/sub/mul/min/max/div/neg/abs`) with
+- [x] A bot can express integer **arithmetic** (`add/sub/mul/min/max/div/neg/abs`) with
       int32-saturating / div-trunc / ÷0:=0 semantics, validated and evaluated in a real fight.
+      _(Slice 2 — PR #80)_
 - [ ] A bot can read any frozen-ruleset constant via **`rule(path)`**; a symbolic bot and its
       magic-number twin behave identically, and the symbolic one survives a `CANONICAL_RULES`
       retune that breaks the twin.
@@ -151,7 +152,7 @@ grappler, sweeper, vulture` — spanning the strategic axes (pressure ×2 flavor
 
 ---
 
-### Slice 2: Bots can compute — arithmetic NumExpr ops
+### Slice 2: Bots can compute — arithmetic NumExpr ops — ✅ DONE (PR #80)
 
 **Value**: A bot author (LLM) can express thresholds and derived quantities instead of only
 comparing raw leaves — the foundation for strategy that isn't a pile of magic numbers.
