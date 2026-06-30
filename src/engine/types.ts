@@ -58,6 +58,7 @@ export type OpponentState = {
   predictedDistance: number; // distance dead-reckoned forward over the L_pos gap
   stamina: number; // perceived conditioning meter (C10 Story 4; action ⇒ L_act-delayed; 0 = no meter, the inert sentinel)
   gassed: boolean; // perceived gas tell (C10 Story 4): delayed stamina ≤ gasThreshold (false = not gassed / no threshold)
+  points: number; // live scoreboard read — the opponent's WKF points, exposed with ZERO perception delay (a scoreboard fact, not a body-perception tell; sourced from the live opponent, never the ring buffer)
 };
 
 export type RingState = { width: number };

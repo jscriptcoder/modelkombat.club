@@ -189,13 +189,16 @@ const perceivedFrame = (history: Frame[], tick: number, lPos: number): Frame =>
 // `distance` is the raw delayed gap to live self; `predictedDistance` dead-reckons
 // the delayed position forward over the lPos gap (oppPos.x + oppPos.vx · lPos) so a
 // constant-velocity opponent reads at its true current distance.
+// Returns everything EXCEPT the live `points` — that scoreboard field is not a body-
+// perception tell, carries no latency, and is completed in `viewFor` from the live
+// opponent (so it never leaks into the delayed ring buffer).
 const perceiveOpponent = (
   selfX: number,
   oppPos: Frame,
   oppAct: Frame,
   lPos: number,
   rules: Rules,
-): OpponentState => {
+): Omit<OpponentState, "points"> => {
   const predictedX = oppPos.x + oppPos.vx * lPos;
 
   return {
@@ -221,7 +224,7 @@ const perceiveOpponent = (
 // asymmetry with the delayed `opponent.knockdown` tell).
 const viewFor = (
   self: Fighter,
-  opponent: OpponentState,
+  opponent: Omit<OpponentState, "points">,
   oppLive: Fighter,
   rules: Rules,
   tick: number,
@@ -255,7 +258,7 @@ const viewFor = (
       stamina: self.stamina, // live — the conditioning meter is self-proprioception (C10)
       gassed: gassed(self, rules) ? 1 : 0, // live — the derived gas tell (C10 Story 3): 1 iff at/below the gas line
     },
-    opponent,
+    opponent: { ...opponent, points: oppLive.points }, // points is a LIVE scoreboard read off the true opponent (zero latency, like self.points / clock.tick)
     ring: { width: rules.ring.width },
     clock: { tick, ticksRemaining: maxTicks - tick },
   };

@@ -67,9 +67,9 @@ neg/abs`; int32-saturating, div truncates toward zero, ÷0:=0). No `let`.
 - [x] A bot can express integer **arithmetic** (`add/sub/mul/min/max/div/neg/abs`) with
       int32-saturating / div-trunc / ÷0:=0 semantics, validated and evaluated in a real fight.
       _(Slice 2 — PR #80)_
-- [ ] A bot can read any frozen-ruleset constant via **`rule(path)`**; a symbolic bot and its
+- [x] A bot can read any frozen-ruleset constant via **`rule(path)`**; a symbolic bot and its
       magic-number twin behave identically, and the symbolic one survives a `CANONICAL_RULES`
-      retune that breaks the twin.
+      retune that breaks the twin. _(Slice 3 — PR #81)_
 - [ ] A bot can read **`opponent.points`** (live) and act on the score gap.
 - [ ] `spec.md` is **generated from `dsl.ts` + `rules.ts`**, committed, drift-tested, embeds a
       JSON Schema, interpolates all numbers from `CANONICAL_RULES`, and embeds **validated**
@@ -187,7 +187,7 @@ a real fight.
 
 ---
 
-### Slice 3: Bots reference the ruleset symbolically — unified `rule(path)`
+### Slice 3: Bots reference the ruleset symbolically — unified `rule(path)` — ✅ DONE (PR #81)
 
 **Value**: A bot expresses "in range of the front kick" as `rule("moves.mae-geri.reach")`
 instead of `270000` — removing transcription noise (the benchmark measures strategy) and
