@@ -181,13 +181,17 @@ The authoritative numbers the platform fights on (`CANONICAL_RULES`).
 
 ### Techniques
 
-| technique | startup | active | recovery | score | reach | cost | bands |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `sweep` | 7 | 2 | 13 | 0 | 180000 | 40 | — |
-| `kizami-zuki` | 7 | 2 | 13 | 1 | 210000 | 15 | high/mid |
-| `gyaku-zuki` | 7 | 3 | 14 | 1 | 240000 | 20 | high/mid |
-| `mae-geri` | 9 | 3 | 16 | 2 | 270000 | 35 | mid |
-| `mawashi-geri` | 11 | 3 | 18 | 2 | 300000 | 45 | high/mid |
+`cancels into` — on a CONNECT (hit/block), a move can cancel its recovery into
+one of these follow-ups within `cancelWindow` ticks (see the primer). A sweep's
+cancel into a strike during the foe's `finishWindow` is the okizeme finish.
+
+| technique | startup | active | recovery | score | reach | cost | bands | cancels into |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `sweep` | 7 | 2 | 13 | 0 | 180000 | 40 | — | gyaku-zuki |
+| `kizami-zuki` | 7 | 2 | 13 | 1 | 210000 | 15 | high/mid | gyaku-zuki |
+| `gyaku-zuki` | 7 | 3 | 14 | 1 | 240000 | 20 | high/mid | mae-geri / mawashi-geri |
+| `mae-geri` | 9 | 3 | 16 | 2 | 270000 | 35 | mid | gyaku-zuki |
+| `mawashi-geri` | 11 | 3 | 18 | 2 | 300000 | 45 | high/mid | gyaku-zuki |
 
 ### Global constants
 

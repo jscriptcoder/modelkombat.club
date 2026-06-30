@@ -151,7 +151,7 @@ const actionGrammarSection = (): string =>
   ].join("\n");
 
 const moveRow = (id: string, m: MoveSpec): string =>
-  `| ${code(id)} | ${m.startup} | ${m.active} | ${m.recovery} | ${m.score} | ${m.reach} | ${m.staminaCost ?? 0} | ${(m.bands ?? []).join("/") || "—"} |`;
+  `| ${code(id)} | ${m.startup} | ${m.active} | ${m.recovery} | ${m.score} | ${m.reach} | ${m.staminaCost ?? 0} | ${(m.bands ?? []).join("/") || "—"} | ${(m.cancelInto ?? []).join(" / ") || "—"} |`;
 
 const frameTableSection = (rules: Rules): string => {
   // `Object.entries` widens optional move values to `MoveSpec | undefined`, but
@@ -173,8 +173,12 @@ const frameTableSection = (rules: Rules): string => {
     "",
     "### Techniques",
     "",
-    "| technique | startup | active | recovery | score | reach | cost | bands |",
-    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    "`cancels into` — on a CONNECT (hit/block), a move can cancel its recovery into",
+    "one of these follow-ups within `cancelWindow` ticks (see the primer). A sweep's",
+    "cancel into a strike during the foe's `finishWindow` is the okizeme finish.",
+    "",
+    "| technique | startup | active | recovery | score | reach | cost | bands | cancels into |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...rows,
     "",
     "### Global constants",

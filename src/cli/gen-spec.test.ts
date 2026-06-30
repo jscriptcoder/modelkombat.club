@@ -134,6 +134,36 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(pairingLine(spec, "perception.lPos", lPos)).toBeDefined();
     });
 
+    it("shows each move's cancel-into routes (the okizeme/rekka follow-ups)", () => {
+      const lines = generateSpec().split("\n");
+
+      for (const [id, move] of Object.entries(CANONICAL_RULES.moves)) {
+        const row = lines.find((l) => l.startsWith(`| ${code(id)} |`));
+        expect(row, `${id} row`).toBeDefined();
+
+        for (const target of move.cancelInto ?? []) {
+          expect(row, `${id} cancels into ${target}`).toContain(target);
+        }
+      }
+    });
+
+    it("renders `—` for a move with no cancel routes", () => {
+      const gyaku = { ...CANONICAL_RULES.moves["gyaku-zuki"] };
+
+      delete gyaku.cancelInto;
+
+      const rules: Rules = {
+        ...CANONICAL_RULES,
+        moves: { ...CANONICAL_RULES.moves, "gyaku-zuki": gyaku },
+      };
+
+      const row = generateSpec(rules)
+        .split("\n")
+        .find((l) => l.startsWith(`| ${code("gyaku-zuki")} |`));
+
+      expect(row?.endsWith("| — |")).toBe(true);
+    });
+
     it("lists only configured techniques — an unconfigured move gets no row", () => {
       const rulesNoSweep: Rules = {
         ...CANONICAL_RULES,
