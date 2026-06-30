@@ -14,13 +14,21 @@ import {
   type BenchmarkResult,
   type OpponentScore,
 } from "../engine/benchmark.js";
-import { ValidationError, type BotDoc } from "../engine/dsl.js";
+import {
+  safeParse,
+  validate,
+  ValidationError,
+  type BotDoc,
+  type ValidationIssue,
+} from "../engine/dsl.js";
 import type { Rules } from "../engine/types.js";
+import { extractBotJson } from "./extract.js";
 
 export type LoadBot = (path: string) => BotDoc;
 
 export type BenchmarkDeps = {
   loadBot: LoadBot; // throws ValidationError (rejected) or Error (unreadable)
+  readText: (path: string) => string; // raw reply text; throws Error if unreadable
   gauntlet: BotDoc[];
   rules: Rules;
   seeds: readonly number[];
@@ -30,7 +38,9 @@ export type BenchmarkDeps = {
 
 export type CliOutput = { stdout: string; stderr: string; code: number };
 
-const USAGE = "usage: npm run benchmark -- <bot.json>\n";
+const USAGE =
+  "usage: npm run benchmark -- <bot.json>\n" +
+  "       npm run benchmark -- --from-reply <reply.txt>\n";
 
 const signed = (n: number): string => (n > 0 ? `+${n}` : `${n}`);
 
@@ -91,11 +101,75 @@ const formatReport = (
   return `${header}\n\n${table}\n\n${summary}`;
 };
 
-export const runBenchmarkCli = (
-  argv: string[],
+// A validated bot scored against the gauntlet and rendered to a 0-exit report.
+const scoredOutput = (bot: BotDoc, deps: BenchmarkDeps): CliOutput => {
+  const result = benchmark({
+    bot,
+    gauntlet: deps.gauntlet,
+    seeds: deps.seeds,
+    maxTicks: deps.maxTicks,
+    rules: deps.rules,
+  });
+
+  return {
+    stdout: formatReport(bot, result, deps) + "\n",
+    stderr: "",
+    code: 0,
+  };
+};
+
+// A distinct, last-ranked invalid outcome (hard-zero-distinct): a labelled
+// header naming the reply, then each structured issue on its own line.
+const formatInvalid = (source: string, issues: ValidationIssue[]): string =>
+  `invalid submission ${source}:\n` +
+  issues.map((i) => `  ${i.path}: ${i.reason}`).join("\n") +
+  "\n";
+
+// A raw reply reduced to either a validated bot or an invalid outcome. Lenient
+// extraction picks the JSON substring, then the SAME safeParse + validate TCB
+// gate the strict loader uses runs — but failures are captured, not thrown.
+type ReplyOutcome =
+  | { kind: "bot"; bot: BotDoc }
+  | { kind: "invalid"; issues: ValidationIssue[] };
+
+const evaluateReply = (text: string): ReplyOutcome => {
+  const extracted = extractBotJson(text);
+
+  if (extracted === null) {
+    return {
+      kind: "invalid",
+      issues: [{ path: "$", reason: "no bot JSON found in reply" }],
+    };
+  }
+
+  let doc: unknown;
+
+  try {
+    doc = safeParse(extracted);
+  } catch (e) {
+    if (e instanceof ValidationError) {
+      return { kind: "invalid", issues: e.issues };
+    }
+
+    return {
+      kind: "invalid",
+      issues: [
+        { path: "$", reason: e instanceof Error ? e.message : "invalid JSON" },
+      ],
+    };
+  }
+
+  const res = validate(doc);
+  if (!res.ok) return { kind: "invalid", issues: res.issues };
+
+  // Justified: validate ok ⇒ doc matches BotDoc (the guarantee loadBotDoc uses).
+  return { kind: "bot", bot: doc as BotDoc };
+};
+
+const fromBotFile = (
+  path: string | undefined,
   deps: BenchmarkDeps,
 ): CliOutput => {
-  const path = argv[0];
   if (path === undefined) return { stdout: "", stderr: USAGE, code: 2 };
 
   let bot: BotDoc;
@@ -121,17 +195,46 @@ export const runBenchmarkCli = (
     };
   }
 
-  const result = benchmark({
-    bot,
-    gauntlet: deps.gauntlet,
-    seeds: deps.seeds,
-    maxTicks: deps.maxTicks,
-    rules: deps.rules,
-  });
-
-  return {
-    stdout: formatReport(bot, result, deps) + "\n",
-    stderr: "",
-    code: 0,
-  };
+  return scoredOutput(bot, deps);
 };
+
+const fromReply = (
+  replyPath: string | undefined,
+  deps: BenchmarkDeps,
+): CliOutput => {
+  if (replyPath === undefined) return { stdout: "", stderr: USAGE, code: 2 };
+
+  let text: string;
+
+  try {
+    text = deps.readText(replyPath);
+  } catch (e) {
+    return {
+      stdout: "",
+      stderr: `${e instanceof Error ? e.message : String(e)}\n`,
+      code: 1,
+    };
+  }
+
+  const outcome = evaluateReply(text);
+
+  if (outcome.kind === "invalid") {
+    return {
+      stdout: "",
+      stderr: formatInvalid(replyPath, outcome.issues),
+      code: 1,
+    };
+  }
+
+  return scoredOutput(outcome.bot, deps);
+};
+
+// Direct `<bot.json>` validates strictly (slice-1 behaviour, byte-unchanged);
+// `--from-reply <reply.txt>` adds lenient extraction. One-shot — no repair loop.
+export const runBenchmarkCli = (
+  argv: string[],
+  deps: BenchmarkDeps,
+): CliOutput =>
+  argv[0] === "--from-reply"
+    ? fromReply(argv[1], deps)
+    : fromBotFile(argv[0], deps);
