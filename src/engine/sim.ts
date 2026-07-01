@@ -61,12 +61,21 @@ import type {
 import { runTick, type BotDoc } from "./dsl.js";
 import { mulberry32 } from "./prng.js";
 
+// Why a fighter's requested action did NOT take effect this tick (Slice 8 telemetry —
+// a human re-prompt aid, never a metric input). `unaffordable`: a costed move refused by
+// the stamina gate; `out-of-band`: an attack at a band the move can't strike; `locked`:
+// a committed fighter's action ignored (its move can't be interrupted); `inert`: a move /
+// sweep / throw this Rules doesn't configure. `null` (on the frame) ⇒ the action was
+// honoured (or an idle asked for nothing).
+export type DegradeReason = "unaffordable" | "out-of-band" | "locked" | "inert";
+
 export type FighterFrame = {
   x: number;
   y: number;
   action: Action;
   points: number;
   stamina: number; // C10 meter at end of tick; 0 every frame when no meter is configured
+  degrade: DegradeReason | null; // why `action` didn't take effect (Slice 8); null = honoured
 };
 export type FightEvent = { tick: number; a: FighterFrame; b: FighterFrame };
 
@@ -360,8 +369,15 @@ const bandLegal = (spec: { bands?: Band[] }, band: Band): boolean =>
   spec.bands === undefined || spec.bands.includes(band);
 
 // Honour a neutral fighter's action (start a move, or step). A committed fighter
-// ignores its action — the move it is locked into continues.
-const intake = (f: Fighter, action: Action, rules: Rules): void => {
+// ignores its action — the move it is locked into continues. Returns WHY the action
+// did not take effect (Slice 8 telemetry: `DegradeReason`), or `null` when it was
+// honoured. The reason is a by-product of the SAME control flow that decides the
+// outcome — one source of truth, so the telemetry can never drift from the physics.
+const intake = (
+  f: Fighter,
+  action: Action,
+  rules: Rules,
+): DegradeReason | null => {
   if (f.state.kind !== "neutral") {
     // Cancel (§3 / §11.3 `CancelEnable`): a committed, cancelable fighter may interrupt the
     // rest of its move into a follow-up listed in its current move's `cancelInto`. This is
@@ -380,60 +396,81 @@ const intake = (f: Fighter, action: Action, rules: Rules): void => {
       ) {
         f.state = startAttack(spec, action.band);
         f.cancelRemaining = 0; // the fresh move re-opens the window only when IT connects
+
+        return null; // the cancel took effect
       }
     }
 
-    return;
+    // Committed and not cancelling: an idle asked for nothing (no frustration ⇒ null);
+    // any other action wanted something the commitment denied ⇒ `locked`.
+    return action.type === "idle" ? null : "locked";
   }
 
   if (action.type === "attack") {
     const spec = rules.moves[action.move]; // C9: undefined ⇒ move not configured ⇒ idle (inert)
 
-    if (
-      spec !== undefined &&
-      bandLegal(spec, action.band) && // C9: an out-of-band attack degrades to idle
-      affordable(f, spec, rules)
-    ) {
-      const move = startAttack(spec, action.band);
-      f.state = move;
-      spend(f, spec, rules); // C10: a costed move drains stamina on commit
-      move.extra += gasRecovery(f, rules); // C10 Story 3: a commit into the gas line recovers slower
-    }
-  } else if (
-    action.type === "sweep" &&
-    rules.moves.sweep !== undefined &&
-    affordable(f, rules.moves.sweep, rules)
-  ) {
+    if (spec === undefined) return "inert";
+    if (!bandLegal(spec, action.band)) return "out-of-band"; // C9: an out-of-band attack degrades to idle
+    if (!affordable(f, spec, rules)) return "unaffordable"; // C10: too little stamina to commit
+
+    const move = startAttack(spec, action.band);
+    f.state = move;
+    spend(f, spec, rules); // C10: a costed move drains stamina on commit
+    move.extra += gasRecovery(f, rules); // C10 Story 3: a commit into the gas line recovers slower
+
+    return null;
+  }
+
+  if (action.type === "sweep") {
     // Sweep (C8): a low-band knockdown strike. Commit to an attacking move at band `low`
     // reading the optional `moves.sweep` spec. Without the spec the action is inert (no state
     // change) ⇒ byte-identical to the pre-sweep engine. An unaffordable sweep degrades to idle.
+    if (rules.moves.sweep === undefined) return "inert";
+    if (!affordable(f, rules.moves.sweep, rules)) return "unaffordable";
+
     const move = startAttack(rules.moves.sweep, "low");
     f.state = move;
     spend(f, rules.moves.sweep, rules);
     move.extra += gasRecovery(f, rules); // C10 Story 3: a gassed sweep also recovers slower
-  } else if (action.type === "move") {
+
+    return null;
+  }
+
+  if (action.type === "move") {
     f.x = clamp(
       f.x + action.dir * f.facing * rules.walkSpeed,
       0,
       rules.ring.width,
     );
-  } else if (action.type === "jump") {
+
+    return null;
+  }
+
+  if (action.type === "jump") {
     // Launch: commit to a gravity arc with the initial upward velocity. `y` rises
     // in `advance`; `dir` is reserved (vertical-only for now). Absent impulse ⇒ 0
     // ⇒ an inert jump that lands the same tick (forward-compatible with no-y rules).
     f.state = { kind: "airborne", vy: rules.jumpImpulse ?? 0 };
-  } else if (
-    action.type === "throw" &&
-    rules.throw !== undefined &&
-    affordable(f, rules.throw, rules)
-  ) {
+
+    return null;
+  }
+
+  if (action.type === "throw") {
     // Commit to a grab (startup → grab-active → recovery). Without a throw frame table
     // the action is inert (no state change) ⇒ byte-identical to the pre-throw engine. An
     // unaffordable grab degrades to idle.
+    if (rules.throw === undefined) return "inert";
+    if (!affordable(f, rules.throw, rules)) return "unaffordable";
+
     f.state = { kind: "throwing", elapsed: 0, stuffed: false };
     spend(f, rules.throw, rules);
+
+    return null;
   }
-  // idle / block / crouch (or throw with no frame table): no positional effect.
+
+  // idle / block / crouch / throw-break: no positional effect, and none is a
+  // frustrated request — each takes its intended (possibly no-op) effect.
+  return null;
 };
 
 // The height band a fighter guards this tick, or null if it is open. A fighter
@@ -921,8 +958,8 @@ export function runFight(cfg: FightConfig): FightResult {
     a.guardAge = aGuardAge;
     b.guardBand = bGuardBand;
     b.guardAge = bGuardAge;
-    intake(a, aAction, rules);
-    intake(b, bAction, rules);
+    const aDegrade = intake(a, aAction, rules);
+    const bDegrade = intake(b, bAction, rules);
 
     // Compute both outcomes from the frozen post-intake snapshot, THEN apply both.
     const aOutcome = computeStrike(
@@ -986,6 +1023,7 @@ export function runFight(cfg: FightConfig): FightResult {
         action: aAction,
         points: a.points,
         stamina: a.stamina,
+        degrade: aDegrade,
       },
       b: {
         x: b.x,
@@ -993,6 +1031,7 @@ export function runFight(cfg: FightConfig): FightResult {
         action: bAction,
         points: b.points,
         stamina: b.stamina,
+        degrade: bDegrade,
       },
     });
 

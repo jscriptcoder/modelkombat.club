@@ -42,13 +42,20 @@ export const formatAction = (a: Action): string => {
   }
 };
 
-// Whether a row differs from the previously shown one in any column a reader
-// cares about: either fighter's action, or either fighter's score. Position
-// drifts every tick during a walk, so it is deliberately NOT part of the test —
-// otherwise nothing would ever collapse.
+// One fighter's action cell: the action label, plus its degrade reason inline when
+// the requested action did not take effect (e.g. `mawashi-geri high (unaffordable)`).
+const actionCell = (f: FighterFrame): string =>
+  f.degrade === null
+    ? formatAction(f.action)
+    : `${formatAction(f.action)} (${f.degrade})`;
+
+// Whether a row differs from the previously shown one in any column a reader cares
+// about: either fighter's action cell (which folds in the degrade reason), or either
+// fighter's score. Position and stamina drift every tick during a walk / regen, so
+// they are deliberately NOT part of the test — otherwise nothing would ever collapse.
 const changed = (curr: FightEvent, prev: FightEvent): boolean =>
-  formatAction(curr.a.action) !== formatAction(prev.a.action) ||
-  formatAction(curr.b.action) !== formatAction(prev.b.action) ||
+  actionCell(curr.a) !== actionCell(prev.a) ||
+  actionCell(curr.b) !== actionCell(prev.b) ||
   curr.a.points !== prev.a.points ||
   curr.b.points !== prev.b.points;
 
@@ -58,22 +65,54 @@ const selectRows = (events: FightEvent[], mode: FormatMode): FightEvent[] => {
   return events.filter((e, i) => i === 0 || changed(e, events[i - 1]));
 };
 
-type Row = [string, string, string, string, string, string, string];
+type Row = [
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+];
 
 const rowOf = (e: FightEvent): Row => [
   `${e.tick}`,
   `${e.a.x}`,
   `${e.b.x}`,
-  formatAction(e.a.action),
-  formatAction(e.b.action),
+  actionCell(e.a),
+  actionCell(e.b),
+  `${e.a.stamina}`,
+  `${e.b.stamina}`,
   `${e.a.points}`,
   `${e.b.points}`,
 ];
 
-const HEADERS: Row = ["tick", "A.x", "B.x", "A act", "B act", "A", "B"];
+const HEADERS: Row = [
+  "tick",
+  "A.x",
+  "B.x",
+  "A act",
+  "B act",
+  "A.sta",
+  "B.sta",
+  "A pts",
+  "B pts",
+];
 
 // Numbers right-align, action labels left-align; column widths fit the content.
-const ALIGN_RIGHT = [true, true, true, false, false, true, true] as const;
+const ALIGN_RIGHT = [
+  true,
+  true,
+  true,
+  false,
+  false,
+  true,
+  true,
+  true,
+  true,
+] as const;
 
 const render = (rows: Row[]): string => {
   const widths = HEADERS.map((_, col) =>

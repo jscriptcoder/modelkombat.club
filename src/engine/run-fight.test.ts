@@ -5350,3 +5350,229 @@ describe("runFight — yame (match-mode exchange resets)", () => {
     expect(result.events).toHaveLength(8);
   });
 });
+
+// Slice 8: every event records WHY a fighter's requested action did (or did not) take
+// effect — a typed `degrade` reason (`unaffordable` / `out-of-band` / `locked` / `inert`,
+// or `null` when it was honoured). Pure-additive telemetry: it never changes an outcome.
+describe("runFight — degrade telemetry (why a requested action didn't take effect)", () => {
+  const STRIKER = bot([], { type: "attack", move: "gyaku-zuki", band: "mid" });
+
+  it("flags an unaffordable move as `unaffordable` (and never commits it)", () => {
+    // Meter starts at 10; the strike costs 20 ⇒ one short ⇒ degrades to idle.
+    const rules = getMockRules({
+      stamina: { max: 10 },
+      moves: {
+        "gyaku-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+          staminaCost: 20,
+        },
+      },
+    });
+
+    const result = runFight(
+      getMockConfig({ rules, botA: STRIKER, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe("unaffordable");
+    expect(result.events[0].a.stamina).toBe(10); // no spend — never committed
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("flags an out-of-band attack as `out-of-band`", () => {
+    // mae-geri is mid-only; attacking `high` degrades to idle at intake.
+    const rules = getMockRules({
+      moves: {
+        "gyaku-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+        },
+        "mae-geri": {
+          startup: 6,
+          active: 2,
+          recovery: 8,
+          score: 2,
+          reach: 270000,
+          bands: ["mid"],
+        },
+      },
+    });
+
+    const KICKER = bot([], { type: "attack", move: "mae-geri", band: "high" });
+
+    const result = runFight(
+      getMockConfig({ rules, botA: KICKER, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe("out-of-band");
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("flags a committed fighter's re-request as `locked`, but the commit itself as null", () => {
+    // gyaku-zuki (12 committed ticks) commits at tick 0, then the bot keeps re-requesting
+    // it while locked in the move — each re-request is refused (no cancel routes configured).
+    const result = runFight(
+      getMockConfig({ botA: STRIKER, botB: IDLE, maxTicks: 8 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe(null); // the commit took effect
+    expect(result.events[1].a.degrade).toBe("locked"); // committed ⇒ re-request ignored
+    expect(result.events[7].a.degrade).toBe("locked");
+  });
+
+  it("does NOT flag a committed fighter that idles (asked for nothing, denied nothing)", () => {
+    // Strike once at tick 0, then idle: the idle ticks are committed but not frustrated.
+    const strikeThenIdle = bot(
+      [
+        {
+          when: {
+            op: "eq",
+            args: [
+              { op: "field", path: "clock.tick" },
+              { op: "const", value: 0 },
+            ],
+          },
+          do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({ botA: strikeThenIdle, botB: IDLE, maxTicks: 4 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe(null); // committed
+    expect(result.events[1].a.degrade).toBe(null); // committed, but idling ⇒ not `locked`
+  });
+
+  it("flags an unconfigured `sweep` as `inert`", () => {
+    const SWEEPER = bot([], { type: "sweep" }); // no moves.sweep in the mock rules
+
+    const result = runFight(
+      getMockConfig({ botA: SWEEPER, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe("inert");
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("flags an attack naming an unconfigured move as `inert`", () => {
+    // The mock rules configure only gyaku-zuki; attacking mawashi-geri is inert.
+    const KICKER = bot([], {
+      type: "attack",
+      move: "mawashi-geri",
+      band: "high",
+    });
+
+    const result = runFight(
+      getMockConfig({ botA: KICKER, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe("inert");
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("flags an unaffordable sweep as `unaffordable`", () => {
+    const rules = getMockRules({
+      stamina: { max: 10 },
+      moves: {
+        "gyaku-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+        },
+        sweep: {
+          startup: 5,
+          active: 2,
+          recovery: 8,
+          score: 0,
+          reach: 180000,
+          knockdown: true,
+          staminaCost: 20, // > the 10 on hand ⇒ can't commit
+        },
+      },
+    });
+
+    const SWEEPER = bot([], { type: "sweep" });
+
+    const result = runFight(
+      getMockConfig({ rules, botA: SWEEPER, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe("unaffordable");
+    expect(result.events[0].a.stamina).toBe(10); // no spend
+  });
+
+  it("flags an unconfigured `throw` as `inert`", () => {
+    const THROWER = bot([], { type: "throw" }); // no throw spec in the mock rules
+
+    const result = runFight(
+      getMockConfig({ botA: THROWER, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe("inert");
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("flags an unaffordable throw as `unaffordable`", () => {
+    const rules = getMockRules({
+      stamina: { max: 10 },
+      throw: {
+        startup: 2,
+        active: 1,
+        recovery: 3,
+        reach: 250000,
+        score: 3,
+        staminaCost: 20, // > the 10 on hand ⇒ can't commit
+      },
+    });
+
+    const THROWER = bot([], { type: "throw" });
+
+    const result = runFight(
+      getMockConfig({ rules, botA: THROWER, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe("unaffordable");
+    expect(result.events[0].a.stamina).toBe(10); // no spend
+  });
+
+  it("records null for honoured actions (a step, an idle)", () => {
+    const result = runFight(
+      getMockConfig({ botA: AGGRESSOR, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe(null); // move honoured
+    expect(result.events[0].b.degrade).toBe(null); // idle honoured
+  });
+
+  it("is telemetry-only — an all-degraded fighter is physically identical to an idler", () => {
+    const SWEEPER = bot([], { type: "sweep" }); // inert every tick (no moves.sweep)
+
+    const degraded = runFight(
+      getMockConfig({ botA: SWEEPER, botB: IDLE, maxTicks: 6 }),
+    );
+
+    const idler = runFight(
+      getMockConfig({ botA: IDLE, botB: IDLE, maxTicks: 6 }),
+    );
+
+    // Physically the inert sweep does exactly what idling does — same score, same path…
+    expect(degraded.scores).toEqual(idler.scores);
+    expect(degraded.events.map((e) => e.a.x)).toEqual(
+      idler.events.map((e) => e.a.x),
+    );
+    // …yet the telemetry records WHY (it was inert), which the idler has no reason for.
+    expect(degraded.events[0].a.degrade).toBe("inert");
+    expect(idler.events[0].a.degrade).toBe(null);
+  });
+});
