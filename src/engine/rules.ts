@@ -124,8 +124,10 @@ export const CANONICAL_RULES: Rules = {
   //   • reach 120000 < strike.reach (240000) ⇒ a grab is close-range (the reach hierarchy
   //     throw < sweep < strike; the sweep fills the gap in a later slice).
   //   • score 3 — a clean throw is the WKF ippon.
-  // knockdownDuration 30: a ~half-second knockdown; the okizeme finish / i-frame split is
-  // carved out of it in a later slice.
+  // knockdownDuration 18: a short knockdown; the okizeme finish / i-frame split is carved out
+  // of it (finishWindow below). Deliberately short so a swept foe WAKES before an okizeme
+  // sweep→finish→sweep loop can re-lock it — the loop cannot keep the foe perpetually downed,
+  // so the both-neutral yame boundary still arrives (else a WKF match farms the whole cap).
   throw: {
     startup: 7,
     active: 2,
@@ -134,15 +136,16 @@ export const CANONICAL_RULES: Rules = {
     score: 3,
     staminaCost: 40, // special move cost (C10) — twice the basic strike
   },
-  knockdownDuration: 30,
+  knockdownDuration: 18,
   // Okizeme (C8): the first `finishWindow` ticks of ANY knockdown are a guaranteed FINISH —
   // an opposing strike scores `finishScore`, ignoring band / guard / occupancy (the foe is prone).
   //   • finishWindow 10 — the sweep→cancel→strike combo lands its finish at knockdown +9 (knockdown
   //     tick 7 → cancel at the first recovery frame, tick 9 → strike active tick 16); 10 lands it with
   //     a frame to spare, while an UN-cancelled strike (neutral tick 22, active 29) arrives far too
-  //     late ⇒ the hit-confirm cancel is load-bearing.
+  //     late — the foe has already woken from the short knockdown (tick 25), so it lands a mere base
+  //     poke, never the finish ⇒ the hit-confirm cancel is load-bearing.
   //   • finishScore 3 — a finish pays the WKF ippon, decoupled from the finishing poke's base score.
-  //   • knockdownDuration (30) > finishWindow (10) ⇒ the remaining ticks are wake-up i-frames.
+  //   • knockdownDuration (18) > finishWindow (10) ⇒ the remaining ticks are wake-up i-frames.
   finishWindow: 10,
   finishScore: 3,
   // The vertical axis (C4) — the anti-air leg of the sweep game. The arc is integrated as

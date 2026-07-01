@@ -620,7 +620,7 @@ describe("runTick — rule(path) ruleset reads", () => {
     ["counterWindow", 10, 0],
     ["counterBonus", 1, 0],
     ["cancelWindow", 6, 0],
-    ["knockdownDuration", 30, 0],
+    ["knockdownDuration", 18, 0],
     ["finishWindow", 10, 0],
     ["finishScore", 3, 0],
     ["perception.lPos", 1, 0],

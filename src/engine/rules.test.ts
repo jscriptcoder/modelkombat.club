@@ -761,7 +761,9 @@ describe("CANONICAL_RULES — a sweep is a low-band strike (banded by occupancy)
 describe("CANONICAL_RULES — sweep → cancel → okizeme finish (3, hit-confirmed)", () => {
   // Sweep at tick 0 (knockdown at tick 7); then a strike at `strikeTick`. At the first recovery
   // frame the strike CANCELS the sweep's recovery (rekka) and its active frame lands inside the
-  // finish window; at the first NEUTRAL tick (no cancel) the strike arrives in the i-frame tail.
+  // finish window ⇒ the okizeme ippon (3). At the first NEUTRAL tick (no cancel) the strike can
+  // start no earlier than the sweep's full recovery, by which point the foe has already WOKEN from
+  // the short knockdown — so it lands a mere base poke (1), never the finish.
   const finishScoreAt = (strikeTick: number): number =>
     runFight(
       sweepFight({
@@ -787,7 +789,7 @@ describe("CANONICAL_RULES — sweep → cancel → okizeme finish (3, hit-confir
       sweepSpec().startup + sweepSpec().active + sweepSpec().recovery; // first neutral ⇒ no cancel
 
     expect(finishScoreAt(cancelTick)).toBe(3); // cancel lands the finish in-window ⇒ ippon
-    expect(finishScoreAt(neutralTick)).toBe(0); // uncancelled ⇒ i-frames ⇒ no finish
+    expect(finishScoreAt(neutralTick)).toBe(1); // uncancelled ⇒ foe wakes first ⇒ a base poke, not the finish
   });
 });
 
@@ -806,6 +808,73 @@ describe("CANONICAL_RULES — a whiffed sweep is punishable", () => {
 
     expect(result.scores.a).toBe(0); // the sweep whiffed (and scores 0 anyway)
     expect(result.scores.b).toBe(1); // committed in recovery, it couldn't block ⇒ punished
+  });
+});
+
+// The okizeme lock (as authored in bots/sweeper.json): finish the downed foe while the
+// finish window is live, else sweep any grounded foe in reach; otherwise close the gap.
+// Its sweep→knockdown→finish→sweep chain is legal DSL, so the platform must answer it in
+// the frame table, not the roster.
+const PERPETUAL_SWEEPER: BotDoc = bot(
+  [
+    {
+      when: {
+        op: "gt",
+        args: [
+          { op: "field", path: "self.finishWindow" },
+          { op: "const", value: 0 },
+        ],
+      },
+      do: { type: "attack", move: "gyaku-zuki", band: "high" },
+    },
+    {
+      when: all(
+        {
+          op: "eq",
+          args: [
+            { op: "field", path: "self.canAct" },
+            { op: "const", value: 1 },
+          ],
+        },
+        {
+          op: "lte",
+          args: [
+            { op: "field", path: "opponent.distance" },
+            { op: "const", value: sweepSpec().reach },
+          ],
+        },
+      ),
+      do: { type: "sweep" },
+    },
+  ],
+  { type: "move", dir: 1 },
+);
+
+describe("CANONICAL_RULES — the okizeme loop no longer starves the yame (the de-wall)", () => {
+  // The sweeper's sweep→knockdown→finish→sweep loop can keep a passive foe PERPETUALLY downed, so
+  // the both-neutral YAME boundary never arrives and a WKF match farms the entire tick cap (the
+  // 100%-win wall the round-robin surfaced). The canonical knockdownDuration is short enough that
+  // the swept foe WAKES back into neutral: a yame fires and the match ends decisively on the point
+  // gap. Lengthening the knockdown back to the old 30 re-locks the foe before it can wake ⇒ the
+  // yame is starved ⇒ the match runs to the cap again.
+  const okizemeMatch = (rules: Rules) =>
+    runFight({
+      rules,
+      botA: PERPETUAL_SWEEPER,
+      botB: ADVANCER, // a passive foe: only breaking the lock (not its own offense) can end the match
+      maxTicks: 600,
+      seed: 1,
+      match: { winGap: 8 }, // the design's WKF win gap
+    });
+
+  it("wakes the swept foe in time for a yame at the canonical knockdown; the old 30 farms the cap", () => {
+    const canonical = okizemeMatch(CANONICAL_RULES);
+    expect(canonical.endReason).toBe("gap"); // a yame fired ⇒ the match ends on the point gap
+    expect(canonical.ticks).toBeLessThan(600); // decisively, before the cap — no longer a farming wall
+
+    const walled = okizemeMatch({ ...CANONICAL_RULES, knockdownDuration: 30 });
+    expect(walled.endReason).toBe("time"); // the loop starves the yame ⇒ it farms every tick
+    expect(walled.ticks).toBe(600);
   });
 });
 

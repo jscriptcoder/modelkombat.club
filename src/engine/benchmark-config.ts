@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v2";
+export const BENCHMARK_VERSION = "v3";
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -44,4 +44,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // Recompute and bump (with BENCHMARK_VERSION) whenever a scoring input changes —
 // the guard test in benchmark-config.test.ts prints the expected value on drift.
 export const INPUT_HASH =
-  "093e03b2fff0dc3ab6ac1a5124e4fd3403a34f71f189d9a921d00e2fdb930bb5";
+  "bf4e3b0922c456a755da59dcab698e0d6310f42394684c8855c8bc8d27755720";
