@@ -34,9 +34,15 @@ import {
   BENCHMARK_VERSION,
   GAUNTLET_NAMES,
   INPUT_HASH,
+  MATCH,
   MAX_TICKS,
   SEEDS,
 } from "../engine/benchmark-config.js";
+
+// The WKF match parameters the benchmark scores on (winGap + the tick cap). A
+// narrow structural type so the section/primer can be exercised against a
+// retuned gap in tests — mirroring the `rules` parameter's purpose.
+type Match = { winGap: number };
 
 // markdown inline-code span
 const code = (s: string): string => "`" + s + "`";
@@ -202,14 +208,16 @@ const errorCatalogSection = (): string =>
     "- **unknown numeric/boolean op** — an unrecognised expression operator.",
   ].join("\n");
 
-const benchmarkSection = (): string =>
+const benchmarkSection = (match: Match): string =>
   [
     "## Benchmark rules",
     "",
-    "A submitted bot is scored deterministically against a frozen, versioned",
-    "gauntlet — the spec is the only input; there is no feedback loop.",
+    "A submitted bot fights **WKF matches** against a frozen, versioned gauntlet,",
+    "scored deterministically — the spec is the only input; there is no feedback loop.",
     "",
-    `- ${code("metric")} — Σ net-points over every (opponent × seed × side) fight; win-rate breaks ties.`,
+    `- ${code("win condition")} — a match ends the moment either fighter leads by ${code("winGap")} = ${match.winGap} points; otherwise it runs the full ${code("maxTicks")} = ${MAX_TICKS} ticks and is decided on total points (equal ⇒ a draw).`,
+    `- ${code("yame")} — after each SCORING exchange resolves, both fighters reset to the neutral start (position, posture, guard, open windows) — but points, stamina, and memory PERSIST. No okizeme farm carries across exchanges.`,
+    `- ${code("metric")} — win-rate (matches won) is primary; Σ net-points over every (opponent × seed × side) fight breaks ties.`,
     `- ${code("seeds")} — ${SEEDS[0]}..${SEEDS[SEEDS.length - 1]} (${SEEDS.length} seeds), each matchup played twice (bot as A and as B).`,
     `- ${code("maxTicks")} — ${MAX_TICKS}`,
     "- gauntlet opponents:",
@@ -383,7 +391,7 @@ const jsonSchemaSection = (): string =>
 // from `rules` (just like the frame table), so a `CANONICAL_RULES` retune updates
 // the strategy text and it can never cite a stale constant. Each claim is one
 // line so its concept and its value stay paired.
-const primerSection = (rules: Rules): string => {
+const primerSection = (rules: Rules, match: Match): string => {
   const cv = (n: number): string => code(String(n)); // code-spanned value
   const lPos = rules.perception?.lPos ?? 0;
   const lAct = rules.perception?.lAct ?? 0;
@@ -405,6 +413,7 @@ const primerSection = (rules: Rules): string => {
     `- **Parry, counter, cancel.** A matching guard's first \`parryWindow\` = ${cv(rules.parryWindow ?? 0)} ticks **DEFLECT** (a parry: no score, +${cv(rules.parryRecovery ?? 0)} attacker recovery) rather than merely block — reaction-precise defense out-rewards a pre-emptive hold. A parry opens a \`counterWindow\` = ${cv(rules.counterWindow ?? 0)}-tick window worth +${cv(rules.counterBonus ?? 0)}. A strike that **CONNECTS** (hit or block) opens a \`cancelWindow\` = ${cv(rules.cancelWindow ?? 0)}-tick window to cancel recovery into a \`cancelInto\` follow-up (the rekka hit-confirm).`,
     `- **Okizeme (the knockdown game).** A throw or sweep knocks the foe **down** for \`knockdownDuration\` = ${cv(rules.knockdownDuration ?? 0)} ticks; the first \`finishWindow\` = ${cv(rules.finishWindow ?? 0)} are a guaranteed **FINISH** worth \`finishScore\` = ${cv(rules.finishScore ?? 0)} (ignoring band / guard / occupancy — the foe is prone); the rest are wake-up **i-frames**. Read the window live as \`self.finishWindow\`.`,
     `- **Stamina & gas.** Start at \`stamina.max\` = ${cv(st.max)}; an UNCOMMITTED fighter (neutral, not guarding) regens +${cv(st.regen ?? 0)}/tick. A guard bleeds \`blockChip\` = ${cv(st.blockChip ?? 0)} per contact tick (a fresh parry draws \`parryChip\` = ${cv(st.parryChip ?? 0)} once). At or below \`gasThreshold\` = ${cv(st.gasThreshold ?? 0)} a fighter is **GASSED**: every commit eats +${cv(st.gasRecoveryPenalty ?? 0)} recovery, and any move costing more than ${cv(st.gasThreshold ?? 0)} stamina (the kicks / throw / sweep) degrades to idle while the cheaper punches still commit — the emergent special-lockout. PACE your offense: spend only what regen can refill.`,
+    `- **Play the match, not the scoreboard.** You are ranked by WKF **match win-rate**, not raw points: a fight ends at a ${cv(match.winGap)}-point lead, else on total points at the ${cv(MAX_TICKS)}-tick cap. Between scoring exchanges the ring resets to neutral (bodies reset; points / stamina / memory persist), so there is no okizeme farm — turn a lead into a decisive gap and hold it.`,
   ].join("\n");
 };
 
@@ -462,11 +471,15 @@ const examplesSection = (): string =>
 
 /**
  * The committed `docs/spec.md` content — deterministic, drift-tested.
- * `rules` defaults to `CANONICAL_RULES` (the frozen platform table); it is a
- * parameter only so the frame table + primer can be exercised against an
- * alternate ruleset (e.g. one omitting an optional move, or a retune).
+ * `rules` defaults to `CANONICAL_RULES` (the frozen platform table) and `match`
+ * to the benchmark `MATCH` manifest; both are parameters only so the frame table,
+ * primer, and benchmark section can be exercised against an alternate ruleset or a
+ * retuned win gap (e.g. one omitting an optional move, or a different `winGap`).
  */
-export function generateSpec(rules: Rules = CANONICAL_RULES): string {
+export function generateSpec(
+  rules: Rules = CANONICAL_RULES,
+  match: Match = MATCH,
+): string {
   return (
     [
       header(),
@@ -479,9 +492,9 @@ export function generateSpec(rules: Rules = CANONICAL_RULES): string {
       frameTableSection(rules),
       errorCatalogSection(),
       jsonSchemaSection(),
-      primerSection(rules),
+      primerSection(rules, match),
       examplesSection(),
-      benchmarkSection(),
+      benchmarkSection(match),
     ].join("\n\n") + "\n"
   );
 }

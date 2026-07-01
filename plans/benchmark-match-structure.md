@@ -3,11 +3,12 @@
 **Branch**: one branch per slice (`feat/match-*`). This plan file + the Slice-7-done edit
 to `plans/llm-benchmark-v1.md` landed via `feat/benchmark-match-structure` (PR #87, merged).
 **Status**: Active — **Slices 1 ✅ (PR #88) · 2 ✅ (PR #89) · 3 ✅ (PR #90) · 6 ✅ (PR #91, the scoped sweeper
-de-wall `knockdownDuration 30→18`), all merged.** Slice 6 shipped **ahead of** 4/5 (the measurement, done
-analytically in "## LIVE STATE", drove the go decision and the fix executed). **Slice 4 ✅ DONE (branch
-`feat/match-measure`, awaiting commit approval)** — dogfood match-mode characterization + the
-`docs/benchmark-gauntlet-v3.md` note (5/6 in-band; `vulture` out-low → follow-up). **Remaining: Slice 5 (spec
-teaches match mode) → the vulture follow-up story.**
+de-wall `knockdownDuration 30→18`) · 4 ✅ (PR #92), all merged.** Slice 6 shipped **ahead of** 4/5 (the
+measurement, done analytically in "## LIVE STATE", drove the go decision and the fix executed). Slice 4
+delivered the dogfood match-mode characterization (`15W/104L/1D`) + the `docs/benchmark-gauntlet-v3.md` note
+(5/6 in-band; `vulture` out-low → follow-up). **Slice 5 ✅ built** (branch `feat/match-spec`, awaiting commit
+approval — `docs/spec.md` teaches match mode). **With Slice 5 merged, all in-scope slices (1–6) are done;
+the only open whole-feature AC (every member in-band) is carried by the vulture follow-up story.**
 
 ## Goal
 
@@ -97,8 +98,11 @@ under the new metric before deciding any rebalance.
       dogfood bot is **re-evaluated** under match mode, with the result characterized in a test.
       _(Slice 4 — this branch: `docs/benchmark-gauntlet-v3.md` note; `dogfood.test.ts` pins the
       match-mode record 15W/104L/1D. 5/6 members in-band; `vulture` 16% out-low → follow-up story.)_
-- [ ] `docs/spec.md` **teaches match mode** (the 8-gap/time win condition + yame), generated from
-      the manifest/rules, drift-tested.
+- [x] `docs/spec.md` **teaches match mode** (the 8-gap/time win condition + yame), generated from
+      the manifest/rules, drift-tested. _(Slice 5 — this branch: `gen-spec.ts` gains a `match` param;
+      the benchmark section states the win condition (`winGap`/`maxTicks`, manifest-sourced) + yame +
+      the corrected win-rate-primary metric; the primer gains a "play the match" bullet; retune-tracking
+      + drift tests green.)_
 - [x] _(Conditional)_ If measurement still shows a bot too dominant, a **data-driven rebalance**
       (rules tuning preferred) lands with its own version bump. _(Triggered by the `sweeper` (100%) —
       Slice 6, PR #91: `knockdownDuration 30→18` de-walls the okizeme loop; `BENCHMARK_VERSION v3`.
@@ -311,7 +315,7 @@ config.
 
 ---
 
-### Slice 4: Re-measure the gauntlet under match mode + re-dogfood — ✅ DONE (branch `feat/match-measure`, awaiting commit approval)
+### Slice 4: Re-measure the gauntlet under match mode + re-dogfood — ✅ DONE (PR #92, merged)
 
 _Re-scoped as a post-fix validation (Slice 6 already shipped the go decision). Delivered: (a)
 `src/cli/dogfood.test.ts` gains a **match-mode characterization** — runs the real `benchmark()` over the
@@ -360,7 +364,18 @@ the dogfood test).
 
 ---
 
-### Slice 5: `docs/spec.md` teaches match mode
+### Slice 5: `docs/spec.md` teaches match mode — ✅ DONE (branch `feat/match-spec`, awaiting commit approval)
+
+_Shipped: `generateSpec(rules, match = MATCH)` gains a second defaulted `match` param (a test lever
+mirroring `rules`). `benchmarkSection(match)` now states the **win condition** (`winGap` = 8 lead / else
+`maxTicks` = 600 cap, equal ⇒ draw), a **yame** line (bodies reset; points/stamina/memory PERSIST), and a
+**corrected metric** (win-rate primary, net-points tiebreak — fixing the stale Slice-3 drift). The primer
+gains a "**Play the match, not the scoreboard**" bullet citing the gap/cap/win-rate. RED = 5 generator
+tests (win-condition sourcing, corrected metric ordering, yame-persist, benchmark retune-tracking, primer
+retune-tracking) + the existing drift snapshot; GREEN = thread `match` + `npm run gen:spec`. 733 tests;
+`gen-spec.ts` mutation **100% (518/518)** — the drift test byte-pins every literal (399 kills) and the
+content assertions cover the rest. **No scoring-input change** ⇒ `BENCHMARK_VERSION`/`INPUT_HASH` unchanged
+(spec text isn't hashed); `sim.ts`/`dsl.ts` untouched (no DSL surface). LF pin intact._
 
 **Value**: The one-shot spec instrument tells the LLM it is authoring for a **WKF match** (play to
 the 8-gap / clock, exchanges reset at yame) — without it, a model optimizes for the wrong (raw-
@@ -553,16 +568,16 @@ Slice 5's spec strategic match-mode primer; the dogfood re-run narrative (validi
 
 ### Immediate NEXT on resume
 
-Slices 1–3 + 6 are **merged** (PRs #88/#89/#90/#91); **Slice 4 built** on `feat/match-measure` (awaiting
-commit approval — dogfood characterization + `docs/benchmark-gauntlet-v3.md`). Remaining, in order: **Slice 5**
-→ the **vulture follow-up story** (separate).
+Slices 1–4 + 6 are **merged** (PRs #88/#89/#90/#91/#92); **Slice 5 built** on `feat/match-spec`
+(awaiting commit approval — `gen-spec.ts` + regenerated `docs/spec.md`). With Slice 5 merged, **every
+in-scope slice (1–6) is done**. The only remaining whole-feature AC — the **"feature success metric"**
+requiring _every_ gauntlet member in the `[25%, 75%]` band — is carried by the **vulture follow-up story**
+(`vulture` at 16% is out-low; a naive offense buff backfired, so it needs a deliberate parry→counter
+redesign — out of scope for this feature).
 
-**Slice 5 (next)** — `docs/spec.md` **teaches match mode**: extend `gen-spec.ts` so the benchmark-rules section
-states the win condition (gap 8 / cap 600, sourced from the manifest, not literals) + a yame description, plus a
-strategic primer (play to the gap/clock; exchanges reset to neutral with points/stamina/mem persisting;
-win-rate is the metric). RED = a generator retune-tracking test (a changed `winGap` changes the text) + the
-drift snapshot; regenerate `docs/spec.md` (keep the LF pin). Then the feature's in-scope work is complete
-(vulture in-band requirement carried by the follow-up story).
+**Next: close out this feature** — once Slice 5 merges, do the end-of-feature steps (merge learnings to
+`.claude/CLAUDE.md` Status; delete this plan file) noting the vulture band requirement is deferred to its
+own story, then start the **vulture follow-up story** (`grill-me` → `story-splitting`/`planning`).
 
 ---
 
