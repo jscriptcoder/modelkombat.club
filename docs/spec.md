@@ -782,6 +782,7 @@ frame table above, so a rules retune updates this prose.
 - **Parry, counter, cancel.** A matching guard's first `parryWindow` = `2` ticks **DEFLECT** (a parry: no score, +`12` attacker recovery) rather than merely block — reaction-precise defense out-rewards a pre-emptive hold. A parry opens a `counterWindow` = `10`-tick window worth +`1`. A strike that **CONNECTS** (hit or block) opens a `cancelWindow` = `6`-tick window to cancel recovery into a `cancelInto` follow-up (the rekka hit-confirm).
 - **Okizeme (the knockdown game).** A throw or sweep knocks the foe **down** for `knockdownDuration` = `18` ticks; the first `finishWindow` = `10` are a guaranteed **FINISH** worth `finishScore` = `3` (ignoring band / guard / occupancy — the foe is prone); the rest are wake-up **i-frames**. Read the window live as `self.finishWindow`.
 - **Stamina & gas.** Start at `stamina.max` = `100`; an UNCOMMITTED fighter (neutral, not guarding) regens +`10`/tick. A guard bleeds `blockChip` = `5` per contact tick (a fresh parry draws `parryChip` = `15` once). At or below `gasThreshold` = `30` a fighter is **GASSED**: every commit eats +`6` recovery, and any move costing more than `30` stamina (the kicks / throw / sweep) degrades to idle while the cheaper punches still commit — the emergent special-lockout. PACE your offense: spend only what regen can refill.
+- **Play the match, not the scoreboard.** You are ranked by WKF **match win-rate**, not raw points: a fight ends at a `8`-point lead, else on total points at the `600`-tick cap. Between scoring exchanges the ring resets to neutral (bodies reset; points / stamina / memory persist), so there is no okizeme farm — turn a lead into a decisive gap and hold it.
 
 ## Example bots
 
@@ -1055,10 +1056,12 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
 
 ## Benchmark rules
 
-A submitted bot is scored deterministically against a frozen, versioned
-gauntlet — the spec is the only input; there is no feedback loop.
+A submitted bot fights **WKF matches** against a frozen, versioned gauntlet,
+scored deterministically — the spec is the only input; there is no feedback loop.
 
-- `metric` — Σ net-points over every (opponent × seed × side) fight; win-rate breaks ties.
+- `win condition` — a match ends the moment either fighter leads by `winGap` = 8 points; otherwise it runs the full `maxTicks` = 600 ticks and is decided on total points (equal ⇒ a draw).
+- `yame` — after each SCORING exchange resolves, both fighters reset to the neutral start (position, posture, guard, open windows) — but points, stamina, and memory PERSIST. No okizeme farm carries across exchanges.
+- `metric` — win-rate (matches won) is primary; Σ net-points over every (opponent × seed × side) fight breaks ties.
 - `seeds` — 1..10 (10 seeds), each matchup played twice (bot as A and as B).
 - `maxTicks` — 600
 - gauntlet opponents:

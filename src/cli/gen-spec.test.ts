@@ -20,6 +20,7 @@ import {
   BENCHMARK_VERSION,
   GAUNTLET_NAMES,
   INPUT_HASH,
+  MATCH,
   MAX_TICKS,
   SEEDS,
 } from "../engine/benchmark-config.js";
@@ -184,6 +185,11 @@ describe("generateSpec — the factual machine-truth spec", () => {
   });
 
   describe("benchmark rules (sourced from the manifest)", () => {
+    // The one line carrying a benchmark-rule bullet, found by its code-spanned
+    // label — so an assertion targets the intended rule (not a stray match).
+    const ruleLine = (spec: string, label: string): string =>
+      spec.split("\n").find((l) => l.includes(code(label))) ?? "";
+
     it("names every frozen gauntlet opponent", () => {
       const spec = generateSpec();
       for (const name of GAUNTLET_NAMES) expect(spec).toContain(name);
@@ -195,6 +201,48 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(seedLine).toContain(String(SEEDS[0]));
       expect(seedLine).toContain(String(SEEDS[SEEDS.length - 1]));
       expect(pairingLine(spec, "maxTicks", MAX_TICKS)).toBeDefined();
+    });
+
+    it("states the WKF match win condition — the gap and the tick cap, sourced from the manifest", () => {
+      const spec = generateSpec();
+      // the win-gap is paired with its manifest value on the win-condition line
+      expect(pairingLine(spec, "winGap", MATCH.winGap)).toBeDefined();
+
+      const winCond = ruleLine(spec, "win condition");
+      expect(winCond).toContain(String(MAX_TICKS)); // the tick cap
+      expect(winCond.toLowerCase()).toContain("draw"); // equal-at-cap ⇒ draw
+    });
+
+    it("ranks by win-rate first, net-points as the tiebreaker (corrects the stale metric)", () => {
+      const metric = ruleLine(generateSpec(), "metric");
+      expect(metric).toContain("win-rate");
+      expect(metric).toContain("net-points");
+      // win-rate is named BEFORE net-points — it is primary, not the tiebreaker
+      expect(metric.indexOf("win-rate")).toBeLessThan(
+        metric.indexOf("net-points"),
+      );
+    });
+
+    it("describes yame — bodies reset while points, stamina, and memory persist", () => {
+      const yame = ruleLine(generateSpec(), "yame");
+      expect(yame.toLowerCase()).toContain("reset");
+
+      for (const kept of ["points", "stamina", "memory"]) {
+        expect(yame.toLowerCase(), `${kept} persists across yame`).toContain(
+          kept,
+        );
+      }
+    });
+
+    it("interpolates the win gap — a retune changes the text (no hardcoded literal)", () => {
+      const canonical = generateSpec(CANONICAL_RULES, { winGap: MATCH.winGap });
+      const retuned = generateSpec(CANONICAL_RULES, { winGap: 12 });
+
+      expect(pairingLine(canonical, "winGap", MATCH.winGap)).toBeDefined();
+      expect(pairingLine(retuned, "winGap", 12)).toBeDefined();
+      // once winGap changes, no line pairs `winGap` with the old value — proving
+      // the number came from the manifest param, not a literal baked into prose
+      expect(pairingLine(retuned, "winGap", MATCH.winGap)).toBeUndefined();
     });
   });
 
@@ -272,6 +320,21 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(claimLine(primer, "reactable iff")).toContain(code("0")); // lAct sentinel
       expect(claimLine(primer, "triangle")).toContain(code("0")); // throw.reach sentinel
       expect(claimLine(primer, "GASSED")).toContain(code("0")); // stamina sentinel
+    });
+
+    it("teaches the match objective — win-rate, the win gap, and the tick cap (interpolated from the manifest)", () => {
+      const primer = sectionOf(generateSpec(), HEADING);
+      const match = claimLine(primer, "match win-rate");
+      expect(match).toContain(code(String(MATCH.winGap))); // the win gap
+      expect(match).toContain(code(String(MAX_TICKS))); // the tick cap
+
+      // a retuned win gap flows into the primer prose too (not a hardcoded literal)
+      const retuned = sectionOf(
+        generateSpec(CANONICAL_RULES, { winGap: 12 }),
+        HEADING,
+      );
+
+      expect(claimLine(retuned, "match win-rate")).toContain(code("12"));
     });
   });
 
