@@ -4,8 +4,8 @@
 > Every allowlist, limit, and frame-table number below is read directly from
 > the engine, so this document cannot lie about how a fight resolves.
 
-- **Benchmark version:** `v2` — a score is comparable only against another at the same version.
-- **Input hash:** `093e03b2fff0dc3ab6ac1a5124e4fd3403a34f71f189d9a921d00e2fdb930bb5` (pins the scoring inputs: rules + gauntlet + run params).
+- **Benchmark version:** `v3` — a score is comparable only against another at the same version.
+- **Input hash:** `bf4e3b0922c456a755da59dcab698e0d6310f42394684c8855c8bc8d27755720` (pins the scoring inputs: rules + gauntlet + run params).
 
 A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is
 validated once against the allowlists below (the security boundary), then run
@@ -213,7 +213,7 @@ cancel into a strike during the foe's `finishWindow` is the okizeme finish.
 - `counterWindow` — 10
 - `counterBonus` — 1
 - `cancelWindow` — 6
-- `knockdownDuration` — 30
+- `knockdownDuration` — 18
 - `finishWindow` — 10
 - `finishScore` — 3
 - `perception.lPos` — 1
@@ -780,7 +780,7 @@ frame table above, so a rules retune updates this prose.
 - **The triangle `strike > throw > guard`.** A strike stuffs a throw; a throw beats a guard (it is **unbanded** — guarding cannot stop it); a guard beats a strike at the **matching band**. Reach orders the options close-to-far: throw `120000` < sweep `180000` < jab `210000` < reverse `240000` < front `270000` < roundhouse `300000`.
 - **Height & occupancy.** A `crouch` vacates the `high` band (a high strike whiffs a croucher); an airborne fighter vacates `low` once past `lowClearance` = `8000` (a sweep whiffs a well-timed jump). The arc is integer `y += vy; vy -= gravity` from `jumpImpulse` = `12000` / `gravity` = `4000`.
 - **Parry, counter, cancel.** A matching guard's first `parryWindow` = `2` ticks **DEFLECT** (a parry: no score, +`12` attacker recovery) rather than merely block — reaction-precise defense out-rewards a pre-emptive hold. A parry opens a `counterWindow` = `10`-tick window worth +`1`. A strike that **CONNECTS** (hit or block) opens a `cancelWindow` = `6`-tick window to cancel recovery into a `cancelInto` follow-up (the rekka hit-confirm).
-- **Okizeme (the knockdown game).** A throw or sweep knocks the foe **down** for `knockdownDuration` = `30` ticks; the first `finishWindow` = `10` are a guaranteed **FINISH** worth `finishScore` = `3` (ignoring band / guard / occupancy — the foe is prone); the rest are wake-up **i-frames**. Read the window live as `self.finishWindow`.
+- **Okizeme (the knockdown game).** A throw or sweep knocks the foe **down** for `knockdownDuration` = `18` ticks; the first `finishWindow` = `10` are a guaranteed **FINISH** worth `finishScore` = `3` (ignoring band / guard / occupancy — the foe is prone); the rest are wake-up **i-frames**. Read the window live as `self.finishWindow`.
 - **Stamina & gas.** Start at `stamina.max` = `100`; an UNCOMMITTED fighter (neutral, not guarding) regens +`10`/tick. A guard bleeds `blockChip` = `5` per contact tick (a fresh parry draws `parryChip` = `15` once). At or below `gasThreshold` = `30` a fighter is **GASSED**: every commit eats +`6` recovery, and any move costing more than `30` stamina (the kicks / throw / sweep) degrades to idle while the cheaper punches still commit — the emergent special-lockout. PACE your offense: spend only what regen can refill.
 
 ## Example bots

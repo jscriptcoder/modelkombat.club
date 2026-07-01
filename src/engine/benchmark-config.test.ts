@@ -55,8 +55,8 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     expect(MATCH).toEqual({ winGap: 8 });
   });
 
-  it("carries BENCHMARK_VERSION v2 (match-mode scoring)", () => {
-    expect(BENCHMARK_VERSION).toBe("v2");
+  it("carries BENCHMARK_VERSION v3 (knockdownDuration de-wall retune)", () => {
+    expect(BENCHMARK_VERSION).toBe("v3");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {

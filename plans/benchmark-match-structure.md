@@ -2,8 +2,15 @@
 
 **Branch**: one branch per slice (`feat/match-*`). This plan file + the Slice-7-done edit
 to `plans/llm-benchmark-v1.md` landed via `feat/benchmark-match-structure` (PR #87, merged).
-**Status**: Active — **Slice 1 ✅ (PR #88, merged), Slice 2 ✅ (PR #89). NEXT: Slice 3** (benchmark
-adopts match mode + win-rate aggregation + `v2`/hash).
+**Status**: Active — **Slices 1 ✅ (PR #88) · 2 ✅ (PR #89) · 3 ✅ (PR #90), all merged.**
+**Slice 4 measurement DONE** (analytically — see "## LIVE STATE" at the bottom). **Slice 6 RE-SCOPED to the
+sweeper fix (`knockdownDuration 30→18`); vulture split to a follow-up story.** **Slice 6 (scoped) DONE — built
+via TDD on branch `feat/match-remeasure`, AWAITING COMMIT APPROVAL** (`kd 30→18` in `rules.ts`; de-wall
+relationship test in `rules.test.ts` — the okizeme loop vs a passive foe now ends the match on the point gap
+instead of farming the cap, reverting to 30 fails it; cascade: `BENCHMARK_VERSION v2→v3` + `INPUT_HASH`,
+`interpret-tick.test.ts` reader row 30→18, one okizeme boundary test 3-vs-0 → 3-vs-1 as the woken foe now
+takes a base poke, `docs/spec.md` regen; 727 tests, `rules.ts` + `benchmark-config.ts` mutation 100%;
+`sim.ts`/`dsl.ts` untouched). NEXT after merge: Slice 5 (spec teaches match mode) + the vulture follow-up story.
 
 ## Goal
 
@@ -84,11 +91,11 @@ under the new metric before deciding any rebalance.
       posture, guard, windows) while **points, stamina, and mem persist**; a fight can run multiple
       exchanges, and the 8-gap check fires **at the yame boundary** (an in-progress combo is never
       amputated). _(Slice 2 — PR #89.)_
-- [ ] `npm run benchmark -- <bot.json>` fights **WKF matches** against the gauntlet, ranks by
+- [x] `npm run benchmark -- <bot.json>` fights **WKF matches** against the gauntlet, ranks by
       **win-rate (primary) then Σ net-points (tiebreaker)**, leads the report headline with
-      win-rate, and reports `BENCHMARK_VERSION` `v2` with a matching `INPUT_HASH`.
-- [ ] `compareSubmission` ranks scored submissions by **win-rate then net-points** (invalids still
-      hard-zero-distinct, last).
+      win-rate, and reports `BENCHMARK_VERSION` `v2` with a matching `INPUT_HASH`. _(Slice 3 — PR #90.)_
+- [x] `compareSubmission` ranks scored submissions by **win-rate then net-points** (invalids still
+      hard-zero-distinct, last). _(Slice 3 — PR #90.)_
 - [ ] The gauntlet is **re-measured under match mode** (per-member win-rates captured) and the
       dogfood bot is **re-evaluated** under match mode, with the result characterized in a test.
 - [ ] `docs/spec.md` **teaches match mode** (the 8-gap/time win condition + yame), generated from
@@ -248,7 +255,18 @@ scores the fight evolves continuously (this is the design's "yame after a scorin
 
 ---
 
-### Slice 3: The benchmark fights WKF matches and ranks by win-rate
+### Slice 3: The benchmark fights WKF matches and ranks by win-rate — ✅ DONE (PR #90)
+
+_Shipped as 4 RED→GREEN→MUTATE increments, no engine change (`sim.ts` / the `dsl.ts` TCB untouched):
+(A) `benchmark-config.ts` — `MATCH = { winGap: 8 }`, `BENCHMARK_VERSION` → `v2`, folded into
+`INPUT_HASH` (`093e03b2…`); (B) `benchmark.ts` — `BenchmarkConfig.match?` threaded through
+`scoreAgainst`/`playBothSides` into both `runFight` calls; (C) `submission.ts` — `compareSubmission`
+swapped to win-rate primary / net-points tiebreak; (D) `run-benchmark.ts` + `cli/benchmark.ts` —
+headline leads with win-rate, `BenchmarkDeps.match?` → `scoredOutput` → `benchmark()`, shell sets
+`match: MATCH`. `docs/spec.md` regenerated (v2 + hash; match-mode strategic content deferred to
+Slice 5). 726 tests; changed-file mutation 100% (205/205 — config 10, aggregator 55, comparator 25,
+CLI 115). Refactor assessed: the flagged "shared comparator" is not real duplication (`benchmark.ts`
+aggregates the numbers, `submission.ts` compares them) — only stale header/field comments corrected._
 
 **Value**: `npm run benchmark` now scores **match outcomes** — fights end on the 8-gap, the
 ranking leads with win-rate, and the version/hash reflect the new scoring inputs so old and new
@@ -420,6 +438,106 @@ move; the both-tails shape does not).
   (the `sim.ts` resolver + `runFight` orchestration are the only outcome-path changes).
 - On completion: this realizes the roadmap's **match structure** capability (the deferred §7);
   update `.claude/CLAUDE.md` Status, then delete this plan file.
+
+---
+
+## LIVE STATE (2026-07-01) — Slice 4 measured, Slice 6 scoped, awaiting AC approval
+
+**Branch**: `feat/match-remeasure` off `main`@`9b56835`. Uncommitted: the Slice-3-done edit to this file
+(fold into the next commit). **No production code written yet** — all rebalance analysis used TEMP
+`*.mts` harnesses at the repo root that were DELETED after each run (read-only measurement).
+
+### Slice 4 measurement (round-robin win-rate under match mode, `winGap 8`, 10 seeds, both sides, `CANONICAL_RULES`)
+
+Each gauntlet member as the submitted bot vs the other 5 (no-mirror), 100 fights each:
+
+| member   | win-rate | net   | record      | band `[25,75]` |
+| -------- | -------- | ----- | ----------- | -------------- |
+| sweeper  | **100%** | +4664 | 100W 0L 0D  | **OUT (high)** |
+| rekka    | 72%      | +904  | 72W 28L     | in-band        |
+| grappler | 40%      | −698  | 40W 52L 8D  | in-band        |
+| zoner    | 27%      | −1639 | 27W 64L 9D  | in-band        |
+| jabber   | 25%      | −2126 | 25W 72L 3D  | in-band (edge) |
+| vulture  | **16%**  | −1105 | 16W 64L 20D | **OUT (low)**  |
+
+**GO** — sweeper (>75%) and vulture (<25%) out of band. **Key finding**: the metric change did NOT bound
+the sweeper — its `sweep → knockdown → finish → sweep` **okizeme loop keeps the opponent downed / itself
+committed every tick, so the both-neutral yame trigger NEVER fires** → no reset, no 8-gap stop → it farms
+to the full 600 ticks (+4664). The loop is **legal DSL** (a real LLM submission could replicate it), so the
+fix MUST be RULES tuning (a bot-swap wouldn't close the exploit). _(The dogfood re-run is a PR-narrative
+refresh only — `src/cli/dogfood.test.ts` asserts validity, not a net, so it's unaffected by any tune.)_
+
+### Rebalance experiments (what works / what fails)
+
+- **`finishScore 3→1`**: INERT on win-rate (changes margin, not who wins — the sweeper still out-scores).
+- **Gas lever** (`sweep cost↑`, `regen↓`): FAILS — the sweeper refuels during the opponent's i-frames; and
+  `regen↓` collateral-crashes jabber (25→7%). Off the table.
+- **`finishWindow`**: a CLIFF, not a dial — ≥8 ⇒ sweeper 100%, ≤7 ⇒ sweeper 0% (+ rekka walls to 92%).
+  Binary because the finish is a delayed separate `gyaku-zuki` (startup 7) that lands iff the window
+  survives ≥8 ticks. Can't dial the sweeper into band.
+- **`knockdownDuration` (GRADED — the chosen lever)**: `30→18` ⇒ sweeper **69%**, rekka 70, grappler 61,
+  zoner 27, jabber 25, vulture 16 → the **UNIQUE single-knob balance** (5/6 in-band; keeps `fw 10 < kd 18`).
+  Any DEEPER sweeper nerf (kd<18 or `sweep.reach↓`) walls **rekka to 80–92%** — sweeper & rekka trade the
+  #1 spot, so a robust plateau needs a SECOND nerf to rekka.
+- **rekka lever**: `cancelWindow 6→3` does NOT nerf rekka (still 82% — the chain fires immediately on
+  `cancelWindow>0`). Wrong lever; a real rekka nerf would need the `cancelInto` routes / counter knobs.
+- **vulture buff**: a naive "poke when safe" offensive rule BACKFIRED (16→7% — a defensive bot punished for
+  attacking). A real fix is a careful **parry→counter redesign** (convert its strong defense into scoring) —
+  genuine bot-design work, deferred to a follow-up story.
+
+### Decisions (via AskUserQuestion, 2026-07-01)
+
+1. Rebalance lever = **rules-tune the okizeme economy** (not the yame engine, not a bot-swap).
+2. Robustness = explored → **no robust plateau exists** without a 2-front (sweeper+rekka) rebalance.
+3. Vulture = buff its bot → **attempted, backfired** → deferred (parry→counter redesign, own story).
+4. **Scope = SHIP the sweeper fix now (`kd 30→18`), vulture as a FOLLOW-UP.** Slice 6 narrows to the
+   sweeper de-wall; rekka stays in-band at 70% under `kd=18` so no rekka nerf is needed.
+
+### Slice 6 (SCOPED) — de-wall the sweeper via `knockdownDuration 30→18` — ✅ BUILT (AWAITING COMMIT APPROVAL)
+
+**Value**: closes the okizeme sweep-lock exploit (sweeper 100→69%, in-band) so the win-rate metric can't be
+gamed by a legal loop. 5/6 members in `[25,75]`.
+
+**Built via TDD** (branch `feat/match-remeasure`): RED = a `runFight` de-wall relationship test in
+`rules.test.ts` (the `PERPETUAL_SWEEPER` okizeme loop vs a passive `ADVANCER`, WKF match mode `winGap 8`) —
+at the canonical kd the swept foe wakes into neutral so a **yame fires and the match ends on the point gap**
+(`endReason "gap"`, `ticks < 600`), while at the old `kd=30` the loop **starves the yame and farms the cap**
+(`endReason "time"`, `ticks === 600`); flips 10/10 seeds; reverting to 30 fails the canonical assertion. GREEN
+= `rules.ts` `30→18` (+ accurate comments). One boundary-straddling okizeme test moved from 3-vs-0 to **3-vs-1**
+(with the shorter knockdown the foe wakes before an _uncancelled_ strike can land, so it takes a base poke, not
+the i-frame whiff — the "hit-confirm cancel is load-bearing" claim is preserved and sharpened). Cascade + full
+gate: 727 tests green; `rules.ts` mutation 100% (35/35 — the `18` literal isn't itself mutated, it's pinned by
+the reader row + relationship test) and `benchmark-config.ts` 100% (10/10, version+hash strings); typecheck /
+lint / format clean; `sim.ts` / `dsl.ts` untouched.
+
+**Acceptance criteria** (all met):
+
+1. `CANONICAL_RULES.knockdownDuration === 18`, preserving the structural invariant `finishWindow(10) < kd`
+   (existing `rules.test.ts` "finish inside a window shorter than the knockdown" test stays green).
+2. A behavioral `runFight` relationship test proves the de-wall: a fighter caught in the sweep→knockdown loop
+   WAKES and acts before being re-locked at `kd=18` (loop no longer a guaranteed freeze) — reverting to `30`
+   fails it. Backed by a gauntlet-level characterization that the `sweeper` member is no longer a 100% wall.
+3. `BENCHMARK_VERSION → "v3"`, `INPUT_HASH` recomputed (kd rides `CANONICAL_RULES` ⇒ folded via the rules
+   hash); the `benchmark-config.test.ts` guard + the version assertion (`"v2"→"v3"`) pass.
+4. `interpret-tick.test.ts:623` RULE_READERS row updated: `["knockdownDuration", 30, 0] → [..., 18, 0]`.
+5. `docs/spec.md` regenerated (frame-table `kd 30→18` + version `v3`); drift test green (LF pin intact).
+6. Full suite green (the RELATIVE kd fixtures — `wake = knock + kd` — adapt; no test hardcodes `30` except
+   the reader row in #4); a re-measure confirms the 5/6-in-band spread.
+7. **Data + tests ONLY** — `sim.ts` / `dsl.ts` untouched (no engine logic, no DSL surface).
+
+**Explicitly deferred to follow-ups** (NOT this slice): the `vulture` parry→counter redesign (own story);
+Slice 5's spec strategic match-mode primer; the dogfood re-run narrative (validity test already green).
+
+**Cascade the change touches**: `rules.ts:137` (the value) · `interpret-tick.test.ts:623` (reader row) ·
+`benchmark-config.ts` (version+hash) · `benchmark-config.test.ts` (version assertion) · `docs/spec.md`
+(regen) · `rules.test.ts` (new de-wall test; existing relative fixtures adapt). `dogfood.test.ts` unaffected.
+
+### Immediate NEXT on resume
+
+Slice 6 (scoped) is **built and green, awaiting commit approval** on `feat/match-remeasure`. On approval →
+commit → push → open PR → merge. Then remaining plan work: **Slice 5** (spec teaches match mode — the
+strategic match-mode primer) + the **vulture parry→counter follow-up story**. (Slices 1–3 merged; Slice 4 =
+the measurement above; Slice 6 = the scoped sweeper de-wall, now built.)
 
 ---
 
