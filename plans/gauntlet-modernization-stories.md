@@ -129,21 +129,47 @@ behavioral test**, not the capability acceptance test.
   conflict with tight calibration for niche moves — narrow-gating satisfies the "referenced"
   bar without degrading the band.
 
+- **S3 (`grappler` close-range) — ✅ DONE (`v14`, PR #141; archived
+  [`docs/archive/gauntlet-s3-grappler.md`](../docs/archive/gauntlet-s3-grappler.md)).**
+  `grappler` gained `empi` (≤85k) + `hiza-geri` (85–95k → knockdown → `gyaku-zuki`
+  okizeme finish), the throw kept as the ippon at the 95–120k contact band. **Full real
+  integration** (user-approved, no fallback): the moves fire for real (100-fight count
+  `empi` 102 / `hiza-geri` 161 / `gyaku-zuki` 157). Coverage **11/11 — full arsenal**.
+  v14 board (all 6 ∈ `[25,75]`):
+
+  | Member     | v13 | **v14** | Band                         |
+  | ---------- | --- | ------- | ---------------------------- |
+  | `sweeper`  | 67  | **67**  | ✅                           |
+  | `vulture`  | 60  | **68**  | ✅ (took grappler's strikes) |
+  | `grappler` | 66  | **58**  | ✅ (more central)            |
+  | `rekka`    | 41  | **41**  | ✅                           |
+  | `zoner`    | 35  | **35**  | ✅                           |
+  | `jabber`   | 31  | **31**  | ✅                           |
+
+  Mutation 100% (10/10); dogfood unchanged (18W/102L). **Finding (extends the S2
+  lesson):** the close moves are throw-dominated with **no rare band** (unlike zoner's
+  far sliver), so real integration DOES perturb the round-robin — via the
+  **parry→counter coupling**, not grappler's own win-rate. A broad strike layer fed
+  `vulture`'s counter to 80% (OUT); the fix was to keep the **throw** owning the
+  95–120k contact band (throw the spacer vulture, strike the rushers inside 95k). No
+  guard/counter-readiness tell exists, so this had to be done by **range, not read**.
+
 ## Revised remaining sequence
 
-Coverage now **9/11** (`shuto` on `jabber`; `yoko-geri` + `ushiro-geri` on `zoner`;
-uncovered = `empi`, `hiza-geri`). Remaining (re-measure after each; final lock lands when
-all-6-in-band **and** 11/11 moves covered):
+Coverage now **11/11 — full arsenal covered** (`shuto` on `jabber`; `yoko-geri` +
+`ushiro-geri` on `zoner`; `empi` + `hiza-geri` on `grappler`). All 6 members in band at
+`v14`. Both end-state conditions (all-6-in-band **and** 11/11 covered) now hold — only
+the lock remains:
 
-- **S3 · `grappler`** — close-range (`empi`, `hiza-geri`) ⇒ completes **11/11** coverage.
-  Watch the `empi`/`hiza-geri` niche (like `zoner`'s long kicks, they may need narrow gating
-  to preserve calibration).
-- **S4 · calibration lock + close-out** — land the band + coverage acceptance tests, write
-  the final `gauntlet-vN` doc, update `docs/STATUS.md`, archive the split.
+- **S4 · calibration lock + close-out** — land the capability acceptance tests
+  (band-membership `[25,75]` for all 6 + full-coverage: every `CANONICAL_RULES.moves`
+  key referenced), write the final `gauntlet-vN` doc + coverage map, update
+  `docs/STATUS.md` + memory, and archive this split.
 
 ## Next Step
 
-S2 shipped (`v13`, all 6 in band, coverage 9/11). Next: load `planning` for **S3
-(`grappler` close-range: `empi` + `hiza-geri`)** — start from a fresh `v13` re-measure.
-Completing S3's coverage brings the roster to 11/11, unblocking the S4 lock. Carry the S2
-lesson: if the close moves have no healthy niche, narrow-gate them to preserve the band.
+S3 shipped (`v14`, all 6 in band, **coverage 11/11 — complete**). Next: load `planning`
+for **S4 (calibration lock + close-out)** — the final slice. Both end-state conditions
+hold, so S4 is the certification pass: RED capability tests that assert the band + full
+coverage (now first satisfiable), the `gauntlet-vN` record, and archiving this split. No
+member is out-of-band, so the S4 balance-escalation contingency is **not** triggered.

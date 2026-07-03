@@ -1,8 +1,29 @@
 # Plan: S3 — `grappler` gains the close-range knee + elbow
 
 **Branch**: feat/grappler-close-range
-**Status**: Active
+**Status**: ✅ Done — shipped `v14` (PR #141), close-out PR #142
 **Parent**: `plans/gauntlet-modernization-stories.md` (slice S3)
+
+> **Outcome.** `grappler` gained `empi` (gated ≤85k) + `hiza-geri` (85–95k →
+> knockdown → `gyaku-zuki` okizeme finish), with the throw kept as the ippon at the
+> **95–120k contact band**. **Full real integration** (the approved direction — no
+> fallback needed): across 100 fights the moves fire `empi` 102 / `hiza-geri` 161 /
+> `gyaku-zuki` 157 (the knee confirms into a finish every time). v14 board (all 6 ∈
+> `[25,75]`): jabber 31, zoner 35, rekka 41, grappler 58, sweeper 67, vulture 68.
+> Coverage **11/11 — full arsenal**. `benchmark-config.ts` mutation 100% (10/10);
+> full suite 1037 green; dogfood unchanged (18W/102L); engine untouched ⇒ replay
+> byte-identical.
+>
+> **Finding:** the close moves are throw-dominated with no naturally-rare band
+> (unlike zoner's long kicks), so real integration DOES perturb the round-robin —
+> but via the **parry→counter coupling**, not grappler's own win-rate. A broad strike
+> layer (empi ≤95k) fed `vulture`'s counter to **80% (OUT-high)** — grappler's best
+> matchup (it beats vulture by _throwing_) flipped to its worst (vulture counters its
+> parryable strikes). The fix: keep the **throw** owning the 95–120k contact band
+> (grappler throws vs the spacer vulture, strikes vs the rushers that close inside
+> 95k), pushing the strikes into a pocket vulture never forces. Real firing +
+> calibration both hold. No guard/counter-readiness tell exists in the perceived
+> snapshot, so "throw the turtle, strike the rusher" had to be done by range, not read.
 
 ## Goal
 
