@@ -233,7 +233,7 @@ const perceiveOpponent = (
   lPos: number,
   rules: Rules,
   match: FightConfig["match"],
-): Omit<OpponentState, "points" | "penalties"> => {
+): Omit<OpponentState, "points" | "penalties" | "senshu"> => {
   const predictedX = oppPos.x + oppPos.vx * lPos;
 
   return {
@@ -263,13 +263,17 @@ const perceiveOpponent = (
 // asymmetry with the delayed `opponent.knockdown` tell).
 const viewFor = (
   self: Fighter,
-  opponent: Omit<OpponentState, "points" | "penalties">,
+  opponent: Omit<OpponentState, "points" | "penalties" | "senshu">,
   oppLive: Fighter,
   rules: Rules,
   tick: number,
   cap: number,
   inOT: boolean,
   match: FightConfig["match"],
+  // C3: the egocentric senshu tells, precomputed at the call site from the bout-level senshuHolder
+  // (the `===` lives there so it is mutation-covered). 1 iff this fighter / its opponent holds senshu.
+  selfSenshu: number,
+  oppSenshu: number,
 ): State => {
   const st = self.state;
 
@@ -307,12 +311,14 @@ const viewFor = (
       gassed: gassed(self, rules) ? 1 : 0, // live — the derived gas tell (C10 Story 3): 1 iff at/below the gas line
       penalties: self.penaltyCount, // live — the shared jogai/passivity warning count is self-proprioception (A3)
       passivityRemaining, // live — the countdown to the passivity foul (B3), derived above
+      senshu: selfSenshu, // live — the first-blood tell off the bout-level senshuHolder (C3)
     },
     opponent: {
       ...opponent,
       points: oppLive.points,
       penalties: oppLive.penaltyCount,
-    }, // points + penalties are LIVE scoreboard reads off the true opponent (zero latency, like self.points / clock.tick)
+      senshu: oppSenshu,
+    }, // points + penalties + senshu are LIVE scoreboard reads off the true opponent (zero latency, like self.points / clock.tick)
     ring: { width: rules.ring.width },
     // ticksRemaining counts down the CURRENT period's budget: `cap − tick`. In regulation cap ==
     // maxTicks (unchanged); once sudden death begins cap == maxTicks + otTicks, so the OT budget is
@@ -1024,14 +1030,36 @@ export function runFight(cfg: FightConfig): FightResult {
     // 2. Both fighters decide against one immutable pre-tick snapshot.
     const aAction = runTick(
       botA,
-      viewFor(a, aOpp, b, rules, tick, cap, inOT, match),
+      viewFor(
+        a,
+        aOpp,
+        b,
+        rules,
+        tick,
+        cap,
+        inOT,
+        match,
+        senshuHolder === "A" ? 1 : 0, // self holds senshu iff the bout latched it to A
+        senshuHolder === "B" ? 1 : 0, // opponent (B) holds senshu
+      ),
       a.mem,
       rules,
     );
 
     const bAction = runTick(
       botB,
-      viewFor(b, bOpp, a, rules, tick, cap, inOT, match),
+      viewFor(
+        b,
+        bOpp,
+        a,
+        rules,
+        tick,
+        cap,
+        inOT,
+        match,
+        senshuHolder === "B" ? 1 : 0, // self holds senshu iff the bout latched it to B
+        senshuHolder === "A" ? 1 : 0, // opponent (A) holds senshu
+      ),
       b.mem,
       rules,
     );
@@ -1158,7 +1186,8 @@ export function runFight(cfg: FightConfig): FightResult {
     if (match?.senshu && senshuHolder === "undecided") {
       const aTech = a.points > aPointsBefore;
       const bTech = b.points > bPointsBefore;
-      if (aTech || bTech) senshuHolder = aTech && bTech ? "none" : aTech ? "A" : "B";
+      if (aTech || bTech)
+        senshuHolder = aTech && bTech ? "none" : aTech ? "A" : "B";
     }
 
     // Match mode: yame. After the exchange fully resolves — a point was scored and
@@ -1273,7 +1302,12 @@ export function runFight(cfg: FightConfig): FightResult {
     // resetToNeutral clears position/posture/guard/windows/clocks; points, stamina, penaltyCount,
     // mem, and senshuHolder persist. `ticks` advances to the new cap so an exhausted OT reports the
     // full executed count (an early break overwrites it with tick+1).
-    if (!inOT && otTicks > 0 && tick === maxTicks - 1 && a.points === b.points) {
+    if (
+      !inOT &&
+      otTicks > 0 &&
+      tick === maxTicks - 1 &&
+      a.points === b.points
+    ) {
       cap = maxTicks + otTicks;
       inOT = true;
       ticks = cap;

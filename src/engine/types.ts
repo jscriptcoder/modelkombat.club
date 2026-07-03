@@ -44,6 +44,7 @@ export type SelfState = {
   gassed: number; // C10 derived gas tell (live): 1 iff stamina ≤ gasThreshold, else 0 (also 0 when no threshold/meter — the inert sentinel)
   penalties: number; // shared jogai/passivity warning count (live scoreboard, like points); 0 = none
   passivityRemaining: number; // B3: ticks until the passivity foul (live self-proprioception); max(0, limit − ticksSinceOffense), 0 = foul imminent / no passivity configured (the sentinel)
+  senshu: number; // C3 first-blood tell (live, egocentric): 1 iff I hold senshu, else 0 (0 = undecided/none, or no senshu configured — the sentinel)
 };
 
 export type OpponentState = {
@@ -63,6 +64,7 @@ export type OpponentState = {
   points: number; // live scoreboard read — the opponent's WKF points, exposed with ZERO perception delay (a scoreboard fact, not a body-perception tell; sourced from the live opponent, never the ring buffer)
   penalties: number; // live scoreboard read — the opponent's shared jogai/passivity warning count, ZERO perception delay (public fact, off the live opponent, never the ring buffer)
   passivityRemaining: number; // B4: perceived countdown to the foe's passivity foul, max(0, limit − ticksSinceOffense); DELAYED on the L_act layer (a body-condition tell, like stamina — NOT the live scoreboard); 0 = imminent / no passivity configured (the sentinel)
+  senshu: number; // C3 first-blood tell (live scoreboard read, zero delay like points): 1 iff the opponent holds senshu, else 0 (0 = undecided/none/unconfigured)
 };
 
 export type RingState = { width: number };
