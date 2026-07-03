@@ -71,3 +71,11 @@ Design source of truth (living): [../move-roster.md](../move-roster.md) — bala
 - **`ushiro-geri` — back kick** (move #4/6; Slice 1 wiring #126 → benchmark v8, Slice 2 `rule()` readers #127): [ushiro-geri-back-kick.md](ushiro-geri-back-kick.md)
 - **`empi` — elbow** (move #5/6; Slice 1 wiring #129 → benchmark v9, Slice 2 `rule()` readers #130): [empi-elbow.md](empi-elbow.md)
 - **`hiza-geri` — knee** (move #6/6, completes Batch 1; Slice 1 wiring #132 → benchmark v10, Slice 2 `rule()` readers #133): [hiza-geri-knee.md](hiza-geri-knee.md)
+
+## Gauntlet modernization + rebalance
+
+Parent split (living, in `plans/`): `gauntlet-modernization-stories.md` — re-author the frozen
+benchmark gauntlet one bot per PR until all 6 members land in the `[25%, 75%]` round-robin band
+**and** the roster collectively exercises the full arsenal.
+
+- **S1 — `vulture` parry→counter** (PR #135 → benchmark v11): [gauntlet-s1-vulture-parry-counter.md](gauntlet-s1-vulture-parry-counter.md)

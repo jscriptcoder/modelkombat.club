@@ -17,11 +17,11 @@ Redesign the `vulture` gauntlet bot into a disciplined **parry→counter** defen
 
 ## Confirmed `v10` baseline
 
-| Member | Win% | Band | | Member | Win% | Band |
-|---|---|---|---|---|---|---|
-| `sweeper` | 82.0 | ❌ high | | `zoner` | 36.0 | ✅ |
-| `rekka` | 72.0 | ✅ | | `jabber` | 28.0 | ✅ |
-| `grappler` | 66.0 | ✅ | | `vulture` | 16.0 | ❌ low |
+| Member     | Win% | Band    |     | Member    | Win% | Band   |
+| ---------- | ---- | ------- | --- | --------- | ---- | ------ |
+| `sweeper`  | 82.0 | ❌ high |     | `zoner`   | 36.0 | ✅     |
+| `rekka`    | 72.0 | ✅      |     | `jabber`  | 28.0 | ✅     |
+| `grappler` | 66.0 | ✅      |     | `vulture` | 16.0 | ❌ low |
 
 Coverage 5/11 moves (uncovered = the 6 Batch-1 moves). **Bargain hypothesis:**
 `vulture` meets `sweeper` in 20 of its 100 fights; `sweeper` needs to shed only
@@ -48,7 +48,7 @@ frequency, which the re-measure quantifies.
 - [ ] **Discipline**: offense fires ONLY in the counter window (or the pre-existing
       gassed-punish) — `vulture` does NOT attack in neutral (guards the 16→7% backfire).
 - [ ] **Behavioral proof**: fed a snapshot with `self.counterWindow > 0`, `self.canAct
-      = 1`, affordable stamina, `vulture` chooses `attack uraken` — a scenario in which
+= 1`, affordable stamina, `vulture` chooses `attack uraken` — a scenario in which
       today's `vulture` chooses block/move (no counter rule exists).
 - [ ] `vulture.json` references `uraken` (coverage ++ toward the 12-move goal).
 - [ ] Round-robin re-measured at `v11`: `vulture` lands in `[25%, 75%]`; the effect on
@@ -79,37 +79,38 @@ change**. Intentionally skipped: neutral offense, whiff-punish-on-read, kick cou
 **Acceptance criteria**: as above — **present and get human confirmation before writing
 any test/data.**
 **RED** (failing tests first; both fail against today's counter-less `vulture`):
-- *Primary (deterministic, interpreter-level)*: given a perceived state with
+
+- _Primary (deterministic, interpreter-level)_: given a perceived state with
   `self.counterWindow > 0`, `self.canAct = 1`, affordable stamina, assert `vulture`'s
   action is `attack uraken` (`high`). Fails today (falls through to block/move).
-- *Discipline (kills the over-broad rule)*: given `counterWindow == 0`, not gassed,
+- _Discipline (kills the over-broad rule)_: given `counterWindow == 0`, not gassed,
   opponent not attacking, mid-range, assert `vulture` does NOT attack (move/block/idle).
   This is the guard against an unconditional / `>= 0` counter rule — the 16→7% mutant.
-- *Behavioral (end-to-end, also re-confirms parry reliability)*: in a crafted fight
+- _Behavioral (end-to-end, also re-confirms parry reliability)_: in a crafted fight
   vs a minimal startup-7 attacker at a seed whose jitter yields a parry, assert
   `vulture` scores a counter (`uraken` + `counterBonus`) inside `counterWindow`. If a
   deterministic parry seed proves fiddly, the aggregate round-robin re-measure is the
   end-to-end evidence and this drops to best-effort (noted, not silently cut).
-- *Mutator note*: this slice is a **DATA** change — no new `src/` logic. The mutant it
+- _Mutator note_: this slice is a **DATA** change — no new `src/` logic. The mutant it
   must kill is "revert `vulture.json` to the counter-less doc"; the primary + discipline
   RED tests kill it by construction (pass on new, fail on old).
-**GREEN**: add exactly ONE rule to `vulture.json`, high-priority (after the
-`canAct == 0` idle guard): `when self.counterWindow > 0 → attack uraken high`.
-Gas-proof `uraken` (cost 12) so a chip-drained blocker can still counter. No other
-rule touched.
-**MUTATE**: no new production logic to mutate. The only `src/` change is the versioned
-config constants (`BENCHMARK_VERSION`, `INPUT_HASH` in `benchmark-config.ts`), whose
-mutants are already killed by the existing `INPUT_HASH` guard test — re-run Stryker on
-the changed `benchmark-config.ts` region to confirm 100% (expected: unchanged). Test
-effectiveness for the data change is evidenced structurally (RED distinguishes
-old-vs-new `vulture` + rejects the over-broad rule).
-**KILL MUTANTS**: ensure the discipline test is present and red-first, so an
-over-broad or unconditional counter rewrite cannot pass.
-**REFACTOR**: assess `vulture.json` rule ordering for readability; keep the defensive
-core intact and self-evident.
-**Done when**: all ACs met; round-robin re-measured (`vulture` in-band; `sweeper`
-effect + any new outlier recorded); `dogfood.test.ts` + `INPUT_HASH` + `v11` updated;
-`npm run fight` byte-identical; suite/typecheck/lint green; **human approves commit**.
+  **GREEN**: add exactly ONE rule to `vulture.json`, high-priority (after the
+  `canAct == 0` idle guard): `when self.counterWindow > 0 → attack uraken high`.
+  Gas-proof `uraken` (cost 12) so a chip-drained blocker can still counter. No other
+  rule touched.
+  **MUTATE**: no new production logic to mutate. The only `src/` change is the versioned
+  config constants (`BENCHMARK_VERSION`, `INPUT_HASH` in `benchmark-config.ts`), whose
+  mutants are already killed by the existing `INPUT_HASH` guard test — re-run Stryker on
+  the changed `benchmark-config.ts` region to confirm 100% (expected: unchanged). Test
+  effectiveness for the data change is evidenced structurally (RED distinguishes
+  old-vs-new `vulture` + rejects the over-broad rule).
+  **KILL MUTANTS**: ensure the discipline test is present and red-first, so an
+  over-broad or unconditional counter rewrite cannot pass.
+  **REFACTOR**: assess `vulture.json` rule ordering for readability; keep the defensive
+  core intact and self-evident.
+  **Done when**: all ACs met; round-robin re-measured (`vulture` in-band; `sweeper`
+  effect + any new outlier recorded); `dogfood.test.ts` + `INPUT_HASH` + `v11` updated;
+  `npm run fight` byte-identical; suite/typecheck/lint green; **human approves commit**.
 
 ## Contingency (feeds the escalation ladder)
 
@@ -136,4 +137,5 @@ effect + any new outlier recorded); `dogfood.test.ts` + `INPUT_HASH` + `v11` upd
    the next slices build on).
 
 ---
-*Delete this file when S1 is merged; the parent split tracks the remaining slices.*
+
+_Delete this file when S1 is merged; the parent split tracks the remaining slices._

@@ -510,6 +510,30 @@ v7` (`INPUT_HASH` flip). **Slice 2 (#124)** adds the 6 `rule("moves.yoko-geri.*"
   **Batch-1 grounded arsenal COMPLETE (6/6) — next: the roster-wide no-Pareto-dominance property test + the owed
   `vulture`/`sweeper` gauntlet rebalance.**
 
+- DONE (**gauntlet modernization + rebalance — S1: `vulture` parry→counter**, PR #135): the first
+  slice of the gauntlet **modernization + rebalance** feature (parent split
+  `plans/gauntlet-modernization-stories.md`) — re-authoring the frozen benchmark gauntlet, one bot
+  per PR, so it (a) lands all 6 members in the `[25%, 75%]` round-robin band and (b) collectively
+  exercises the full arsenal. **Lever: bot-document redesign only** (no `CANONICAL_RULES` change ⇒
+  `npm run fight` byte-identical). S1 gives the pure-reactive `vulture` the counter it never had:
+  ONE rule — `self.counterWindow > 0 → attack uraken high` (gas-proof `uraken` cost 12 so a
+  chip-drained blocker can still counter; the defensive core — throw-break, block-by-band,
+  gassed-punish — untouched). Because the generic `sim.ts` resolver already rewards a parry
+  (`parryRecovery +12` punish window → `counterWindow` → `counterBonus` a startup-7 strike lands in
+  time), the fix is **pure data + a behavioral characterization**, no engine change. Round-robin
+  re-measure (v10 → **v11**): `vulture` **16 → 60%** (fixed), and the round-robin coupling pulls
+  `sweeper` **82 → 67%** in-band with **no `sweeper` edit** — the predicted "bargain" (`sweeper` was
+  the D1 out-of-band-high finding). Two original outliers → one: the counter feasts on startup-7
+  punch-spam, so `jabber` fell **28 → 19% (out low)** — **accepted and deferred** to a new `jabber`
+  slice per the escalation ladder (redistribute, don't nerf `vulture`). Coverage 5/11 → **6/11**
+  (`uraken`). Wiring a gauntlet bot flips `INPUT_HASH` ⇒ `BENCHMARK_VERSION v10 → v11`; dogfood
+  characterization 16W → 18W; `docs/spec.md` regenerated (it embeds `vulture` as its example bot).
+  1017 tests; `benchmark-config.ts` mutation 100% (the JSON bot is data — Stryker doesn't mutate it;
+  effectiveness is structural — the RED tests distinguish old-vs-new `vulture` + reject the
+  over-broad counter rule). Plan archived at `docs/archive/gauntlet-s1-vulture-parry-counter.md`.
+  **Next slices:** `zoner` long-range, `grappler` close-range, the added `jabber` rebalance, then
+  the calibration lock (CI band + coverage acceptance tests + final gauntlet doc).
+
 ### §7 match structure built between C9 and Capability D
 
 Capabilities A (jogai), B (passivity), and C (tie resolution) — the WKF officiating
@@ -545,12 +569,16 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    `rule()`-readers PR (no bump). **Next: the roster-wide no-Pareto-dominance property test**
    (`rules.test.ts`, asserting no move dominates another across the full 12-move roster). Air
    (`tobi-geri`) is Batch 2, gated on the unbuilt air-strike capability (item 5).
-2. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low
-   `[25%,75%]` band; a naive offense buff backfired 16→7%), now joined by a NEW D1
-   finding: **`sweeper` 82% (out-of-band HIGH under senshu)**. Both are report-only in
-   `docs/benchmark-gauntlet-v4.md`; neither is rebalanced (D was adoption-only). A
-   rebalance is a separate capability. **Fold the Batch-1 roster shift into this** once the
-   family lands (item 1 changes the gauntlet's option space).
+2. **Gauntlet modernization + rebalance — IN PROGRESS (S1 shipped, PR #135).** Reframed
+   from a pure rebalance into modernization + rebalance: re-author the frozen gauntlet, one
+   bot per PR, until all 6 land in `[25%,75%]` AND the roster collectively exercises the
+   full arsenal (the Batch-1 roster shift folded in). Parent split:
+   `plans/gauntlet-modernization-stories.md`. **S1 (`vulture` parry→counter, v11)** fixed the
+   `vulture` low tail (16 → 60%) and — via the round-robin coupling — pulled `sweeper`
+   **82 → 67%** in-band with no `sweeper` edit; it also knocked `jabber` **28 → 19% (out
+   low)**, deferred to a new slice. **Remaining:** `zoner` long-range, `grappler` close-range,
+   the `jabber` rebalance, then the calibration lock (CI band + coverage acceptance tests +
+   final gauntlet doc). Lever is bot-document only ⇒ `npm run fight` unaffected.
 3. **Deferred jogai / passivity / overtime benchmark + spec adoption** — Capability D
    was scoped to senshu only; folding jogai / passivity / overtime into the benchmark
    `MATCH` (+ `INPUT_HASH` / `BENCHMARK_VERSION`) and teaching their prose in
