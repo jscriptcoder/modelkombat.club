@@ -213,6 +213,24 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(winCond.toLowerCase()).toContain("draw"); // equal-at-cap ⇒ draw
     });
 
+    it("teaches the senshu first-blood tie-break in the win condition when the manifest enables it (D2)", () => {
+      // the default manifest enables senshu ⇒ the cascade names it, and STILL
+      // names the residual draw (a level bout with no first-blood holder)
+      const winCond = ruleLine(generateSpec(), "win condition");
+      expect(winCond.toLowerCase()).toContain("senshu");
+      expect(winCond.toLowerCase()).toContain("draw");
+
+      // ... and it is GATED on the manifest — a match without senshu omits it,
+      // proving the cascade is interpolated from match.senshu, not a literal
+      const noSenshu = ruleLine(
+        generateSpec(CANONICAL_RULES, { winGap: MATCH.winGap }),
+        "win condition",
+      );
+
+      expect(noSenshu.toLowerCase()).not.toContain("senshu");
+      expect(noSenshu.toLowerCase()).toContain("draw");
+    });
+
     it("ranks by win-rate first, net-points as the tiebreaker (corrects the stale metric)", () => {
       const metric = ruleLine(generateSpec(), "metric");
       expect(metric).toContain("win-rate");
@@ -335,6 +353,28 @@ describe("generateSpec — the factual machine-truth spec", () => {
       );
 
       expect(claimLine(retuned, "match win-rate")).toContain(code("12"));
+    });
+
+    it("makes the senshu tells actionable in the primer — names self.senshu and opponent.senshu (D2)", () => {
+      const matchLine = claimLine(
+        sectionOf(generateSpec(), HEADING),
+        "match win-rate",
+      );
+
+      expect(matchLine.toLowerCase()).toContain("senshu");
+      expect(matchLine).toContain(code("self.senshu"));
+      expect(matchLine).toContain(code("opponent.senshu"));
+
+      // gated on the manifest — a match without senshu keeps the tells out AND
+      // appends nothing: the bullet renders exactly as before (ends unchanged)
+      const noSenshu = sectionOf(
+        generateSpec(CANONICAL_RULES, { winGap: MATCH.winGap }),
+        HEADING,
+      );
+      const noSenshuLine = claimLine(noSenshu, "match win-rate");
+
+      expect(noSenshuLine.toLowerCase()).not.toContain("senshu");
+      expect(noSenshuLine.endsWith("hold it.")).toBe(true);
     });
   });
 
