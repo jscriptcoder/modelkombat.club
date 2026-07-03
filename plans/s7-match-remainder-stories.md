@@ -155,6 +155,21 @@ limit − oppAct.ticksSinceOffense)`, threading `match` in (D2, the C10 S4b `isG
   at 100% mutation). Byte-identical absent `match.senshu` (`0/0`; existing bots don't read the fields),
   replay-stable, swap-symmetric. The C3 plan (`c3-senshu-perception.md`) deleted (record in git/PR #110). The
   C3 resolved-decisions section below is retained as the design record.
+- **Capability D — benchmark + spec senshu adoption — ✅ DONE** (PRs #113–#114, merged 2026-07-03;
+  `main`@`0b8c3f1`). **Capability D COMPLETE** — the downstream adoption of the built §7 senshu tie-break
+  (C1/C3) into the LLM benchmark + `docs/spec.md`; NO engine change (senshu shipped in C1/C3). **Scoped to
+  senshu only** (jogai/passivity/overtime adoption + prose DEFERRED — they'd force a gauntlet rebalance /
+  mislead authors with fields reading `0`). **D1 (#113)**: widen `BenchmarkConfig["match"]` → shared
+  `FightConfig["match"]` (senshu carried typed; aggregator keys off the resulting `winner` ⇒ no logic change);
+  `MATCH = { winGap: 8, senshu: true }`; `BENCHMARK_VERSION v3→v4`; `INPUT_HASH` re-pinned; synthetic
+  SCORER/DELAYED solo-first-blood test (win under senshu / draw without, both sides, net-invariant); dogfood
+  re-pinned `15W/104L/1D → 16W/104L/0D`; added `docs/benchmark-gauntlet-v4.md` (report-only: senshu sharpens
+  the ranking, 0 draws; `sweeper` 69→82% out-HIGH [new], `vulture` 16% out-low → 4/6 in band; both DEFERRED).
+  **D2 (#114, version-neutral)**: `generateSpec` `Match` gains `senshu?`; win-condition prose teaches the
+  `winGap → senshu → residual-draw` cascade + primer names `self.senshu`/`opponent.senshu`, both **gated on
+  `match.senshu`** (taught == scored); `docs/spec.md` regenerated (2 prose regions). No new DSL/TCB surface
+  (senshu reads shipped in C3); `npm run fight` unaffected. 872 tests; D1 mutation 100% (65/65), D2 100%
+  (6/6). The plan (`d-benchmark-spec-adoption.md`) deleted (record in git / PRs #113–#114 + gauntlet-v4 doc).
 
 ## Parent
 
@@ -1133,27 +1148,25 @@ INPUT_HASH` (senshu entered the hashed `match` payload ⇒ the digest differs) A
 C (tie resolution) COMPLETE** — C1 (senshu #104–#105) + C2 (overtime #107–#108) + C3 (senshu perception
 #110); see Progress. `main`@`a9d9a38`. **C4 (`clock.overtime`) shipped inside C2b.**
 
-**Next: Capability D — downstream adoption.** The §7 mechanics — jogai, passivity, senshu, overtime —
-are all BUILT; D wires them into the benchmark and teaches them in the spec. Two threads, per the §7
-precedent (the benchmark match-structure feature, PRs #87–#93, which shipped a benchmark-adoption slice
+**Capability D (benchmark + spec senshu adoption) COMPLETE** — D1 (benchmark scores under senshu, #113)
+and D2 (spec teaches the senshu win/draw cascade, #114), merged 2026-07-03, `main`@`0b8c3f1`; see Progress.
+**Scoped to senshu only** (`MATCH = { winGap: 8, senshu: true }`, `BENCHMARK_VERSION v4`, `INPUT_HASH`
+re-pinned; `generateSpec` teaches the `winGap → senshu → residual-draw` cascade + the `self.senshu` /
+`opponent.senshu` tells, gated on `match.senshu`). 872 tests; D1 mutation 100% (65/65), D2 100% (6/6). The
+plan `d-benchmark-spec-adoption.md` is deleted (record in git / PRs #113–#114 + `docs/benchmark-gauntlet-v4.md`).
 
-- a spec-teaching slice):
+**Next (the standing §7 remainder — all DEFERRED; each needs `grill-me` → `planning` → TDD):**
 
-1. **Benchmark adoption** — fold `senshu` (and `overtime`?) into the frozen `MATCH` config, refold
-   `INPUT_HASH`, bump `BENCHMARK_VERSION`; re-characterize the gauntlet under the new tie-resolution
-   (draws now break to senshu / OT) and refresh the gauntlet doc.
-2. **Spec teaching** — `generateSpec` teaches the corrected win/draw semantics + the
-   jogai / passivity / senshu / overtime prose (the deferred `docs/spec.md` match narrative — every prior
-   §7 story deferred its prose to here).
+1. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low `[25%,75%]` band; a
+   naive offense buff backfired), now joined by a NEW D1 finding: **`sweeper` 82% (out-of-band HIGH under
+   senshu)**. Both are report-only in `docs/benchmark-gauntlet-v4.md`; neither is rebalanced (D was
+   adoption-only). A rebalance is a separate capability.
+2. **Deferred jogai / passivity / overtime adoption** — D scoped to senshu only; folding jogai/passivity/OT
+   into `MATCH` (+ `INPUT_HASH`/version) and teaching their prose in `generateSpec` was deliberately deferred
+   (each would force its own gauntlet re-characterization / possible rebalance). The jogai + passivity
+   MECHANICS are already built (Capability A / B); only their benchmark+spec adoption remains.
+3. **Rest of §7** — **rounds** (the last unbuilt match-structure piece).
+4. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap capability).
 
-Still open beyond D (the standing §7 remainder): the **`vulture` parry→counter gauntlet-rebalance**
-follow-up, then **air-actions** + the **rest of §7** (rounds).
-
-Flow: ~~`grill-me`~~ **DONE 2026-07-03** (decisions resolved → tie-resolution / senshu-only /
-report-only; see "Capability D — resolved decisions" above) → ~~`find-gaps`~~ **DONE 2026-07-03** (AC-1…
-AC-9 + AC→slice map; see "Capability D — Acceptance criteria" above) → **`planning` (NEXT)** — turn D1
-(benchmark) then D2 (spec) into `plans/d-benchmark-spec-adoption.md` PR-sized slices → per-slice
-RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR (`tdd` + `testing` + `mutation-testing` + `refactoring`).
-Precedent to mirror: the ENGINE stays byte-identical (senshu already honors match-absent) — D1
-deliberately changes benchmark SCORING (v3→v4, guarded by the version bump); scoped mutation on the
-changed `benchmark-config.ts` / `gen-spec.ts` regions + the guard/drift tests.
+This standing tracker is KEPT (the §7 design record + resolved-decisions/AC sections below remain the
+authoritative reference for the deferred adoption work).
