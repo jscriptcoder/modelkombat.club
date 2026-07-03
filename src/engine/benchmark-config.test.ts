@@ -55,8 +55,8 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     expect(MATCH).toEqual({ winGap: 8, senshu: true });
   });
 
-  it("carries BENCHMARK_VERSION v12 (gauntlet modernization S-jabber: jabber block+counter)", () => {
-    expect(BENCHMARK_VERSION).toBe("v12");
+  it("carries BENCHMARK_VERSION v13 (gauntlet modernization S2: zoner long kicks)", () => {
+    expect(BENCHMARK_VERSION).toBe("v13");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {
