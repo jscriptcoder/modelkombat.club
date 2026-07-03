@@ -185,32 +185,32 @@ legit score always lands before any reset — no free-escape exploit.
 
 **Jogai (ring-out penalty).**
 
-| Decision | Resolution |
-| --- | --- |
-| Boundary | **Out-zone over the hard clamp**: legal region `[margin, width−margin]`, outer strips = jogai zone. A pure scoring-layer READ (`self.x` vs `margin`) — no movement-physics change. |
-| Config | `match.jogai?: { margin }` (sub-units). Officiating layer, not `Rules`. |
-| Penalty | **Warning ladder** on the shared per-fighter `penaltyCount` (below): 1st foul free, each subsequent ⇒ **opponent +1 point**, feeding the existing `winGap`. No DQ / instant loss. |
-| Trigger | **On-entry transition** (in-bounds → out-zone edge-detect); one jogai per crossing, re-arms on return. The margin is the grace — no dwell counter. |
-| Consequence | **Full yame reset** (`resetToNeutral` both) + `winGap` re-check (endReason `"gap"`) + jogai `FightEvent`. Offender lands at center ⇒ no re-trigger. |
+| Decision    | Resolution                                                                                                                                                                         |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Boundary    | **Out-zone over the hard clamp**: legal region `[margin, width−margin]`, outer strips = jogai zone. A pure scoring-layer READ (`self.x` vs `margin`) — no movement-physics change. |
+| Config      | `match.jogai?: { margin }` (sub-units). Officiating layer, not `Rules`.                                                                                                            |
+| Penalty     | **Warning ladder** on the shared per-fighter `penaltyCount` (below): 1st foul free, each subsequent ⇒ **opponent +1 point**, feeding the existing `winGap`. No DQ / instant loss.  |
+| Trigger     | **On-entry transition** (in-bounds → out-zone edge-detect); one jogai per crossing, re-arms on return. The margin is the grace — no dwell counter.                                 |
+| Consequence | **Full yame reset** (`resetToNeutral` both) + `winGap` re-check (endReason `"gap"`) + jogai `FightEvent`. Offender lands at center ⇒ no re-trigger.                                |
 
 **Passivity (non-engagement penalty)** — the anti-stall lever (bots were farming the 600-tick cap).
 
-| Decision | Resolution |
-| --- | --- |
-| Metric | **Per-fighter no-offense clock** `ticksSinceOffense`; exceed `match.passivity.limit` ⇒ passive. |
-| Reset | **Making contact only** (hit/block/parry/grab/sweep-connect) — a whiff at air does NOT reset. This is what breaks the far-apart stall; reuses the union's computed outcomes. |
-| Ladder | **Shared category-2 ladder with jogai**: one `penaltyCount`/fighter, both fouls feed it (1st free, 2+ ⇒ opponent +1 → `winGap`), sharing the free first warning. WKF-faithful pooling. |
-| Consequence | Full yame reset (restores `startGap` engaging distance), reset both clocks, `winGap` re-check, event. |
+| Decision    | Resolution                                                                                                                                                                             |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Metric      | **Per-fighter no-offense clock** `ticksSinceOffense`; exceed `match.passivity.limit` ⇒ passive.                                                                                        |
+| Reset       | **Making contact only** (hit/block/parry/grab/sweep-connect) — a whiff at air does NOT reset. This is what breaks the far-apart stall; reuses the union's computed outcomes.           |
+| Ladder      | **Shared category-2 ladder with jogai**: one `penaltyCount`/fighter, both fouls feed it (1st free, 2+ ⇒ opponent +1 → `winGap`), sharing the free first warning. WKF-faithful pooling. |
+| Consequence | Full yame reset (restores `startGap` engaging distance), reset both clocks, `winGap` re-check, event.                                                                                  |
 
 **Tie resolution (the reframed "rounds")** — WKF is single-round; the real §7 gap is breaking a
 level bout (equal points at the time limit → today `"draw"`). Best-of-N is a non-WKF import, dropped.
 
-| Decision | Resolution |
-| --- | --- |
-| Scheme | **Overtime → senshu fallback.** Level at cap ⇒ sudden-death OT; OT decides ⇒ win; OT scoreless ⇒ senshu-holder; never-scored ⇒ draw. |
-| Overtime | Reset both to neutral start (points/stamina/mem persist); **first fighter to hold a lead (gap ≥ 1) wins immediately**; a same-tick trade stays level; fixed `match.overtimeTicks` cap ⇒ senshu fallback; jogai/passivity stay live in OT (their points can BE the sudden-death score). |
-| Senshu | **First-blood latch (WKF-faithful)**: the first fighter to score a **technique** point (penalty points never confer) holds senshu; simultaneous first score ⇒ none (permanent, not transferred). **Revoked** to none if the holder later commits any jogai/passivity foul (incl. the free 1st warning). Standalone toggle `match.senshu?: boolean` (also the OT fallback). |
-| endReason | `"gap" \| "time" \| "overtime" \| "senshu"` (a true no-senshu draw reports via the tie path with winner `"draw"`). |
+| Decision  | Resolution                                                                                                                                                                                                                                                                                                                                                                 |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Scheme    | **Overtime → senshu fallback.** Level at cap ⇒ sudden-death OT; OT decides ⇒ win; OT scoreless ⇒ senshu-holder; never-scored ⇒ draw.                                                                                                                                                                                                                                       |
+| Overtime  | Reset both to neutral start (points/stamina/mem persist); **first fighter to hold a lead (gap ≥ 1) wins immediately**; a same-tick trade stays level; fixed `match.overtimeTicks` cap ⇒ senshu fallback; jogai/passivity stay live in OT (their points can BE the sudden-death score).                                                                                     |
+| Senshu    | **First-blood latch (WKF-faithful)**: the first fighter to score a **technique** point (penalty points never confer) holds senshu; simultaneous first score ⇒ none (permanent, not transferred). **Revoked** to none if the holder later commits any jogai/passivity foul (incl. the free 1st warning). Standalone toggle `match.senshu?: boolean` (also the OT fallback). |
+| endReason | `"gap" \| "time" \| "overtime" \| "senshu"` (a true no-senshu draw reports via the tie path with winner `"draw"`).                                                                                                                                                                                                                                                         |
 
 **New DSL read surface** (all additive `FIELD_READERS`, config-gated values, static entries ⇒
 `dsl.ts` interpreter stays 100% — the C10 pattern). jogai `margin` is **spec-taught**, not a field.
