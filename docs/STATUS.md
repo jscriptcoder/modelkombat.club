@@ -443,6 +443,15 @@ winGap` at yame / jogai / passivity) — so the first fighter to a 1-point gap (
   field-readers (`dsl.ts` TCB) so bots introspect its frames — a **reads-only** change (no `CANONICAL_RULES` edit) ⇒
   `INPUT_HASH` stable ⇒ **no version bump**. 895 tests; both slices 100% mutation on changed lines. Plan archived at
   `docs/archive/uraken-backfist.md`. **Next Batch-1 move: `shuto`.**
+- DONE (**Batch-1 arsenal expansion — `shuto` (knife-hand), move #2/6, PRs #120–#121**): the **longest-reach
+  hand** — it **out-ranges the reverse punch** (`reach 260000` > `gyaku-zuki` 240000) despite scoring only 1
+  (_yuko_), a `high·mid` gas-proof poke (`staminaCost 22 ≤ gasThreshold 30`). The no-Pareto trade made concrete:
+  reach up, paid with score down (1 < 2), cost up (22 > 20), startup down (8 > 7) — dominance-free vs both existing
+  hands. Same **pure data + TCB allowlist** shape as `uraken` (the generic `sim.ts` resolver is untouched). **Slice 1
+  (#120)** wires it in (`MoveId`/`Rules.moves` types, `MOVES` entry, `CANONICAL_RULES` spec, regenerated `spec.md`)
+  ⇒ `BENCHMARK_VERSION v5 → v6` (`INPUT_HASH` flip). **Slice 2 (#121)** adds the 6 `rule("moves.shuto.*")` readers
+  (`dsl.ts` TCB) ⇒ reads-only, `INPUT_HASH` stable ⇒ **no version bump**. 918 tests; both slices 100% mutation on
+  changed lines. Plan archived at `docs/archive/shuto-knife-hand.md`. **Next Batch-1 move: `yoko-geri`.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -473,11 +482,11 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
 
 1. **Batch-1 arsenal expansion (IN PROGRESS)** — the real-karate move roster
    (`docs/move-roster.md`: balance law + 6 resolved frame blocks), one PR per technique.
-   **`uraken` SHIPPED** (#117 wiring → v5, #118 `rule()` readers → no bump). Remaining 5
-   grounded moves: **`shuto`, `yoko-geri`, `ushiro-geri`, `empi`, `hiza-geri`** — each wires
-   into `CANONICAL_RULES` ⇒ its own `BENCHMARK_VERSION` bump (v6…v10). Then a roster-wide
-   no-Pareto-dominance property test. Air (`tobi-geri`) is Batch 2, gated on the unbuilt
-   air-strike capability (item 5).
+   **`uraken` SHIPPED** (#117 wiring → v5, #118 `rule()` readers → no bump) and **`shuto`
+   SHIPPED** (#120 wiring → v6, #121 `rule()` readers → no bump). Remaining 4 grounded moves:
+   **`yoko-geri`, `ushiro-geri`, `empi`, `hiza-geri`** — each wiring PR bumps
+   `BENCHMARK_VERSION` (v7…v10). Then a roster-wide no-Pareto-dominance property test. Air
+   (`tobi-geri`) is Batch 2, gated on the unbuilt air-strike capability (item 5).
 2. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low
    `[25%,75%]` band; a naive offense buff backfired 16→7%), now joined by a NEW D1
    finding: **`sweeper` 82% (out-of-band HIGH under senshu)**. Both are report-only in
