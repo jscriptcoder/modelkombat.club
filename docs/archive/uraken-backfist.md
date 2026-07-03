@@ -1,7 +1,7 @@
 # Plan: `uraken` (backfist) — Batch-1 move #1
 
 **Branch**: feat/uraken-backfist (Slice 1) · feat/uraken-rule-readers (Slice 2)
-**Status**: Slice 1 **MERGED** (PR #117, benchmark v5) · Slice 2 **Active**
+**Status**: ✅ **COMPLETE** — Slice 1 MERGED (PR #117, benchmark v5) · Slice 2 MERGED (PR #118, no bump)
 **Design source**: `docs/move-roster.md` (Batch-1 resolved frame data; balance law + policies)
 
 ## Goal
@@ -117,7 +117,7 @@ window → `result.scores`. **No new resolver code.**
   non-`uraken` paths); `dsl.ts`/`rules.ts` mutation 100%; typecheck + lint clean; mutation report
   reviewed; human approves commit.
 
-### Slice 2: Bots can introspect `uraken`'s frames via `rule("moves.uraken.*")`
+### Slice 2: Bots can introspect `uraken`'s frames via `rule("moves.uraken.*")` — ✅ MERGED (PR #118)
 
 **Value**: The bot author can read `uraken`'s frames at runtime to write adaptive logic
 (e.g. gate on `rule("moves.uraken.reach")`), the same as every other move.
@@ -136,12 +136,12 @@ staminaCost}` (mirror the `mae-geri` readers, `?.`/`?? 0` for the optional key),
    **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
    **Acceptance criteria** — **present and confirm before code**:
 
-- [ ] **AC-9 (rule-path accepted):** `validate` accepts a bot using `rule("moves.uraken.reach")`
-      (and the other 5 paths); an unknown `moves.uraken.bands` path is **rejected**.
-- [ ] **AC-10 (reader returns the value):** the interpreter resolves `rule("moves.uraken.reach")`
-      to **200000** and `rule("moves.uraken.staminaCost")` to **12** against `CANONICAL_RULES`.
-- [ ] **AC-11 (spec lists the paths):** regenerated `spec.md` lists the six `moves.uraken.*`
-      rule paths + the `rulePath` schema enum; drift tests green.
+- [x] **AC-9 (rule-path accepted):** `validate` accepts a bot using `rule("moves.uraken.reach")`
+      (and the other 5 paths); an unknown `moves.uraken.bands` path is **rejected**. _(PR #118)_
+- [x] **AC-10 (reader returns the value):** the interpreter resolves `rule("moves.uraken.reach")`
+      to **200000** and `rule("moves.uraken.staminaCost")` to **12** against `CANONICAL_RULES`. _(PR #118)_
+- [x] **AC-11 (spec lists the paths):** regenerated `spec.md` lists the six `moves.uraken.*`
+      rule paths + the `rulePath` schema enum; drift tests green. _(PR #118)_
       **RED**: `validate-bot.test.ts` — AC-9 (accept the 6 paths; reject a bogus one); an interpreter
       test — AC-10 (reader values); `gen-spec.test.ts`/`spec-schema.test.ts` — AC-11 (drift).
       **GREEN**: the 6 readers + regen.

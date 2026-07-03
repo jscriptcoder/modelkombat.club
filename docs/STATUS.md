@@ -432,6 +432,17 @@ winGap` at yame / jogai / passivity) — so the first fighter to a 1-point gap (
   872 tests; D1 `benchmark-config.ts` + `benchmark.ts` mutation 100% (65/65), D2 `gen-spec.ts` changed-region 100%
   (6/6). Non-goals honored: no `endReason` surfacing, no jogai/passivity/overtime, no gauntlet rebalance.
   **Capability D is COMPLETE.**
+- DONE (**Batch-1 arsenal expansion — `uraken` (backfist), move #1/6, PRs #117–#118**): the first real-karate
+  roster expansion (design source `docs/move-roster.md` — balance law + 6 resolved Batch-1 frame blocks). `uraken`
+  is the **cheapest** (`staminaCost 12`, gas-proof) + **shortest** (`reach 200000`) hand strike and the **first
+  `high`-only** technique (`bands:["high"]` ⇒ whiffs a croucher) — a 1-point _yuko_ snap. Because the `sim.ts`
+  resolver is fully **generic** (`rules.moves[action.move]` + `bandLegal` + `affordable`), the move is **pure data +
+  TCB allowlist**, no resolver code. **Slice 1 (#117)** wires it in: `MoveId`/`Rules.moves` types, the `MOVES`
+  allowlist entry, the `CANONICAL_RULES` spec, regenerated `spec.md`; wiring a move into `CANONICAL_RULES` flips the
+  benchmark `INPUT_HASH` ⇒ `BENCHMARK_VERSION v4 → v5`. **Slice 2 (#118)** adds the 6 `rule("moves.uraken.*")`
+  field-readers (`dsl.ts` TCB) so bots introspect its frames — a **reads-only** change (no `CANONICAL_RULES` edit) ⇒
+  `INPUT_HASH` stable ⇒ **no version bump**. 895 tests; both slices 100% mutation on changed lines. Plan archived at
+  `docs/archive/uraken-backfist.md`. **Next Batch-1 move: `shuto`.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -460,22 +471,31 @@ intake → S3 compute → S4 apply → S5 advance; `strike > throw > guard` prec
 HIT/BLOCK/WHIFF gate) is pinned in `docs/DESIGN.md` §11. The §7 officiating design
 records for the deferred adoption work are in `docs/archive/s7-match-structure.md`.
 
-1. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low
+1. **Batch-1 arsenal expansion (IN PROGRESS)** — the real-karate move roster
+   (`docs/move-roster.md`: balance law + 6 resolved frame blocks), one PR per technique.
+   **`uraken` SHIPPED** (#117 wiring → v5, #118 `rule()` readers → no bump). Remaining 5
+   grounded moves: **`shuto`, `yoko-geri`, `ushiro-geri`, `empi`, `hiza-geri`** — each wires
+   into `CANONICAL_RULES` ⇒ its own `BENCHMARK_VERSION` bump (v6…v10). Then a roster-wide
+   no-Pareto-dominance property test. Air (`tobi-geri`) is Batch 2, gated on the unbuilt
+   air-strike capability (item 5).
+2. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low
    `[25%,75%]` band; a naive offense buff backfired 16→7%), now joined by a NEW D1
    finding: **`sweeper` 82% (out-of-band HIGH under senshu)**. Both are report-only in
    `docs/benchmark-gauntlet-v4.md`; neither is rebalanced (D was adoption-only). A
-   rebalance is a separate capability.
-2. **Deferred jogai / passivity / overtime benchmark + spec adoption** — Capability D
+   rebalance is a separate capability. **Fold the Batch-1 roster shift into this** once the
+   family lands (item 1 changes the gauntlet's option space).
+3. **Deferred jogai / passivity / overtime benchmark + spec adoption** — Capability D
    was scoped to senshu only; folding jogai / passivity / overtime into the benchmark
    `MATCH` (+ `INPUT_HASH` / `BENCHMARK_VERSION`) and teaching their prose in
    `generateSpec` was deliberately deferred (each would force its own gauntlet
    re-characterization / possible rebalance). The jogai + passivity + overtime
    MECHANICS are already built (Capabilities A / B / C2); only their benchmark+spec
    adoption remains.
-3. **Rest of §7** — **rounds** (the last unbuilt match-structure piece, beyond the
+4. **Rest of §7** — **rounds** (the last unbuilt match-structure piece, beyond the
    benchmark's yame + win condition + tie resolution).
-4. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap
+5. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap
    capability; `self.y`/`self.vy`/`self.posture` are the deferred perception surface).
+   Unblocks Batch 2 of the arsenal expansion (`tobi-geri`, item 1).
 
 Also unbuilt (platform layer, later): the KotH ladder, the HTTP API
 (`/spec` / `/validate` / `/fight`), and the Pixi viewer.
