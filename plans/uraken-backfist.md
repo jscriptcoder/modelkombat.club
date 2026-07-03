@@ -172,4 +172,5 @@ Before each PR:
 
 ---
 
-_Delete this file when both slices are merged (the record lives in the PRs + `docs/move-roster.md`)._
+_When both slices are merged, **archive** this file under `docs/archive/` (add a README index
+entry) — **do not delete it**. The record also lives in the PRs + `docs/move-roster.md`._
