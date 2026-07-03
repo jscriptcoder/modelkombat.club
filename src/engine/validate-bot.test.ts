@@ -1030,6 +1030,13 @@ describe("validate — rule(path) ruleset reads", () => {
     "moves.yoko-geri.score",
     "moves.yoko-geri.reach",
     "moves.yoko-geri.staminaCost",
+    "moves.ushiro-geri.startup",
+    "moves.ushiro-geri.active",
+    "moves.ushiro-geri.recovery",
+    "moves.ushiro-geri.score",
+    "moves.ushiro-geri.reach",
+    "moves.ushiro-geri.staminaCost",
+    "moves.ushiro-geri.scoreByBand.high",
     "throw.score",
     "jumpImpulse",
     "gravity",
@@ -1050,6 +1057,7 @@ describe("validate — rule(path) ruleset reads", () => {
     "moves.uraken.bands", // a real uraken field, but non-numeric ⇒ not a reader
     "moves.shuto.bands", // a real shuto field, but non-numeric ⇒ not a reader
     "moves.yoko-geri.bands", // a real yoko-geri field, but non-numeric ⇒ not a reader
+    "moves.ushiro-geri.bands", // a real ushiro-geri field, but non-numeric ⇒ not a reader
     "perception.lol", // typo
     "self.x", // a field path, not a rule path
     "stamina", // a non-leaf object

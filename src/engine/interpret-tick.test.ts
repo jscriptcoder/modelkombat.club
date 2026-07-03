@@ -637,6 +637,13 @@ describe("runTick — rule(path) ruleset reads", () => {
     ["moves.yoko-geri.score", 2, 0],
     ["moves.yoko-geri.reach", 315000, 0],
     ["moves.yoko-geri.staminaCost", 48, 0],
+    ["moves.ushiro-geri.startup", 13, 0],
+    ["moves.ushiro-geri.active", 3, 0],
+    ["moves.ushiro-geri.recovery", 22, 0],
+    ["moves.ushiro-geri.score", 2, 0],
+    ["moves.ushiro-geri.reach", 330000, 0],
+    ["moves.ushiro-geri.staminaCost", 52, 0],
+    ["moves.ushiro-geri.scoreByBand.high", 3, 0],
     ["throw.startup", 7, 0],
     ["throw.active", 2, 0],
     ["throw.recovery", 14, 0],
@@ -690,6 +697,28 @@ describe("runTick — rule(path) ruleset reads", () => {
 
     expect(
       evalsToRule("moves.mawashi-geri.scoreByBand.high", 0, noBandScore),
+    ).toBe(true);
+  });
+
+  it("reads ushiro-geri's scoreByBand.high as 0 when the back kick has no scoreByBand", () => {
+    // ushiro-geri PRESENT but scoreByBand absent ⇒ the INNER `?.` must guard it
+    // (the move-level `?.` short-circuit never reaches this branch otherwise).
+    const noBandScore: Rules = {
+      ...MINIMAL_RULES,
+      moves: {
+        ...MINIMAL_RULES.moves,
+        "ushiro-geri": {
+          startup: 13,
+          active: 3,
+          recovery: 22,
+          score: 2,
+          reach: 330000,
+        },
+      },
+    };
+
+    expect(
+      evalsToRule("moves.ushiro-geri.scoreByBand.high", 0, noBandScore),
     ).toBe(true);
   });
 
