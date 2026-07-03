@@ -215,6 +215,26 @@ describe("validate — bot intake gate", () => {
       expect(result.ok).toBe(true);
     });
 
+    it("accepts an attack naming empi at a legal band (Batch-1 expansion)", () => {
+      const result = validate(
+        getMockBotDoc({
+          default: { type: "attack", move: "empi", band: "mid" },
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
+    it("accepts empi out-of-band — band-legality is runtime, not the gate", () => {
+      const result = validate(
+        getMockBotDoc({
+          default: { type: "attack", move: "empi", band: "low" },
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
     it("accepts uraken out-of-band — band-legality is runtime, not the gate", () => {
       const result = validate(
         getMockBotDoc({

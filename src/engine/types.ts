@@ -22,7 +22,11 @@ export type Band = "high" | "mid" | "low";
 // roundhouse and the neutral start gap), `mid`-only 2-point waza-ari, slowest and gas-locked.
 // `ushiro-geri` (back kick) is the reach APEX and highest-commitment kick — longer still than
 // the side kick, `high·mid` with a jodan-ippon bonus (score 2 / 3 jodan, like the roundhouse),
-// the slowest startup, longest recovery, and priciest cost in the roster (gas-locked).
+// the slowest startup, longest recovery, and priciest cost in the roster (gas-locked). `empi`
+// (elbow) is the SHORTEST reach in the game — a point-blank `high·mid` close strike that sits
+// below the throw, scoring a flat 2 (waza-ari) as the deliberate close-range exception to the
+// hand score-cap, gas-locked, and a cancel SOURCE only (it opens into the reverse but is not a
+// reverse-punch target).
 export type MoveId =
   | "kizami-zuki"
   | "gyaku-zuki"
@@ -31,7 +35,8 @@ export type MoveId =
   | "uraken"
   | "shuto"
   | "yoko-geri"
-  | "ushiro-geri";
+  | "ushiro-geri"
+  | "empi";
 
 // ─── Action grammar — a bot returns exactly ONE per tick ─────────────────────
 // `dir` is RELATIVE to facing: +1 = toward opponent, -1 = away, 0 = hold.
@@ -174,6 +179,7 @@ export type Rules = {
     shuto?: MoveSpec;
     "yoko-geri"?: MoveSpec;
     "ushiro-geri"?: MoveSpec;
+    empi?: MoveSpec;
   };
   // Vertical axis (C4). Both absent ⇒ inert (a `jump` launches no arc) ⇒
   // byte-identical to the pre-vertical engine. `jumpImpulse` is the initial
