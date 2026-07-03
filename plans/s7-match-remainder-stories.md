@@ -793,26 +793,146 @@ mid-exchange combo at the cap is truncated by OT entry exactly as the regulation
 **AC → slice map:** **C2a** (officiating) owns AC-1…AC-11 + AC-14; **C2b** (perception) owns AC-12,
 AC-13, AC-15 + AC-14's perception half.
 
+## C3 — resolved decisions (grill 2026-07-03)
+
+Confirmed before find-gaps/planning C3 (senshu perception — the first-blood tells so a bot can
+protect its own senshu or bait a holder into fouling it away). Feeds `find-gaps` → `planning`
+directly. **Pure perception fold-in** — the C1 latch/revocation machinery already exists; C3 only
+surfaces the bout-level `senshuHolder` to bots. Extends the same `FightConfig.match` scoring-layer
+seam; NOT in `Rules`/`CANONICAL_RULES` (`npm run fight` unaffected). Absent `match.senshu` ⇒
+byte-identical.
+
+**Read fields (Q1 — both):** `self.senshu` + `opponent.senshu`, bilateral like every other scoreboard
+fact (`points`, `penalties`). *Protect* reads `self.senshu` (don't foul my lead away); *steal* reads
+`opponent.senshu` — senshu never transfers, so "steal" = bait the holder into a Category-2 foul →
+`none`. A one-sided tell would be the odd scoreboard fact out and can't drive the steal half.
+
+**Perception layer (Q2 — live scoreboard, zero delay):** both ride the LIVE layer in `viewFor` off the
+bout-level `senshuHolder` — NOT the `L_act` ring buffer — exactly like `opponent.points` /
+`opponent.penalties`. Senshu is a public referee call derived from the *live* per-tick point delta;
+`opponent.points` is already zero-delay, so a delayed senshu would be incoherent (a bot could out-read
+the delay from the live points it's computed from). Mechanically, `senshuHolder` isn't in the `Frame`
+ring buffer at all — delaying would require inventing a per-fighter frame field for a semantically
+wrong result.
+
+**Encoding (Q3 — two booleans, collapse undecided+none):** egocentric `? 1 : 0`. For fighter A's view:
+`self.senshu = senshuHolder === "A" ? 1 : 0`, `opponent.senshu = senshuHolder === "B" ? 1 : 0` (swap
+for B). BOTH `undecided` (nobody yet) and `none` (simultaneous / revoked) collapse to `0/0` — a bot
+can't distinguish "senshu still winnable" from "senshu gone forever." The strategically-distinct
+"senshu still available" tell (undecided vs none) is DEFERRED as additive YAGNI (no gauntlet bot needs
+it; a third `senshuOpen`-style read can be added later without breaking anything). `senshu` stored as a
+`number` (0/1) on `SelfState`/`OpponentState` (the `gassed`/`points` convention), computed at the view
+site so Stryker mutates the `===`/string-literals (killable) — sidesteps the C2b bare-`inOT ? 1 : 0`
+`ConditionalExpression` under-generation gotcha.
+
+**Threading:** `senshuHolder` (already a `runFight` local) is passed into `viewFor` at both call sites;
+each site derives the two egocentric values (A-side `holder === "A"` / `holder === "B"`; B-side
+mirrored) → swap-symmetric by construction. `viewFor` builds `self.senshu` / `opponent.senshu` into the
+view; the two static `FIELD_READERS` (`(s) => s.self.senshu`, `(s) => s.opponent.senshu`) pass through
+⇒ `dsl.ts` interpreter stays 100% (config-gated value only; the TCB boundary can't depend on `match`).
+
+**Spec (Q5 — mechanical regen):** the two readers auto-propagate to `docs/spec.md` via `ALLOWED_FIELDS`
+— the field-whitelist bullets + JSON Schema `fieldPath.enum` gain `self.senshu` / `opponent.senshu`,
+bare (like `clock.overtime` in C2b). NO senshu win/draw semantic prose (deferred to Capability D). NO
+`BENCHMARK_VERSION` / `INPUT_HASH` change (C3 touches no scoring input — that's Capability D). The
+drift test re-pins the regenerated spec byte-for-byte.
+
+**Invariants:** byte-identical when `match.senshu` absent (`senshuHolder` stays `undecided` ⇒ `0/0`,
+and existing gauntlet bots don't reference the new fields ⇒ existing fights unchanged); replay-stable
+(deterministic latch → pure view, no PRNG, integer-only); swap-symmetric (A's `self.senshu` ≡ B's
+`opponent.senshu`); same pre-tick snapshot (senshu joins the live scoreboard group, never mixed into
+the delayed ring-buffer snapshot — invariant #4 untouched). The two `FIELD_READERS` are the story's
+ONLY new TCB surface (no host/net/fs/time/randomness).
+
+**Recommended slicing (Q4 — one slice, for `planning`):** a SINGLE PR — `self.senshu` +
+`opponent.senshu` share identical machinery (thread `senshuHolder` → `viewFor`, two readers, mechanical
+spec regen); neither delivers standalone value and `self.senshu` alone can't be tested without the
+threading `opponent.senshu` also needs. Mirrors C2b shipping two shared-machinery readers
+(`clock.overtime` + OT-budget `ticksRemaining`) in one PR. Branch `feat/senshu-perception`.
+Byte-identical-absent + replay-stable + swap-symmetric, with scoped mutation on the changed `viewFor`
+region (`sim.ts`) + the reader region (`dsl.ts`) + the gen-spec drift test.
+
+**find-gaps resolutions (2026-07-03):** (1) **AC-8 KEPT** — a dedicated `L_act > 0` fixture
+behaviorally locks the Q2 "live layer" decision (`opponent.senshu` flips in lockstep with the live
+`opponent.points`, NOT lagged `L_act` ticks), over relying on AC-7 + the unit reader row alone. (2)
+**Proof depth** = a minimal probe bot that branches its move on `self.senshu` / `opponent.senshu` per
+read (the C2b `clock.overtime` style) + interpret-tick reader-table rows; NO end-to-end protect/steal
+strategy scenario (YAGNI — beyond any gauntlet bot). (3) **Read cadence:** senshu becomes visible on
+the tick AFTER the latch/revoke — the SAME one-tick observe-after-commit cadence as the live
+`opponent.points` (`viewFor` runs at the top of the tick, before combat/latch), NO additional
+perception delay; a same-tick latch-then-revoke therefore never surfaces a transient `self.senshu = 1`
+(AC-6). (4) `undecided` and `none` stay intentionally indistinguishable (both `0/0`) — the availability
+nuance remains deferred.
+
+**Acceptance criteria (find-gaps 2026-07-03):**
+
+- **AC-1 — solo-holder read + swap.** Given `match.senshu` true and A latches senshu (a solo first
+  technique) at tick T, Then from tick T+1 a bot reads A's `self.senshu = 1` / `opponent.senshu = 0`
+  and B's `self.senshu = 0` / `opponent.senshu = 1` (swap-symmetric). Also verified as interpret-tick
+  reader rows for both fields.
+- **AC-2 — undecided read.** Given `match.senshu` true and no technique scored yet, Then both fighters
+  read `self.senshu = 0` and `opponent.senshu = 0` (senshu still up for grabs, but indistinguishable
+  from `none`).
+- **AC-3 — none (simultaneous) collapses to 0/0.** Given both fighters score their first technique on
+  the same tick (senshu → `none`), Then both read `self.senshu = 0` / `opponent.senshu = 0` for the
+  rest of the bout — identical to undecided (the availability nuance is intentionally not exposed).
+- **AC-4 — none (revoked) + revoke visibility.** Given A holds senshu (reads `self.senshu = 1`) then
+  commits a jogai/passivity foul at tick T (senshu → `none`), Then from tick T+1 A reads
+  `self.senshu = 0` and B reads `opponent.senshu = 0` — the hold is observably lost, not transferred
+  (B's `self.senshu` stays `0`).
+- **AC-5 — penalty never confers (visibility).** Given a jogai/passivity penalty gives B its first
+  point (never a technique), Then no fighter ever reads B as holding senshu (B's `self.senshu` / A's
+  `opponent.senshu` stay `0`); a subsequent solo A technique then makes A read `self.senshu = 1`.
+- **AC-6 — same-tick latch-then-revoke never flashes.** Given A scores its first technique AND fouls on
+  the same tick (C1 AC-8 ⇒ `none`), Then a bot NEVER reads `self.senshu = 1` for A on any tick — the
+  view goes `0` (undecided) → `0` (none) with no transient hold (latch + revoke both resolve before the
+  next view is built).
+- **AC-7 — read cadence = live-points cadence.** Given senshu latches to A during tick T's combat, Then
+  `self.senshu` first reads `1` on tick T+1's view — the SAME one-tick observe-after-commit cadence as
+  the live `opponent.points` read (`viewFor` runs at the top of the tick), with NO additional
+  `L_pos`/`L_act` delay (the senshu flip and the `opponent.points` increment surface on the same tick).
+- **AC-8 — opponent.senshu is LIVE (immune to L_act).** Given `perception` with `L_act > 0` and A
+  latches senshu at tick T, Then B reads `opponent.senshu = 1` on tick T+1 with NO `L_act` lag — in
+  lockstep with B's live `opponent.points`, proving senshu rides the live scoreboard layer, not the
+  delayed ring buffer.
+- **AC-9 — persists across resets incl. OT.** Given A holds senshu and yame/jogai/passivity resets —
+  and an overtime `resetToNeutral` — occur, Then A continues to read `self.senshu = 1` after each reset
+  (`senshuHolder` persists; the read tracks it).
+- **AC-10 — byte-identical absent + swap-symmetric + interpreter 100%.** Given `match.senshu` absent /
+  `false`, Then both fields read `0` all bout, existing bots' fights are byte-identical (no
+  `FightResult` change), and replay is stable; given present, the reads are swap-symmetric (A↔B mirror).
+  The `dsl.ts` interpreter stays 100% (two static config-gated readers).
+- **AC-11 — spec drift-clean.** Given the two readers are added, Then `docs/spec.md` is regenerated
+  (field-whitelist bullets + JSON Schema `fieldPath.enum` gain `self.senshu` / `opponent.senshu`, bare
+  — NO senshu win/draw prose, deferred to Capability D) and the drift test re-pins it byte-for-byte; NO
+  `BENCHMARK_VERSION` / `INPUT_HASH` change (C3 touches no scoring input).
+
+**AC → slice map:** a SINGLE slice (`feat/senshu-perception`) owns AC-1…AC-11 — both readers share the
+`senshuHolder` → `viewFor` threading; no sub-split (Q4).
+
 ## Next Step
 
 **Capability A (jogai) COMPLETE** (A1+A2+A3, PRs #97–#99). **Capability B (passivity) COMPLETE**
 (B1 clock #100, B2 shared penalty ladder #101, B3 self read #102, B4 opponent read #103). **Capability
 C, stories C1 (senshu) + C2 (overtime) COMPLETE** (C1a latch #104, C1b revocation #105; C2a officiating
-#107, C2b perception #108) — see Progress. `main`@`8ca63ea`. **C4 (`clock.overtime` live 1/0 +
+#107, C2b perception #108) — see Progress. `main`@`7a07df1`. **C4 (`clock.overtime` live 1/0 +
 OT-budget `ticksRemaining`) shipped inside C2b.**
 
-**Next: C3 — senshu perception** (`self.senshu` / `opponent.senshu` — the first-blood tells that let a
-bot know who holds senshu, so it can play to protect or steal it). The read-surface decision tree is
-UNRESOLVED: which fields (self only, or both), which perception layer (`opponent.senshu` on the
-`L_act`-delayed action layer like the other body tells, or a live scoreboard read like
-`opponent.points`), and the `none`/`undecided` encoding a bot sees. Config-gated FIELD_READERS ⇒ the
-`dsl.ts` interpreter stays 100%; scoring-layer, byte-identical when `match.senshu`/`overtime` absent.
+**In progress: C3 — senshu perception** (`self.senshu` / `opponent.senshu` — the first-blood tells that
+let a bot know who holds senshu, so it can play to protect or steal it). The read-surface decision tree
+is **RESOLVED** (grill 2026-07-03 — see the "C3 — resolved decisions" section above): both
+`self.senshu` + `opponent.senshu`; the **LIVE** scoreboard layer (off the bout-level `senshuHolder`,
+like `opponent.points`, NOT the `L_act` ring buffer); two booleans collapsing `undecided`+`none` →
+`0/0` (availability tell deferred as YAGNI); **ONE** slice (branch `feat/senshu-perception`).
+Config-gated FIELD_READERS ⇒ the `dsl.ts` interpreter stays 100%; scoring-layer, byte-identical when
+`match.senshu`/`overtime` absent.
 
 After C3: **Capability D** — benchmark adoption (fold `senshu`/`overtime` into `MATCH` + `INPUT_HASH`,
 bump `BENCHMARK_VERSION`) + `generateSpec` teaches the jogai/passivity/senshu/OT prose + the corrected
 win/draw semantics (the deferred `docs/spec.md` match narrative).
 
-Flow: `grill-me` (resolve the C3 read-surface decision tree) → `find-gaps` (harden ACs) → `planning` →
-per-slice RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR (`tdd` + `testing` + `mutation-testing` +
-`refactoring`). Precedent to mirror: every §7 slice is byte-identical when its `match` key is absent +
+Flow: `grill-me` (DONE 2026-07-03 — C3 read-surface tree resolved above) → `find-gaps` (DONE
+2026-07-03 — AC-1…AC-11 above) → **`planning` (NEXT — one PR-sized slice; branch
+`feat/senshu-perception` already cut)** → per-slice RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR (`tdd` +
+`testing` + `mutation-testing` + `refactoring`). Precedent to mirror: every §7 slice is byte-identical when its `match` key is absent +
 replay-stable + swap-symmetric, with scoped mutation on the changed `sim.ts`/`dsl.ts` regions.
