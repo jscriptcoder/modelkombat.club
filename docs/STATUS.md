@@ -465,6 +465,21 @@ winGap` at yame / jogai / passivity) — so the first fighter to a 1-point gap (
 v7` (`INPUT_HASH` flip). **Slice 2 (#124)** adds the 6 `rule("moves.yoko-geri.*")` readers (`dsl.ts` TCB) ⇒
   reads-only, `INPUT_HASH` stable ⇒ **no version bump**. 941 tests; both slices 100% mutation on changed lines. Plan
   archived at `docs/archive/yoko-geri-side-kick.md`. **Next Batch-1 move: `ushiro-geri`.**
+- DONE (**Batch-1 arsenal expansion — `ushiro-geri` (back kick), move #4/6, PRs #126–#127**): the **reach apex**
+  (`reach 330000` — now the **longest technique in the game**, past `yoko-geri` 315000 and `startGap` 300000) and the
+  expansion's **first jodan-ippon _kick_** — `scoreByBand {high: 3}` scores **3** (_ippon_) at head height / **2**
+  (_waza-ari_) at chudan, mirroring the roundhouse. The **highest-commitment** move in the roster: the slowest startup
+  (13), longest recovery (22), and priciest cost (`staminaCost 52 > gasThreshold 30` ⇒ gas-locked). Dominance-free vs
+  both `yoko-geri` (out-commits it on every tempo/cost axis for +15k reach and the ippon) and `mawashi-geri` (same
+  jodan bonus, +30k reach traded for slower/costlier). A cancel **target** too: `gyaku-zuki.cancelInto` grows to
+  `["mae-geri", "mawashi-geri", "yoko-geri", "ushiro-geri"]`. Same **pure data + TCB allowlist** shape (the generic
+  `sim.ts` resolver is untouched). **Slice 1 (#126)** wires it in (`MoveId`/`Rules.moves` types, `MOVES` entry, the
+  `CANONICAL_RULES` spec + the grown cancel edge, regenerated `spec.md`) ⇒ `BENCHMARK_VERSION v7 → v8` (`INPUT_HASH`
+  flip). **Slice 2 (#127)** adds the **7** `rule("moves.ushiro-geri.*")` readers — the 6 standard plus
+  `scoreByBand.high` (the jodan bonus, mirroring `mawashi-geri`) ⇒ reads-only, `INPUT_HASH` stable ⇒ **no version
+  bump**. 967 tests; both slices 100% mutation on changed lines (a `scoreByBand.high` inner-`?.` guard test, mirroring
+  the roundhouse, kills the lone survivor). Plan archived at `docs/archive/ushiro-geri-back-kick.md`. **Next Batch-1
+  move: `empi`.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -496,9 +511,10 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
 1. **Batch-1 arsenal expansion (IN PROGRESS)** — the real-karate move roster
    (`docs/move-roster.md`: balance law + 6 resolved frame blocks), one PR per technique.
    **`uraken` SHIPPED** (#117 wiring → v5, #118 `rule()` readers → no bump), **`shuto`
-   SHIPPED** (#120 wiring → v6, #121 `rule()` readers → no bump), and **`yoko-geri` SHIPPED**
-   (#123 wiring → v7, #124 `rule()` readers → no bump). Remaining 3 grounded moves:
-   **`ushiro-geri`, `empi`, `hiza-geri`** — each wiring PR bumps `BENCHMARK_VERSION` (v8…v10).
+   SHIPPED** (#120 wiring → v6, #121 `rule()` readers → no bump), **`yoko-geri` SHIPPED**
+   (#123 wiring → v7, #124 `rule()` readers → no bump), and **`ushiro-geri` SHIPPED**
+   (#126 wiring → v8, #127 `rule()` readers → no bump). Remaining 2 grounded moves:
+   **`empi`, `hiza-geri`** — each wiring PR bumps `BENCHMARK_VERSION` (v9…v10).
    Then a roster-wide no-Pareto-dominance property test. Air (`tobi-geri`) is Batch 2, gated on
    the unbuilt air-strike capability (item 5).
 2. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low
