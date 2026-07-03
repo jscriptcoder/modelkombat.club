@@ -163,6 +163,13 @@ the frame table below.
 - `moves.yoko-geri.score`
 - `moves.yoko-geri.reach`
 - `moves.yoko-geri.staminaCost`
+- `moves.ushiro-geri.startup`
+- `moves.ushiro-geri.active`
+- `moves.ushiro-geri.recovery`
+- `moves.ushiro-geri.score`
+- `moves.ushiro-geri.reach`
+- `moves.ushiro-geri.staminaCost`
+- `moves.ushiro-geri.scoreByBand.high`
 - `throw.startup`
 - `throw.active`
 - `throw.recovery`
@@ -446,6 +453,13 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "moves.yoko-geri.score",
         "moves.yoko-geri.reach",
         "moves.yoko-geri.staminaCost",
+        "moves.ushiro-geri.startup",
+        "moves.ushiro-geri.active",
+        "moves.ushiro-geri.recovery",
+        "moves.ushiro-geri.score",
+        "moves.ushiro-geri.reach",
+        "moves.ushiro-geri.staminaCost",
+        "moves.ushiro-geri.scoreByBand.high",
         "throw.startup",
         "throw.active",
         "throw.recovery",
