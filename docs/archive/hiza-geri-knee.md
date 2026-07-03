@@ -1,7 +1,7 @@
 # Plan: `hiza-geri` (knee) — Batch-1 move #6 (the last grounded move)
 
 **Branch**: feat/hiza-geri-knee (Slice 1) · feat/hiza-geri-rule-readers (Slice 2)
-**Status**: Active — Slice 1 not started
+**Status**: ✅ **COMPLETE** — Slice 1 MERGED (PR #132, benchmark v10) · Slice 2 MERGED (PR #133, no bump)
 **Design source**: `docs/move-roster.md` (Batch-1 resolved frame data; balance law + policies)
 
 ## Goal
@@ -101,43 +101,43 @@ Behaviour proven by `runFight` against `CANONICAL_RULES` (engine), `validate` (T
 `gen-spec` / schema drift tests (spec). Observable score/knockdown/accept assertions, not literals
 alone.
 
-- [ ] **AC-1 (knockdown, scores 0 — the standing down):** a clean point-blank `hiza-geri` at
+- [x] **AC-1 (knockdown, scores 0 — the standing down):** a clean point-blank `hiza-geri` at
       `band:"mid"` **downs** the foe (freezes it for the knockdown, like the sweep) and scores **0**
       on the hit — the points live in the finish. Pins `hiza-geri().score === 0` and
       `hiza-geri().knockdown === true`.
-- [ ] **AC-2 (band gate — mid only):** `hiza-geri` at `band:"mid"` downs/commits; at `band:"high"`
+- [x] **AC-2 (band gate — mid only):** `hiza-geri` at `band:"mid"` downs/commits; at `band:"high"`
       and `band:"low"` it degrades to idle ⇒ **0**, no knockdown (out of band). Pins
       `hiza-geri().bands` is exactly `["mid"]` and asserts `hiza-geri().scoreByBand` is `undefined`
       (no jodan bonus — distinct from the kicks).
-- [ ] **AC-3 (second-shortest reach — the infighting floor):** at a gap in `(110000, 120000]` — e.g.
+- [x] **AC-3 (second-shortest reach — the infighting floor):** at a gap in `(110000, 120000]` — e.g.
       `startGap 115000` — `hiza-geri` whiffs to **0** (no knockdown) where a `throw` connects ⇒
       **3**. Documents `empi.reach < hiza-geri.reach < throw.reach` (asserts
       `hiza-geri().reach > empi().reach` **and** `hiza-geri().reach < throwSpec().reach`, i.e. 110k ∈
       (95k, 120k) — the second technique below the throw, landing only point-blank).
-- [ ] **AC-4 (gas-LOCKED):** a **gassed** fighter (`stamina ≤ gasThreshold 30`) can **no longer**
+- [x] **AC-4 (gas-LOCKED):** a **gassed** fighter (`stamina ≤ gasThreshold 30`) can **no longer**
       commit `hiza-geri` — the commit degrades to idle ⇒ **0**, no knockdown (cost 40 > 30, like the
       throw/sweep/kicks). Property: `hiza-geri().staminaCost > gasThreshold`.
-- [ ] **AC-5 (okizeme finish — THE signature, 3 hit-confirmed):** a `hiza-geri` that connects downs
+- [x] **AC-5 (okizeme finish — THE signature, 3 hit-confirmed):** a `hiza-geri` that connects downs
       the foe and opens the cancel window; a `gyaku-zuki` started **inside `finishWindow`**
       hit-confirms the **finish** ⇒ scores `finishScore` (**3**) — the standing-knee okizeme, the
       sweep's finish path lifted to mid. Pins `hiza-geri().cancelInto` contains `"gyaku-zuki"`,
       `hiza-geri().knockdown === true`, `hiza-geri().score === 0`. _(hiza-geri is a cancel **source
       only** — there is no `gyaku-zuki → hiza-geri` edge; assert
       `gyaku().cancelInto` does **not** contain `"hiza-geri"`.)_
-- [ ] **AC-6 (TCB allowlist):** `validate` accepts `{type:"attack", move:"hiza-geri", band:"mid"}`
+- [x] **AC-6 (TCB allowlist):** `validate` accepts `{type:"attack", move:"hiza-geri", band:"mid"}`
       **and** accepts it out-of-band (`band:"high"`) — band-legality is a runtime concern; the
       validator only checks the move id + band are well-formed.
-- [ ] **AC-7 (spec teaches the move + band):** regenerated `spec.md` lists `hiza-geri` in the
+- [x] **AC-7 (spec teaches the move + band):** regenerated `spec.md` lists `hiza-geri` in the
       attack-move line, the move-stats table (with `bands: mid`, `reach 110000`, `score 0`), and the
       JSON-schema `move` enum; `gen-spec` + schema drift tests stay green; `BENCHMARK_VERSION`
       v9 → v10.
-- [ ] **AC-8 (rule-path accepted):** `validate` accepts a bot using `rule("moves.hiza-geri.reach")`
+- [x] **AC-8 (rule-path accepted):** `validate` accepts a bot using `rule("moves.hiza-geri.reach")`
       (and the other 5 paths); an unknown `moves.hiza-geri.knockdown` **and** `moves.hiza-geri.bands`
       path are **rejected** (neither is a reader). _(Slice 2)_
-- [ ] **AC-9 (reader returns the value):** the interpreter resolves `rule("moves.hiza-geri.reach")`
+- [x] **AC-9 (reader returns the value):** the interpreter resolves `rule("moves.hiza-geri.reach")`
       to **110000**, `rule("moves.hiza-geri.staminaCost")` to **40**, and
       `rule("moves.hiza-geri.score")` to **0** against `CANONICAL_RULES`. _(Slice 2)_
-- [ ] **AC-10 (spec lists the paths):** regenerated `spec.md` lists the six `moves.hiza-geri.*` rule
+- [x] **AC-10 (spec lists the paths):** regenerated `spec.md` lists the six `moves.hiza-geri.*` rule
       paths + the `rulePath` schema enum; drift tests green. _(Slice 2)_
 
 **Deferred (NOT this feature):** the roster-wide no-Pareto-dominance property test (add once Batch-1
@@ -151,7 +151,7 @@ has landed); the knee ↔ throw cancel (not expressible in Batch 1 — deferred 
 One slice = one PR. Each follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Load the project CLAUDE.md +
 `tdd`/`testing`/`mutation-testing`/`refactoring` before any code.
 
-### Slice 1: Bot can throw `hiza-geri` — the canonical mid-band standing knockdown → okizeme knee
+### Slice 1: Bot can throw `hiza-geri` — the canonical mid-band standing knockdown → okizeme knee — ✅ MERGED (PR #132)
 
 **Value**: The bot author gets a point-blank **standing** knockdown that scores nothing on the hit
 but sets up a guaranteed 3-point okizeme finish — the sweep's knockdown game lifted out of the low
@@ -228,7 +228,7 @@ needed** (Slice 2 is a clean 6-reader add).
 `dsl.ts`/`rules.ts`/`benchmark-config.ts` mutation 100%; typecheck + lint + format clean; mutation
 report reviewed; human approves commit.
 
-### Slice 2: Bots can introspect `hiza-geri`'s frames via `rule("moves.hiza-geri.*")`
+### Slice 2: Bots can introspect `hiza-geri`'s frames via `rule("moves.hiza-geri.*")` — ✅ MERGED (PR #133)
 
 **Value**: The bot author can read `hiza-geri`'s frames at runtime to write adaptive logic (e.g.
 gate on `rule("moves.hiza-geri.reach")` to only commit the knee at point-blank spacing), the same as
@@ -257,16 +257,27 @@ path → interpreter reads `CANONICAL_RULES.moves["hiza-geri"].<field>`.
 sentinel `0`). **Note the `score` row is `["moves.hiza-geri.score", 0, 0]`** — canonical 0 (the knee
 scores 0) and minimal 0, exactly like the existing `["moves.sweep.score", 0, 0]` row; both the `?.`
 and `?? 0` mutants are still killed by the **minimal** column (an absent move returns `undefined ≠
-0`), so no extra test is needed. The other five rows have distinct non-zero canonical values, so a
-wrong-field read is caught.
-`gen-spec.test.ts` / `spec-schema.test.ts` — AC-10 (data-driven drift goes RED on the reader add,
-green after regen).
-**GREEN**: the 6 readers + regen.
-**MUTATE**: scope Stryker to the new `dsl.ts` reader lines; expect path-string + `?? 0` mutants,
-killed by AC-8/AC-9. `rm -rf .stryker-tmp` first. Confirm `dsl.ts` 100%.
-**KILL MUTANTS / REFACTOR**: as Slice 1 (none expected).
-**Done when**: AC-8…AC-10 green; full suite green; `dsl.ts` mutation 100%; typecheck + lint + format
-clean; report reviewed; human approves commit.
+0`), so no extra test is needed **for those two mutants**. The other five rows have distinct
+non-zero canonical values, so a wrong-field read is caught.
+
+> **Build correction (what actually shipped).** The prediction above missed one mutant: because
+> `hiza-geri` is hyphenated, its reader uses **bracket** notation (`r.moves["hiza-geri"]`), which
+> carries a `StringLiteral` mutant (`r.moves[""]`) that the **dot**-accessed `sweep` has not. With
+> `score: 0`, `r.moves[""]?.score ?? 0` returns 0 — identical to the original in **both** the
+> canonical (0) and minimal (0) columns, so that mutant **survived** the `.each` row. `hiza-geri` is
+> the **only hyphenated move whose score is 0**, so it is the only score reader hitting this. Killed
+> with a targeted guard test (mirroring the roundhouse `scoreByBand` guard) that configures
+> `hiza-geri` with a **non-zero** score, pinning the reader to the `"hiza-geri"` key. Slice 2 thus
+> shipped as **6 readers + 1 guard test** (not the predicted zero); `dsl.ts` reader lines mutation
+> **100%** (24/24).
+> `gen-spec.test.ts` / `spec-schema.test.ts` — AC-10 (data-driven drift goes RED on the reader add,
+> green after regen).
+> **GREEN**: the 6 readers + regen.
+> **MUTATE**: scope Stryker to the new `dsl.ts` reader lines; expect path-string + `?? 0` mutants,
+> killed by AC-8/AC-9. `rm -rf .stryker-tmp` first. Confirm `dsl.ts` 100%.
+> **KILL MUTANTS / REFACTOR**: as Slice 1 (none expected).
+> **Done when**: AC-8…AC-10 green; full suite green; `dsl.ts` mutation 100%; typecheck + lint + format
+> clean; report reviewed; human approves commit.
 
 > **Slice-count note:** Slices 1 + 2 MAY be merged into a single "fully-wired `hiza-geri`" PR, but
 > the recommended path keeps them split, as `uraken` (#117/#118), `shuto` (#120/#121), `yoko-geri`

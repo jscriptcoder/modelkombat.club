@@ -491,8 +491,24 @@ v7` (`INPUT_HASH` flip). **Slice 2 (#124)** adds the 6 `rule("moves.yoko-geri.*"
   wires it in (`MoveId`/`Rules.moves` types, `MOVES` entry, the `CANONICAL_RULES` spec, regenerated `spec.md`) ⇒
   `BENCHMARK_VERSION v8 → v9` (`INPUT_HASH` flip). **Slice 2 (#130)** adds the **6** `rule("moves.empi.*")` readers
   (no `scoreByBand` ⇒ a clean 6-reader add, no guard test) ⇒ reads-only, `INPUT_HASH` stable ⇒ **no version bump**.
-  990 tests; both slices 100% mutation on changed lines. Plan archived at `docs/archive/empi-elbow.md`. **Next Batch-1
-  move: `hiza-geri` (the last grounded move).**
+  990 tests; both slices 100% mutation on changed lines. Plan archived at `docs/archive/empi-elbow.md`.
+- DONE (**Batch-1 arsenal expansion — `hiza-geri` (knee), move #6/6 — COMPLETES BATCH 1, PRs #132–#133**): the
+  **only mid-band _standing_ knockdown → okizeme** technique. A clean point-blank `mid` knee (`reach 110000` —
+  between `empi` 95000 and the throw 120000, the infighting floor's second rung) scores **0** but **downs** the foe
+  (`knockdown: true`); the points live in the **okizeme finish** (`hiza-geri → gyaku-zuki` inside `finishWindow` ⇒
+  `finishScore` 3) — the sweep's low-band knockdown game lifted to a standing mid angle, reusing the **built C8
+  knockdown + `finishWindow` machinery verbatim (no new engine field, no `sim.ts` change)**. Gas-locked
+  (`staminaCost 40 > gasThreshold 30`), cancel **source only** (no `gyaku-zuki.cancelInto` growth — the smaller
+  `empi` footprint). Same **pure data + TCB allowlist** shape (the generic `sim.ts` resolver is untouched).
+  **Slice 1 (#132)** wires it in (`MoveId`/`Rules.moves` types, `MOVES` entry, the `CANONICAL_RULES` spec,
+  regenerated `spec.md`) ⇒ `BENCHMARK_VERSION v9 → v10` (`INPUT_HASH` flip). **Slice 2 (#133)** adds the **6**
+  `rule("moves.hiza-geri.*")` readers ⇒ reads-only, `INPUT_HASH` stable ⇒ **no version bump** — but with a **novel
+  mutation finding**: as the only **hyphenated** move with `score 0`, its bracket-notation reader
+  (`r.moves["hiza-geri"]`) carries a `StringLiteral` `""` mutant the score-0/0 row cannot kill (unlike the
+  dot-accessed `sweep`), so a targeted key-guard test (a non-zero-score fixture) was added ⇒ **6 readers + 1 guard
+  test**. 1014 tests; both slices 100% mutation on changed lines. Plan archived at `docs/archive/hiza-geri-knee.md`.
+  **Batch-1 grounded arsenal COMPLETE (6/6) — next: the roster-wide no-Pareto-dominance property test + the owed
+  `vulture`/`sweeper` gauntlet rebalance.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -521,16 +537,14 @@ intake → S3 compute → S4 apply → S5 advance; `strike > throw > guard` prec
 HIT/BLOCK/WHIFF gate) is pinned in `docs/DESIGN.md` §11. The §7 officiating design
 records for the deferred adoption work are in `docs/archive/s7-match-structure.md`.
 
-1. **Batch-1 arsenal expansion (IN PROGRESS)** — the real-karate move roster
-   (`docs/move-roster.md`: balance law + 6 resolved frame blocks), one PR per technique.
-   **`uraken` SHIPPED** (#117 wiring → v5, #118 `rule()` readers → no bump), **`shuto`
-   SHIPPED** (#120 wiring → v6, #121 `rule()` readers → no bump), **`yoko-geri` SHIPPED**
-   (#123 wiring → v7, #124 `rule()` readers → no bump), **`ushiro-geri` SHIPPED**
-   (#126 wiring → v8, #127 `rule()` readers → no bump), and **`empi` SHIPPED**
-   (#129 wiring → v9, #130 `rule()` readers → no bump). Remaining 1 grounded move:
-   **`hiza-geri`** — its wiring PR bumps `BENCHMARK_VERSION` (→ v10).
-   Then a roster-wide no-Pareto-dominance property test. Air (`tobi-geri`) is Batch 2, gated on
-   the unbuilt air-strike capability (item 5).
+1. **Batch-1 grounded arsenal expansion — ✅ COMPLETE (6/6)** — the real-karate move roster
+   (`docs/move-roster.md`: balance law + 6 resolved frame blocks), one PR per technique. All shipped:
+   **`uraken`** (#117 → v5, #118), **`shuto`** (#120 → v6, #121), **`yoko-geri`** (#123 → v7, #124),
+   **`ushiro-geri`** (#126 → v8, #127), **`empi`** (#129 → v9, #130), and **`hiza-geri`** (#132 → v10,
+   #133) — each a wiring PR (bumps `BENCHMARK_VERSION` via the `INPUT_HASH` flip) + a reads-only
+   `rule()`-readers PR (no bump). **Next: the roster-wide no-Pareto-dominance property test**
+   (`rules.test.ts`, asserting no move dominates another across the full 12-move roster). Air
+   (`tobi-geri`) is Batch 2, gated on the unbuilt air-strike capability (item 5).
 2. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low
    `[25%,75%]` band; a naive offense buff backfired 16→7%), now joined by a NEW D1
    finding: **`sweeper` 82% (out-of-band HIGH under senshu)**. Both are report-only in
