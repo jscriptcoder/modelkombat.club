@@ -952,6 +952,12 @@ describe("validate — rule(path) ruleset reads", () => {
     "moves.kizami-zuki.staminaCost",
     "moves.mae-geri.score",
     "moves.mawashi-geri.scoreByBand.high",
+    "moves.uraken.startup",
+    "moves.uraken.active",
+    "moves.uraken.recovery",
+    "moves.uraken.score",
+    "moves.uraken.reach",
+    "moves.uraken.staminaCost",
     "throw.score",
     "jumpImpulse",
     "gravity",
@@ -969,6 +975,7 @@ describe("validate — rule(path) ruleset reads", () => {
   it.each([
     "moves.gyaku-zuki.speed", // unknown stat
     "moves.fireball.reach", // unknown move
+    "moves.uraken.bands", // a real uraken field, but non-numeric ⇒ not a reader
     "perception.lol", // typo
     "self.x", // a field path, not a rule path
     "stamina", // a non-leaf object
