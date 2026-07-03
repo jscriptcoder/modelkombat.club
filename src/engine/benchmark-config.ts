@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v10"; // Batch-1 arsenal expansion #6: hiza-geri (knee) enters CANONICAL_RULES
+export const BENCHMARK_VERSION = "v11"; // Gauntlet modernization S1: vulture gains a parry→counter (gas-proof uraken)
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -47,4 +47,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // Recompute and bump (with BENCHMARK_VERSION) whenever a scoring input changes —
 // the guard test in benchmark-config.test.ts prints the expected value on drift.
 export const INPUT_HASH =
-  "215fd6f4a5f7b3f94aba644630c59a3048b16f64c6af06d8d53e586ec289d4c4";
+  "04937c3249d0747e3e10a5c279838490dbc6ad362eb3987c9a78c52c728c96a4";
