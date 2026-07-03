@@ -1,5 +1,12 @@
 # Gauntlet modernization + rebalance — child-story split
 
+> **✅ FEATURE COMPLETE (2026-07-03).** All slices shipped — S1 `vulture` (`v11`), S-jabber
+> (`v12`), S2 `zoner` (`v13`), S3 `grappler` (`v14`), S4 calibration lock. Both end-state
+> conditions hold: all 6 members ∈ `[25%, 75%]` and 11/11 arsenal coverage, CI-locked by
+> `src/cli/gauntlet-calibration.test.ts`. Final board + coverage map:
+> [`../benchmark-gauntlet-v14.md`](../benchmark-gauntlet-v14.md). Per-slice records:
+> `gauntlet-s1…s4-*.md`. This split is archived as the design trail.
+
 Feeds `planning` (one child story → one PR plan at a time). Resolved decision
 tree captured in the grill session (2026-07-03); this split is condition (C):
 **collective coverage of all 12 moves + all 6 members in the `[25%, 75%]` band.**

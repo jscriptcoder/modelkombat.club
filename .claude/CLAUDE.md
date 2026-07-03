@@ -73,11 +73,12 @@ validate → fight → byte-identical replay over the full deep-karate combat tr
 (perception latency, height bands, vertical axis + occupancy, parry/counter windows,
 on-contact cancel combos, throws, sweeps + okizeme), the **C9** multi-move "real
 karate" arsenal, the **C10** stamina economy, **WKF match structure** (yame + win
-condition + jogai / passivity officiating + senshu / overtime tie-resolution), and the
-offline **LLM bot-authoring benchmark v1**. **Not yet built:** air-actions and the rest
-of §7 (rounds); the deferred benchmark/spec adoption of jogai / passivity / overtime;
-the gauntlet rebalance (`vulture`, `sweeper`); and the platform layer (KotH ladder,
-HTTP API, Pixi viewer). See `docs/STATUS.md` for detail and the next slice.
+condition + jogai / passivity officiating + senshu / overtime tie-resolution), the
+offline **LLM bot-authoring benchmark v1**, and the **gauntlet modernization** (all 6
+frozen bots re-authored into the `[25%, 75%]` band with 11/11 arsenal coverage,
+CI-locked at `v14`). **Not yet built:** air-actions and the rest of §7 (rounds); the
+deferred benchmark/spec adoption of jogai / passivity / overtime; and the platform layer
+(KotH ladder, HTTP API, Pixi viewer). See `docs/STATUS.md` for detail and the next slice.
 
 Flow for the next capability: `grill-me` → `planning` → TDD, **PR per capability**. The
 §11 combat-resolution spine (two-phase compute-then-apply, `strike > throw > guard`)

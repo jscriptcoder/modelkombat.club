@@ -1,8 +1,23 @@
 # Plan: S4 — gauntlet calibration lock + feature close-out
 
-**Branch**: feat/gauntlet-calibration-lock (Slice 1); chore/gauntlet-modernization-close-out (Slice 2)
-**Status**: Active
-**Parent**: `plans/gauntlet-modernization-stories.md` (slice S4 — the final slice)
+**Branch**: feat/gauntlet-calibration-lock (Slice 1, PR #143); chore/gauntlet-modernization-close-out (Slice 2)
+**Status**: ✅ Done — the final slice; the gauntlet modernization feature is COMPLETE.
+**Parent**: [`gauntlet-modernization-stories.md`](gauntlet-modernization-stories.md) (slice S4 — archived alongside)
+
+> **Outcome.** Landed the CI lock (`src/cli/gauntlet-calibration.test.ts`): a band
+> test (all 6 members' round-robin win-rate ∈ `[0.25, 0.75]`) + a coverage test (all
+> 11 `moves` keys referenced), each with a committed "guard bites" proof. Both GREEN on
+> the frozen v14 roster ⇒ a certification pass, **not** a rebalance (no bot/rules change,
+> `BENCHMARK_VERSION` stays `v14`). Final board + coverage map recorded in
+> [`../benchmark-gauntlet-v14.md`](../benchmark-gauntlet-v14.md). `benchmark-config.ts`
+> mutation 100% (10/10); full suite 1046 green.
+>
+> **Bundled fix (discovered while verifying):** the frozen bot texts were pinned to LF
+> via `.gitattributes` (`bots/*.json text eol=lf`) and `INPUT_HASH` re-pinned to the
+> canonical all-LF value (`5bae2d64…` → `5a503468…`). The old pin was a fragile
+> mixed-ending state (grappler LF, others CRLF) that broke the `INPUT_HASH` guard on a
+> fresh Windows checkout under `core.autocrlf`. Line endings don't affect parsing/fights
+> ⇒ scores byte-identical, version unchanged; `docs/spec.md` regenerated.
 
 ## Goal
 

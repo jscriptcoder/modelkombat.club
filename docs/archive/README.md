@@ -72,13 +72,16 @@ Design source of truth (living): [../move-roster.md](../move-roster.md) — bala
 - **`empi` — elbow** (move #5/6; Slice 1 wiring #129 → benchmark v9, Slice 2 `rule()` readers #130): [empi-elbow.md](empi-elbow.md)
 - **`hiza-geri` — knee** (move #6/6, completes Batch 1; Slice 1 wiring #132 → benchmark v10, Slice 2 `rule()` readers #133): [hiza-geri-knee.md](hiza-geri-knee.md)
 
-## Gauntlet modernization + rebalance
+## Gauntlet modernization + rebalance ✅ COMPLETE
 
-Parent split (living, in `plans/`): `gauntlet-modernization-stories.md` — re-author the frozen
-benchmark gauntlet one bot per PR until all 6 members land in the `[25%, 75%]` round-robin band
-**and** the roster collectively exercises the full arsenal.
+Re-authored the frozen benchmark gauntlet one bot per PR until all 6 members land in the
+`[25%, 75%]` round-robin band **and** the roster collectively exercises the full arsenal.
+Both conditions met + CI-locked at `v14`. Final board + coverage map:
+[../benchmark-gauntlet-v14.md](../benchmark-gauntlet-v14.md). Parent split (the design
+trail): [gauntlet-modernization-stories.md](gauntlet-modernization-stories.md).
 
 - **S1 — `vulture` parry→counter** (PR #135 → benchmark v11): [gauntlet-s1-vulture-parry-counter.md](gauntlet-s1-vulture-parry-counter.md)
 - **S-jabber — `jabber` block+counter** (PR #137 → benchmark v12; the `shuto` range-poke pivoted to a reactive block + counter): [gauntlet-s-jabber.md](gauntlet-s-jabber.md)
 - **S2 — `zoner` beyond-neutral long kicks** (PR #139 → benchmark v13; `yoko-geri` + `ushiro-geri` narrow-gated to preserve calibration — the "no healthy niche" finding): [gauntlet-s2-zoner.md](gauntlet-s2-zoner.md)
 - **S3 — `grappler` close-range knee + elbow** (PR #141 → benchmark v14; `empi` + `hiza-geri` knockdown→okizeme woven into the close game — **completes 11/11 coverage**; full real integration, the parry→counter-coupling finding): [gauntlet-s3-grappler.md](gauntlet-s3-grappler.md)
+- **S4 — calibration lock + close-out** (PR #143; `v14` unchanged — CI lock asserting all 6 ∈ band + 11/11 coverage, plus the LF line-ending pin for a byte-stable `INPUT_HASH`): [gauntlet-s4-calibration-lock.md](gauntlet-s4-calibration-lock.md)

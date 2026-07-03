@@ -587,6 +587,23 @@ v11 → v12` (`INPUT_HASH` re-pinned); dogfood record unchanged (18W/102L — al
   the old all-throw bot. Plan archived at `docs/archive/gauntlet-s3-grappler.md`. **Next:** the S4
   calibration lock — both end-state conditions (all-6-in-band + 11/11 coverage) now hold.
 
+- DONE (**gauntlet modernization + rebalance — S4: calibration lock + feature close-out**, PR #143):
+  **the final slice — the feature is COMPLETE.** Landed the CI lock
+  (`src/cli/gauntlet-calibration.test.ts`): a band test (all 6 members' round-robin win-rate ∈
+  `[0.25, 0.75]`) + a coverage test (all 11 `moves` keys referenced), each with a committed "guard
+  bites" proof (a fabricated pushover falls below band; a roster missing `grappler` leaves
+  `empi`/`hiza-geri` uncovered). Both GREEN on the frozen v14 roster ⇒ a **certification pass, not a
+  rebalance** — no bot/rules change, `BENCHMARK_VERSION` stays `v14`. Also bundled a robustness fix
+  discovered while verifying: the frozen bot texts are now LF-pinned via `.gitattributes`
+  (`bots/*.json text eol=lf`) and `INPUT_HASH` re-pinned to the canonical all-LF value
+  (`5bae2d64 → 5a503468`) — the old pin was a fragile mixed-ending state (grappler LF, others CRLF)
+  that broke the hash guard on a fresh Windows checkout under `core.autocrlf`; line endings don't
+  affect parsing/fights ⇒ scores byte-identical, version unchanged; `docs/spec.md` regenerated.
+  Final board + coverage map: `docs/benchmark-gauntlet-v14.md` (all 6 ∈ band: vulture 68, sweeper 67,
+  grappler 58, rekka 41, zoner 35, jabber 31; coverage 11/11). 1046 tests; `benchmark-config.ts`
+  mutation 100% (10/10). Plans archived at `docs/archive/gauntlet-s4-calibration-lock.md` +
+  `docs/archive/gauntlet-modernization-stories.md`; `plans/` now empty.
+
 ### §7 match structure built between C9 and Capability D
 
 Capabilities A (jogai), B (passivity), and C (tie resolution) — the WKF officiating
@@ -622,27 +639,21 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    `rule()`-readers PR (no bump). **Next: the roster-wide no-Pareto-dominance property test**
    (`rules.test.ts`, asserting no move dominates another across the full 12-move roster). Air
    (`tobi-geri`) is Batch 2, gated on the unbuilt air-strike capability (item 5).
-2. **Gauntlet modernization + rebalance — S1 + S-jabber + S2 + S3 shipped; all 6 in band,
-   coverage 11/11 (full arsenal). Only the S4 lock remains.** Reframed from a pure rebalance
-   into modernization + rebalance: re-author the frozen gauntlet, one bot per PR, until all 6
-   land in `[25%,75%]` AND the roster collectively exercises the full arsenal. Parent split:
-   `plans/gauntlet-modernization-stories.md`. **S1 (`vulture` parry→counter, v11, PR #135)**
-   fixed the `vulture` low tail (16 → 60%) and pulled `sweeper` **82 → 67%** in-band via the
-   coupling; it knocked `jabber` **28 → 19% (out low)**. **S-jabber (`jabber` block+counter,
-   v12, PR #137)** fixed that — `jabber` **19 → 31%** (the `shuto` range-poke pivoted to a
-   reactive block + counter), covering `shuto`. **S2 (`zoner` long kicks, v13, PR #139)** added
-   `yoko-geri` + `ushiro-geri`, **narrow-gated** to preserve calibration (the "no healthy niche"
-   finding), so the v13 board = v12 board (coverage 9/11). **S3 (`grappler` close-range, v14,
-   PR #141)** wove in `empi` + `hiza-geri` knockdown→okizeme as a **full real integration**
-   (the moves fire for real; throw kept owning the 95–120k contact band so `vulture`'s counter
-   never feasts) ⇒ **coverage 11/11 — complete**; v14 board sweeper 67, vulture 68, grappler 58,
-   rekka 41, zoner 35, jabber 31. **Both end-state conditions now hold (all 6 ∈ `[25,75]` +
-   11/11).** **Remaining:** only the **S4 calibration lock** — land the CI band + coverage
-   acceptance tests (now first satisfiable), the final gauntlet-vN doc, archive the split. Lever
-   is bot-document only ⇒ `npm run fight` unaffected. **Findings for S4:** full coverage can
-   conflict with tight calibration for niche moves — S2's far kicks needed narrow-gating; S3's
-   close moves needed the throw to own the contact band (the parry→counter-coupling risk). No
-   member is out-of-band, so the S4 balance-escalation contingency is not triggered.
+2. **Gauntlet modernization + rebalance — ✅ COMPLETE (v14, PRs #135–#143).** Re-authored the
+   frozen gauntlet one bot per PR until all 6 landed in `[25%,75%]` AND the roster collectively
+   exercised the full 11-move arsenal, then CI-locked both. **S1 `vulture` parry→counter (v11)**
+   fixed the low tail (16 → 60%) and pulled `sweeper` 82 → 67% via the coupling (knocking `jabber`
+   28 → 19%); **S-jabber block+counter (v12)** restored `jabber` 19 → 31%; **S2 `zoner` (v13)**
+   added `yoko-geri` + `ushiro-geri` narrow-gated ("no healthy niche"); **S3 `grappler` (v14)**
+   wove in `empi` + `hiza-geri` okizeme as full real integration ⇒ coverage 11/11; **S4 (v14, PR
+   #143)** landed the calibration lock (`src/cli/gauntlet-calibration.test.ts`: band + coverage
+   guards) + LF-pinned the bot texts for a byte-stable `INPUT_HASH` — a certification pass, no
+   scoring change. **Final board (all 6 ∈ `[25,75]`):** vulture 68, sweeper 67, grappler 58, rekka
+   41, zoner 35, jabber 31; coverage 11/11. Record: `docs/benchmark-gauntlet-v14.md`; design trail:
+   `docs/archive/gauntlet-*.md`. **Durable findings:** the coupled round-robin can't be
+   precision-dialed (band = dispersion, mean pinned ~50%); niche moves conflict with tight
+   calibration (S2 far kicks narrow-gated; S3 close moves fed `vulture`'s parry→counter until the
+   throw kept the contact band — distinguish by range, not read, as no guard tell exists).
 3. **Deferred jogai / passivity / overtime benchmark + spec adoption** — Capability D
    was scoped to senshu only; folding jogai / passivity / overtime into the benchmark
    `MATCH` (+ `INPUT_HASH` / `BENCHMARK_VERSION`) and teaching their prose in
