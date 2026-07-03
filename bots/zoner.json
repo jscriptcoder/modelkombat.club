@@ -72,6 +72,50 @@
             "op": "lte",
             "args": [
               { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 330000 }
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 320000 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "ushiro-geri", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 320000 }
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 310000 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "yoko-geri", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
               { "op": "const", "value": 300000 }
             ]
           },
