@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v13"; // Gauntlet modernization S2: zoner gains beyond-neutral yoko-geri + ushiro-geri (narrow-gated)
+export const BENCHMARK_VERSION = "v14"; // Gauntlet modernization S3: grappler gains close-range empi + hiza-geri knockdown→okizeme (completes 11/11 coverage)
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -47,4 +47,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // Recompute and bump (with BENCHMARK_VERSION) whenever a scoring input changes —
 // the guard test in benchmark-config.test.ts prints the expected value on drift.
 export const INPUT_HASH =
-  "f0d7313f18bb7ac83e9df76525a5747d296ea3ee5f0b3676fc95221218a73d11";
+  "5bae2d64bcd60fa81aa4b10534661fd8f528b73d07b8860226ba683d4db4b395";

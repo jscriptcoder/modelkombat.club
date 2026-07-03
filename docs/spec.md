@@ -4,8 +4,8 @@
 > Every allowlist, limit, and frame-table number below is read directly from
 > the engine, so this document cannot lie about how a fight resolves.
 
-- **Benchmark version:** `v13` — a score is comparable only against another at the same version.
-- **Input hash:** `f0d7313f18bb7ac83e9df76525a5747d296ea3ee5f0b3676fc95221218a73d11` (pins the scoring inputs: rules + gauntlet + run params).
+- **Benchmark version:** `v14` — a score is comparable only against another at the same version.
+- **Input hash:** `5bae2d64bcd60fa81aa4b10534661fd8f528b73d07b8860226ba683d4db4b395` (pins the scoring inputs: rules + gauntlet + run params).
 
 A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is
 validated once against the allowlists below (the security boundary), then run
