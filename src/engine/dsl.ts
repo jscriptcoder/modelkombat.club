@@ -209,6 +209,13 @@ export const RULE_READERS = {
   "moves.shuto.score": (r: Rules) => r.moves["shuto"]?.score ?? 0,
   "moves.shuto.reach": (r: Rules) => r.moves["shuto"]?.reach ?? 0,
   "moves.shuto.staminaCost": (r: Rules) => r.moves["shuto"]?.staminaCost ?? 0,
+  "moves.yoko-geri.startup": (r: Rules) => r.moves["yoko-geri"]?.startup ?? 0,
+  "moves.yoko-geri.active": (r: Rules) => r.moves["yoko-geri"]?.active ?? 0,
+  "moves.yoko-geri.recovery": (r: Rules) => r.moves["yoko-geri"]?.recovery ?? 0,
+  "moves.yoko-geri.score": (r: Rules) => r.moves["yoko-geri"]?.score ?? 0,
+  "moves.yoko-geri.reach": (r: Rules) => r.moves["yoko-geri"]?.reach ?? 0,
+  "moves.yoko-geri.staminaCost": (r: Rules) =>
+    r.moves["yoko-geri"]?.staminaCost ?? 0,
   "throw.startup": (r: Rules) => r.throw?.startup ?? 0,
   "throw.active": (r: Rules) => r.throw?.active ?? 0,
   "throw.recovery": (r: Rules) => r.throw?.recovery ?? 0,

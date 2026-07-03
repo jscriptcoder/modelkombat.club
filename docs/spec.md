@@ -157,6 +157,12 @@ the frame table below.
 - `moves.shuto.score`
 - `moves.shuto.reach`
 - `moves.shuto.staminaCost`
+- `moves.yoko-geri.startup`
+- `moves.yoko-geri.active`
+- `moves.yoko-geri.recovery`
+- `moves.yoko-geri.score`
+- `moves.yoko-geri.reach`
+- `moves.yoko-geri.staminaCost`
 - `throw.startup`
 - `throw.active`
 - `throw.recovery`
@@ -433,6 +439,12 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "moves.shuto.score",
         "moves.shuto.reach",
         "moves.shuto.staminaCost",
+        "moves.yoko-geri.startup",
+        "moves.yoko-geri.active",
+        "moves.yoko-geri.recovery",
+        "moves.yoko-geri.score",
+        "moves.yoko-geri.reach",
+        "moves.yoko-geri.staminaCost",
         "throw.startup",
         "throw.active",
         "throw.recovery",
