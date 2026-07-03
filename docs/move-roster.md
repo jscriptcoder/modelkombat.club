@@ -4,8 +4,9 @@
 blocks resolved. **Build underway** (one PR per technique): **`uraken` SHIPPED** (move #1/6 —
 wiring PR #117 → benchmark v5, `rule()` readers PR #118 → no bump; archived at
 `archive/uraken-backfist.md`); **`shuto` SHIPPED** (move #2/6 — wiring PR #120 → benchmark v6,
-`rule()` readers PR #121 → no bump; archived at `archive/shuto-knife-hand.md`). Next:
-`yoko-geri`. Living source of truth for the
+`rule()` readers PR #121 → no bump; archived at `archive/shuto-knife-hand.md`); **`yoko-geri`
+SHIPPED** (move #3/6 — wiring PR #123 → benchmark v7, `rule()` readers PR #124 → no bump; archived
+at `archive/yoko-geri-side-kick.md`). Next: `ushiro-geri`. Living source of truth for the
 fighting-move roster and the balance law that governs it. Consolidates the built
 **baseline** (authoritative in `src/engine/rules.ts` `CANONICAL_RULES`, proven by
 behavioral `runFight` tests in `rules.test.ts`, designed in `DESIGN.md §P7`) and will
@@ -174,14 +175,14 @@ bands) is **TBD in grill-me**, which also resolves each move's distinct niche (S
 Global decision (Q1): new long kicks MAY exceed `startGap` (300k) as beyond-neutral zoning
 pokes, paying with the slowest startups, longest recovery, highest cost, and gas-lock.
 
-| Move                      | reach   | startup | active | recovery | score        | bands    | cost | cancelInto   | notes                                                                                              |
-| ------------------------- | ------- | ------- | ------ | -------- | ------------ | -------- | ---- | ------------ | -------------------------------------------------------------------------------------------------- |
-| `yoko-geri` (side kick)   | 315 000 | 12      | 3      | 20       | 2            | mid      | 48   | `gyaku-zuki` | chudan-only spacing thrust; longest-but-one reach, no ippon (Q2)                                   |
-| `ushiro-geri` (back kick) | 330 000 | 13      | 3      | 22       | 2 (3 jodan)  | high·mid | 52   | `gyaku-zuki` | reach apex, most committed; `scoreByBand {high: 3}` (Q3)                                           |
-| `uraken` (backfist) ✅    | 200 000 | 7       | 2      | 13       | 1            | high     | 12   | `gyaku-zuki` | cheapest & shortest hand; jodan-only snap / cheap gas-proof pressure (Q4) — SHIPPED #117/#118      |
-| `shuto` (knife-hand) ✅   | 260 000 | 8       | 2      | 15       | 1            | high·mid | 22   | `gyaku-zuki` | longest-reach hand; gas-proof 1-pt poke, out-ranges the reverse (Q5) — SHIPPED #120/#121           |
-| `empi` (elbow)            | 95 000  | 8       | 2      | 14       | 2            | high·mid | 38   | `gyaku-zuki` | shortest reach in game; point-blank 2-pt; elbow/throw mixup is a NEUTRAL choice, not a cancel (Q6) |
-| `hiza-geri` (knee)        | 110 000 | 9       | 2      | 16       | 0 → 3 finish | mid      | 40   | `gyaku-zuki` | `knockdown: true`; only MID-band standing knockdown→okizeme; finisher reaches at ~110k (Q6)        |
+| Move                       | reach   | startup | active | recovery | score        | bands    | cost | cancelInto   | notes                                                                                                                 |
+| -------------------------- | ------- | ------- | ------ | -------- | ------------ | -------- | ---- | ------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `yoko-geri` (side kick) ✅ | 315 000 | 12      | 3      | 20       | 2            | mid      | 48   | `gyaku-zuki` | beyond-neutral chudan spacing thrust; out-reaches even the roundhouse + startGap, gas-locked (Q2) — SHIPPED #123/#124 |
+| `ushiro-geri` (back kick)  | 330 000 | 13      | 3      | 22       | 2 (3 jodan)  | high·mid | 52   | `gyaku-zuki` | reach apex, most committed; `scoreByBand {high: 3}` (Q3)                                                              |
+| `uraken` (backfist) ✅     | 200 000 | 7       | 2      | 13       | 1            | high     | 12   | `gyaku-zuki` | cheapest & shortest hand; jodan-only snap / cheap gas-proof pressure (Q4) — SHIPPED #117/#118                         |
+| `shuto` (knife-hand) ✅    | 260 000 | 8       | 2      | 15       | 1            | high·mid | 22   | `gyaku-zuki` | longest-reach hand; gas-proof 1-pt poke, out-ranges the reverse (Q5) — SHIPPED #120/#121                              |
+| `empi` (elbow)             | 95 000  | 8       | 2      | 14       | 2            | high·mid | 38   | `gyaku-zuki` | shortest reach in game; point-blank 2-pt; elbow/throw mixup is a NEUTRAL choice, not a cancel (Q6)                    |
+| `hiza-geri` (knee)         | 110 000 | 9       | 2      | 16       | 0 → 3 finish | mid      | 40   | `gyaku-zuki` | `knockdown: true`; only MID-band standing knockdown→okizeme; finisher reaches at ~110k (Q6)                           |
 
 **All 6 locked (grill-me complete, 2026-07-03).** Flagship fallback if the rebalance
 surface proves too large: `yoko-geri`, `uraken`, `empi` + `hiza-geri`.

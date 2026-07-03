@@ -1,7 +1,7 @@
 # Plan: `yoko-geri` (side kick) — Batch-1 move #3
 
 **Branch**: feat/yoko-geri-side-kick (Slice 1) · feat/yoko-geri-rule-readers (Slice 2)
-**Status**: Active
+**Status**: ✅ **COMPLETE** — Slice 1 MERGED (PR #123, benchmark v7) · Slice 2 MERGED (PR #124, no bump)
 **Design source**: `docs/move-roster.md` (Batch-1 resolved frame data; balance law + policies)
 
 ## Goal
@@ -76,35 +76,35 @@ under v7 (no gauntlet re-characterization).
 Behaviour proven by `runFight` against `CANONICAL_RULES` (engine), `validate` (TCB), and the
 `gen-spec` / schema drift tests (spec). Observable score/accept assertions, not literals alone.
 
-- [ ] **AC-1 (waza-ari — mid):** a clean `mid` `yoko-geri` within reach scores **2** (chudan
+- [x] **AC-1 (waza-ari — mid):** a clean `mid` `yoko-geri` within reach scores **2** (chudan
       _waza-ari_ — the expansion's first score-2 move).
-- [ ] **AC-2 (band gate — mid-only):** `yoko-geri` at `band:"high"` degrades to idle ⇒ **0**, and at
+- [x] **AC-2 (band gate — mid-only):** `yoko-geri` at `band:"high"` degrades to idle ⇒ **0**, and at
       `band:"low"` ⇒ **0** (mid-only, unlike the roundhouse's high·mid gate).
-- [ ] **AC-3 (beyond-neutral reach — the signature):** at a gap between the roundhouse (300k) and
+- [x] **AC-3 (beyond-neutral reach — the signature):** at a gap between the roundhouse (300k) and
       `yoko-geri` (315k) — e.g. `startGap 310000` — `yoko-geri` scores **2** where `mawashi-geri`
       (300k) whiffs to **0** (documents `yoko-geri.reach > mawashi-geri.reach` **and** `> startGap` —
       the first move connecting where every existing move whiffs).
-- [ ] **AC-4 (gas-LOCKED — the first special the expansion adds):** a **gassed** fighter
+- [x] **AC-4 (gas-LOCKED — the first special the expansion adds):** a **gassed** fighter
       (`stamina ≤ gasThreshold 30`) can **no longer** commit `yoko-geri` — the commit degrades to idle
       ⇒ **0** (its cost 48 > 30, unlike the gas-proof hands). Property: `yoko-geri.staminaCost > gasThreshold`.
-- [ ] **AC-5 (kick → reverse finisher):** a `yoko-geri` that connects opens the cancel window; a
+- [x] **AC-5 (kick → reverse finisher):** a `yoko-geri` that connects opens the cancel window; a
       `gyaku-zuki` started within it hit-confirms (kick → reverse, the unchanged category policy;
       situational — the 240k reverse only reaches when the kick landed within its reach).
-- [ ] **AC-6 (reverse → side kick — the cancel graph GROWS):** a connecting `gyaku-zuki` cancels
+- [x] **AC-6 (reverse → side kick — the cancel graph GROWS):** a connecting `gyaku-zuki` cancels
       **into** `yoko-geri` (the "reverse → any kick" policy now includes the new kick — the grown
       `gyaku-zuki.cancelInto` edge, spatially valid since the kick out-reaches the punch).
-- [ ] **AC-7 (TCB allowlist):** `validate` accepts `{type:"attack", move:"yoko-geri", band:"mid"}`
+- [x] **AC-7 (TCB allowlist):** `validate` accepts `{type:"attack", move:"yoko-geri", band:"mid"}`
       **and** accepts it out-of-band (`band:"high"`) — band-legality is a runtime concern; the
       validator only checks the move id + band are well-formed.
-- [ ] **AC-8 (spec teaches the move + band):** regenerated `spec.md` lists `yoko-geri` in the
+- [x] **AC-8 (spec teaches the move + band):** regenerated `spec.md` lists `yoko-geri` in the
       attack-move line, the move-stats table (with `bands: mid` — the single-band call-out), and the
       JSON-schema `move` enum; `gen-spec` + schema drift tests stay green; `BENCHMARK_VERSION` v6 → v7.
-- [ ] **AC-9 (rule-path accepted):** `validate` accepts a bot using `rule("moves.yoko-geri.reach")`
+- [x] **AC-9 (rule-path accepted):** `validate` accepts a bot using `rule("moves.yoko-geri.reach")`
       (and the other 5 paths); an unknown `moves.yoko-geri.bands` path is **rejected**. _(Slice 2)_
-- [ ] **AC-10 (reader returns the value):** the interpreter resolves `rule("moves.yoko-geri.reach")`
+- [x] **AC-10 (reader returns the value):** the interpreter resolves `rule("moves.yoko-geri.reach")`
       to **315000**, `rule("moves.yoko-geri.staminaCost")` to **48**, and `rule("moves.yoko-geri.score")`
       to **2** against `CANONICAL_RULES`. _(Slice 2)_
-- [ ] **AC-11 (spec lists the paths):** regenerated `spec.md` lists the six `moves.yoko-geri.*` rule
+- [x] **AC-11 (spec lists the paths):** regenerated `spec.md` lists the six `moves.yoko-geri.*` rule
       paths + the `rulePath` schema enum; drift tests green. _(Slice 2)_
 
 **Deferred (NOT this feature):** the roster-wide no-Pareto-dominance property test (add once more of
@@ -116,7 +116,7 @@ capability, folded into a family-level re-run once the kicks land).
 One slice = one PR. Each follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Load the project CLAUDE.md +
 `tdd`/`testing`/`mutation-testing`/`refactoring` before any code.
 
-### Slice 1: Bot can throw `yoko-geri` — the canonical beyond-neutral score-2 gas-locked kick
+### Slice 1: Bot can throw `yoko-geri` — the canonical beyond-neutral score-2 gas-locked kick — ✅ MERGED (PR #123)
 
 **Value**: The bot author gets a mid-band _waza-ari_ zoning thrust that connects **past neutral** —
 at a gap where even the roundhouse whiffs — trading tempo, band, cost, and the ippon ceiling for that
@@ -175,7 +175,7 @@ no value.
 `dsl.ts`/`rules.ts`/`benchmark-config.ts` mutation 100%; typecheck + lint + format clean; mutation
 report reviewed; human approves commit.
 
-### Slice 2: Bots can introspect `yoko-geri`'s frames via `rule("moves.yoko-geri.*")`
+### Slice 2: Bots can introspect `yoko-geri`'s frames via `rule("moves.yoko-geri.*")` — ✅ MERGED (PR #124)
 
 **Value**: The bot author can read `yoko-geri`'s frames at runtime to write adaptive logic (e.g. gate
 on `rule("moves.yoko-geri.reach")` to open at beyond-neutral spacing), the same as every other move.
