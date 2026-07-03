@@ -4,8 +4,8 @@
 > Every allowlist, limit, and frame-table number below is read directly from
 > the engine, so this document cannot lie about how a fight resolves.
 
-- **Benchmark version:** `v11` — a score is comparable only against another at the same version.
-- **Input hash:** `04937c3249d0747e3e10a5c279838490dbc6ad362eb3987c9a78c52c728c96a4` (pins the scoring inputs: rules + gauntlet + run params).
+- **Benchmark version:** `v12` — a score is comparable only against another at the same version.
+- **Input hash:** `1030535c8299fb9fcf6e44599ec20f782f19c2456c4dfc49fc83b9de35e01dc1` (pins the scoring inputs: rules + gauntlet + run params).
 
 A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is
 validated once against the allowlists below (the security boundary), then run
@@ -905,6 +905,46 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
         ]
       },
       "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "gt",
+        "args": [
+          { "op": "field", "path": "self.counterWindow" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "attack", "move": "shuto", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 3 }
+        ]
+      },
+      "do": { "type": "block", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 2 }
+        ]
+      },
+      "do": { "type": "block", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "block", "band": "low" }
     },
     {
       "when": {

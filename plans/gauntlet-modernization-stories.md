@@ -113,5 +113,7 @@ behavioral test**, not the capability acceptance test.
 
 ## Next Step
 
-Review/commit S1, then load `planning` for the next slice (S2 `zoner`, or S-jabber if we
-choose to restore the band first).
+S1 shipped (`v11`). **S-jabber selected as the next slice** (restore all-6-in-band
+before layering coverage) — branch `feat/jabber-rebalance`. Load `planning` to turn
+S-jabber into a PR-sized plan (start from a fresh `v11` round-robin re-measure —
+`zoner` sits at 36%, the low edge, so watch it as `jabber` strengthens).
