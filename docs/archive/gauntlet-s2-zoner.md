@@ -1,8 +1,18 @@
 # Plan: S2 — `zoner` gains the beyond-neutral long kicks
 
 **Branch**: feat/zoner-long-range
-**Status**: Active
+**Status**: ✅ Done — shipped `v13` (PR #139), close-out PR #140
 **Parent**: `plans/gauntlet-modernization-stories.md` (slice S2)
+
+> **Outcome.** `zoner` gained `yoko-geri` (gated 310–320k) + `ushiro-geri` (gated
+> 320–330k), **narrow-gated** so the two moves are covered without disturbing the
+> calibration. v13 board = v12 board (all 6 ∈ `[25,75]`): sweeper 67, grappler 66,
+> vulture 60, rekka 41, zoner 35, jabber 31. Coverage **9/11** (uncovered: `empi`,
+> `hiza-geri` — S3). `benchmark-config.ts` mutation 100% (10/10); full suite 1031
+> green; dogfood unchanged (18W/102L); engine untouched ⇒ replay byte-identical.
+> **Finding:** the beyond-neutral kicks have no healthy niche in the frozen roster
+> (firing them broadly cost `zoner` its `vulture` matchup); narrow gating is the
+> calibration-preserving way to satisfy the "every move referenced" coverage bar.
 
 ## Goal
 

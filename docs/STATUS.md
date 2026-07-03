@@ -551,6 +551,23 @@ v11 → v12` (`INPUT_HASH` re-pinned); dogfood record unchanged (18W/102L — al
   `docs/archive/gauntlet-s-jabber.md`. **Next slices:** `zoner` long-range (`yoko-geri`, `ushiro-geri`),
   `grappler` close-range (`empi`, `hiza-geri`) ⇒ 11/11 coverage, then the calibration lock.
 
+- DONE (**gauntlet modernization + rebalance — S2: `zoner` beyond-neutral long kicks**, PR #139): arms
+  `zoner` with `yoko-geri` (reach 315k) + `ushiro-geri` (reach 330k), covering two more moves. Same
+  lever — bot-document only (no `CANONICAL_RULES` change ⇒ `npm run fight` byte-identical). **Finding:**
+  these slow (startup 12/13), heavily-punishable kicks have **no healthy niche** in the frozen roster —
+  fired broadly (their natural >300k bands) they cost `zoner` its `vulture` matchup (`zoner` 35 → 26,
+  `vulture` 60 → 70, wider dispersion). So (user-approved) they are **narrow-gated** to the top sliver
+  (`yoko` 310–320k, `ushiro` 320–330k, the 300–310k gap falling through to walk-forward): the two moves
+  are genuinely referenced + reachable (decision-contract), so coverage 7/11 → **9/11** by the "every
+  move referenced" bar, while the **v13 board = v12 board** — calibration untouched (sweeper 67, grappler
+  66, vulture 60, rekka 41, zoner 35, jabber 31; nets shift a few points as the kicks fire rarely, no
+  outcome flips). `BENCHMARK_VERSION v12 → v13` (`INPUT_HASH` re-pinned); dogfood unchanged (18W/102L);
+  `docs/spec.md` regenerated. 1031 tests; `benchmark-config.ts` mutation 100% (10/10); RED verified by
+  stashing the bot to v12 (3 long-kick cases fail, 3 fences pass). Plan archived at
+  `docs/archive/gauntlet-s2-zoner.md`. **Lesson for S4:** condition (C)'s "all 12 moves collectively
+  exercised" can conflict with tight calibration for niche moves — narrow-gating satisfies the coverage
+  bar without degrading the band. **Next:** `grappler` close-range (`empi`, `hiza-geri`) ⇒ 11/11, then lock.
+
 ### §7 match structure built between C9 and Capability D
 
 Capabilities A (jogai), B (passivity), and C (tie resolution) — the WKF officiating
@@ -586,19 +603,22 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    `rule()`-readers PR (no bump). **Next: the roster-wide no-Pareto-dominance property test**
    (`rules.test.ts`, asserting no move dominates another across the full 12-move roster). Air
    (`tobi-geri`) is Batch 2, gated on the unbuilt air-strike capability (item 5).
-2. **Gauntlet modernization + rebalance — IN PROGRESS (S1 + S-jabber shipped; all 6 in
-   band, coverage 7/11).** Reframed from a pure rebalance into modernization + rebalance:
+2. **Gauntlet modernization + rebalance — IN PROGRESS (S1 + S-jabber + S2 shipped; all 6 in
+   band, coverage 9/11).** Reframed from a pure rebalance into modernization + rebalance:
    re-author the frozen gauntlet, one bot per PR, until all 6 land in `[25%,75%]` AND the
    roster collectively exercises the full arsenal. Parent split:
    `plans/gauntlet-modernization-stories.md`. **S1 (`vulture` parry→counter, v11, PR #135)**
    fixed the `vulture` low tail (16 → 60%) and pulled `sweeper` **82 → 67%** in-band via the
-   coupling (no `sweeper` edit); it knocked `jabber` **28 → 19% (out low)**. **S-jabber
-   (`jabber` block+counter, v12, PR #137)** fixed that — `jabber` **19 → 31%** (the `shuto`
-   range-poke pivoted to a reactive block + counter), flipping `rekka` and covering `shuto`
-   (7/11). **Now all 6 ∈ `[25,75]`.** **Remaining:** `zoner` long-range (`yoko-geri`,
-   `ushiro-geri`) — `zoner` is the low-edge member at 35%; `grappler` close-range (`empi`,
-   `hiza-geri`) ⇒ 11/11 coverage; then the calibration lock (CI band + coverage acceptance
-   tests + final gauntlet doc). Lever is bot-document only ⇒ `npm run fight` unaffected.
+   coupling; it knocked `jabber` **28 → 19% (out low)**. **S-jabber (`jabber` block+counter,
+   v12, PR #137)** fixed that — `jabber` **19 → 31%** (the `shuto` range-poke pivoted to a
+   reactive block + counter), covering `shuto`. **S2 (`zoner` long kicks, v13, PR #139)** added
+   `yoko-geri` + `ushiro-geri`, **narrow-gated** to preserve calibration (the "no healthy niche"
+   finding — fired broadly they cost `zoner` its `vulture` matchup), so the v13 board = v12 board
+   (coverage 9/11). **Now all 6 ∈ `[25,75]`, coverage 9/11.** **Remaining:** `grappler`
+   close-range (`empi`, `hiza-geri`) ⇒ 11/11 coverage; then the calibration lock (CI band +
+   coverage acceptance tests + final gauntlet doc). Lever is bot-document only ⇒ `npm run fight`
+   unaffected. **S4 lesson (from S2):** full-12-move coverage can conflict with tight calibration
+   for niche moves; narrow-gating satisfies the "referenced" bar without degrading the band.
 3. **Deferred jogai / passivity / overtime benchmark + spec adoption** — Capability D
    was scoped to senshu only; folding jogai / passivity / overtime into the benchmark
    `MATCH` (+ `INPUT_HASH` / `BENCHMARK_VERSION`) and teaching their prose in

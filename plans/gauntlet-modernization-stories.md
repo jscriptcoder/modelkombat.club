@@ -117,21 +117,33 @@ behavioral test**, not the capability acceptance test.
   `jabber` advances + pressures). `benchmark-config.ts` mutation 100% (10/10);
   dogfood record unchanged (18W/102L).
 
+- **S2 (`zoner` long kicks) — ✅ DONE (`v13`, PR #139; archived
+  [`docs/archive/gauntlet-s2-zoner.md`](../docs/archive/gauntlet-s2-zoner.md)).** `zoner`
+  gained `yoko-geri` + `ushiro-geri`. **Finding:** these slow beyond-neutral kicks have
+  **no healthy niche** — fired broadly they cost `zoner` its `vulture` matchup (`zoner`
+  35→26, `vulture` 60→70). So (user-approved) they are **narrow-gated** to the top sliver
+  (`yoko` 310–320k, `ushiro` 320–330k): the two moves are referenced + reachable (coverage
+  **9/11**) while the **v13 board = v12 board** (calibration untouched): sweeper 67,
+  grappler 66, vulture 60, rekka 41, zoner 35, jabber 31. Mutation 100% (10/10); dogfood
+  unchanged. **Lesson for S4:** condition (C)'s "all 12 moves collectively exercised" can
+  conflict with tight calibration for niche moves — narrow-gating satisfies the "referenced"
+  bar without degrading the band.
+
 ## Revised remaining sequence
 
-Coverage now **7/11** (`shuto` covered by `jabber`; uncovered = `yoko-geri`,
-`ushiro-geri`, `empi`, `hiza-geri`). Remaining (re-measure after each; final lock lands
-when all-6-in-band **and** 11/11 moves covered):
+Coverage now **9/11** (`shuto` on `jabber`; `yoko-geri` + `ushiro-geri` on `zoner`;
+uncovered = `empi`, `hiza-geri`). Remaining (re-measure after each; final lock lands when
+all-6-in-band **and** 11/11 moves covered):
 
-- **S2 · `zoner`** — long-range (`yoko-geri`, `ushiro-geri` — `shuto` now covered by
-  `jabber`). `zoner` sits at 35%, the low edge — arming its long kicks should lift it.
-- **S3 · `grappler`** — close-range (`empi`, `hiza-geri`) ⇒ completes 11/11 coverage.
+- **S3 · `grappler`** — close-range (`empi`, `hiza-geri`) ⇒ completes **11/11** coverage.
+  Watch the `empi`/`hiza-geri` niche (like `zoner`'s long kicks, they may need narrow gating
+  to preserve calibration).
 - **S4 · calibration lock + close-out** — land the band + coverage acceptance tests, write
   the final `gauntlet-vN` doc, update `docs/STATUS.md`, archive the split.
 
 ## Next Step
 
-S-jabber shipped (`v12`, all 6 in band, coverage 7/11). Next: load `planning` for **S2
-(`zoner` long-range)** — start from a fresh `v12` round-robin re-measure. `zoner` is the
-low-edge member (35%); arming `yoko-geri` + `ushiro-geri` should lift it while covering
-two more moves (watch the overshoot guard — the two longest kicks could push it high).
+S2 shipped (`v13`, all 6 in band, coverage 9/11). Next: load `planning` for **S3
+(`grappler` close-range: `empi` + `hiza-geri`)** — start from a fresh `v13` re-measure.
+Completing S3's coverage brings the roster to 11/11, unblocking the S4 lock. Carry the S2
+lesson: if the close moves have no healthy niche, narrow-gate them to preserve the band.
