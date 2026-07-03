@@ -437,10 +437,37 @@ generating code; flag any change that would.
   changed `sim.ts` clock line + `dsl.ts` reader (Stryker emits no `ConditionalExpression` mutant for
   `X ? 1 : 0` literal ternaries, so **both arms of `inOT ? 1 : 0` were hand-verified killed** — always-0 by
   the RED placeholder, always-1 by a manual mutation → 2 failing tests). **C4 (`clock.overtime`) is now
-  shipped inside C2.** **Capability C: C1 (senshu) + C2 (overtime) COMPLETE**; **C3** (`self`/`opponent.senshu`
-  + OT/senshu perception) and **Capability D** (benchmark `MATCH`/`INPUT_HASH`/`BENCHMARK_VERSION` adoption +
-  `generateSpec` win/OT prose) remain. The C2 plan file `plans/c2-overtime.md` is deleted (record in git /
-  PRs #107–#108); the standing tracker `plans/s7-match-remainder-stories.md` flips Next Step to C3.
+  shipped inside C2.** **Capability C: C1 (senshu) + C2 (overtime) COMPLETE**; **C3 (senshu perception)
+  is now DONE — see the next entry**; only **Capability D** (benchmark `MATCH`/`INPUT_HASH`/`BENCHMARK_VERSION`
+  adoption + `generateSpec` win/OT prose) remains. The C2 plan file `plans/c2-overtime.md` is deleted (record
+  in git / PRs #107–#108); the standing tracker `plans/s7-match-remainder-stories.md` flips Next Step to C3.
+- DONE (**senshu perception — Capability C story C3, PR #110**): the first-blood tells that let a bot play
+  to protect its own senshu or bait a holder into fouling it away — closing Capability C's read surface. Two
+  **live, egocentric** DSL reads off the bout-level `senshuHolder`: **`self.senshu`** (1 iff I hold senshu) and
+  **`opponent.senshu`** (1 iff the foe holds it), both `? 1 : 0`, with `undecided` and `none` collapsing to
+  `0/0` (the "still-winnable" availability nuance deferred as additive YAGNI). They ride the **LIVE scoreboard
+  layer** in `viewFor` (zero delay, like `opponent.points`/`penalties`) — NOT the `L_act` ring buffer: senshu
+  is a public referee call derived from the live per-tick point delta, so a delayed tell would contradict the
+  zero-delay `opponent.points` it's computed from, and `senshuHolder` isn't in the `Frame` ring buffer at all.
+  **Single slice** (both readers share one change): `senshuHolder` (the `runFight` local, untouched since C1) is
+  threaded into `viewFor`, and each per-fighter call site computes `senshuHolder === "A"/"B" ? 1 : 0` — the
+  `===` living at the call site so it is mutation-covered (unlike C2b's bare `inOT ? 1 : 0`, the comparison form
+  DOES generate `ConditionalExpression` mutants, killed both-arms by the swap + undecided fixtures). Two new
+  static `FIELD_READERS` (`SelfState.senshu`/`OpponentState.senshu`, the only new TCB surface; value
+  config-gated ⇒ `dsl.ts` interpreter stays **100%**), plus a mechanical `gen:spec` regen (2 field-whitelist
+  bullets + 2 JSON Schema enum entries — **no** senshu win/draw prose, deferred to Capability D, and **no**
+  `BENCHMARK_VERSION`/`INPUT_HASH` change: C3 touches no scoring input). 867 tests; scoped Stryker **100%**
+  (18/18: `dsl.ts` 2/2, `sim.ts` 16/16) on the changed `viewFor` assigns + call-site ternaries + readers.
+  AC-1…AC-11 (in the tracker); **AC-6** (same-tick latch-then-revoke never flashes `1`) and **AC-9**
+  (persistence across the OT `resetToNeutral`) are **covered transitively** — AC-6 by AC-1 (reads `1` only
+  post-latch) + AC-3 (`none`→`0`) + `viewFor` reading `senshuHolder` once per tick; AC-9 by the already-tested
+  C1 latch / C2 `senshuHolder` persistence — with the C3 read itself at 100% mutation.
+  `SelfState.senshu`/`OpponentState.senshu` are additive ⇒ absent `match.senshu` ⇒ `senshuHolder` stays
+  `undecided` ⇒ `0/0` all bout (and existing bots don't reference the fields) ⇒ **byte-identical** +
+  replay-stable + swap-symmetric. **Capability C is COMPLETE** (C1 senshu + C2 overtime + C3 perception); the
+  C3 plan file `plans/c3-senshu-perception.md` is deleted (record in git / PR #110). The standing tracker flips
+  Next Step to **Capability D** (benchmark `MATCH`/`INPUT_HASH`/`BENCHMARK_VERSION` adoption + `generateSpec`
+  win/draw/OT/senshu prose — the deferred `docs/spec.md` match narrative).
 - ROADMAP (C9 + C10 + LLM benchmark v1 + benchmark match structure COMPLETE): the still-unresolved **air-actions** (air
   strikes / horizontal jump displacement) and the **rest of §7 match structure** (jogai / passivity /
   rounds, beyond the benchmark's yame + win condition) — `grill-me` → `planning` → TDD. (C9, the

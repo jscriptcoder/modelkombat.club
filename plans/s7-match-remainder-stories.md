@@ -138,6 +138,23 @@ limit − oppAct.ticksSinceOffense)`, threading `match` in (D2, the C10 S4b `isG
   `X ? 1 : 0` literal ternaries). Byte-identical absent `match.overtime`, replay-stable, swap-symmetric.
   The C2 plan (`c2-overtime.md`) deleted (record in git/PRs #107–#108). The C2 resolved-decisions section
   below is retained as the design record.
+- **C3 — senshu perception — ✅ DONE** (PR #110, merged 2026-07-03; `main`@`a9d9a38`). **Capability C
+  COMPLETE** — two **live, egocentric** DSL reads off the bout-level `senshuHolder`: **`self.senshu`** (1 iff
+  I hold senshu) + **`opponent.senshu`** (1 iff the foe holds it), `? 1 : 0`, with `undecided`/`none`
+  collapsing to `0/0` (the "still-winnable" availability tell deferred as YAGNI). LIVE scoreboard layer in
+  `viewFor` (zero delay, like `opponent.points`) — NOT the `L_act` ring buffer (`senshuHolder` isn't framed;
+  a delayed tell would contradict the live points it's derived from). **Single slice**: `senshuHolder`
+  threaded into `viewFor`, each call site computing `senshuHolder === "A"/"B" ? 1 : 0` (the `===` at the call
+  site ⇒ mutation-covered; the comparison form DOES generate `ConditionalExpression` mutants, unlike C2b's
+  bare `inOT ? 1 : 0` ternary — killed both-arms by swap + undecided fixtures). Two static `FIELD_READERS`
+  (`SelfState.senshu`/`OpponentState.senshu`, the only new TCB surface; value config-gated ⇒ `dsl.ts`
+  interpreter stays 100%); mechanical `gen:spec` regen (2 bullets + 2 JSON Schema enum entries, no prose; no
+  `BENCHMARK_VERSION`/`INPUT_HASH` change). 867 tests; scoped Stryker 100% (18/18: `dsl.ts` 2/2, `sim.ts`
+  16/16). AC-1…AC-11; **AC-6** (same-tick latch-then-revoke never flashes) + **AC-9** (persistence across the
+  OT `resetToNeutral`) covered transitively (AC-1/AC-3 + the already-tested C1 latch / C2 persistence, C3 read
+  at 100% mutation). Byte-identical absent `match.senshu` (`0/0`; existing bots don't read the fields),
+  replay-stable, swap-symmetric. The C3 plan (`c3-senshu-perception.md`) deleted (record in git/PR #110). The
+  C3 resolved-decisions section below is retained as the design record.
 
 ## Parent
 
@@ -914,25 +931,26 @@ nuance remains deferred.
 
 **Capability A (jogai) COMPLETE** (A1+A2+A3, PRs #97–#99). **Capability B (passivity) COMPLETE**
 (B1 clock #100, B2 shared penalty ladder #101, B3 self read #102, B4 opponent read #103). **Capability
-C, stories C1 (senshu) + C2 (overtime) COMPLETE** (C1a latch #104, C1b revocation #105; C2a officiating
-#107, C2b perception #108) — see Progress. `main`@`7a07df1`. **C4 (`clock.overtime` live 1/0 +
-OT-budget `ticksRemaining`) shipped inside C2b.**
+C (tie resolution) COMPLETE** — C1 (senshu #104–#105) + C2 (overtime #107–#108) + C3 (senshu perception
+#110); see Progress. `main`@`a9d9a38`. **C4 (`clock.overtime`) shipped inside C2b.**
 
-**In progress: C3 — senshu perception** (`self.senshu` / `opponent.senshu` — the first-blood tells that
-let a bot know who holds senshu, so it can play to protect or steal it). The read-surface decision tree
-is **RESOLVED** (grill 2026-07-03 — see the "C3 — resolved decisions" section above): both
-`self.senshu` + `opponent.senshu`; the **LIVE** scoreboard layer (off the bout-level `senshuHolder`,
-like `opponent.points`, NOT the `L_act` ring buffer); two booleans collapsing `undecided`+`none` →
-`0/0` (availability tell deferred as YAGNI); **ONE** slice (branch `feat/senshu-perception`).
-Config-gated FIELD_READERS ⇒ the `dsl.ts` interpreter stays 100%; scoring-layer, byte-identical when
-`match.senshu`/`overtime` absent.
+**Next: Capability D — downstream adoption.** The §7 mechanics — jogai, passivity, senshu, overtime —
+are all BUILT; D wires them into the benchmark and teaches them in the spec. Two threads, per the §7
+precedent (the benchmark match-structure feature, PRs #87–#93, which shipped a benchmark-adoption slice
 
-After C3: **Capability D** — benchmark adoption (fold `senshu`/`overtime` into `MATCH` + `INPUT_HASH`,
-bump `BENCHMARK_VERSION`) + `generateSpec` teaches the jogai/passivity/senshu/OT prose + the corrected
-win/draw semantics (the deferred `docs/spec.md` match narrative).
+- a spec-teaching slice):
 
-Flow: `grill-me` (DONE 2026-07-03 — C3 read-surface tree resolved above) → `find-gaps` (DONE
-2026-07-03 — AC-1…AC-11 above) → **`planning` (NEXT — one PR-sized slice; branch
-`feat/senshu-perception` already cut)** → per-slice RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR (`tdd` +
-`testing` + `mutation-testing` + `refactoring`). Precedent to mirror: every §7 slice is byte-identical when its `match` key is absent +
-replay-stable + swap-symmetric, with scoped mutation on the changed `sim.ts`/`dsl.ts` regions.
+1. **Benchmark adoption** — fold `senshu` (and `overtime`?) into the frozen `MATCH` config, refold
+   `INPUT_HASH`, bump `BENCHMARK_VERSION`; re-characterize the gauntlet under the new tie-resolution
+   (draws now break to senshu / OT) and refresh the gauntlet doc.
+2. **Spec teaching** — `generateSpec` teaches the corrected win/draw semantics + the
+   jogai / passivity / senshu / overtime prose (the deferred `docs/spec.md` match narrative — every prior
+   §7 story deferred its prose to here).
+
+Still open beyond D (the standing §7 remainder): the **`vulture` parry→counter gauntlet-rebalance**
+follow-up, then **air-actions** + the **rest of §7** (rounds).
+
+Flow: `grill-me` (scope the benchmark-vs-spec split + which tie params enter `MATCH`) → `find-gaps` →
+`planning` → per-slice RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR (`tdd` + `testing` + `mutation-testing` +
+`refactoring`). Precedent to mirror: every §7 slice is byte-identical when its `match` key is absent +
+replay-stable + swap-symmetric, with scoped mutation on the changed regions.
