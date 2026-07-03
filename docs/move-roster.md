@@ -1,7 +1,7 @@
 # Move Roster — design & balance
 
 **Status:** grill-me complete (2026-07-03) — balance law + policies + all 6 Batch-1 frame
-blocks resolved. **Build underway** (one PR per technique): **`uraken` SHIPPED** (move #1/6 —
+blocks resolved. **Build COMPLETE — all 6 grounded moves shipped** (one PR per technique): **`uraken` SHIPPED** (move #1/6 —
 wiring PR #117 → benchmark v5, `rule()` readers PR #118 → no bump; archived at
 `archive/uraken-backfist.md`); **`shuto` SHIPPED** (move #2/6 — wiring PR #120 → benchmark v6,
 `rule()` readers PR #121 → no bump; archived at `archive/shuto-knife-hand.md`); **`yoko-geri`
@@ -9,8 +9,10 @@ SHIPPED** (move #3/6 — wiring PR #123 → benchmark v7, `rule()` readers PR #1
 at `archive/yoko-geri-side-kick.md`); **`ushiro-geri` SHIPPED** (move #4/6 — wiring PR #126 →
 benchmark v8, `rule()` readers PR #127 → no bump; archived at `archive/ushiro-geri-back-kick.md`);
 **`empi` SHIPPED** (move #5/6 — wiring PR #129 → benchmark v9, `rule()` readers PR #130 → no bump;
-archived at `archive/empi-elbow.md`).
-Next: `hiza-geri`. Living source of truth for the
+archived at `archive/empi-elbow.md`); **`hiza-geri` SHIPPED** (move #6/6 — wiring PR #132 →
+benchmark v10, `rule()` readers PR #133 → no bump; archived at `archive/hiza-geri-knee.md`).
+**Batch 1 grounded arsenal COMPLETE (6/6)** — next is the roster-wide no-Pareto-dominance property
+test + the owed `vulture`/`sweeper` gauntlet rebalance. Living source of truth for the
 fighting-move roster and the balance law that governs it. Consolidates the built
 **baseline** (authoritative in `src/engine/rules.ts` `CANONICAL_RULES`, proven by
 behavioral `runFight` tests in `rules.test.ts`, designed in `DESIGN.md §P7`) and will
@@ -186,7 +188,7 @@ pokes, paying with the slowest startups, longest recovery, highest cost, and gas
 | `uraken` (backfist) ✅       | 200 000 | 7       | 2      | 13       | 1            | high     | 12   | `gyaku-zuki` | cheapest & shortest hand; jodan-only snap / cheap gas-proof pressure (Q4) — SHIPPED #117/#118                          |
 | `shuto` (knife-hand) ✅      | 260 000 | 8       | 2      | 15       | 1            | high·mid | 22   | `gyaku-zuki` | longest-reach hand; gas-proof 1-pt poke, out-ranges the reverse (Q5) — SHIPPED #120/#121                               |
 | `empi` (elbow) ✅            | 95 000  | 8       | 2      | 14       | 2            | high·mid | 38   | `gyaku-zuki` | shortest reach in game; point-blank 2-pt; elbow/throw mixup is a NEUTRAL choice, not a cancel (Q6) — SHIPPED #129/#130 |
-| `hiza-geri` (knee)           | 110 000 | 9       | 2      | 16       | 0 → 3 finish | mid      | 40   | `gyaku-zuki` | `knockdown: true`; only MID-band standing knockdown→okizeme; finisher reaches at ~110k (Q6)                            |
+| `hiza-geri` (knee) ✅        | 110 000 | 9       | 2      | 16       | 0 → 3 finish | mid      | 40   | `gyaku-zuki` | `knockdown: true`; only MID-band standing knockdown→okizeme; finisher reaches at ~110k (Q6) — SHIPPED #132/#133        |
 
 **All 6 locked (grill-me complete, 2026-07-03).** Flagship fallback if the rebalance
 surface proves too large: `yoko-geri`, `uraken`, `empi` + `hiza-geri`.
