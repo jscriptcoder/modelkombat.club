@@ -1,7 +1,7 @@
 # Plan: `ushiro-geri` (back kick) — Batch-1 move #4
 
 **Branch**: feat/ushiro-geri-back-kick (Slice 1) · feat/ushiro-geri-rule-readers (Slice 2)
-**Status**: Active
+**Status**: ✅ **COMPLETE** — Slice 1 MERGED (PR #126, benchmark v8) · Slice 2 MERGED (PR #127, no bump)
 **Design source**: `docs/move-roster.md` (Batch-1 resolved frame data; balance law + policies)
 
 ## Goal
@@ -82,40 +82,40 @@ under v8 (no gauntlet re-characterization).
 Behaviour proven by `runFight` against `CANONICAL_RULES` (engine), `validate` (TCB), and the
 `gen-spec` / schema drift tests (spec). Observable score/accept assertions, not literals alone.
 
-- [ ] **AC-1 (waza-ari — mid):** a clean `mid` `ushiro-geri` within reach scores **2** (chudan
+- [x] **AC-1 (waza-ari — mid):** a clean `mid` `ushiro-geri` within reach scores **2** (chudan
       _waza-ari_ — the base `spec.score`).
-- [ ] **AC-2 (jodan ippon — the signature `scoreByBand`):** a clean `high` `ushiro-geri` within reach
+- [x] **AC-2 (jodan ippon — the signature `scoreByBand`):** a clean `high` `ushiro-geri` within reach
       scores **3** (_ippon_ via `scoreByBand {high: 3}` — the expansion's first jodan-scoring kick,
       mirroring `mawashi-geri`), and at `band:"low"` degrades to idle ⇒ **0** (high·mid gate). Property:
       `ushiro-geri.scoreByBand.high === 3 > ushiro-geri.score`.
-- [ ] **AC-3 (reach apex — the new game-longest):** at a gap between `yoko-geri` (315k) and
+- [x] **AC-3 (reach apex — the new game-longest):** at a gap between `yoko-geri` (315k) and
       `ushiro-geri` (330k) — e.g. `startGap 320000` — `ushiro-geri` (mid) scores **2** where
       `yoko-geri` (315k) whiffs to **0** (documents `ushiro-geri.reach > yoko-geri.reach` **and**
       `> startGap` — the first move connecting where even the prior apex whiffs).
-- [ ] **AC-4 (gas-LOCKED — the priciest move):** a **gassed** fighter (`stamina ≤ gasThreshold 30`)
+- [x] **AC-4 (gas-LOCKED — the priciest move):** a **gassed** fighter (`stamina ≤ gasThreshold 30`)
       can **no longer** commit `ushiro-geri` — the commit degrades to idle ⇒ **0** (its cost 52 > 30).
       Property: `ushiro-geri.staminaCost > gasThreshold` and `> yoko-geri.staminaCost` (the new max).
-- [ ] **AC-5 (kick → reverse finisher):** an `ushiro-geri` that connects opens the cancel window; a
+- [x] **AC-5 (kick → reverse finisher):** an `ushiro-geri` that connects opens the cancel window; a
       `gyaku-zuki` started within it hit-confirms (kick → reverse, the unchanged category policy;
       situational — the 240k reverse only reaches when the kick landed within its reach).
-- [ ] **AC-6 (reverse → back kick — the cancel graph GROWS):** a connecting `gyaku-zuki` cancels
+- [x] **AC-6 (reverse → back kick — the cancel graph GROWS):** a connecting `gyaku-zuki` cancels
       **into** `ushiro-geri` (the "reverse → any kick" policy now includes the new kick — the grown
       `gyaku-zuki.cancelInto` edge, spatially valid since the kick out-reaches the punch).
-- [ ] **AC-7 (TCB allowlist):** `validate` accepts `{type:"attack", move:"ushiro-geri", band:"high"}`
+- [x] **AC-7 (TCB allowlist):** `validate` accepts `{type:"attack", move:"ushiro-geri", band:"high"}`
       and `band:"mid"` **and** accepts it out-of-band (`band:"low"`) — band-legality is a runtime
       concern; the validator only checks the move id + band are well-formed.
-- [ ] **AC-8 (spec teaches the move + bands + jodan bonus):** regenerated `spec.md` lists
+- [x] **AC-8 (spec teaches the move + bands + jodan bonus):** regenerated `spec.md` lists
       `ushiro-geri` in the attack-move line, the move-stats table (with `bands: high·mid` and the
       `scoreByBand` jodan call-out), and the JSON-schema `move` enum; `gen-spec` + schema drift tests
       stay green; `BENCHMARK_VERSION` v7 → v8.
-- [ ] **AC-9 (rule-path accepted):** `validate` accepts a bot using `rule("moves.ushiro-geri.reach")`
+- [x] **AC-9 (rule-path accepted):** `validate` accepts a bot using `rule("moves.ushiro-geri.reach")`
       (and the other **6** paths, including `moves.ushiro-geri.scoreByBand.high` — the 7th, mirroring
       `mawashi-geri`); an unknown `moves.ushiro-geri.bands` path is **rejected**. _(Slice 2)_
-- [ ] **AC-10 (reader returns the value):** the interpreter resolves `rule("moves.ushiro-geri.reach")`
+- [x] **AC-10 (reader returns the value):** the interpreter resolves `rule("moves.ushiro-geri.reach")`
       to **330000**, `rule("moves.ushiro-geri.staminaCost")` to **52**, `rule("moves.ushiro-geri.score")`
       to **2**, and `rule("moves.ushiro-geri.scoreByBand.high")` to **3** against `CANONICAL_RULES`.
       _(Slice 2)_
-- [ ] **AC-11 (spec lists the paths):** regenerated `spec.md` lists the seven `moves.ushiro-geri.*`
+- [x] **AC-11 (spec lists the paths):** regenerated `spec.md` lists the seven `moves.ushiro-geri.*`
       rule paths + the `rulePath` schema enum; drift tests green. _(Slice 2)_
 
 **Deferred (NOT this feature):** the roster-wide no-Pareto-dominance property test (add once more of
@@ -127,7 +127,7 @@ capability, folded into a family-level re-run once the kicks land).
 One slice = one PR. Each follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Load the project CLAUDE.md +
 `tdd`/`testing`/`mutation-testing`/`refactoring` before any code.
 
-### Slice 1: Bot can throw `ushiro-geri` — the canonical reach-apex, jodan-ippon, gas-locked kick
+### Slice 1: Bot can throw `ushiro-geri` — the canonical reach-apex, jodan-ippon, gas-locked kick — ✅ MERGED (PR #126)
 
 **Value**: The bot author gets the game's longest-reach kick, and the first long-range kick that also
 scores the jodan _ippon_ (3) — trading the slowest tempo, longest recovery, and highest cost in the
@@ -190,7 +190,7 @@ no value.
 `dsl.ts`/`rules.ts`/`benchmark-config.ts` mutation 100%; typecheck + lint + format clean; mutation
 report reviewed; human approves commit.
 
-### Slice 2: Bots can introspect `ushiro-geri`'s frames via `rule("moves.ushiro-geri.*")`
+### Slice 2: Bots can introspect `ushiro-geri`'s frames via `rule("moves.ushiro-geri.*")` — ✅ MERGED (PR #127)
 
 **Value**: The bot author can read `ushiro-geri`'s frames at runtime to write adaptive logic (e.g.
 gate on `rule("moves.ushiro-geri.reach")` to open at max spacing, or on
