@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v4";
+export const BENCHMARK_VERSION = "v5"; // Batch-1 arsenal expansion #1: uraken (backfist) enters CANONICAL_RULES
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -47,4 +47,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // Recompute and bump (with BENCHMARK_VERSION) whenever a scoring input changes —
 // the guard test in benchmark-config.test.ts prints the expected value on drift.
 export const INPUT_HASH =
-  "7a6a1f864802013bf68a0e37721ff4ca4026dddc55bef1c20fa608792bae462c";
+  "ee99a5707532b60288dd3d71c0393e42615aab8d511dc943d29d7a673b48e9f4";

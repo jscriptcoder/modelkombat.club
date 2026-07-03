@@ -99,6 +99,25 @@ export const CANONICAL_RULES: Rules = {
       staminaCost: 45, // special (> gasThreshold 30), the costliest ⇒ locks out when gassed
       cancelInto: ["gyaku-zuki"], // a punch can follow the kick
     },
+    // ── Batch-1 expansion #1 (backfist / §move-roster). The cheapest, shortest, high-only 1-point
+    // snap — gas-proof pressure + a rekka opener. It PAYS for the cheapest cost with a jodan-only
+    // band and the shortest hand reach (the trade-off budget / no-Pareto-dominance law):
+    //   • staminaCost 12 < jab (15) ⇒ the cheapest commit; 12 ≤ gasThreshold (30) ⇒ gas-proof
+    //     (a gassed fighter keeps it). Score-1 basic per "stamina tier mirrors score tier".
+    //   • bands ["high"] ⇒ jodan-only (whiffs a croucher) — the first high-ONLY technique.
+    //   • reach 200000 < jab (210000) ⇒ the shortest hand strike.
+    //   • startup 7 = lAct+1 / recovery 13 = lAct + jab.startup ⇒ the reactable + whiff-punishable floor.
+    //   • cancelInto gyaku-zuki ⇒ the cheap rekka opener (hand → reverse, the category policy).
+    uraken: {
+      startup: 7,
+      active: 2,
+      recovery: 13,
+      score: 1,
+      reach: 200000,
+      bands: ["high"],
+      staminaCost: 12,
+      cancelInto: ["gyaku-zuki"],
+    },
   },
   // Defensive depth (C5/C6), tuned to the canonical strike's startup-7 timing:
   //   • parryWindow 2 — a matching guard's first 2 ticks (age 1–2) DEFLECT instead of block: a

@@ -10,12 +10,18 @@
 export type Facing = -1 | 1;
 export type Band = "high" | "mid" | "low";
 // The flat union of named WKF techniques a bot may `attack` with (C9 arsenal). The abstract
-// `strike` scaffold has been RETIRED (C9 S7.3) — the roster is now the four named techniques.
+// `strike` scaffold has been RETIRED (C9 S7.3) — the roster is now the named techniques below.
 // `kizami-zuki` is the jab; `gyaku-zuki` is the reverse punch (longer reach, more committed — the
 // workhorse / reach hierarchy); `mae-geri` is the front kick (mid-only single-band, 2-point
 // waza-ari, out-reaches the punches); `mawashi-geri` is the roundhouse (longest reach, slowest,
-// band-dependent score — jodan 3 / chudan 2).
-export type MoveId = "kizami-zuki" | "gyaku-zuki" | "mae-geri" | "mawashi-geri";
+// band-dependent score — jodan 3 / chudan 2). `uraken` is the backfist (Batch-1 expansion) —
+// the cheapest, shortest, `high`-only 1-point snap (gas-proof pressure / rekka opener).
+export type MoveId =
+  | "kizami-zuki"
+  | "gyaku-zuki"
+  | "mae-geri"
+  | "mawashi-geri"
+  | "uraken";
 
 // ─── Action grammar — a bot returns exactly ONE per tick ─────────────────────
 // `dir` is RELATIVE to facing: +1 = toward opponent, -1 = away, 0 = hold.
@@ -154,6 +160,7 @@ export type Rules = {
     "kizami-zuki"?: MoveSpec;
     "mae-geri"?: MoveSpec;
     "mawashi-geri"?: MoveSpec;
+    uraken?: MoveSpec;
   };
   // Vertical axis (C4). Both absent ⇒ inert (a `jump` launches no arc) ⇒
   // byte-identical to the pre-vertical engine. `jumpImpulse` is the initial
