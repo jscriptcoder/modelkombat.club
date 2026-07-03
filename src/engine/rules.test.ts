@@ -225,7 +225,8 @@ const armed =
       | "mae-geri"
       | "mawashi-geri"
       | "uraken"
-      | "shuto",
+      | "shuto"
+      | "yoko-geri",
   ) =>
   (): MoveSpec => {
     const m = CANONICAL_RULES.moves[id];
@@ -240,6 +241,7 @@ const mae = armed("mae-geri"); // front kick
 const mawashi = armed("mawashi-geri"); // roundhouse
 const uraken = armed("uraken"); // backfist (Batch-1 expansion #1)
 const shuto = armed("shuto"); // knife-hand (Batch-1 expansion #2)
+const yoko = armed("yoko-geri"); // side kick (Batch-1 expansion #3)
 
 // Commits a single named technique at `band` on tick 0, then idles (generalizes strikeOnce).
 const attackOnce = (move: MoveId, band: Band): BotDoc =>
@@ -713,6 +715,154 @@ describe("CANONICAL_RULES — shuto (the knife-hand: longest hand, out-ranges th
   it("is a high·mid yuko (score 1, no jodan bonus)", () => {
     expect(shuto().score).toBe(1);
     expect(shuto().bands).toEqual(["high", "mid"]);
+  });
+});
+
+// ─── Batch-1 expansion #3: yoko-geri (side kick) — the beyond-neutral zoning thrust ──
+// Drains itself with the basic poke, then switches to the side kick the moment it reads
+// GASSED — where the special (48 > gasThreshold 30) is unaffordable and degrades to idle,
+// so the meter never floors past the band (the special lockout, proven for the new kick).
+const DRAIN_THEN_YOKO: BotDoc = bot(
+  [
+    {
+      when: {
+        op: "eq",
+        args: [
+          { op: "field", path: "self.gassed" },
+          { op: "const", value: 1 },
+        ],
+      },
+      do: { type: "attack", move: "yoko-geri", band: "mid" },
+    },
+  ],
+  { type: "attack", move: "gyaku-zuki", band: "mid" },
+);
+
+describe("CANONICAL_RULES — yoko-geri (the side kick: beyond-neutral zoning thrust)", () => {
+  it("scores a clean mid side kick as a waza-ari (2) — the expansion's first score-2 move", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 250000 }), // inside yoko reach (315000)
+        botA: attackOnce("yoko-geri", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(2);
+  });
+
+  it("fizzles off its band — mid-only, so high and low both whiff (no jodan ippon)", () => {
+    const scoreAt = (band: Band): number =>
+      runFight(
+        fight({
+          rules: deterministic({ startGap: 250000 }),
+          botA: attackOnce("yoko-geri", band),
+          botB: IDLE,
+          maxTicks: 30,
+        }),
+      ).scores.a;
+
+    expect(scoreAt("high")).toBe(0);
+    expect(scoreAt("low")).toBe(0);
+  });
+
+  it("reaches beyond neutral — lands at a gap where even the roundhouse whiffs", () => {
+    // A gap beyond the roundhouse's reach (mawashi 300000) but within yoko's (315000) — a
+    // gap where NO existing move connects. This is yoko-geri's signature.
+    const gap = { startGap: 310000 };
+
+    const sideKick = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("yoko-geri", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    const roundhouse = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("mawashi-geri", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(sideKick.scores.a).toBe(2); // inside the side kick's beyond-neutral reach
+    expect(roundhouse.scores.a).toBe(0); // …but out of the roundhouse's
+    expect(yoko().reach).toBeGreaterThan(mawashi().reach);
+    expect(yoko().reach).toBeGreaterThan(CANONICAL_RULES.startGap); // out-reaches the neutral gap
+  });
+
+  it("is gas-LOCKED — a gassed fighter can no longer commit it (special > gas line)", () => {
+    // Same canonical table, out of range (both whiff ⇒ no score noise). The always-striker keeps
+    // committing its BASIC poke (20 ≤ the band) and floors the meter to 0; the drain-then-yoko bot
+    // can only answer the gas band with the side kick (48 > the band), which degrades to idle — so
+    // it stalls at the band and never empties. The mirror image of the gas-proof hands.
+    const staminaSeries = (botA: BotDoc): number[] =>
+      runFight(fight({ botA, botB: IDLE, maxTicks: 150 })).events.map(
+        (e) => e.a.stamina,
+      );
+
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(yoko().staminaCost ?? 0).toBeGreaterThan(gas); // priced above the gas line ⇒ locks out
+    expect(Math.min(...staminaSeries(STRIKER))).toBe(0); // basic commits even gassed ⇒ floors
+    expect(Math.min(...staminaSeries(DRAIN_THEN_YOKO))).toBeGreaterThan(0); // side kick locked out ⇒ stalls
+  });
+
+  it("opens the rekka — a connecting side kick cancels into the reverse (kick → punch finisher)", () => {
+    const cancelTick = yoko().startup + yoko().active; // the first recovery frame
+
+    const result = runFight(
+      fight({
+        rules: deterministic(), // gap 200000 ⇒ both the kick and the 240k finisher reach
+        botA: comboAtTicks([
+          { tick: 0, move: "yoko-geri", band: "mid" },
+          { tick: cancelTick, move: "gyaku-zuki", band: "mid" },
+        ]),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(3); // side kick (2) + cancelled reverse (1)
+    expect(yoko().cancelInto).toContain("gyaku-zuki");
+  });
+
+  it("is a cancel TARGET too — the reverse now cancels into it (reverse → any kick grows)", () => {
+    const cancelTick = gyaku().startup + gyaku().active;
+
+    const result = runFight(
+      fight({
+        rules: deterministic(), // gap 200000 ⇒ the reverse connects and the kick out-reaches it
+        botA: comboAtTicks([
+          { tick: 0, move: "gyaku-zuki", band: "mid" },
+          { tick: cancelTick, move: "yoko-geri", band: "mid" },
+        ]),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(3); // reverse (1) + cancelled side kick (2)
+    expect(gyaku().cancelInto).toContain("yoko-geri"); // the grown "reverse → any kick" edge
+  });
+
+  it("stays reactable and whiff-punishable (the invariant floor)", () => {
+    expect(yoko().startup).toBeGreaterThanOrEqual(lAct() + 1);
+    expect(yoko().recovery).toBeGreaterThanOrEqual(lAct() + kizami().startup);
+  });
+
+  it("is a mid-only waza-ari (score 2, no jodan bonus) priced above the gas line", () => {
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(yoko().score).toBe(2);
+    expect(yoko().bands).toEqual(["mid"]);
+    expect(yoko().scoreByBand).toBeUndefined(); // no ippon ceiling (unlike the roundhouse)
+    expect(yoko().staminaCost ?? 0).toBeGreaterThan(gas);
   });
 });
 

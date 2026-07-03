@@ -74,7 +74,7 @@ export const CANONICAL_RULES: Rules = {
       reach: 240000, // the locked old-strike anchor
       bands: ["high", "mid"],
       staminaCost: 20, // basic (≤ gasThreshold 30)
-      cancelInto: ["mae-geri", "mawashi-geri"], // escalate the punch into either kick
+      cancelInto: ["mae-geri", "mawashi-geri", "yoko-geri"], // escalate the punch into any kick
     },
     "mae-geri": {
       // front kick — chudan-only (mid) for waza-ari (2); deeper than the punches, slower, special.
@@ -136,6 +136,30 @@ export const CANONICAL_RULES: Rules = {
       reach: 260000,
       bands: ["high", "mid"],
       staminaCost: 22,
+      cancelInto: ["gyaku-zuki"],
+    },
+    // yoko-geri (side kick, Batch-1 expansion #3): the beyond-neutral zoning thrust — the
+    // longest reach in the game, the trade-off budget / no-Pareto-dominance law made concrete:
+    //   • reach 315000 > mawashi-geri (300000) AND > startGap (300000) ⇒ it connects at a gap
+    //     where EVERY existing move — even the roundhouse — whiffs. Its signature. Pays with the
+    //     slowest-but-one startup (12 > roundhouse 11), the longest-but-one recovery (20 > 18),
+    //     the highest cost (48 > 45), a single mid band, and no ippon (score 2, no scoreByBand):
+    //     dominance-free vs the roundhouse on five axes.
+    //   • bands ["mid"] ⇒ chudan-only (whiffs high and low) — a spacing thrust, not a head kick.
+    //   • staminaCost 48 > gasThreshold (30) ⇒ special/gas-LOCKED (a gassed fighter loses it) —
+    //     the mirror image of the gas-proof hands, per "stamina tier mirrors score tier".
+    //   • startup 12 ≥ lAct+1 / recovery 20 ≥ lAct + jab.startup ⇒ the reactable + punishable floor.
+    //   • cancelInto gyaku-zuki ⇒ the kick → reverse finisher (situational: the 240k reverse only
+    //     reaches when the kick landed within its reach). It is ALSO a cancel target — the reverse
+    //     grows to cancel into it ("reverse → any kick", above).
+    "yoko-geri": {
+      startup: 12,
+      active: 3,
+      recovery: 20,
+      score: 2,
+      reach: 315000,
+      bands: ["mid"],
+      staminaCost: 48,
       cancelInto: ["gyaku-zuki"],
     },
   },

@@ -17,14 +17,17 @@ export type Band = "high" | "mid" | "low";
 // band-dependent score — jodan 3 / chudan 2). `uraken` is the backfist (Batch-1 expansion) —
 // the cheapest, shortest, `high`-only 1-point snap (gas-proof pressure / rekka opener).
 // `shuto` (knife-hand) is the longest-reach hand — it out-ranges the reverse (a 1-point
-// poke reaching past the 2-point `gyaku-zuki`), `high·mid`, gas-proof.
+// poke reaching past the 2-point `gyaku-zuki`), `high·mid`, gas-proof. `yoko-geri` (side kick)
+// is the beyond-neutral zoning thrust — the longest reach in the game (out-reaches even the
+// roundhouse and the neutral start gap), `mid`-only 2-point waza-ari, slowest and gas-locked.
 export type MoveId =
   | "kizami-zuki"
   | "gyaku-zuki"
   | "mae-geri"
   | "mawashi-geri"
   | "uraken"
-  | "shuto";
+  | "shuto"
+  | "yoko-geri";
 
 // ─── Action grammar — a bot returns exactly ONE per tick ─────────────────────
 // `dir` is RELATIVE to facing: +1 = toward opponent, -1 = away, 0 = hold.
@@ -165,6 +168,7 @@ export type Rules = {
     "mawashi-geri"?: MoveSpec;
     uraken?: MoveSpec;
     shuto?: MoveSpec;
+    "yoko-geri"?: MoveSpec;
   };
   // Vertical axis (C4). Both absent ⇒ inert (a `jump` launches no arc) ⇒
   // byte-identical to the pre-vertical engine. `jumpImpulse` is the initial

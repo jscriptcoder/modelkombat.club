@@ -175,6 +175,26 @@ describe("validate — bot intake gate", () => {
       expect(result.ok).toBe(true);
     });
 
+    it("accepts an attack naming yoko-geri at a legal band (Batch-1 expansion)", () => {
+      const result = validate(
+        getMockBotDoc({
+          default: { type: "attack", move: "yoko-geri", band: "mid" },
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
+    it("accepts yoko-geri out-of-band — band-legality is runtime, not the gate", () => {
+      const result = validate(
+        getMockBotDoc({
+          default: { type: "attack", move: "yoko-geri", band: "high" },
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
     it("accepts uraken out-of-band — band-legality is runtime, not the gate", () => {
       const result = validate(
         getMockBotDoc({
