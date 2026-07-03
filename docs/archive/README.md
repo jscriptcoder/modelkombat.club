@@ -79,3 +79,4 @@ benchmark gauntlet one bot per PR until all 6 members land in the `[25%, 75%]` r
 **and** the roster collectively exercises the full arsenal.
 
 - **S1 — `vulture` parry→counter** (PR #135 → benchmark v11): [gauntlet-s1-vulture-parry-counter.md](gauntlet-s1-vulture-parry-counter.md)
+- **S-jabber — `jabber` block+counter** (PR #137 → benchmark v12; the `shuto` range-poke pivoted to a reactive block + counter): [gauntlet-s-jabber.md](gauntlet-s-jabber.md)
