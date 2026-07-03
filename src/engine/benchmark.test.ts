@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { benchmark, type BenchmarkConfig } from "./benchmark.js";
 import type { Rules, Action } from "./types.js";
-import type { BotDoc } from "./dsl.js";
+import type { BotDoc, BoolExpr } from "./dsl.js";
 
 // ─── factories ───────────────────────────────────────────────────────────────
 // Mock rules WITHOUT perception: no perception ⇒ no PRNG draws ⇒ every fight is
@@ -40,6 +40,46 @@ const TRADER = named("trader", ATTACK_MID);
 const LOSER = named("loser", { type: "idle" });
 // Byte-for-byte identical to SUBMITTED ⇒ the no-mirror skip must drop it.
 const SUBMITTED_CLONE = named("sub", ATTACK_MID);
+
+// ─── senshu fixtures ─────────────────────────────────────────────────────────
+// A level-at-cap matchup with a SOLO first blood, for the senshu tie-break (D1).
+const selfHasScored: BoolExpr = {
+  op: "gte",
+  args: [
+    { op: "field", path: "self.points" },
+    { op: "const", value: 1 },
+  ],
+};
+
+const oppHasScored: BoolExpr = {
+  op: "gte",
+  args: [
+    { op: "field", path: "opponent.points" },
+    { op: "const", value: 1 },
+  ],
+};
+
+// Scores its first point ASAP, then idles forever ⇒ exactly 1 technique point,
+// always drawn FIRST (its opponent below waits) ⇒ it holds senshu.
+const SCORER: BotDoc = {
+  version: 1,
+  name: "scorer",
+  rules: [{ when: selfHasScored, do: { type: "idle" } }],
+  default: ATTACK_MID,
+};
+
+// Idles until the opponent has drawn first blood, THEN scores exactly one point ⇒
+// its point always lands AFTER the scorer's ⇒ a SOLO first blood for SCORER and a
+// 1-1 level bout at the cap (the gap never nears winGap).
+const DELAYED: BotDoc = {
+  version: 1,
+  name: "delayed",
+  rules: [
+    { when: selfHasScored, do: { type: "idle" } },
+    { when: oppHasScored, do: ATTACK_MID },
+  ],
+  default: { type: "idle" },
+};
 
 const config = (o: Partial<BenchmarkConfig> = {}): BenchmarkConfig => ({
   bot: SUBMITTED,
@@ -119,5 +159,59 @@ describe("benchmark — aggregation over both sides × seeds", () => {
     // Without match the bot keeps farming past the gap to the cap ⇒ strictly more.
     const unmatched = benchmark({ ...matched, match: undefined });
     expect(unmatched.perOpponent[0].netPoints).toBeGreaterThan(16);
+  });
+});
+
+describe("benchmark — senshu first-blood tie-resolution (Capability D1)", () => {
+  // Same SOLO-first-blood, level-at-cap matchup; only `match.senshu` toggles.
+  const senshuConfig = (senshu: boolean): BenchmarkConfig => ({
+    bot: SCORER,
+    gauntlet: [DELAYED],
+    seeds: [1],
+    maxTicks: 120,
+    rules: MOCK_RULES,
+    match: senshu ? { winGap: 8, senshu: true } : { winGap: 8 },
+  });
+
+  it("scores a level-at-cap bout as a WIN for the first-blood holder when senshu is on", () => {
+    const result = benchmark(senshuConfig(true));
+
+    // SCORER draws first blood on BOTH sides (behaviour is per-document, not per-slot)
+    // ⇒ holds senshu ⇒ wins the otherwise-level 1-1 bout each time.
+    expect(result.perOpponent[0]).toEqual({
+      name: "delayed",
+      netPoints: 0, // 1-1 each fight ⇒ net 0
+      wins: 2, // as A and as B
+      draws: 0,
+      fights: 2,
+    });
+    expect(result.wins).toBe(2);
+    expect(result.draws).toBe(0);
+  });
+
+  it("scores the SAME level-at-cap bout as a DRAW when senshu is absent", () => {
+    const result = benchmark(senshuConfig(false));
+
+    // No senshu ⇒ the level 1-1 bout stays a draw on both sides.
+    expect(result.perOpponent[0]).toEqual({
+      name: "delayed",
+      netPoints: 0,
+      wins: 0,
+      draws: 2,
+      fights: 2,
+    });
+    expect(result.wins).toBe(0);
+    expect(result.draws).toBe(2);
+  });
+
+  it("leaves net-points invariant under senshu — only the win/draw tally moves (AC-3)", () => {
+    const withSenshu = benchmark(senshuConfig(true));
+    const without = benchmark(senshuConfig(false));
+
+    // senshu rewrites only the winner of a level bout — it never touches a score.
+    expect(withSenshu.netPoints).toBe(without.netPoints);
+    // ... while the win/draw tally diverges (win vs draw).
+    expect(withSenshu.wins).not.toBe(without.wins);
+    expect(withSenshu.draws).not.toBe(without.draws);
   });
 });

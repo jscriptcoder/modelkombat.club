@@ -16,7 +16,7 @@
 // skipped (a bot vs its own clone is just side-asymmetry noise). For a real LLM
 // submission this never triggers; it only matters when self-testing a roster bot.
 // ============================================================================
-import { runFight } from "./sim.js";
+import { runFight, type FightConfig } from "./sim.js";
 import type { Rules } from "./types.js";
 import type { BotDoc } from "./dsl.js";
 
@@ -43,7 +43,10 @@ export type BenchmarkConfig = {
   seeds: readonly number[];
   maxTicks: number;
   rules: Rules;
-  match?: { winGap: number }; // WKF match mode; absent ⇒ every fight runs to maxTicks
+  // WKF match mode, carried verbatim into `runFight` (the aggregator keys off the
+  // resulting `winner`, so any tie-resolution — e.g. senshu — propagates for free).
+  // Absent ⇒ every fight runs to maxTicks.
+  match?: FightConfig["match"];
 };
 
 // One fight reduced to the submitted bot's perspective.

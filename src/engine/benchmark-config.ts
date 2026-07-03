@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v3";
+export const BENCHMARK_VERSION = "v4";
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -23,8 +23,11 @@ export const MAX_TICKS = 600;
 // WKF match mode: a fight ends the moment the point gap reaches winGap (else it
 // runs to MAX_TICKS and is decided on points). This makes a benchmark fight a
 // real match — ranking who WINS, not who farms the most raw points over the cap.
+// `senshu` (v4): a level-at-cap bout is decided by first blood (the first fighter
+// to score) instead of drawing — so win-rate discriminates the close, low-scoring
+// matchups that previously drew.
 // A scoring input ⇒ folded into INPUT_HASH; changing it forces a version bump.
-export const MATCH = { winGap: 8 } as const;
+export const MATCH = { winGap: 8, senshu: true } as const;
 
 // The 6 locked archetypes (bots/<name>.json), spanning the strategic axes —
 // pressure (jabber poke + rekka cancel-combo), zoner, grappler, sweeper/okizeme,
@@ -44,4 +47,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // Recompute and bump (with BENCHMARK_VERSION) whenever a scoring input changes —
 // the guard test in benchmark-config.test.ts prints the expected value on drift.
 export const INPUT_HASH =
-  "bf4e3b0922c456a755da59dcab698e0d6310f42394684c8855c8bc8d27755720";
+  "7a6a1f864802013bf68a0e37721ff4ca4026dddc55bef1c20fa608792bae462c";
