@@ -28,25 +28,25 @@ Verified behaviorally through a minimal probe bot that branches its move on `sel
 `opponent.senshu` (the C2b `clock.overtime` `attackOnceWhenOvertime` pattern) + interpret-tick
 reader-table rows. Full text in `s7-match-remainder-stories.md` (find-gaps 2026-07-03).
 
-- [ ] **AC-1** — solo-holder read + swap: A latches senshu → A reads `self=1`/`opp=0`, B mirrors
+- [x] **AC-1** — solo-holder read + swap: A latches senshu → A reads `self=1`/`opp=0`, B mirrors
       (`self=0`/`opp=1`); also interpret-tick reader rows for both fields.
-- [ ] **AC-2** — undecided read: pre-first-blood → both read `0/0`.
-- [ ] **AC-3** — none (simultaneous) → `0/0` for the rest of the bout (== undecided).
-- [ ] **AC-4** — none (revoked) + revoke visibility: holder fouls it away → from next tick both reads
+- [x] **AC-2** — undecided read: pre-first-blood → both read `0/0`.
+- [x] **AC-3** — none (simultaneous) → `0/0` for the rest of the bout (== undecided).
+- [x] **AC-4** — none (revoked) + revoke visibility: holder fouls it away → from next tick both reads
       drop to `0/0`, not transferred (opponent's `self.senshu` stays `0`).
-- [ ] **AC-5** — penalty never confers (visibility): a penalty point never makes a fighter read as
+- [x] **AC-5** — penalty never confers (visibility): a penalty point never makes a fighter read as
       holder; a later solo technique still latches.
-- [ ] **AC-6** — same-tick latch-then-revoke never flashes: bot never reads `self.senshu = 1`
+- [x] **AC-6** — same-tick latch-then-revoke never flashes: bot never reads `self.senshu = 1`
       transiently (view goes `0` → `0`).
-- [ ] **AC-7** — read cadence = live-points cadence: first reads `1` on tick T+1, lockstep with
+- [x] **AC-7** — read cadence = live-points cadence: first reads `1` on tick T+1, lockstep with
       `opponent.points`, no extra `L_pos`/`L_act` delay.
-- [ ] **AC-8** — `opponent.senshu` is LIVE (immune to `L_act`): with `L_act > 0`, flips in lockstep
+- [x] **AC-8** — `opponent.senshu` is LIVE (immune to `L_act`): with `L_act > 0`, flips in lockstep
       with `opponent.points`, not lagged.
-- [ ] **AC-9** — persists across resets incl. OT: holder still reads `1` after yame/jogai/passivity +
+- [x] **AC-9** — persists across resets incl. OT: holder still reads `1` after yame/jogai/passivity +
       overtime `resetToNeutral`.
-- [ ] **AC-10** — byte-identical absent + swap-symmetric + interpreter 100%: absent `match.senshu` →
+- [x] **AC-10** — byte-identical absent + swap-symmetric + interpreter 100%: absent `match.senshu` →
       `0/0` all bout, existing fights byte-identical (no `FightResult` change), replay-stable.
-- [ ] **AC-11** — spec drift-clean: `docs/spec.md` regenerated (2 bullets + 2 enum entries, bare, no
+- [x] **AC-11** — spec drift-clean: `docs/spec.md` regenerated (2 bullets + 2 enum entries, bare, no
       prose), drift test re-pinned, no version/hash bump.
 
 ## Slices
@@ -71,7 +71,7 @@ senshu win/draw spec prose (Capability D).
 
 1. **interpret-tick reader rows** (`src/engine/interpret-tick.test.ts`): add table rows
    `["self.senshu", { self: { senshu: 1 } }, 1]` and `["opponent.senshu", { opponent: { senshu: 1 } },
-   1]`. These fail to compile until `FieldPath` + the state types include `senshu` — add `senshu: 0` to
+1]`. These fail to compile until `FieldPath` + the state types include `senshu` — add `senshu: 0` to
    the `getMockState` default `self` / `opponent` objects (like C2b's `overtime: 0` on the default
    clock). Fails for the right reason (unknown field path / missing reader), not merely a type error:
    scaffold the type + a deliberately-wrong placeholder reader (`() => 0`) so the row is RED on value.
@@ -108,7 +108,7 @@ gotcha), but the `===`/string mutants fully cover the mapping here, so NO hand-v
    `OpponentState` (after `passivityRemaining`) with a one-line comment (live first-blood tell; `0` =
    not held / no senshu configured — the sentinel).
 2. `src/engine/sim.ts` `viewFor`: grow the signature by two params `selfSenshu: number, oppSenshu:
-   number`; assign `senshu: selfSenshu` in the `self` view and `senshu: oppSenshu` in the `opponent`
+number`; assign `senshu: selfSenshu` in the `self` view and `senshu: oppSenshu` in the `opponent`
    view. At the two call sites (sim.ts:1027 A-view, :1034 B-view) pass the egocentric ternaries —
    A-view: `senshuHolder === "A" ? 1 : 0`, `senshuHolder === "B" ? 1 : 0`; B-view mirrored
    (`=== "B"`, `=== "A"`). Swap-symmetric by construction; the `===` lives at the call site so it is
@@ -153,4 +153,5 @@ GREEN: types + `viewFor` threading + `dsl.ts` readers + `gen:spec` regen.
 MUTATE + KILL: scoped Stryker on the senshu regions; `===`/string/reader mutants killed.
 
 ---
-*Delete this file when the plan is complete. If `plans/` is empty, delete the directory.*
+
+_Delete this file when the plan is complete. If `plans/` is empty, delete the directory._

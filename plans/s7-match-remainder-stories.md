@@ -81,7 +81,7 @@ benchmark-adoption + spec-teaching slices.
   bait the forced commit. **DELAYED, not live** (D1): rides `oppAct`, complementing A3's live
   `opponent.penalties` (pending timer delayed, landed foul live). `frameOf` records raw
   `ticksSinceOffense` (scoring-agnostic, like `stamina`); `perceiveOpponent` derives `Math.max(0,
-  limit − oppAct.ticksSinceOffense)`, threading `match` in (D2, the C10 S4b `isGassedAt` precedent) —
+limit − oppAct.ticksSinceOffense)`, threading `match` in (D2, the C10 S4b `isGassedAt` precedent) —
   coherent with B3's self read at `L_act = 0` (D3). REFACTOR: shared `passivityRemainingOf(tso, match)`
   now feeds BOTH the B3 live self read (`viewFor`) and this delayed opponent read (`perceiveOpponent`).
   One `FieldPath` member + `OpponentState.passivityRemaining` + one **static** `FIELD_READERS` entry ⇒
@@ -692,7 +692,7 @@ short-circuit OT — OT runs on ANY level bout; senshu decides only if OT exhaus
 encho-sen-era authentic, and reuses C1's terminal senshu override UNTOUCHED — it just runs after the
 extended loop, no reordering). Loop bound: `maxTicks + (level ? overtime.ticks : 0)`.
 
-**OT entry:** `resetToNeutral` both fighters (fresh *encho-sen* "yoi" — bodies/posture/guard/windows/
+**OT entry:** `resetToNeutral` both fighters (fresh _encho-sen_ "yoi" — bodies/posture/guard/windows/
 clocks reset; points, stamina, penaltyCount, mem, `senshuHolder` PERSIST); clear the `scored` yame
 flag.
 
@@ -778,7 +778,7 @@ mid-exchange combo at the cap is truncated by OT entry exactly as the regulation
   the DSL sees `0` on every regulation tick and `1` from the first OT tick onward (zero-delay public
   fact). Given `match.overtime` absent / `ticks ≤ 0`, Then `clock.overtime` reads `0` all bout.
 - **AC-13 — ticksRemaining never negative.** Given OT in progress, Then `clock.ticksRemaining =
-  (maxTicks + K) − tick` (counts the OT budget down, ≥ 1 within OT): `1` on the last regulation tick,
+(maxTicks + K) − tick` (counts the OT budget down, ≥ 1 within OT): `1` on the last regulation tick,
   `K` on the first OT tick. Given `match.overtime` absent, Then `ticksRemaining = maxTicks − tick`
   (unchanged, byte-identical).
 - **AC-14 — byte-identical absent + replay-stable + swap-symmetric.** Given `match.overtime` absent (or
@@ -803,13 +803,13 @@ seam; NOT in `Rules`/`CANONICAL_RULES` (`npm run fight` unaffected). Absent `mat
 byte-identical.
 
 **Read fields (Q1 — both):** `self.senshu` + `opponent.senshu`, bilateral like every other scoreboard
-fact (`points`, `penalties`). *Protect* reads `self.senshu` (don't foul my lead away); *steal* reads
+fact (`points`, `penalties`). _Protect_ reads `self.senshu` (don't foul my lead away); _steal_ reads
 `opponent.senshu` — senshu never transfers, so "steal" = bait the holder into a Category-2 foul →
 `none`. A one-sided tell would be the odd scoreboard fact out and can't drive the steal half.
 
 **Perception layer (Q2 — live scoreboard, zero delay):** both ride the LIVE layer in `viewFor` off the
 bout-level `senshuHolder` — NOT the `L_act` ring buffer — exactly like `opponent.points` /
-`opponent.penalties`. Senshu is a public referee call derived from the *live* per-tick point delta;
+`opponent.penalties`. Senshu is a public referee call derived from the _live_ per-tick point delta;
 `opponent.points` is already zero-delay, so a delayed senshu would be incoherent (a bot could out-read
 the delay from the live points it's computed from). Mechanically, `senshuHolder` isn't in the `Frame`
 ring buffer at all — delaying would require inventing a per-fighter frame field for a semantically

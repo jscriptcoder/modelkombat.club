@@ -6905,8 +6905,20 @@ describe("runFight — senshu first-blood tiebreak (story C1a)", () => {
   // gyaku-zuki (startup 4) scores at tick 4; kizami-zuki (startup 8) at tick 8.
   const twoMoveRules = getMockRules({
     moves: {
-      "gyaku-zuki": { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
-      "kizami-zuki": { startup: 8, active: 2, recovery: 6, score: 1, reach: 250000 },
+      "gyaku-zuki": {
+        startup: 4,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
+      "kizami-zuki": {
+        startup: 8,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
     },
   });
 
@@ -7046,8 +7058,20 @@ describe("runFight — senshu revocation on jogai foul (story C1b)", () => {
   // owns (including the free 1st warning) loses senshu to `none` (permanent, not transferred).
   const twoMoveRules = getMockRules({
     moves: {
-      "gyaku-zuki": { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
-      "kizami-zuki": { startup: 8, active: 2, recovery: 6, score: 1, reach: 250000 },
+      "gyaku-zuki": {
+        startup: 4,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
+      "kizami-zuki": {
+        startup: 8,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
     },
   });
 
@@ -7317,8 +7341,20 @@ describe("runFight — senshu revocation on passivity foul (story C1b)", () => {
   // first foul; maxTicks 40 stops on a clean level 1-1 (after the free foul ~t32, before the paid ~t48).
   const twoMoveRules = getMockRules({
     moves: {
-      "gyaku-zuki": { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
-      "kizami-zuki": { startup: 8, active: 2, recovery: 6, score: 1, reach: 250000 },
+      "gyaku-zuki": {
+        startup: 4,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
+      "kizami-zuki": {
+        startup: 8,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
     },
   });
 
@@ -7461,7 +7497,9 @@ describe("runFight — senshu revocation on passivity foul (story C1b)", () => {
     // A huge limit ⇒ no passivity foul ⇒ the holder keeps senshu; per-tick simulation is identical to
     // the no-passivity run.
     const withHugeLimit = runFight(
-      passiveLevel({ match: { winGap: 99, senshu: true, passivity: { limit: 100000 } } }),
+      passiveLevel({
+        match: { winGap: 99, senshu: true, passivity: { limit: 100000 } },
+      }),
     );
 
     const withoutPassivity = runFight(
@@ -7525,8 +7563,20 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
 
   const twoMoveRules = getMockRules({
     moves: {
-      "gyaku-zuki": { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
-      "kizami-zuki": { startup: 8, active: 2, recovery: 6, score: 1, reach: 250000 },
+      "gyaku-zuki": {
+        startup: 4,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
+      "kizami-zuki": {
+        startup: 8,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
     },
   });
 
@@ -7715,7 +7765,9 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
 
   // AC-3: level at the cap, then A alone scores in OT ⇒ A wins immediately on the 1-point gap.
   it("ends overtime the moment one fighter opens a 1-point gap (AC-3)", () => {
-    const result = runFight(levelCfg({ botA: scoreThenOneInOT("gyaku-zuki", 40) }));
+    const result = runFight(
+      levelCfg({ botA: scoreThenOneInOT("gyaku-zuki", 40) }),
+    );
 
     expect(result.scores).toEqual({ a: 2, b: 1 });
     expect(result.winner).toBe("A");
@@ -7839,7 +7891,12 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
       botB: scoreOnce("kizami-zuki"),
       maxTicks: 40,
       seed: 1,
-      match: { winGap: 99, senshu: true, jogai: { margin: 100000 }, overtime: { ticks: 60 } },
+      match: {
+        winGap: 99,
+        senshu: true,
+        jogai: { margin: 100000 },
+        overtime: { ticks: 60 },
+      },
     });
 
     expect(result.scores).toEqual({ a: 1, b: 2 });
@@ -7858,7 +7915,12 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
       botB: scoreOnce("kizami-zuki"),
       maxTicks: 40,
       seed: 1,
-      match: { winGap: 99, senshu: true, jogai: { margin: 100000 }, overtime: { ticks: 60 } },
+      match: {
+        winGap: 99,
+        senshu: true,
+        jogai: { margin: 100000 },
+        overtime: { ticks: 60 },
+      },
     });
 
     expect(result.scores).toEqual({ a: 1, b: 1 }); // a free warning awards no point
@@ -7875,7 +7937,12 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
       botB: scoreThenRetreatUntil("kizami-zuki", 40, 1), // B (non-holder) fouls once in OT
       maxTicks: 40,
       seed: 1,
-      match: { winGap: 99, senshu: true, jogai: { margin: 100000 }, overtime: { ticks: 60 } },
+      match: {
+        winGap: 99,
+        senshu: true,
+        jogai: { margin: 100000 },
+        overtime: { ticks: 60 },
+      },
     });
 
     expect(result.scores).toEqual({ a: 1, b: 1 });
@@ -7943,7 +8010,12 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
       botB: scoreThenBlock("kizami-zuki"), // evens to 1-1, then guards ⇒ sole passivity fouler
       maxTicks: 50,
       seed: 1,
-      match: { winGap: 99, senshu: true, passivity: { limit: 15 }, overtime: { ticks: 20 } },
+      match: {
+        winGap: 99,
+        senshu: true,
+        passivity: { limit: 15 },
+        overtime: { ticks: 20 },
+      },
     });
 
     expect(result.scores).toEqual({ a: 2, b: 1 }); // B's OT passivity foul awards A +1
@@ -7959,7 +8031,13 @@ describe("runFight — sudden-death overtime perception (story C2b: clock.overti
   // positions, so a bot that first acts at the OT boundary lands its strike.
   const otRules = getMockRules({
     moves: {
-      "gyaku-zuki": { startup: 4, active: 2, recovery: 6, score: 1, reach: 250000 },
+      "gyaku-zuki": {
+        startup: 4,
+        active: 2,
+        recovery: 6,
+        score: 1,
+        reach: 250000,
+      },
     },
   });
 
@@ -8123,5 +8201,278 @@ describe("runFight — sudden-death overtime perception (story C2b: clock.overti
     expect(result.winner).toBe("draw");
     expect(result.endReason).toBe("time");
     expect(result.ticks).toBe(30); // 10 + 20, ran to exhaustion with no spurious attack
+  });
+});
+
+describe("runFight — senshu perception (story C3: self.senshu / opponent.senshu)", () => {
+  const senshuRules = getMockRules();
+  const ATTACKER = bot([], { type: "attack", move: "gyaku-zuki", band: "mid" });
+
+  const eqField = (path: FieldPath, value: number): BoolExpr => ({
+    op: "eq",
+    args: [
+      { op: "field", path },
+      { op: "const", value },
+    ],
+  });
+
+  const gteField = (path: FieldPath, value: number): BoolExpr => ({
+    op: "gte",
+    args: [
+      { op: "field", path },
+      { op: "const", value },
+    ],
+  });
+
+  // Attacks until it holds senshu, then idles. A solo holder therefore scores exactly its first blood
+  // and stops; a stuck-0 self.senshu keeps it attacking past 1.
+  const idleWhenSelfSenshu = (move: MoveId): BotDoc => ({
+    version: 1,
+    name: "idle-when-self-senshu",
+    rules: [{ when: eqField("self.senshu", 1), do: { type: "idle" } }],
+    default: { type: "attack", move, band: "mid" },
+  });
+
+  // Idles until it PERCEIVES the opponent holds senshu, then attacks. The reader is NOT the fighter
+  // that scored first blood, so this isolates the opponent read (idle-until-flip, like the C2b overtime
+  // probe).
+  const attackWhenOppSenshu = (move: MoveId): BotDoc => ({
+    version: 1,
+    name: "attack-when-opp-senshu",
+    rules: [
+      {
+        when: eqField("opponent.senshu", 1),
+        do: { type: "attack", move, band: "mid" },
+      },
+    ],
+    default: { type: "idle" },
+  });
+
+  // AC-1: solo first blood latches senshu to A; from the next tick self.senshu reads 1 ⇒ A idles ⇒
+  // never scores again. A stuck-0 read would keep A attacking (a > 1).
+  it("the holder reads self.senshu = 1 and stops — scores only its first blood (AC-1)", () => {
+    const result = runFight({
+      rules: senshuRules,
+      botA: idleWhenSelfSenshu("gyaku-zuki"),
+      botB: IDLE,
+      maxTicks: 40,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.scores).toEqual({ a: 1, b: 0 });
+    expect(result.winner).toBe("A");
+  });
+
+  // AC-1 swap-symmetric: the same probe as B holds senshu and stops (holder logic mirrors A↔B).
+  it("mirrors under a fighter swap — B holds senshu and stops (AC-1 swap-symmetric)", () => {
+    const result = runFight({
+      rules: senshuRules,
+      botA: IDLE,
+      botB: idleWhenSelfSenshu("gyaku-zuki"),
+      maxTicks: 40,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.scores).toEqual({ a: 0, b: 1 });
+    expect(result.winner).toBe("B");
+  });
+
+  // AC-3: two mirror attackers land first blood on the SAME tick ⇒ senshu = none (never held). An
+  // idle-when-self-senshu probe therefore never idles — both keep trading past 1, and the level cap
+  // stays a draw (no holder to break the tie).
+  it("simultaneous first blood ⇒ none ⇒ no fighter ever reads self.senshu = 1 (AC-3)", () => {
+    const result = runFight({
+      rules: senshuRules,
+      botA: idleWhenSelfSenshu("gyaku-zuki"),
+      botB: idleWhenSelfSenshu("gyaku-zuki"),
+      maxTicks: 40,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.scores.a).toBeGreaterThan(1);
+    expect(result.scores.b).toBeGreaterThan(1);
+    expect(result.winner).toBe("draw");
+  });
+
+  // AC-8: A scores first blood ⇒ holds senshu. B idles until it perceives opponent.senshu, then attacks
+  // and scores. opponent.senshu rides the LIVE scoreboard layer (zero delay), so even with L_act = 5 B
+  // reacts — a stuck-0 read would leave B idle (b == 0).
+  it("a foe reads opponent.senshu = 1 when the holder latches it — readable live under L_act (AC-8)", () => {
+    const result = runFight({
+      rules: getMockRules({ perception: { lAct: 5 } }),
+      botA: ATTACKER,
+      botB: attackWhenOppSenshu("gyaku-zuki"),
+      maxTicks: 40,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.scores.b).toBeGreaterThan(0);
+  });
+
+  // AC-8 (live): the detector fires ONLY if opponent.points has registered the score while
+  // opponent.senshu is still 0 — i.e. senshu lagging the live points. Both are LIVE and flip on the
+  // same tick, so the AND is never true ⇒ b == 0. A delayed senshu would open a 5-tick window
+  // (points ≥ 1, senshu 0) in which the detector scores.
+  it("opponent.senshu never lags the live opponent.points — no lag window at L_act = 5 (AC-8 live)", () => {
+    const lagDetector: BotDoc = {
+      version: 1,
+      name: "senshu-lag-detector",
+      rules: [
+        {
+          when: {
+            op: "and",
+            args: [
+              eqField("opponent.senshu", 0),
+              gteField("opponent.points", 1),
+            ],
+          },
+          do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+        },
+      ],
+      default: { type: "idle" },
+    };
+
+    const result = runFight({
+      rules: getMockRules({ perception: { lAct: 5 } }),
+      botA: ATTACKER,
+      botB: lagDetector,
+      maxTicks: 40,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.scores.b).toBe(0);
+  });
+
+  // AC-10: no match ⇒ senshu never latches ⇒ self.senshu reads 0 all bout ⇒ the idle-when-senshu rule
+  // never fires ⇒ identical FightResult to a plain attacker. The field is inert when unconfigured.
+  it("with match.senshu absent, self.senshu reads 0 ⇒ a senshu-gated bot == a plain attacker (AC-10)", () => {
+    const base = { rules: senshuRules, botB: IDLE, maxTicks: 30, seed: 1 };
+    const gated = runFight({ ...base, botA: idleWhenSelfSenshu("gyaku-zuki") });
+    const plain = runFight({ ...base, botA: ATTACKER });
+
+    expect(JSON.stringify(gated)).toBe(JSON.stringify(plain));
+  });
+
+  // AC-10 (replay-stable): a senshu-decided fight is deterministic byte-for-byte.
+  it("a senshu-decided fight replays byte-identically (AC-10 replay-stable)", () => {
+    const cfg: FightConfig = {
+      rules: senshuRules,
+      botA: idleWhenSelfSenshu("gyaku-zuki"),
+      botB: IDLE,
+      maxTicks: 40,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    };
+
+    expect(JSON.stringify(runFight(cfg))).toBe(JSON.stringify(runFight(cfg)));
+  });
+
+  // AC-8 swap-symmetric: the B-slot fighter latches senshu, and A reads opponent.senshu = 1 (kills the
+  // A-view opponent read mutants — the direction the primary AC-8 case never exercises).
+  it("mirrors — A reads opponent.senshu = 1 when B latches senshu (AC-8 swap-symmetric)", () => {
+    const result = runFight({
+      rules: getMockRules({ perception: { lAct: 5 } }),
+      botA: attackWhenOppSenshu("gyaku-zuki"),
+      botB: ATTACKER,
+      maxTicks: 40,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.scores.a).toBeGreaterThan(0);
+  });
+
+  // AC-2: no first blood ⇒ senshu undecided ⇒ opponent.senshu reads 0 ⇒ a foe-senshu probe never
+  // fires. Kills the forcing-true mutant (which would make the read 1 from tick 0).
+  it("reads opponent.senshu = 0 while senshu is undecided — the probe never fires (AC-2)", () => {
+    const result = runFight({
+      rules: senshuRules,
+      botA: attackWhenOppSenshu("gyaku-zuki"),
+      botB: IDLE,
+      maxTicks: 20,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.scores).toEqual({ a: 0, b: 0 });
+  });
+
+  // AC-2 (swap): the same, with the probe in the B slot — kills the B-view forcing-true mutant.
+  it("(swap) reads opponent.senshu = 0 for the B-slot probe while senshu is undecided (AC-2)", () => {
+    const result = runFight({
+      rules: senshuRules,
+      botA: IDLE,
+      botB: attackWhenOppSenshu("gyaku-zuki"),
+      maxTicks: 20,
+      seed: 1,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.scores).toEqual({ a: 0, b: 0 });
+  });
+
+  // Attacks until it holds senshu, then retreats out-zone (to foul it away). Once the free 1st jogai
+  // warning revokes senshu ⇒ self.senshu drops to 0 ⇒ it attacks again.
+  const retreatWhenSelfSenshu = (move: MoveId): BotDoc => ({
+    version: 1,
+    name: "retreat-when-self-senshu",
+    rules: [{ when: eqField("self.senshu", 1), do: { type: "move", dir: -1 } }],
+    default: { type: "attack", move, band: "mid" },
+  });
+
+  // AC-4: the read reflects revocation. A scores first blood (self.senshu 1), retreats, and its free 1st
+  // jogai warning revokes senshu to none ⇒ self.senshu drops back to 0 ⇒ A resumes attacking and scores
+  // more. A read stuck at 1 would leave A retreating forever (a == 1).
+  it("the read reflects revocation — a holder that fouls senshu away resumes attacking (AC-4)", () => {
+    const result = runFight({
+      rules: getMockRules(),
+      botA: retreatWhenSelfSenshu("gyaku-zuki"),
+      botB: IDLE,
+      maxTicks: 120,
+      seed: 1,
+      match: { winGap: 99, senshu: true, jogai: { margin: 100000 } },
+    });
+
+    expect(result.scores.a).toBeGreaterThan(1);
+  });
+
+  // AC-5: a penalty point never confers senshu. A retreats out-zone, handing B jogai PENALTY points
+  // (B has points but no technique). From A's view opponent.points ≥ 1 while opponent.senshu stays 0 ⇒
+  // the detector fires and A scores. If a penalty wrongly conferred senshu, opponent.senshu would read 1
+  // and the detector never fires (a == 0).
+  it("a jogai penalty point never confers senshu — opponent.points rises while opponent.senshu stays 0 (AC-5)", () => {
+    const penaltyProbe: BotDoc = {
+      version: 1,
+      name: "penalty-senshu-probe",
+      rules: [
+        {
+          when: {
+            op: "and",
+            args: [
+              eqField("opponent.senshu", 0),
+              gteField("opponent.points", 1),
+            ],
+          },
+          do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+        },
+      ],
+      default: { type: "move", dir: -1 },
+    };
+
+    const result = runFight({
+      rules: getMockRules(),
+      botA: penaltyProbe,
+      botB: IDLE,
+      maxTicks: 120,
+      seed: 1,
+      match: { winGap: 99, senshu: true, jogai: { margin: 100000 } },
+    });
+
+    expect(result.scores.a).toBeGreaterThan(0);
   });
 });
