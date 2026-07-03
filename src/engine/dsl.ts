@@ -233,6 +233,13 @@ export const RULE_READERS = {
   "moves.empi.score": (r: Rules) => r.moves.empi?.score ?? 0,
   "moves.empi.reach": (r: Rules) => r.moves.empi?.reach ?? 0,
   "moves.empi.staminaCost": (r: Rules) => r.moves.empi?.staminaCost ?? 0,
+  "moves.hiza-geri.startup": (r: Rules) => r.moves["hiza-geri"]?.startup ?? 0,
+  "moves.hiza-geri.active": (r: Rules) => r.moves["hiza-geri"]?.active ?? 0,
+  "moves.hiza-geri.recovery": (r: Rules) => r.moves["hiza-geri"]?.recovery ?? 0,
+  "moves.hiza-geri.score": (r: Rules) => r.moves["hiza-geri"]?.score ?? 0,
+  "moves.hiza-geri.reach": (r: Rules) => r.moves["hiza-geri"]?.reach ?? 0,
+  "moves.hiza-geri.staminaCost": (r: Rules) =>
+    r.moves["hiza-geri"]?.staminaCost ?? 0,
   "throw.startup": (r: Rules) => r.throw?.startup ?? 0,
   "throw.active": (r: Rules) => r.throw?.active ?? 0,
   "throw.recovery": (r: Rules) => r.throw?.recovery ?? 0,
