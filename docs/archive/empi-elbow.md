@@ -1,7 +1,7 @@
 # Plan: `empi` (elbow) — Batch-1 move #5
 
 **Branch**: feat/empi-elbow (Slice 1) · feat/empi-rule-readers (Slice 2)
-**Status**: Active — Slice 1 not started
+**Status**: ✅ **COMPLETE** — Slice 1 MERGED (PR #129, benchmark v9) · Slice 2 MERGED (PR #130, no bump)
 **Design source**: `docs/move-roster.md` (Batch-1 resolved frame data; balance law + policies)
 
 ## Goal
@@ -81,34 +81,34 @@ so their round-robin outcomes stay byte-identical under v9 (no gauntlet re-chara
 Behaviour proven by `runFight` against `CANONICAL_RULES` (engine), `validate` (TCB), and the
 `gen-spec` / schema drift tests (spec). Observable score/accept assertions, not literals alone.
 
-- [ ] **AC-1 (waza-ari — point-blank):** a clean `empi` within reach (point-blank) scores **2**
+- [x] **AC-1 (waza-ari — point-blank):** a clean `empi` within reach (point-blank) scores **2**
       (close-range _waza-ari_ — the first close strike of the expansion).
-- [ ] **AC-2 (band gate — high·mid, flat 2):** `empi` scores **2** at `band:"high"` **and** **2** at
+- [x] **AC-2 (band gate — high·mid, flat 2):** `empi` scores **2** at `band:"high"` **and** **2** at
       `band:"mid"` (flat — **no** jodan bonus, unlike `ushiro-geri`), and degrades to idle ⇒ **0** at
       `band:"low"` (out of band).
-- [ ] **AC-3 (shortest reach — the signature / infighting floor):** at a gap between `empi` (95k) and
+- [x] **AC-3 (shortest reach — the signature / infighting floor):** at a gap between `empi` (95k) and
       the `throw` (120k) — e.g. `startGap 100000` — `empi` whiffs to **0** where a `throw` connects ⇒
       **3** (documents `empi.reach < throw.reach` — the new infighting floor, the shortest reach in the
       game, connecting only point-blank).
-- [ ] **AC-4 (gas-LOCKED):** a **gassed** fighter (`stamina ≤ gasThreshold 30`) can **no longer**
+- [x] **AC-4 (gas-LOCKED):** a **gassed** fighter (`stamina ≤ gasThreshold 30`) can **no longer**
       commit `empi` — the commit degrades to idle ⇒ **0** (its cost 38 > 30, like the kicks). Property:
       `empi.staminaCost > gasThreshold`.
-- [ ] **AC-5 (close strike → reverse finisher):** an `empi` that connects opens the cancel window; a
+- [x] **AC-5 (close strike → reverse finisher):** an `empi` that connects opens the cancel window; a
       `gyaku-zuki` started within it hit-confirms (empi → reverse, the "close strike → `gyaku-zuki`"
       category policy; situational — the 240k reverse only reaches when the elbow landed within its
       reach). _(empi is a cancel **source only** — there is no reverse → empi edge.)_
-- [ ] **AC-6 (TCB allowlist):** `validate` accepts `{type:"attack", move:"empi", band:"mid"}` **and**
+- [x] **AC-6 (TCB allowlist):** `validate` accepts `{type:"attack", move:"empi", band:"mid"}` **and**
       accepts it out-of-band (`band:"low"`) — band-legality is a runtime concern; the validator only
       checks the move id + band are well-formed.
-- [ ] **AC-7 (spec teaches the move + bands):** regenerated `spec.md` lists `empi` in the attack-move
+- [x] **AC-7 (spec teaches the move + bands):** regenerated `spec.md` lists `empi` in the attack-move
       line, the move-stats table (with `bands: high/mid` and the shortest `reach`), and the JSON-schema
       `move` enum; `gen-spec` + schema drift tests stay green; `BENCHMARK_VERSION` v8 → v9.
-- [ ] **AC-8 (rule-path accepted):** `validate` accepts a bot using `rule("moves.empi.reach")` (and the
+- [x] **AC-8 (rule-path accepted):** `validate` accepts a bot using `rule("moves.empi.reach")` (and the
       other 5 paths); an unknown `moves.empi.bands` path is **rejected**. _(Slice 2)_
-- [ ] **AC-9 (reader returns the value):** the interpreter resolves `rule("moves.empi.reach")` to
+- [x] **AC-9 (reader returns the value):** the interpreter resolves `rule("moves.empi.reach")` to
       **95000**, `rule("moves.empi.staminaCost")` to **38**, and `rule("moves.empi.score")` to **2**
       against `CANONICAL_RULES`. _(Slice 2)_
-- [ ] **AC-10 (spec lists the paths):** regenerated `spec.md` lists the six `moves.empi.*` rule paths +
+- [x] **AC-10 (spec lists the paths):** regenerated `spec.md` lists the six `moves.empi.*` rule paths +
       the `rulePath` schema enum; drift tests green. _(Slice 2)_
 
 **Deferred (NOT this feature):** the roster-wide no-Pareto-dominance property test (add once Batch-1
@@ -121,7 +121,7 @@ expressible in Batch 1 — deferred engine work).
 One slice = one PR. Each follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Load the project CLAUDE.md +
 `tdd`/`testing`/`mutation-testing`/`refactoring` before any code.
 
-### Slice 1: Bot can throw `empi` — the canonical shortest-reach score-2 gas-locked close strike
+### Slice 1: Bot can throw `empi` — the canonical shortest-reach score-2 gas-locked close strike — ✅ MERGED (PR #129)
 
 **Value**: The bot author gets a point-blank _waza-ari_ that only lands inside throw range — a new
 infighting tool that scores kick-tier points from the hands, trading all reach for that access. The
@@ -184,7 +184,7 @@ no value.
 `dsl.ts`/`rules.ts`/`benchmark-config.ts` mutation 100%; typecheck + lint + format clean; mutation
 report reviewed; human approves commit.
 
-### Slice 2: Bots can introspect `empi`'s frames via `rule("moves.empi.*")`
+### Slice 2: Bots can introspect `empi`'s frames via `rule("moves.empi.*")` — ✅ MERGED (PR #130)
 
 **Value**: The bot author can read `empi`'s frames at runtime to write adaptive logic (e.g. gate on
 `rule("moves.empi.reach")` to only commit the elbow at point-blank spacing), the same as every other

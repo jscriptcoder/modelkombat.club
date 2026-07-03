@@ -480,6 +480,19 @@ v7` (`INPUT_HASH` flip). **Slice 2 (#124)** adds the 6 `rule("moves.yoko-geri.*"
   bump**. 967 tests; both slices 100% mutation on changed lines (a `scoreByBand.high` inner-`?.` guard test, mirroring
   the roundhouse, kills the lone survivor). Plan archived at `docs/archive/ushiro-geri-back-kick.md`. **Next Batch-1
   move: `empi`.**
+- DONE (**Batch-1 arsenal expansion — `empi` (elbow), move #5/6, PRs #129–#130**): the **first close-range strike**
+  and the **shortest reach in the game** (`reach 95000` — below even the throw's 120000), the new infighting **floor**
+  that connects only point-blank. It scores a **flat 2** (_waza-ari_) at `high·mid` — the deliberate close-range
+  exception to the hand score-cap (no `scoreByBand`, unlike `ushiro-geri`/`mawashi-geri`) — is gas-locked
+  (`staminaCost 38 > gasThreshold 30`), and is a cancel **source only** (`empi → gyaku-zuki`; **not** a reverse-punch
+  target, so `gyaku-zuki.cancelInto` is unchanged — the smaller `uraken`/`shuto` footprint, no cancel-edge growth).
+  Dominance-free vs `mae-geri` (also score 2): it trades ~175k of reach down for point-blank access, so neither
+  dominates. Same **pure data + TCB allowlist** shape (the generic `sim.ts` resolver is untouched). **Slice 1 (#129)**
+  wires it in (`MoveId`/`Rules.moves` types, `MOVES` entry, the `CANONICAL_RULES` spec, regenerated `spec.md`) ⇒
+  `BENCHMARK_VERSION v8 → v9` (`INPUT_HASH` flip). **Slice 2 (#130)** adds the **6** `rule("moves.empi.*")` readers
+  (no `scoreByBand` ⇒ a clean 6-reader add, no guard test) ⇒ reads-only, `INPUT_HASH` stable ⇒ **no version bump**.
+  990 tests; both slices 100% mutation on changed lines. Plan archived at `docs/archive/empi-elbow.md`. **Next Batch-1
+  move: `hiza-geri` (the last grounded move).**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -512,9 +525,10 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    (`docs/move-roster.md`: balance law + 6 resolved frame blocks), one PR per technique.
    **`uraken` SHIPPED** (#117 wiring → v5, #118 `rule()` readers → no bump), **`shuto`
    SHIPPED** (#120 wiring → v6, #121 `rule()` readers → no bump), **`yoko-geri` SHIPPED**
-   (#123 wiring → v7, #124 `rule()` readers → no bump), and **`ushiro-geri` SHIPPED**
-   (#126 wiring → v8, #127 `rule()` readers → no bump). Remaining 2 grounded moves:
-   **`empi`, `hiza-geri`** — each wiring PR bumps `BENCHMARK_VERSION` (v9…v10).
+   (#123 wiring → v7, #124 `rule()` readers → no bump), **`ushiro-geri` SHIPPED**
+   (#126 wiring → v8, #127 `rule()` readers → no bump), and **`empi` SHIPPED**
+   (#129 wiring → v9, #130 `rule()` readers → no bump). Remaining 1 grounded move:
+   **`hiza-geri`** — its wiring PR bumps `BENCHMARK_VERSION` (→ v10).
    Then a roster-wide no-Pareto-dominance property test. Air (`tobi-geri`) is Batch 2, gated on
    the unbuilt air-strike capability (item 5).
 2. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low
