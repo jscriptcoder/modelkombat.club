@@ -1,4 +1,11 @@
-# §7 match-structure remainder — story split
+# §7 match-structure remainder — story split (ARCHIVED design record)
+
+> **ARCHIVED 2026-07-03.** This was `plans/s7-match-remainder-stories.md`. Capabilities
+> A (jogai), B (passivity), C (tie resolution), and D (benchmark + spec senshu adoption)
+> are all **DONE** (PRs #97–#114). It is kept as the authoritative **design record** —
+> the resolved-decisions + acceptance-criteria sections below remain the reference for
+> the still-**deferred** benchmark/spec adoption of jogai / passivity / overtime.
+> The live status + "Next in the pipeline" roadmap now live in **`docs/STATUS.md`**.
 
 Source design: `docs/DESIGN.md` §7a (grill 2026-07-01). Precedent to mirror:
 benchmark match-structure (PRs #87–#93) — additive slices, each byte-identical
@@ -1155,7 +1162,9 @@ re-pinned; `generateSpec` teaches the `winGap → senshu → residual-draw` casc
 `opponent.senshu` tells, gated on `match.senshu`). 872 tests; D1 mutation 100% (65/65), D2 100% (6/6). The
 plan `d-benchmark-spec-adoption.md` is deleted (record in git / PRs #113–#114 + `docs/benchmark-gauntlet-v4.md`).
 
-**Next (the standing §7 remainder — all DEFERRED; each needs `grill-me` → `planning` → TDD):**
+**Next (the standing §7 remainder — all DEFERRED; each needs `grill-me` → `planning` → TDD).**
+The live roadmap now lives in **`docs/STATUS.md` → "Next in the pipeline"**; summarized here for
+context alongside the design records:
 
 1. **Gauntlet rebalance** — the `vulture` parry→counter follow-up (16%, out the low `[25%,75%]` band; a
    naive offense buff backfired), now joined by a NEW D1 finding: **`sweeper` 82% (out-of-band HIGH under
@@ -1168,5 +1177,5 @@ plan `d-benchmark-spec-adoption.md` is deleted (record in git / PRs #113–#114 
 3. **Rest of §7** — **rounds** (the last unbuilt match-structure piece).
 4. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap capability).
 
-This standing tracker is KEPT (the §7 design record + resolved-decisions/AC sections below remain the
-authoritative reference for the deferred adoption work).
+This archived document is KEPT as the §7 design record — the resolved-decisions/AC sections above remain
+the authoritative reference for the deferred adoption work.

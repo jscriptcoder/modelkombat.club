@@ -100,9 +100,12 @@ guard` precedence resolves in the union (strike **stuffs**, `throw-break` escape
   behavioral `runFight` test (the design inequalities + WKF scoring); the CLI runner
   fights on it and `src/cli/demo-rules.ts` is gone.
 
-**354 tests; `sim.ts` mutation ~95%, `dsl.ts` interpreter 100%, `rules.ts` 100%. Next:**
-capability not yet resolved (candidates: match structure, air-actions). See
-`.claude/CLAUDE.md` Status for the live roadmap and detail.
+The milestones above are the core-engine highlights; since then the build has added the
+**C9** multi-move arsenal, the **C10** stamina economy, **WKF match structure** (yame +
+win condition + jogai / passivity officiating + senshu / overtime tie-resolution), and
+the offline **LLM bot-authoring benchmark v1**. The full capability-by-capability build
+log and the **"Next in the pipeline"** roadmap are the authoritative status record in
+**`docs/STATUS.md`**.
 
-See `.claude/CLAUDE.md` for the invariants and current direction, `docs/DESIGN.md`
-for the design rationale.
+See `docs/STATUS.md` for the live status + roadmap, `.claude/CLAUDE.md` for the
+invariants and current direction, and `docs/DESIGN.md` for the design rationale.
