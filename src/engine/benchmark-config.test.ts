@@ -49,14 +49,14 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     ]);
   });
 
-  it("freezes the run parameters: seeds 1..10 at 600 ticks, WKF match at an 8-point gap", () => {
+  it("freezes the run parameters: seeds 1..10 at 600 ticks, WKF match at an 8-point gap with senshu", () => {
     expect(SEEDS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(MAX_TICKS).toBe(600);
-    expect(MATCH).toEqual({ winGap: 8 });
+    expect(MATCH).toEqual({ winGap: 8, senshu: true });
   });
 
-  it("carries BENCHMARK_VERSION v3 (knockdownDuration de-wall retune)", () => {
-    expect(BENCHMARK_VERSION).toBe("v3");
+  it("carries BENCHMARK_VERSION v4 (senshu first-blood tie-resolution adoption)", () => {
+    expect(BENCHMARK_VERSION).toBe("v4");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {
