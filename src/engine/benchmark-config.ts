@@ -44,7 +44,10 @@ export const GAUNTLET_NAMES: readonly string[] = [
 ];
 
 // sha256 of { rules: CANONICAL_RULES, seeds, maxTicks, match, gauntlet: [<file text>] }.
-// Recompute and bump (with BENCHMARK_VERSION) whenever a scoring input changes —
-// the guard test in benchmark-config.test.ts prints the expected value on drift.
+// The gauntlet file texts are hashed with LF line endings, pinned by `.gitattributes`
+// (`bots/*.json text eol=lf`) so the digest is byte-stable on every platform. Recompute
+// and bump (with BENCHMARK_VERSION) whenever a scoring input changes — the guard test in
+// benchmark-config.test.ts prints the expected value on drift. (This value canonicalized
+// to all-LF; the version stayed `v14` because line endings do not affect parsing/fights.)
 export const INPUT_HASH =
-  "5bae2d64bcd60fa81aa4b10534661fd8f528b73d07b8860226ba683d4db4b395";
+  "5a503468bff0888c2196ab9259ae51d811c7101a68413ddb3b7c764a4cd05834";
