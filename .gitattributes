@@ -2,3 +2,9 @@
 # byte-match drift test holds. Without this, core.autocrlf=true would check it
 # out as CRLF on Windows while generateSpec() emits LF, failing the test.
 docs/spec.md text eol=lf
+
+# The gauntlet bot documents are frozen scoring inputs: benchmark-config's
+# INPUT_HASH is the sha256 of their (LF) file text. Pin them to LF so the hash
+# guard holds on every platform — else core.autocrlf=true checks them out as
+# CRLF on Windows, changing the hashed bytes and failing the guard test.
+bots/*.json text eol=lf
