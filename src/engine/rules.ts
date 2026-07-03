@@ -118,6 +118,26 @@ export const CANONICAL_RULES: Rules = {
       staminaCost: 12,
       cancelInto: ["gyaku-zuki"],
     },
+    // shuto (knife-hand, Batch-1 expansion #2): the LONGEST-reach hand — it out-ranges the
+    // reverse, the trade-off budget / no-Pareto-dominance law made concrete:
+    //   • reach 260000 > gyaku-zuki (240000) ⇒ a 1-point hand reaching PAST the 2-point reverse
+    //     (and past the jab 210000) — its signature. Pays with score 1 (< reverse 2), cost 22
+    //     (> reverse 20), startup 8 (> reverse 7): dominance-free vs both existing hands.
+    //   • bands ["high","mid"] ⇒ the conventional chudan/jodan gate (whiffs a low attack).
+    //   • staminaCost 22 ≤ gasThreshold (30) ⇒ gas-proof, the priciest basic hand (> jab 15,
+    //     > backfist 12). Score-1 basic per "stamina tier mirrors score tier".
+    //   • startup 8 ≥ lAct+1 / recovery 15 ≥ lAct + jab.startup ⇒ the reactable + punishable floor.
+    //   • cancelInto gyaku-zuki ⇒ the rekka opener (hand → reverse, the category policy).
+    shuto: {
+      startup: 8,
+      active: 2,
+      recovery: 15,
+      score: 1,
+      reach: 260000,
+      bands: ["high", "mid"],
+      staminaCost: 22,
+      cancelInto: ["gyaku-zuki"],
+    },
   },
   // Defensive depth (C5/C6), tuned to the canonical strike's startup-7 timing:
   //   • parryWindow 2 — a matching guard's first 2 ticks (age 1–2) DEFLECT instead of block: a
