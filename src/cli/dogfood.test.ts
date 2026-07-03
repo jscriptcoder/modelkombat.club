@@ -16,15 +16,16 @@ import { CANONICAL_RULES } from "../engine/rules.js";
 // The dogfood bot — authored COLD from `docs/spec.md` alone (the one-shot
 // benchmark input), exercising the spec's sweep→cancel→finish okizeme combo to
 // prove the generated spec is a sufficient authoring instrument. Two things are
-// pinned here: (1) it VALIDATES first-try, and (2) run through the real v13
+// pinned here: (1) it VALIDATES first-try, and (2) run through the real v14
 // benchmark (WKF match mode + senshu, CANONICAL_RULES) it competes as a REAL
 // match participant — winning some matchups and losing most. This replaces the
 // stale raw-600-tick read (a −2682 "> half net-points" near-miss against a
 // 100%-win sweeper); under match mode the score ranks by match wins, so the
 // dogfood is a weak-but-legitimate entry. Gauntlet modernization S1 (vulture
 // gains a parry→counter) shifted its record 16W/104L → 18W/102L; S-jabber
-// (jabber block+counter) and S2 (zoner's narrow-gated long kicks) both left it
-// unchanged — the dogfood was already losing both matchups.
+// (jabber block+counter), S2 (zoner's narrow-gated long kicks) and S3
+// (grappler's close-range knee + elbow) all left it unchanged — the dogfood was
+// already losing those matchups.
 const botText = (name: string): string =>
   readFileSync(
     fileURLToPath(new URL(`../../bots/${name}.json`, import.meta.url)),
@@ -37,8 +38,8 @@ describe("dogfood bot (authored from docs/spec.md)", () => {
     expect(validate(doc).ok).toBe(true);
   });
 
-  it("competes as a real match participant in the v13 benchmark (wins some, loses most)", () => {
-    // The real aggregator over the frozen v13 gauntlet — the exact scoring inputs
+  it("competes as a real match participant in the v14 benchmark (wins some, loses most)", () => {
+    // The real aggregator over the frozen v14 gauntlet — the exact scoring inputs
     // pinned by BENCHMARK_VERSION/INPUT_HASH (a change bumps the version and this
     // characterization with it).
     const result = benchmark({
