@@ -468,7 +468,33 @@ generating code; flag any change that would.
   C3 plan file `plans/c3-senshu-perception.md` is deleted (record in git / PR #110). The standing tracker flips
   Next Step to **Capability D** (benchmark `MATCH`/`INPUT_HASH`/`BENCHMARK_VERSION` adoption + `generateSpec`
   win/draw/OT/senshu prose — the deferred `docs/spec.md` match narrative).
-- ROADMAP (C9 + C10 + LLM benchmark v1 + benchmark match structure COMPLETE): the still-unresolved **air-actions** (air
+- DONE (**Capability D — benchmark + spec senshu adoption, PRs #113–#114**): the downstream adoption that wires
+  the built §7 **senshu** first-blood tie-break (C1/C3) into the LLM benchmark's frozen manifest and teaches it
+  in `docs/spec.md` — **NO new engine behavior** (senshu shipped in C1/C3; D flips a scoring-config flag + writes
+  prose). **Scoped to senshu only** (jogai/passivity/overtime adoption DEFERRED — they'd force a gauntlet
+  rebalance / mislead authors with fields that read `0` all match). Two slices. **D1 (PR #113, benchmark scores
+  under senshu)**: widen `BenchmarkConfig["match"]` → the shared `FightConfig["match"]` (senshu carried typed;
+  the aggregator already keys off the resulting `winner`, so it propagates with NO logic change),
+  `MATCH = { winGap: 8, senshu: true }`, `BENCHMARK_VERSION v3 → v4`, `INPUT_HASH` re-pinned (guard forced-RED →
+  GREEN). A level-at-cap **solo-first-blood** bout now tallies a WIN for the holder (proven by a synthetic
+  `benchmark.test.ts` SCORER/DELAYED pair on `MOCK_RULES`, both sides), with **net-points invariant** (senshu
+  never moves a score). Dogfood re-pinned `15W/104L/1D → 16W/104L/0D` (the lone draw → first-blood win). Added
+  `docs/benchmark-gauntlet-v4.md` (senshu re-characterization; `v3` kept intact) — **report-only, NO rebalance**:
+  senshu SHARPENS the ranking (0 draws everywhere; net unchanged), so `sweeper` rises 69% → **82% (now out-of-band
+  HIGH — a NEW senshu-surfaced observation)** and `vulture` stays 16% (out low) → 4/6 in `[25%,75%]`; both DEFERRED
+  (sweeper new, vulture the existing parry→counter follow-up). **D2 (PR #114, spec teaches senshu)**,
+  VERSION-NEUTRAL: `generateSpec`'s `Match` gains `senshu?`; the `benchmarkSection` win-condition prose teaches the
+  `winGap → senshu → residual-draw` cascade and the primer "play the match" bullet gains the actionable senshu
+  clause naming `self.senshu`/`opponent.senshu` — both **gated on `match.senshu`** (taught == scored: a senshu-off
+  manifest renders the original prose) — `docs/spec.md` regenerated (2 prose regions only). **NO new DSL/TCB
+  surface** (senshu reads shipped in C3 ⇒ field-whitelist / JSON Schema enums unchanged; the `dsl.ts` TCB is
+  untouched throughout D); `npm run fight` unaffected (`match` is benchmark-only, not in `Rules`/`CANONICAL_RULES`).
+  872 tests; D1 `benchmark-config.ts` + `benchmark.ts` mutation 100% (65/65), D2 `gen-spec.ts` changed-region 100%
+  (6/6). Non-goals honored: no `endReason` surfacing, no jogai/passivity/overtime, no gauntlet rebalance.
+  **Capability D is COMPLETE** — the plan `plans/d-benchmark-spec-adoption.md` is deleted (record in git / PRs
+  #113–#114 + `docs/benchmark-gauntlet-v4.md`); the standing tracker `plans/s7-match-remainder-stories.md` flips
+  its Next Step to the remaining §7 (jogai / passivity / rounds) + air-actions.
+- ROADMAP (C9 + C10 + LLM benchmark v1 + benchmark match structure + Capability C/D senshu tie-resolution COMPLETE): the still-unresolved **air-actions** (air
   strikes / horizontal jump displacement) and the **rest of §7 match structure** (jogai / passivity /
   rounds, beyond the benchmark's yame + win condition) — `grill-me` → `planning` → TDD. (C9, the
   multi-move arsenal, is DONE — see its entry above; its per-move stamina costs are wired into
