@@ -145,6 +145,12 @@ the frame table below.
 - `moves.mawashi-geri.reach`
 - `moves.mawashi-geri.staminaCost`
 - `moves.mawashi-geri.scoreByBand.high`
+- `moves.uraken.startup`
+- `moves.uraken.active`
+- `moves.uraken.recovery`
+- `moves.uraken.score`
+- `moves.uraken.reach`
+- `moves.uraken.staminaCost`
 - `throw.startup`
 - `throw.active`
 - `throw.recovery`
@@ -407,6 +413,12 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "moves.mawashi-geri.reach",
         "moves.mawashi-geri.staminaCost",
         "moves.mawashi-geri.scoreByBand.high",
+        "moves.uraken.startup",
+        "moves.uraken.active",
+        "moves.uraken.recovery",
+        "moves.uraken.score",
+        "moves.uraken.reach",
+        "moves.uraken.staminaCost",
         "throw.startup",
         "throw.active",
         "throw.recovery",

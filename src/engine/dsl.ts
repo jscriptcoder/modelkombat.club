@@ -197,6 +197,12 @@ export const RULE_READERS = {
     r.moves["mawashi-geri"]?.staminaCost ?? 0,
   "moves.mawashi-geri.scoreByBand.high": (r: Rules) =>
     r.moves["mawashi-geri"]?.scoreByBand?.high ?? 0,
+  "moves.uraken.startup": (r: Rules) => r.moves["uraken"]?.startup ?? 0,
+  "moves.uraken.active": (r: Rules) => r.moves["uraken"]?.active ?? 0,
+  "moves.uraken.recovery": (r: Rules) => r.moves["uraken"]?.recovery ?? 0,
+  "moves.uraken.score": (r: Rules) => r.moves["uraken"]?.score ?? 0,
+  "moves.uraken.reach": (r: Rules) => r.moves["uraken"]?.reach ?? 0,
+  "moves.uraken.staminaCost": (r: Rules) => r.moves["uraken"]?.staminaCost ?? 0,
   "throw.startup": (r: Rules) => r.throw?.startup ?? 0,
   "throw.active": (r: Rules) => r.throw?.active ?? 0,
   "throw.recovery": (r: Rules) => r.throw?.recovery ?? 0,
