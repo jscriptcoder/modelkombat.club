@@ -217,6 +217,12 @@ and passivity slice builds on this reset/edge-detect spine.
 
 ### Capability D — Downstream adoption (per the precedent; after the mechanics land)
 
+> **SCOPED by grill 2026-07-03 → tie-resolution only.** The "full officiating" framing below is
+> superseded: D adopts **senshu only** (`MATCH = { winGap: 8, senshu: true }`), teaches **senshu +
+> corrected win/draw prose only**, and is **report-only** (no rebalance). jogai / passivity / overtime
+> adoption + their prose are DEFERRED. See **"Capability D — resolved decisions (grill 2026-07-03)"**
+> below for the authoritative decisions.
+
 | Slice                                    | Value                                                    | Includes                                                                                                                                                                              | Defers                                 | Acceptance Examples                                                                                                               | Release   |
 | ---------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------- |
 | **D1** benchmark adopts full officiating | The frozen gauntlet scores under jogai/passivity/tie-res | Fold new `match` config into the benchmark `MATCH` constant + `INPUT_HASH`; bump `BENCHMARK_VERSION`; re-characterize the gauntlet + `docs/benchmark-gauntlet-vN.md`                  | A possible rebalance (see Parking Lot) | Given the benchmark config change, Then `INPUT_HASH` guard test forces a version bump; the gauntlet is re-characterized in a note | Shippable |
@@ -927,6 +933,199 @@ nuance remains deferred.
 **AC → slice map:** a SINGLE slice (`feat/senshu-perception`) owns AC-1…AC-11 — both readers share the
 `senshuHolder` → `viewFor` threading; no sub-split (Q4).
 
+## Capability D — resolved decisions (grill 2026-07-03)
+
+Confirmed before find-gaps/planning Capability D (downstream adoption — wiring the built §7
+tie-resolution into the LLM benchmark and teaching it in `docs/spec.md`). **NO new engine behavior**
+— every §7 mechanic (jogai/passivity/senshu/overtime) is already built + byte-identical-absent; D
+flips a scoring-config flag and writes prose. Feeds `find-gaps` → `planning`.
+
+**Scope (Q1 — tie-resolution only):** the benchmark adopts ONLY the tie-resolution mechanics;
+**jogai/passivity are DEFERRED.** Rationale: jogai (ring-out) + passivity (non-engagement) change how
+every gauntlet fight _plays_ (a wall-pinned zoner rung out; a turtle fouled), so the 6 archetypes —
+authored/balanced under v3 (winGap only) — would need a FULL rebalance (the S6 sweeper de-wall, but
+across two new mechanics at once), not a re-characterization. senshu/overtime carry no such risk:
+they only rewrite level-at-cap bouts, never a _decided_ fight ⇒ purely additive to ranking
+discrimination. jogai/passivity adoption belongs with the deferred `vulture` rebalance / air-actions
+work, not "tie-resolution downstream adoption."
+
+**Which tie param (Q2 — senshu only):** `MATCH = { winGap: 8, senshu: true }` — senshu only, NO
+overtime. The v3 dogfood already showed ~1 draw / 120 fights; senshu resolves ~all of that tail at
+ZERO cost (no extra ticks, no transcript/telemetry change, no `overtime.ticks` to justify). Overtime's
+residual is marginal AND mostly unresolvable: the dominant leftover draw is `senshuHolder ===
+"undecided"` (nobody opened a gap in 600 ticks — the both-defensive / mirror matchup), which by its
+nature also fails to open a 1-gap in a sudden-death period ⇒ OT ends level ⇒ falls back to senshu ⇒
+still `"undecided"` ⇒ STILL a draw. So OT would add ~2× tick budget on level bouts + a frozen `ticks`
+value + re-characterization under a longer clock, to resolve only the rare `"none"` (simultaneous-
+first) case. Not worth it. Overtime adoption deferred alongside jogai/passivity.
+
+**Auto-propagation (confirmed in code):** D1 is a config flip + re-freeze, NOT a ranking-logic change.
+The harness's `botWin`/`draw` key off `runFight`'s `winner` (`benchmark.ts:77-83`), which senshu
+already REWRITES for a level bout (→ the holder). So flipping `senshu: true` in `MATCH` auto-
+propagates: a level-at-cap benchmark bout resolves to a senshu winner in the `Submission` tally with
+no aggregator change. The `net` tiebreak is INVARIANT under senshu — a senshu bout is level
+(`scores.a === scores.b`) ⇒ `net = 0` ⇒ only win-rate moves. The only code change is widening the
+harness `match` TYPE (`BenchmarkConfig["match"]`, currently `{ winGap }`) to the shared
+`FightConfig["match"]` so `senshu` is carried typed.
+
+**Spec scope (Q3 — senshu + corrected win/draw only):** the spec teaches ONLY senshu + the corrected
+win/draw/tie cascade; **jogai/passivity/overtime prose DEFERRED** to their own (later) adoption.
+Decisive principle = taught==scored: the spec IS the benchmark's measuring instrument
+(`benchmarkSection` is parameterized by the frozen `MATCH`). Under `MATCH = { winGap, senshu }`, during
+a benchmark fight `self.senshu`/`opponent.senshu` are LIVE, but `clock.overtime` and
+`self`/`opponent.passivityRemaining` read sentinel `0` all match — teaching those semantics would point
+authors at dead fields and contradict taught==scored. Those DSL fields already sit in the
+auto-generated whitelist/JSON-schema as bare entries (config-gated, no prose) — consistent with how the
+spec already carries gated fields. Concretely D2: correct `benchmarkSection`'s "equal ⇒ a draw" →
+"level at cap ⇒ first-blood _senshu_ decides; still level (simultaneous first, or nobody scored) ⇒
+draw," + a primer nudge making `self.senshu`/`opponent.senshu` actionable ("draw first blood to hold
+the tiebreak").
+
+**Re-characterization (Q5 — report-only, rides D1):** senshu is NOT cosmetic on the gauntlet — the v3
+round-robin has material draws (`vulture` 29D, `sweeper` 13D, `zoner` 9D, `grappler` 8D per 100),
+which senshu converts to decisive results and MOVES win-rates. And the dogfood's exact W/L/D record is
+pinned as a characterization in `src/cli/dogfood.test.ts` ⇒ enabling senshu makes that test go RED
+until re-pinned. So re-characterization is TEST-FORCED, part of D1's blast radius. Decision:
+**report-only, NOT a balance gate** — adopt senshu because it's WKF-correct; re-pin `dogfood.test.ts` +
+refresh the doc with the honest new numbers; DO NOT rebalance. If senshu pushes anyone further out of
+`[25,75]`, that's DATA feeding the deferred `vulture` story, not a D1 blocker. D1's success =
+"benchmark scores correctly under senshu + guard test green at v4 + characterization re-pinned," NOT
+"5/6 in band." The dogfood re-pin + gauntlet-doc refresh both RIDE D1's PR (the dogfood test is
+test-forced by the `MATCH` change; keeps committed docs from lagging the code). Doc handling REFINED by
+find-gaps (AC-5): **ADD a new `docs/benchmark-gauntlet-v4.md`, KEEP v3** (do NOT rename) — v3 is the
+pinned record of the match-structure feature (cited by `.claude/CLAUDE.md`); renaming would destroy that
+record + orphan two references.
+
+**Version/hash (mechanical, D1 only):** D1 bumps `BENCHMARK_VERSION` v3→v4 + recomputes `INPUT_HASH`
+(adding `senshu` to `MATCH` changes the digest; the guard test prints the new hash on drift) + updates
+the guard test's version + `MATCH`-`toEqual` assertions. **D2 is VERSION-NEUTRAL** — it only reads
+`MATCH` to generate prose, touches no scoring input ⇒ NO version/hash bump (the C3 precedent:
+perception/spec fold-ins don't bump).
+
+**Slicing & sequencing (Q4 — two slices, D1 → D2):** hard dependency — `generateSpec` defaults `match
+= MATCH` (imported from `benchmark-config.ts`), so the spec can only teach senshu AFTER `MATCH` carries
+it + v4 is frozen; spec-first would teach a tie-break the config doesn't enable (breaks taught==scored
+
+- the drift test). Mirrors §7 S3 (adopt) → S5 (teach).
+
+* **D1 — benchmark scores under senshu.** Widen harness `match` type → `FightConfig["match"]`; `MATCH =
+{ winGap: 8, senshu: true }`; bump v3→v4 + recompute `INPUT_HASH` + update the guard test; re-pin
+  `dogfood.test.ts`; ADD a new `docs/benchmark-gauntlet-v4.md` (keep v3 — AC-5). **Observable:** a
+  level-at-cap benchmark bout resolves to a senshu WINNER in the `Submission` tally (a draw becomes a
+  win/loss).
+* **D2 — spec teaches senshu.** Widen `generateSpec`'s `Match` type with `senshu?`; correct the
+  win/draw prose + add the primer nudge; regenerate `docs/spec.md` (byte-drift test pins it).
+  **Observable:** `docs/spec.md` explains the senshu win/draw cascade. Version-neutral.
+
+**Invariants:** ENGINE untouched — the "byte-identical when `match` absent" invariant is about
+`runFight` (senshu already honors it); D1 DELIBERATELY changes benchmark scoring (that's the point —
+v3→v4 captures exactly this), guarded by the version bump. `npm run fight` unaffected (match is
+benchmark-only, NOT in `Rules`/`CANONICAL_RULES`). No TCB/DSL surface (no new `FIELD_READERS`; the
+senshu readers shipped in C3). Determinism / integer-only / same-pre-tick-snapshot all untouched (no
+engine change). D2 adds no ops (prose + type only). Scoped mutation: D1 on the changed
+`benchmark-config.ts` + the guard test's forced values; D2 on the changed `gen-spec.ts` region + the
+drift test.
+
+**Still deferred beyond D:** overtime + jogai + passivity benchmark adoption (+ their spec prose), the
+`vulture` parry→counter rebalance, then air-actions + the rest of §7 (rounds).
+
+## Capability D — Acceptance criteria (find-gaps 2026-07-03)
+
+AC→slice map at the end. All D1 unless tagged **[D2]**.
+
+- **AC-1 — benchmark honors senshu (the mechanism).** Given a `benchmark()` run over a synthetic
+  matchup that ends LEVEL at the tick cap with a SOLO first blood (one fighter's technique point rises
+  first; neither reaches `winGap`), When `match = { winGap, senshu: true }`, Then that fight is tallied
+  as a WIN for the first-blood holder in the `Submission` (`perOpponent` `wins` +1, `draws` +0); AND the
+  SAME matchup under `match` senshu-absent tallies as a DRAW (`wins` +0, `draws` +1). Proven by a
+  dedicated synthetic test in `benchmark.test.ts` on seed-independent `MOCK_RULES` — the mechanism proof,
+  independent of the frozen gauntlet (which the dogfood re-pin, AC-4, covers).
+
+- **AC-2 — `MATCH` / version / hash freeze (RED→bump→GREEN).** Given `MATCH = { winGap: 8, senshu:
+true }` set while the manifest is still v3, Then (forced RED, right reason) `computeInputHash() !==
+INPUT_HASH` (senshu entered the hashed `match` payload ⇒ the digest differs) AND the `MATCH` `toEqual`
+  fails — proving the digest captured a REAL config change, not a gratuitous bump. When
+  `BENCHMARK_VERSION` is bumped v3→v4 (new reason-label title: senshu tie-resolution adoption) and
+  `INPUT_HASH` is re-pinned to the printed digest, Then (final GREEN) `benchmark-config.test.ts` is
+  green: `MATCH` `toEqual({ winGap: 8, senshu: true })`, `BENCHMARK_VERSION` `toBe("v4")`,
+  `computeInputHash() === INPUT_HASH`. The `MATCH`-`toEqual` shape assertion is the Stryker-killer for the
+  `senshu` literal (an `ObjectLiteral`/`BooleanLiteral` mutant flips the freeze red).
+
+- **AC-3 — net-tiebreak invariance (senshu moves only win-rate).** Given the AC-1 synthetic level-at-cap
+  matchup, When `benchmark()` is run with `match.senshu` true vs senshu-absent (all else identical), Then
+  `netPoints` is IDENTICAL across the two runs WHILE `wins`/`draws` diverge (the draw flips to a win).
+  senshu never alters a tick — the per-fight `scores` are byte-identical; a level bout contributes `net
+= 0` either way — so the Σ net-points tiebreak key is untouched; only win-rate moves (the grill's
+  "purely additive to ranking discrimination"). [D1]
+
+- **AC-4 — dogfood re-characterization (method + invariants; exact figures pinned at GREEN).** Given the
+  v4 `MATCH` (senshu enabled), When the dogfood bot is re-run through the real `benchmark()` over the
+  frozen gauntlet (6 opponents × 10 seeds × 2 sides = 120 fights), Then `src/cli/dogfood.test.ts` is
+  re-pinned to the exact deterministic `wins`/`losses`/`draws`, subject to the invariants (verifiable
+  independent of the numbers): `totalFights == 120`; `wins + losses + draws == 120`; **`draws ≤ 1`**
+  (senshu only RESOLVES the prior lone draw — it never creates one; the draw stays only if its
+  `senshuHolder` was `none`/`undecided`); the record is REPLAY-STABLE (identical across runs). The v3→v4
+  test titles/comments are updated. The exact W/L/D is a GREEN-phase output, mirrored into
+  `docs/benchmark-gauntlet-v4.md` (AC-5). NO rebalance regardless of where the numbers land (report-only;
+  any out-of-band shift feeds the deferred `vulture` story).
+
+- **AC-5 — v4 gauntlet doc ADDED, v3 preserved (no rename).** Given the v4 re-characterization, Then a
+  NEW `docs/benchmark-gauntlet-v4.md` exists, titled for the senshu tie-resolution re-characterization,
+  carrying the v4 round-robin (each member re-run under senshu) + the AC-4 dogfood record;
+  `docs/benchmark-gauntlet-v3.md` is left INTACT (the pinned record of the match-structure feature, still
+  cited by `.claude/CLAUDE.md`). The D close-out ADDS a v4 pointer to CLAUDE.md/tracker (does NOT rewrite
+  the v3 refs) ⇒ no dangling references. Report-only (no rebalance). _[find-gaps refinement of the grill's
+  "rename → v4": a rename would destroy the v3 match-structure record CLAUDE.md cites + orphan two
+  references.]_
+
+- **AC-6 — corrected win/draw prose teaches the senshu cascade [D2].** Given the regenerated
+  `docs/spec.md`, Then the benchmark-rules win-condition prose teaches the three-step cascade: a match
+  ends early once a fighter leads by `winGap`; else at `maxTicks` it is decided on total points; if still
+  LEVEL, the first fighter to have scored a technique point (SENSHU) wins; only a bout with NO first-blood
+  holder (simultaneous first, or nobody scored) is a draw. A new `gen-spec.test.ts` assertion locks that
+  the win-condition line names "senshu"; the existing assertion (the line contains "draw") STILL holds;
+  both interpolated from `MATCH` (no hardcoded literal). Microcopy finalized at GREEN; the byte-drift test
+  re-pins `docs/spec.md`. VERSION-NEUTRAL (D2 touches no scoring input ⇒ no `BENCHMARK_VERSION`/
+  `INPUT_HASH` change).
+
+- **AC-7 — primer senshu nudge, augmenting the "play the match" bullet [D2].** Given the regenerated
+  `docs/spec.md`, Then the EXISTING "play the match, not the scoreboard" primer bullet is AUGMENTED with
+  an actionable senshu clause — if the bout stays level, first blood holds the senshu tiebreak; read
+  `self.senshu` / `opponent.senshu` (draw first blood / bait the holder). Observable: a primer line names
+  "senshu" AND code-spans BOTH `self.senshu` and `opponent.senshu`; the existing "match win-rate" primer
+  assertions (winGap + maxTicks, `gen-spec.test.ts:325-338`) STILL hold. Microcopy at GREEN; byte-drift
+  re-pin. Version-neutral. _(A single augmented bullet, not a second "play the match" thread.)_
+
+- **AC-8 — invariants (inherited vs deliberate).** The ENGINE is untouched (senshu shipped in C1/C3), so:
+  (1) `runFight` "byte-identical when `match` absent" is INHERITED, not re-proven in D; (2) D1
+  DELIBERATELY changes benchmark SCORING (v3→v4, guarded by the version bump) — NOT a byte-identical
+  change; (3) the v4 benchmark stays DETERMINISTIC / REPLAY-STABLE (`benchmark()` is pure; same inputs →
+  identical `Submission`), locked by the guard test + the dogfood characterization + the existing
+  `benchmark.test.ts` determinism test; (4) SWAP-SYMMETRY is inherited (both sides A/B played; senshu is
+  swap-consistent per C1); (5) `npm run fight` unaffected (match is benchmark-only, not in
+  `Rules`/`CANONICAL_RULES`).
+
+- **AC-9 — non-goals (explicitly out of scope for D).** (1) NO new DSL/TCB surface — the senshu readers
+  shipped in C3; D adds no `FIELD_READERS` / no `ALLOWED_FIELDS` bullets; D2's `docs/spec.md` drift is
+  BOUNDED to the win-condition prose (AC-6) + the one primer bullet (AC-7). (2) NO `endReason` surfacing —
+  the benchmark ranks on `winner`, not `endReason`, and `endReason` isn't a DSL field; the spec needn't
+  teach the literal `"senshu"` endReason. (3) NO rebalance (report-only; AC-4/AC-5). (4) NO
+  jogai/passivity/overtime adoption or prose (deferred to their own later capability).
+
+**AC → slice map:**
+
+| AC   | Slice  | Proof surface                                                                            |
+| ---- | ------ | ---------------------------------------------------------------------------------------- |
+| AC-1 | **D1** | synthetic level-at-cap solo-first-blood → senshu win in the tally (`benchmark.test.ts`)  |
+| AC-2 | **D1** | `MATCH`/version/hash freeze, RED→bump→GREEN (`benchmark-config.test.ts`)                 |
+| AC-3 | **D1** | net-tiebreak invariance (same scenario, `benchmark.test.ts`)                             |
+| AC-4 | **D1** | dogfood re-pin — method + invariants (`dogfood.test.ts`), exact figures at GREEN         |
+| AC-5 | **D1** | ADD `docs/benchmark-gauntlet-v4.md`, keep v3 (no dangling refs)                          |
+| AC-6 | **D2** | win-condition prose teaches winGap → senshu → residual-draw (`gen-spec.test.ts` + drift) |
+| AC-7 | **D2** | primer "play the match" bullet augmented w/ senshu + `self`/`opponent.senshu` (drift)    |
+| AC-8 | D1+D2  | inherited engine invariants + benchmark determinism/replay/swap                          |
+| AC-9 | D1+D2  | non-goals (no DSL/TCB surface, no endReason, no rebalance, no jogai/passivity/OT)        |
+
 ## Next Step
 
 **Capability A (jogai) COMPLETE** (A1+A2+A3, PRs #97–#99). **Capability B (passivity) COMPLETE**
@@ -950,7 +1149,11 @@ precedent (the benchmark match-structure feature, PRs #87–#93, which shipped a
 Still open beyond D (the standing §7 remainder): the **`vulture` parry→counter gauntlet-rebalance**
 follow-up, then **air-actions** + the **rest of §7** (rounds).
 
-Flow: `grill-me` (scope the benchmark-vs-spec split + which tie params enter `MATCH`) → `find-gaps` →
-`planning` → per-slice RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR (`tdd` + `testing` + `mutation-testing` +
-`refactoring`). Precedent to mirror: every §7 slice is byte-identical when its `match` key is absent +
-replay-stable + swap-symmetric, with scoped mutation on the changed regions.
+Flow: ~~`grill-me`~~ **DONE 2026-07-03** (decisions resolved → tie-resolution / senshu-only /
+report-only; see "Capability D — resolved decisions" above) → ~~`find-gaps`~~ **DONE 2026-07-03** (AC-1…
+AC-9 + AC→slice map; see "Capability D — Acceptance criteria" above) → **`planning` (NEXT)** — turn D1
+(benchmark) then D2 (spec) into `plans/d-benchmark-spec-adoption.md` PR-sized slices → per-slice
+RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR (`tdd` + `testing` + `mutation-testing` + `refactoring`).
+Precedent to mirror: the ENGINE stays byte-identical (senshu already honors match-absent) — D1
+deliberately changes benchmark SCORING (v3→v4, guarded by the version bump); scoped mutation on the
+changed `benchmark-config.ts` / `gen-spec.ts` regions + the guard/drift tests.
