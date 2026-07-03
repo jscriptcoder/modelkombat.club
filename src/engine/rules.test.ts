@@ -218,7 +218,15 @@ const sweepFight = (o: Partial<FightConfig> = {}): FightConfig =>
 // Each reader throws if its technique is not configured — so a malformed table fails an
 // assertion in a test, not at collection time (mirrors gyaku()/sweepSpec()).
 const armed =
-  (id: "kizami-zuki" | "gyaku-zuki" | "mae-geri" | "mawashi-geri" | "uraken") =>
+  (
+    id:
+      | "kizami-zuki"
+      | "gyaku-zuki"
+      | "mae-geri"
+      | "mawashi-geri"
+      | "uraken"
+      | "shuto",
+  ) =>
   (): MoveSpec => {
     const m = CANONICAL_RULES.moves[id];
     if (!m) throw new Error(`CANONICAL_RULES.moves['${id}'] is not configured`);
@@ -230,7 +238,8 @@ const kizami = armed("kizami-zuki"); // jab
 const gyaku = armed("gyaku-zuki"); // reverse punch
 const mae = armed("mae-geri"); // front kick
 const mawashi = armed("mawashi-geri"); // roundhouse
-const uraken = armed("uraken"); // backfist (Batch-1 expansion)
+const uraken = armed("uraken"); // backfist (Batch-1 expansion #1)
+const shuto = armed("shuto"); // knife-hand (Batch-1 expansion #2)
 
 // Commits a single named technique at `band` on tick 0, then idles (generalizes strikeOnce).
 const attackOnce = (move: MoveId, band: Band): BotDoc =>
@@ -598,6 +607,112 @@ describe("CANONICAL_RULES — uraken (the backfist: cheapest, shortest, high-onl
   it("is a single-band high yuko (score 1, no jodan bonus)", () => {
     expect(uraken().score).toBe(1);
     expect(uraken().bands).toEqual(["high"]);
+  });
+});
+
+// ─── Batch-1 expansion #2: shuto (knife-hand) — the longest hand, out-ranges the reverse ──
+describe("CANONICAL_RULES — shuto (the knife-hand: longest hand, out-ranges the reverse)", () => {
+  it("scores a clean high knife-hand as a single yuko", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 150000 }), // inside shuto reach (260000)
+        botA: attackOnce("shuto", "high"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(1);
+  });
+
+  it("scores a clean mid knife-hand — the high·mid gate (unlike uraken's high-only)", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 150000 }),
+        botA: attackOnce("shuto", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(1);
+  });
+
+  it("fizzles at low — outside the high·mid band gate", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 150000 }),
+        botA: attackOnce("shuto", "low"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("out-ranges the reverse — lands at a gap where gyaku-zuki whiffs", () => {
+    // A gap beyond the reverse's reach (gyaku 240000) but within shuto's (260000).
+    const gap = { startGap: 250000 };
+
+    const knifeHand = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("shuto", "high"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    const reverse = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("gyaku-zuki", "high"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(knifeHand.scores.a).toBe(1); // inside the knife-hand's longer reach
+    expect(reverse.scores.a).toBe(0); // …but out of the reverse's
+    expect(shuto().reach).toBeGreaterThan(gyaku().reach);
+  });
+
+  it("is the priciest gas-proof hand — dearer than jab and backfist, still ≤ the gas line", () => {
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(shuto().staminaCost ?? 0).toBeGreaterThan(kizami().staminaCost ?? 0);
+    expect(shuto().staminaCost ?? 0).toBeGreaterThan(uraken().staminaCost ?? 0);
+    expect(shuto().staminaCost ?? 0).toBeLessThanOrEqual(gas);
+  });
+
+  it("opens the rekka — a connecting knife-hand cancels into the reverse", () => {
+    const cancelTick = shuto().startup + shuto().active; // the first recovery frame
+
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 150000 }),
+        botA: comboAtTicks([
+          { tick: 0, move: "shuto", band: "high" },
+          { tick: cancelTick, move: "gyaku-zuki", band: "high" },
+        ]),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(2); // knife-hand 1 + cancelled reverse 1
+    expect(shuto().cancelInto).toContain("gyaku-zuki");
+  });
+
+  it("stays reactable and whiff-punishable (the invariant floor)", () => {
+    expect(shuto().startup).toBeGreaterThanOrEqual(lAct() + 1);
+    expect(shuto().recovery).toBeGreaterThanOrEqual(lAct() + kizami().startup);
+  });
+
+  it("is a high·mid yuko (score 1, no jodan bonus)", () => {
+    expect(shuto().score).toBe(1);
+    expect(shuto().bands).toEqual(["high", "mid"]);
   });
 });
 
