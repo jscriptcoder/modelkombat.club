@@ -1,7 +1,7 @@
 # Plan: `uraken` (backfist) — Batch-1 move #1
 
-**Branch**: feat/uraken-backfist
-**Status**: Active
+**Branch**: feat/uraken-backfist (Slice 1) · feat/uraken-rule-readers (Slice 2)
+**Status**: Slice 1 **MERGED** (PR #117, benchmark v5) · Slice 2 **Active**
 **Design source**: `docs/move-roster.md` (Batch-1 resolved frame data; balance law + policies)
 
 ## Goal
@@ -42,23 +42,23 @@ uraken: { startup: 7, active: 2, recovery: 13, score: 1,
 Behaviour proven by `runFight` against `CANONICAL_RULES` (engine), `validate` (TCB), and the
 `gen-spec` / schema drift tests (spec). Observable score/accept assertions, not literals alone.
 
-- [ ] **AC-1 (yuko snap):** a clean `high` `uraken` within reach scores **1**.
-- [ ] **AC-2 (high-only gate — mid):** `uraken` at `band:"mid"` degrades to idle ⇒ **0**
-      (NEW: high-only, the inverse of the punches' `high·mid`).
-- [ ] **AC-3 (high-only gate — low):** `uraken` at `band:"low"` ⇒ **0**.
-- [ ] **AC-4 (shortest reach):** at a gap the jab (210k) still reaches but `uraken` (200k)
-      cannot, `uraken` whiffs ⇒ **0** (documents `reach < jab`).
-- [ ] **AC-5 (cheapest, gas-proof):** a **gassed** fighter (`stamina ≤ 30`) still commits
+- [x] **AC-1 (yuko snap):** a clean `high` `uraken` within reach scores **1**. _(Slice 1, #117)_
+- [x] **AC-2 (high-only gate — mid):** `uraken` at `band:"mid"` degrades to idle ⇒ **0**
+      (NEW: high-only, the inverse of the punches' `high·mid`). _(Slice 1, #117)_
+- [x] **AC-3 (high-only gate — low):** `uraken` at `band:"low"` ⇒ **0**. _(Slice 1, #117)_
+- [x] **AC-4 (shortest reach):** at a gap the jab (210k) still reaches but `uraken` (200k)
+      cannot, `uraken` whiffs ⇒ **0** (documents `reach < jab`). _(Slice 1, #117)_
+- [x] **AC-5 (cheapest, gas-proof):** a **gassed** fighter (`stamina ≤ 30`) still commits
       `uraken` and scores **1** (its cost 12 ≤ `gasThreshold` 30 — unlike the gas-locked
-      kicks); the cost drawn is **12** (< jab 15 — the cheapest commit).
-- [ ] **AC-6 (cancel → reverse):** a `high` `uraken` that connects opens the cancel window; a
-      `gyaku-zuki` started within it hit-confirms (the rekka opener works).
-- [ ] **AC-7 (TCB allowlist):** `validate` accepts `{type:"attack", move:"uraken", band:"high"}`
+      kicks); the cost drawn is **12** (< jab 15 — the cheapest commit). _(Slice 1, #117)_
+- [x] **AC-6 (cancel → reverse):** a `high` `uraken` that connects opens the cancel window; a
+      `gyaku-zuki` started within it hit-confirms (the rekka opener works). _(Slice 1, #117)_
+- [x] **AC-7 (TCB allowlist):** `validate` accepts `{type:"attack", move:"uraken", band:"high"}`
       **and** accepts it out-of-band (`band:"mid"`) — band-legality is a runtime concern; the
-      validator only checks the move id + band are well-formed.
-- [ ] **AC-8 (spec teaches the move):** regenerated `spec.md` lists `uraken` in the attack-move
+      validator only checks the move id + band are well-formed. _(Slice 1, #117)_
+- [x] **AC-8 (spec teaches the move):** regenerated `spec.md` lists `uraken` in the attack-move
       line, the move-stats table (with `bands: high`), and the JSON-schema `move` enum;
-      `gen-spec` + schema drift tests stay green.
+      `gen-spec` + schema drift tests stay green. _(Slice 1, #117)_
 
 **Deferred (NOT this feature):** the roster-wide no-Pareto-dominance property test (add once
 more of Batch-1 lands, per `docs/move-roster.md`); the gauntlet rebalance re-run (a validation
@@ -69,7 +69,7 @@ step after the family lands, folding in `vulture`/`sweeper`).
 One slice = one PR. Each follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Load the project
 CLAUDE.md + `tdd`/`testing`/`mutation-testing`/`refactoring` before any code.
 
-### Slice 1: Bot can throw `uraken` — a canonical high-only, cheapest, shortest 1-point snap
+### Slice 1: Bot can throw `uraken` — a canonical high-only, cheapest, shortest 1-point snap — ✅ MERGED (PR #117)
 
 **Value**: The bot author gets the cheapest gas-proof poke — a `high`-only _yuko_ snap that
 survives gassing and opens the rekka, at the cost of whiffing any croucher and the shortest
