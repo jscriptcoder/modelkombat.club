@@ -96,24 +96,42 @@ behavioral test**, not the capability acceptance test.
   new slice** (escalation ladder: redistribute, don't nerf `vulture`). Coverage now 6/11
   (`uraken` added). Spec regenerated (embeds the `vulture` example + version).
 
+- **S-jabber (`jabber` block+counter) — ✅ DONE (`v12`, PR #137; archived
+  [`docs/archive/gauntlet-s-jabber.md`](../docs/archive/gauntlet-s-jabber.md)).** The
+  planned `shuto` **range-poke failed** (it broke `jabber`'s only winning matchup,
+  `zoner` → 0%); pivoted (user-approved) to a reactive **block-on-reaction + `shuto`
+  counter**. Re-measure — all 6 back in band:
+
+  | Member     | v11   | **v12** | Band                         |
+  | ---------- | ----- | ------- | ---------------------------- |
+  | `sweeper`  | 67    | **67**  | ✅                           |
+  | `grappler` | 66    | **66**  | ✅                           |
+  | `vulture`  | 60    | **60**  | ✅                           |
+  | `rekka`    | 52    | **41**  | ✅ (jabber took wins here)   |
+  | `zoner`    | 36    | **35**  | ✅                           |
+  | `jabber`   | 19 ❌ | **31**  | ✅ (fixed — flipped `rekka`) |
+
+  `jabber` flipped `rekka` 0→11/20 and held `zoner` 19→20/20. Coverage now **7/11**
+  (`shuto`, via the counter — so `shuto` is REASSIGNED off S2). Tradeoff accepted:
+  `jabber` gains a reactive layer that partly overlaps `vulture` (still distinct —
+  `jabber` advances + pressures). `benchmark-config.ts` mutation 100% (10/10);
+  dogfood record unchanged (18W/102L).
+
 ## Revised remaining sequence
 
-`uraken` is now covered by `vulture`, so coverage assignments shift slightly. Remaining
-(re-measure after each; final lock lands when all-6-in-band **and** 11/11 moves covered):
+Coverage now **7/11** (`shuto` covered by `jabber`; uncovered = `yoko-geri`,
+`ushiro-geri`, `empi`, `hiza-geri`). Remaining (re-measure after each; final lock lands
+when all-6-in-band **and** 11/11 moves covered):
 
-- **S2 · `zoner`** — long-range (`yoko-geri`, `ushiro-geri`, `shuto`).
-- **S3 · `grappler`** — close-range (`empi`, `hiza-geri`).
-- **S-jabber · `jabber` rebalance+modernization (NEW, added by S1)** — lift `jabber` back
-  into band by making it less counter-feedable (band mix-ups; a 2nd move e.g. `shuto`),
-  turning its S1 regression into coverage progress. Exact sequencing vs S2/S3 decided on
-  fresh measurements (`zoner` sits at 36, closest to the low edge — watch it when `jabber`
-  strengthens).
+- **S2 · `zoner`** — long-range (`yoko-geri`, `ushiro-geri` — `shuto` now covered by
+  `jabber`). `zoner` sits at 35%, the low edge — arming its long kicks should lift it.
+- **S3 · `grappler`** — close-range (`empi`, `hiza-geri`) ⇒ completes 11/11 coverage.
 - **S4 · calibration lock + close-out** — land the band + coverage acceptance tests, write
   the final `gauntlet-vN` doc, update `docs/STATUS.md`, archive the split.
 
 ## Next Step
 
-S1 shipped (`v11`). **S-jabber selected as the next slice** (restore all-6-in-band
-before layering coverage) — branch `feat/jabber-rebalance`. Load `planning` to turn
-S-jabber into a PR-sized plan (start from a fresh `v11` round-robin re-measure —
-`zoner` sits at 36%, the low edge, so watch it as `jabber` strengthens).
+S-jabber shipped (`v12`, all 6 in band, coverage 7/11). Next: load `planning` for **S2
+(`zoner` long-range)** — start from a fresh `v12` round-robin re-measure. `zoner` is the
+low-edge member (35%); arming `yoko-geri` + `ushiro-geri` should lift it while covering
+two more moves (watch the overshoot guard — the two longest kicks could push it high).

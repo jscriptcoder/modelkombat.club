@@ -1,8 +1,14 @@
 # Plan: S-jabber — rebalance `jabber` back into the round-robin band
 
 **Branch**: feat/jabber-rebalance
-**Status**: Active
+**Status**: ✅ Done — shipped `v12` (PR #137), close-out PR #138
 **Parent**: `plans/gauntlet-modernization-stories.md` (slice S-jabber, added by S1)
+
+> **Outcome.** `jabber` **19 → 31%** (in band). Final v12 round-robin, all 6 ∈
+> `[25,75]`: sweeper 67, grappler 66, vulture 60, rekka 41, zoner 35, jabber 31.
+> `jabber` flipped `rekka` 0→11/20 and held `zoner` 19→20/20. Coverage **7/11**
+> (`shuto`, via the counter). `benchmark-config.ts` mutation 100% (10/10); full
+> suite 1025 green; engine outcome path untouched ⇒ replay byte-identical.
 
 ## Goal
 
