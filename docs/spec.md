@@ -151,6 +151,12 @@ the frame table below.
 - `moves.uraken.score`
 - `moves.uraken.reach`
 - `moves.uraken.staminaCost`
+- `moves.shuto.startup`
+- `moves.shuto.active`
+- `moves.shuto.recovery`
+- `moves.shuto.score`
+- `moves.shuto.reach`
+- `moves.shuto.staminaCost`
 - `throw.startup`
 - `throw.active`
 - `throw.recovery`
@@ -420,6 +426,12 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "moves.uraken.score",
         "moves.uraken.reach",
         "moves.uraken.staminaCost",
+        "moves.shuto.startup",
+        "moves.shuto.active",
+        "moves.shuto.recovery",
+        "moves.shuto.score",
+        "moves.shuto.reach",
+        "moves.shuto.staminaCost",
         "throw.startup",
         "throw.active",
         "throw.recovery",
