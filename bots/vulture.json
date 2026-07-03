@@ -14,6 +14,16 @@
     },
     {
       "when": {
+        "op": "gt",
+        "args": [
+          { "op": "field", "path": "self.counterWindow" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "attack", "move": "uraken", "band": "high" }
+    },
+    {
+      "when": {
         "op": "eq",
         "args": [
           { "op": "field", "path": "opponent.throwing" },

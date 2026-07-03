@@ -4,8 +4,8 @@
 > Every allowlist, limit, and frame-table number below is read directly from
 > the engine, so this document cannot lie about how a fight resolves.
 
-- **Benchmark version:** `v10` — a score is comparable only against another at the same version.
-- **Input hash:** `215fd6f4a5f7b3f94aba644630c59a3048b16f64c6af06d8d53e586ec289d4c4` (pins the scoring inputs: rules + gauntlet + run params).
+- **Benchmark version:** `v11` — a score is comparable only against another at the same version.
+- **Input hash:** `04937c3249d0747e3e10a5c279838490dbc6ad362eb3987c9a78c52c728c96a4` (pins the scoring inputs: rules + gauntlet + run params).
 
 A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is
 validated once against the allowlists below (the security boundary), then run
@@ -937,6 +937,16 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
         ]
       },
       "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "gt",
+        "args": [
+          { "op": "field", "path": "self.counterWindow" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "attack", "move": "uraken", "band": "high" }
     },
     {
       "when": {
