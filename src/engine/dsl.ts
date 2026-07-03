@@ -227,6 +227,12 @@ export const RULE_READERS = {
     r.moves["ushiro-geri"]?.staminaCost ?? 0,
   "moves.ushiro-geri.scoreByBand.high": (r: Rules) =>
     r.moves["ushiro-geri"]?.scoreByBand?.high ?? 0,
+  "moves.empi.startup": (r: Rules) => r.moves.empi?.startup ?? 0,
+  "moves.empi.active": (r: Rules) => r.moves.empi?.active ?? 0,
+  "moves.empi.recovery": (r: Rules) => r.moves.empi?.recovery ?? 0,
+  "moves.empi.score": (r: Rules) => r.moves.empi?.score ?? 0,
+  "moves.empi.reach": (r: Rules) => r.moves.empi?.reach ?? 0,
+  "moves.empi.staminaCost": (r: Rules) => r.moves.empi?.staminaCost ?? 0,
   "throw.startup": (r: Rules) => r.throw?.startup ?? 0,
   "throw.active": (r: Rules) => r.throw?.active ?? 0,
   "throw.recovery": (r: Rules) => r.throw?.recovery ?? 0,
