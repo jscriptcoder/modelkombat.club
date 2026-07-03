@@ -26,7 +26,11 @@ export type Band = "high" | "mid" | "low";
 // (elbow) is the SHORTEST reach in the game — a point-blank `high·mid` close strike that sits
 // below the throw, scoring a flat 2 (waza-ari) as the deliberate close-range exception to the
 // hand score-cap, gas-locked, and a cancel SOURCE only (it opens into the reverse but is not a
-// reverse-punch target).
+// reverse-punch target). `hiza-geri` (knee) is the only MID-band STANDING knockdown → okizeme
+// technique — a point-blank `mid`-only knee (reach above the elbow, below the throw) that scores
+// 0 on the hit but DOWNS the foe (`knockdown`), the points living in the okizeme finish (a
+// hit-confirmed `gyaku-zuki` inside the finish window ⇒ 3), gas-locked, and a cancel SOURCE only —
+// the sweep's low knockdown game lifted to a standing mid angle.
 export type MoveId =
   | "kizami-zuki"
   | "gyaku-zuki"
@@ -36,7 +40,8 @@ export type MoveId =
   | "shuto"
   | "yoko-geri"
   | "ushiro-geri"
-  | "empi";
+  | "empi"
+  | "hiza-geri";
 
 // ─── Action grammar — a bot returns exactly ONE per tick ─────────────────────
 // `dir` is RELATIVE to facing: +1 = toward opponent, -1 = away, 0 = hold.
@@ -180,6 +185,7 @@ export type Rules = {
     "yoko-geri"?: MoveSpec;
     "ushiro-geri"?: MoveSpec;
     empi?: MoveSpec;
+    "hiza-geri"?: MoveSpec;
   };
   // Vertical axis (C4). Both absent ⇒ inert (a `jump` launches no arc) ⇒
   // byte-identical to the pre-vertical engine. `jumpImpulse` is the initial

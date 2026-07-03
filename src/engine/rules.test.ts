@@ -228,7 +228,8 @@ const armed =
       | "shuto"
       | "yoko-geri"
       | "ushiro-geri"
-      | "empi",
+      | "empi"
+      | "hiza-geri",
   ) =>
   (): MoveSpec => {
     const m = CANONICAL_RULES.moves[id];
@@ -246,6 +247,7 @@ const shuto = armed("shuto"); // knife-hand (Batch-1 expansion #2)
 const yoko = armed("yoko-geri"); // side kick (Batch-1 expansion #3)
 const ushiro = armed("ushiro-geri"); // back kick (Batch-1 expansion #4)
 const empi = armed("empi"); // elbow (Batch-1 expansion #5)
+const hizaGeri = armed("hiza-geri"); // knee (Batch-1 expansion #6)
 
 // Commits a single named technique at `band` on tick 0, then idles (generalizes strikeOnce).
 const attackOnce = (move: MoveId, band: Band): BotDoc =>
@@ -1149,6 +1151,185 @@ describe("CANONICAL_RULES — empi (the elbow: shortest reach + point-blank waza
     expect(empi().bands).toEqual(["high", "mid"]);
     expect(empi().reach).toBeLessThan(throwSpec().reach); // the shortest reach in the game
     expect(empi().staminaCost ?? 0).toBeGreaterThan(gas);
+  });
+});
+
+// ─── Batch-1 expansion #6: hiza-geri (knee) — the mid-band STANDING knockdown ─────
+// Drains itself with the basic poke, then switches to the knee the moment it reads GASSED —
+// where the special (40 > gasThreshold 30) is unaffordable and degrades to idle, so the meter
+// never floors past the band (the special lockout, proven for the standing knockdown knee).
+const DRAIN_THEN_HIZA: BotDoc = bot(
+  [
+    {
+      when: {
+        op: "eq",
+        args: [
+          { op: "field", path: "self.gassed" },
+          { op: "const", value: 1 },
+        ],
+      },
+      do: { type: "attack", move: "hiza-geri", band: "mid" },
+    },
+  ],
+  { type: "attack", move: "gyaku-zuki", band: "mid" },
+);
+
+describe("CANONICAL_RULES — hiza-geri (the knee: mid-band standing knockdown → okizeme)", () => {
+  it("downs the foe with a point-blank knee for no score — the standing knockdown", () => {
+    // Mirrors the sweep's "downs a grounded foe for no score", lifted to a MID, point-blank knee
+    // against a neutral (standing) advancer: the knee freezes it for the knockdown and scores 0.
+    const knock = hizaGeri().startup; // knockdown on the first active frame (elapsed = startup)
+    const wake = knock + (CANONICAL_RULES.knockdownDuration ?? 0); // neutral again here
+
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 100000 }), // inside hiza-geri reach (110000)
+        botA: attackOnce("hiza-geri", "mid"),
+        botB: ADVANCER,
+        maxTicks: wake + 5,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0); // the knee scores 0 — the points live in the finish
+    expect(result.events[wake - 1].b.x).toBe(result.events[knock + 1].b.x); // frozen while downed
+    expect(result.events[wake].b.x).not.toBe(result.events[wake - 1].b.x); // moves again on wake
+  });
+
+  it("is a MID-only knockdown — out of band it degrades to idle (no down, no finish)", () => {
+    // Score alone can't tell an in-band (score-0) knockdown from an out-of-band degrade, so the
+    // okizeme finish is the oracle: in band ⇒ down ⇒ the cancelled reverse finishes for 3; out of
+    // band ⇒ the knee idles ⇒ the reverse is a mere base poke (1), no down to finish.
+    const cancelTick = hizaGeri().startup + hizaGeri().active; // first recovery frame ⇒ cancels
+
+    const finishAt = (band: Band): number =>
+      runFight(
+        fight({
+          rules: deterministic({ startGap: 100000 }), // knee (110k) + 240k finisher both reach
+          botA: comboAtTicks([
+            { tick: 0, move: "hiza-geri", band },
+            { tick: cancelTick, move: "gyaku-zuki", band: "mid" },
+          ]),
+          botB: IDLE,
+          maxTicks: 45,
+        }),
+      ).scores.a;
+
+    expect(finishAt("mid")).toBe(3); // in band ⇒ knockdown ⇒ okizeme finish (3)
+    expect(finishAt("high")).toBe(1); // out of band ⇒ idle ⇒ the reverse is a base poke (1)
+    expect(finishAt("low")).toBe(1); // out of band ⇒ base poke, no finish
+    expect(hizaGeri().bands).toEqual(["mid"]); // mid-only, unlike the sweep's occupancy banding
+    expect(hizaGeri().scoreByBand).toBeUndefined(); // a knockdown, not a scoring strike — no jodan bonus
+  });
+
+  it("has the second-shortest reach — only lands point-blank, whiffs where the throw still grabs", () => {
+    // empi 95k < hiza-geri 110k < throw 120k. The knee is the SECOND technique below the throw: it
+    // downs a foe only point-blank and whiffs at a gap the throw still reaches. Since a score-0
+    // connect and a whiff both score 0, the okizeme finish is the connect oracle (connect ⇒ 3;
+    // whiff ⇒ 0, as the un-hit-confirmed reverse is locked out in the knee's recovery).
+    const cancelTick = hizaGeri().startup + hizaGeri().active;
+
+    const kneeFinish = (startGap: number): number =>
+      runFight(
+        fight({
+          rules: deterministic({ startGap }),
+          botA: comboAtTicks([
+            { tick: 0, move: "hiza-geri", band: "mid" },
+            { tick: cancelTick, move: "gyaku-zuki", band: "mid" },
+          ]),
+          botB: IDLE,
+          maxTicks: 45,
+        }),
+      ).scores.a;
+
+    const grab = runFight(
+      fight({
+        rules: deterministic({ startGap: 115000 }), // beyond the knee (110k), within the throw (120k)
+        botA: throwOnce,
+        botB: IDLE,
+        maxTicks: 20,
+      }),
+    );
+
+    expect(kneeFinish(90000)).toBe(3); // point-blank ⇒ knee downs ⇒ okizeme finish
+    expect(kneeFinish(115000)).toBe(0); // out of the knee's reach ⇒ whiff, no down, follow-up locked in recovery
+    expect(grab.scores.a).toBe(3); // …but the throw (120k) still grabs from the same 115000 gap
+    expect(empi().reach).toBeLessThan(hizaGeri().reach); // empi 95k < hiza-geri 110k
+    expect(hizaGeri().reach).toBeLessThan(throwSpec().reach); // hiza-geri 110k < throw 120k — the infighting floor
+  });
+
+  it("is gas-LOCKED — a gassed fighter can no longer commit it (special > gas line)", () => {
+    // Like the kick / elbow lockouts. STRIKER keeps committing its BASIC poke (≤ the band) and
+    // floors the meter to 0; the drain-then-knee bot can only answer the gas band with the knee
+    // (40 > the band), which degrades to idle — so it stalls at the band.
+    const staminaSeries = (botA: BotDoc): number[] =>
+      runFight(fight({ botA, botB: IDLE, maxTicks: 150 })).events.map(
+        (e) => e.a.stamina,
+      );
+
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(hizaGeri().staminaCost ?? 0).toBeGreaterThan(gas); // priced above the gas line ⇒ locks out
+    expect(Math.min(...staminaSeries(STRIKER))).toBe(0); // basic commits even gassed ⇒ floors
+    expect(Math.min(...staminaSeries(DRAIN_THEN_HIZA))).toBeGreaterThan(0); // knee locked out ⇒ stalls
+  });
+
+  it("finishes the downed foe for an ippon on a hit-confirm cancel — the standing okizeme (its signature)", () => {
+    // The sweep's okizeme, lifted to a mid, point-blank knee: connect ⇒ knockdown ⇒ a gyaku-zuki
+    // cancelled into the finish window scores the ippon (3). Uncancelled, the strike starts no
+    // earlier than the knee's full recovery — by which point the foe has woken ⇒ a mere base poke.
+    const finishScoreAt = (strikeTick: number): number =>
+      runFight(
+        fight({
+          rules: deterministic({ startGap: 100000 }), // knee (110k) + 240k finisher both reach
+          botA: bot(
+            [
+              {
+                when: clk("eq", 0),
+                do: { type: "attack", move: "hiza-geri", band: "mid" },
+              },
+              {
+                when: clk("eq", strikeTick),
+                do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+              },
+            ],
+            { type: "idle" },
+          ),
+          botB: IDLE,
+          maxTicks: 45,
+        }),
+      ).scores.a;
+
+    const cancelTick = hizaGeri().startup + hizaGeri().active; // first recovery frame ⇒ cancels
+
+    const neutralTick =
+      hizaGeri().startup + hizaGeri().active + hizaGeri().recovery; // first neutral ⇒ no cancel
+
+    expect(finishScoreAt(cancelTick)).toBe(3); // hit-confirm cancel lands the finish in-window ⇒ ippon
+    expect(finishScoreAt(neutralTick)).toBe(1); // uncancelled ⇒ foe wakes first ⇒ a base poke, not the finish
+    expect(hizaGeri().score).toBe(0); // the knee itself scores 0 — the points live in the finish
+    expect(hizaGeri().knockdown).toBe(true);
+    expect(hizaGeri().cancelInto).toContain("gyaku-zuki");
+    expect(gyaku().cancelInto).not.toContain("hiza-geri"); // source only — the reverse does not cancel into it
+  });
+
+  it("stays reactable and whiff-punishable (the invariant floor)", () => {
+    expect(hizaGeri().startup).toBeGreaterThanOrEqual(lAct() + 1);
+    expect(hizaGeri().recovery).toBeGreaterThanOrEqual(
+      lAct() + kizami().startup,
+    );
+  });
+
+  it("is a mid-only standing knockdown knee: point-blank reach, scores 0, gas-locked, cancel source only", () => {
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(hizaGeri().score).toBe(0); // knockdown ⇒ the hit scores 0 (points live in the finish)
+    expect(hizaGeri().knockdown).toBe(true);
+    expect(hizaGeri().scoreByBand).toBeUndefined();
+    expect(hizaGeri().bands).toEqual(["mid"]);
+    expect(empi().reach).toBeLessThan(hizaGeri().reach); // above the elbow (95k)
+    expect(hizaGeri().reach).toBeLessThan(throwSpec().reach); // below the throw (120k) — the infighting floor
+    expect(hizaGeri().staminaCost ?? 0).toBeGreaterThan(gas); // gas-locked special
+    expect(hizaGeri().cancelInto).toEqual(["gyaku-zuki"]); // cancel source only
   });
 });
 

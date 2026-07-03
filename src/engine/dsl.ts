@@ -280,6 +280,7 @@ export const MOVES: ReadonlySet<string> = new Set<MoveId>([
   "yoko-geri",
   "ushiro-geri",
   "empi",
+  "hiza-geri",
 ]);
 
 export const BANDS: ReadonlySet<string> = new Set<Band>(["high", "mid", "low"]);
