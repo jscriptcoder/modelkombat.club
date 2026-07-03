@@ -189,6 +189,33 @@ export const CANONICAL_RULES: Rules = {
       staminaCost: 52,
       cancelInto: ["gyaku-zuki"],
     },
+    // empi (elbow, Batch-1 expansion #5): the first close-range strike — the trade-off budget /
+    // no-Pareto-dominance law inverted from the long kicks:
+    //   • reach 95000 < throw (120000) ⇒ the SHORTEST reach in the game, the new infighting FLOOR.
+    //     It whiffs at spacings where every existing move (down to the throw) still connects, and
+    //     only lands point-blank — the reward for braving throw range. Its signature.
+    //   • score 2 (waza-ari), FLAT — no scoreByBand ⇒ a high·mid strike scoring 2 at BOTH bands.
+    //     An elbow is technically an `uchi`, so this is the DELIBERATE close-range exception to the
+    //     hand score-cap (close range is its own category); dominance-free vs mae-geri (also 2) —
+    //     it trades ~175k of reach down for its point-blank access, so neither dominates.
+    //   • bands ["high","mid"] ⇒ jodan/chudan gate (whiffs only low).
+    //   • staminaCost 38 > gasThreshold (30) ⇒ special/gas-LOCKED (a gassed fighter loses it), per
+    //     "stamina tier mirrors score tier".
+    //   • startup 8 ≥ lAct+1 / recovery 14 ≥ lAct + jab.startup ⇒ the reactable + punishable floor.
+    //   • cancelInto gyaku-zuki ⇒ the close strike → reverse finisher (situational: the 240k reverse
+    //     only reaches when the elbow landed). It is a cancel SOURCE ONLY — the reverse does NOT
+    //     grow to cancel into it (that "reverse → any kick" edge is the KICKS' only, above). The
+    //     elbow ↔ throw mixup lives at the neutral action-choice level (a throw is not cancellable-into).
+    empi: {
+      startup: 8,
+      active: 2,
+      recovery: 14,
+      score: 2,
+      reach: 95000,
+      bands: ["high", "mid"],
+      staminaCost: 38,
+      cancelInto: ["gyaku-zuki"],
+    },
   },
   // Defensive depth (C5/C6), tuned to the canonical strike's startup-7 timing:
   //   • parryWindow 2 — a matching guard's first 2 ticks (age 1–2) DEFLECT instead of block: a

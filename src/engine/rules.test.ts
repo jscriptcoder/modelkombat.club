@@ -227,7 +227,8 @@ const armed =
       | "uraken"
       | "shuto"
       | "yoko-geri"
-      | "ushiro-geri",
+      | "ushiro-geri"
+      | "empi",
   ) =>
   (): MoveSpec => {
     const m = CANONICAL_RULES.moves[id];
@@ -244,6 +245,7 @@ const uraken = armed("uraken"); // backfist (Batch-1 expansion #1)
 const shuto = armed("shuto"); // knife-hand (Batch-1 expansion #2)
 const yoko = armed("yoko-geri"); // side kick (Batch-1 expansion #3)
 const ushiro = armed("ushiro-geri"); // back kick (Batch-1 expansion #4)
+const empi = armed("empi"); // elbow (Batch-1 expansion #5)
 
 // Commits a single named technique at `band` on tick 0, then idles (generalizes strikeOnce).
 const attackOnce = (move: MoveId, band: Band): BotDoc =>
@@ -1014,6 +1016,139 @@ describe("CANONICAL_RULES — ushiro-geri (the back kick: reach apex + jodan ipp
     expect(ushiro().scoreByBand?.high).toBe(3); // jodan ippon ceiling (like the roundhouse)
     expect(ushiro().bands).toEqual(["high", "mid"]);
     expect(ushiro().staminaCost ?? 0).toBeGreaterThan(gas);
+  });
+});
+
+// ─── Batch-1 expansion #5: empi (elbow) — the shortest-reach close-range strike ──
+// Drains itself with the basic poke, then switches to the elbow the moment it reads GASSED —
+// where the special (38 > gasThreshold 30) is unaffordable and degrades to idle, so the meter
+// never floors past the band (the special lockout, proven for the first close strike).
+const DRAIN_THEN_EMPI: BotDoc = bot(
+  [
+    {
+      when: {
+        op: "eq",
+        args: [
+          { op: "field", path: "self.gassed" },
+          { op: "const", value: 1 },
+        ],
+      },
+      do: { type: "attack", move: "empi", band: "mid" },
+    },
+  ],
+  { type: "attack", move: "gyaku-zuki", band: "mid" },
+);
+
+describe("CANONICAL_RULES — empi (the elbow: shortest reach + point-blank waza-ari)", () => {
+  it("scores a clean point-blank elbow as a waza-ari (2) — the close-range payoff", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 90000 }), // inside empi reach (95000)
+        botA: attackOnce("empi", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(2);
+  });
+
+  it("is a high·mid strike scoring a FLAT 2 (no jodan bonus) and fizzles low", () => {
+    const scoreAt = (band: Band): number =>
+      runFight(
+        fight({
+          rules: deterministic({ startGap: 90000 }),
+          botA: attackOnce("empi", band),
+          botB: IDLE,
+          maxTicks: 30,
+        }),
+      ).scores.a;
+
+    expect(scoreAt("high")).toBe(2); // jodan and chudan alike ⇒ flat waza-ari (no scoreByBand)
+    expect(scoreAt("mid")).toBe(2);
+    expect(scoreAt("low")).toBe(0); // out of band ⇒ idle ⇒ no score
+    expect(empi().scoreByBand).toBeUndefined(); // the flatness — unlike ushiro-geri / mawashi-geri
+  });
+
+  it("is the shortest reach in the game — whiffs at a gap where even the throw lands", () => {
+    // A gap beyond the elbow's reach (95000) but within the throw's (120000): the elbow is the
+    // new infighting FLOOR — it only lands point-blank, the reward for braving throw range. Its
+    // signature (the mirror image of the side/back kicks' beyond-neutral reach).
+    const gap = { startGap: 100000 };
+
+    const elbow = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("empi", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    // grappleFight positions the pair at the same 100000 gap — inside the throw's 120000 reach.
+    const grab = runFight(
+      grappleFight({ botA: throwOnce, botB: IDLE, maxTicks: 20 }),
+    );
+
+    expect(elbow.scores.a).toBe(0); // out of the elbow's point-blank reach
+    expect(grab.scores.a).toBe(3); // …but the throw still lands from the same gap
+    expect(empi().reach).toBeLessThan(throwSpec().reach); // shorter than the throw — the new floor
+  });
+
+  it("is gas-LOCKED — a gassed fighter can no longer commit it (special > gas line)", () => {
+    // Like the kick lockouts. STRIKER keeps committing its BASIC poke (≤ the band) and floors the
+    // meter to 0; the drain-then-empi bot can only answer the gas band with the elbow (38 > the
+    // band), which degrades to idle — so it stalls at the band.
+    const staminaSeries = (botA: BotDoc): number[] =>
+      runFight(fight({ botA, botB: IDLE, maxTicks: 150 })).events.map(
+        (e) => e.a.stamina,
+      );
+
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(empi().staminaCost ?? 0).toBeGreaterThan(gas); // priced above the gas line ⇒ locks out
+    expect(Math.min(...staminaSeries(STRIKER))).toBe(0); // basic commits even gassed ⇒ floors
+    expect(Math.min(...staminaSeries(DRAIN_THEN_EMPI))).toBeGreaterThan(0); // elbow locked out ⇒ stalls
+  });
+
+  it("opens the rekka — a connecting elbow cancels into the reverse (close strike → punch)", () => {
+    const cancelTick = empi().startup + empi().active; // the first recovery frame
+
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 90000 }), // point-blank ⇒ both the elbow and the 240k reverse reach
+        botA: comboAtTicks([
+          { tick: 0, move: "empi", band: "mid" },
+          { tick: cancelTick, move: "gyaku-zuki", band: "mid" },
+        ]),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(3); // elbow waza-ari (2) + cancelled reverse (1)
+    expect(empi().cancelInto).toContain("gyaku-zuki");
+  });
+
+  it("is a cancel SOURCE only — the reverse does NOT cancel into it (only the kicks grow that edge)", () => {
+    // The derived cancel graph grows gyaku-zuki.cancelInto for the KICKS only; a close strike is
+    // not a reverse-punch target. This guards against carelessly widening that edge to the elbow.
+    expect(gyaku().cancelInto).not.toContain("empi");
+  });
+
+  it("stays reactable and whiff-punishable (the invariant floor)", () => {
+    expect(empi().startup).toBeGreaterThanOrEqual(lAct() + 1);
+    expect(empi().recovery).toBeGreaterThanOrEqual(lAct() + kizami().startup);
+  });
+
+  it("is a high·mid close strike (flat waza-ari, shortest reach) priced above the gas line", () => {
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(empi().score).toBe(2);
+    expect(empi().scoreByBand).toBeUndefined(); // flat — no jodan bonus (unlike ushiro-geri)
+    expect(empi().bands).toEqual(["high", "mid"]);
+    expect(empi().reach).toBeLessThan(throwSpec().reach); // the shortest reach in the game
+    expect(empi().staminaCost ?? 0).toBeGreaterThan(gas);
   });
 });
 
