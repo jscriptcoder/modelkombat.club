@@ -144,6 +144,26 @@ describe("validate — bot intake gate", () => {
 
       expect(result.ok).toBe(true);
     });
+
+    it("accepts an attack naming uraken at a legal band (Batch-1 expansion)", () => {
+      const result = validate(
+        getMockBotDoc({
+          default: { type: "attack", move: "uraken", band: "high" },
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+    });
+
+    it("accepts uraken out-of-band — band-legality is runtime, not the gate", () => {
+      const result = validate(
+        getMockBotDoc({
+          default: { type: "attack", move: "uraken", band: "mid" },
+        }),
+      );
+
+      expect(result.ok).toBe(true);
+    });
   });
 
   describe("memory cells", () => {

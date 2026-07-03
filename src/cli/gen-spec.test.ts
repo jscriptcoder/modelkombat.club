@@ -371,6 +371,7 @@ describe("generateSpec — the factual machine-truth spec", () => {
         generateSpec(CANONICAL_RULES, { winGap: MATCH.winGap }),
         HEADING,
       );
+
       const noSenshuLine = claimLine(noSenshu, "match win-rate");
 
       expect(noSenshuLine.toLowerCase()).not.toContain("senshu");

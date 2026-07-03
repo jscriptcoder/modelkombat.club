@@ -55,8 +55,8 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     expect(MATCH).toEqual({ winGap: 8, senshu: true });
   });
 
-  it("carries BENCHMARK_VERSION v4 (senshu first-blood tie-resolution adoption)", () => {
-    expect(BENCHMARK_VERSION).toBe("v4");
+  it("carries BENCHMARK_VERSION v5 (Batch-1 arsenal expansion #1: uraken backfist)", () => {
+    expect(BENCHMARK_VERSION).toBe("v5");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {

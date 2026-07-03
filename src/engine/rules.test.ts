@@ -218,7 +218,7 @@ const sweepFight = (o: Partial<FightConfig> = {}): FightConfig =>
 // Each reader throws if its technique is not configured — so a malformed table fails an
 // assertion in a test, not at collection time (mirrors gyaku()/sweepSpec()).
 const armed =
-  (id: "kizami-zuki" | "gyaku-zuki" | "mae-geri" | "mawashi-geri") =>
+  (id: "kizami-zuki" | "gyaku-zuki" | "mae-geri" | "mawashi-geri" | "uraken") =>
   (): MoveSpec => {
     const m = CANONICAL_RULES.moves[id];
     if (!m) throw new Error(`CANONICAL_RULES.moves['${id}'] is not configured`);
@@ -230,6 +230,7 @@ const kizami = armed("kizami-zuki"); // jab
 const gyaku = armed("gyaku-zuki"); // reverse punch
 const mae = armed("mae-geri"); // front kick
 const mawashi = armed("mawashi-geri"); // roundhouse
+const uraken = armed("uraken"); // backfist (Batch-1 expansion)
 
 // Commits a single named technique at `band` on tick 0, then idles (generalizes strikeOnce).
 const attackOnce = (move: MoveId, band: Band): BotDoc =>
@@ -492,6 +493,111 @@ describe("CANONICAL_RULES — crouch ducks a high strike (occupancy)", () => {
     );
 
     expect(result.scores.a).toBe(0);
+  });
+});
+
+// ─── Batch-1 expansion #1: uraken (backfist) — the cheapest, shortest, high-only snap ──
+describe("CANONICAL_RULES — uraken (the backfist: cheapest, shortest, high-only snap)", () => {
+  it("scores a clean high backfist as a single yuko", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 150000 }), // inside uraken reach (200000)
+        botA: attackOnce("uraken", "high"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(1);
+  });
+
+  it("fizzles at mid — the high-only band gate (unlike the high·mid punches)", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 150000 }),
+        botA: attackOnce("uraken", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("fizzles at low — the high-only band gate", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 150000 }),
+        botA: attackOnce("uraken", "low"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  it("has the shortest hand reach — whiffs at a gap where the jab still lands", () => {
+    // A gap beyond uraken's reach (200000) but within the jab's (kizami 210000).
+    const gap = { startGap: 205000 };
+
+    const backfist = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("uraken", "high"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    const jab = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("kizami-zuki", "high"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(backfist.scores.a).toBe(0); // out of the backfist's shorter reach
+    expect(jab.scores.a).toBe(1); // …but inside the jab's
+    expect(uraken().reach).toBeLessThan(kizami().reach);
+  });
+
+  it("is the cheapest commit and stays affordable when gassed (basic ≤ gas line)", () => {
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(uraken().staminaCost ?? 0).toBeLessThan(kizami().staminaCost ?? 0);
+    expect(uraken().staminaCost ?? 0).toBeLessThanOrEqual(gas);
+  });
+
+  it("opens the rekka — a connecting backfist cancels into the reverse", () => {
+    const cancelTick = uraken().startup + uraken().active; // the first recovery frame
+
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 150000 }),
+        botA: comboAtTicks([
+          { tick: 0, move: "uraken", band: "high" },
+          { tick: cancelTick, move: "gyaku-zuki", band: "high" },
+        ]),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(2); // backfist 1 + cancelled reverse 1
+    expect(uraken().cancelInto).toContain("gyaku-zuki");
+  });
+
+  it("stays reactable and whiff-punishable (the invariant floor)", () => {
+    expect(uraken().startup).toBeGreaterThanOrEqual(lAct() + 1);
+    expect(uraken().recovery).toBeGreaterThanOrEqual(lAct() + kizami().startup);
+  });
+
+  it("is a single-band high yuko (score 1, no jodan bonus)", () => {
+    expect(uraken().score).toBe(1);
+    expect(uraken().bands).toEqual(["high"]);
   });
 });
 
