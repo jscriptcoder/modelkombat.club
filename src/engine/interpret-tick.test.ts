@@ -650,6 +650,12 @@ describe("runTick — rule(path) ruleset reads", () => {
     ["moves.empi.score", 2, 0],
     ["moves.empi.reach", 95000, 0],
     ["moves.empi.staminaCost", 38, 0],
+    ["moves.hiza-geri.startup", 9, 0],
+    ["moves.hiza-geri.active", 2, 0],
+    ["moves.hiza-geri.recovery", 16, 0],
+    ["moves.hiza-geri.score", 0, 0],
+    ["moves.hiza-geri.reach", 110000, 0],
+    ["moves.hiza-geri.staminaCost", 40, 0],
     ["throw.startup", 7, 0],
     ["throw.active", 2, 0],
     ["throw.recovery", 14, 0],
@@ -704,6 +710,29 @@ describe("runTick — rule(path) ruleset reads", () => {
     expect(
       evalsToRule("moves.mawashi-geri.scoreByBand.high", 0, noBandScore),
     ).toBe(true);
+  });
+
+  it("reads moves.hiza-geri.score keyed off the knee entry (its score is 0, which hides a key mutation)", () => {
+    // hiza-geri scores 0 canonically, so the canonical + minimal rows both read 0 and cannot catch
+    // a mutated bracket key (r.moves[""]?.score ?? 0 ⇒ 0 either way). Configure a NON-ZERO score to
+    // pin that the reader keys off "hiza-geri" specifically. (It is the only hyphenated move whose
+    // score is 0, so — unlike the dot-accessed sweep — it is the only score reader needing this.)
+    const scoringKnee: Rules = {
+      ...MINIMAL_RULES,
+      moves: {
+        ...MINIMAL_RULES.moves,
+        "hiza-geri": {
+          startup: 9,
+          active: 2,
+          recovery: 16,
+          score: 7,
+          reach: 110000,
+          knockdown: true,
+        },
+      },
+    };
+
+    expect(evalsToRule("moves.hiza-geri.score", 7, scoringKnee)).toBe(true);
   });
 
   it("reads ushiro-geri's scoreByBand.high as 0 when the back kick has no scoreByBand", () => {

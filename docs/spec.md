@@ -176,6 +176,12 @@ the frame table below.
 - `moves.empi.score`
 - `moves.empi.reach`
 - `moves.empi.staminaCost`
+- `moves.hiza-geri.startup`
+- `moves.hiza-geri.active`
+- `moves.hiza-geri.recovery`
+- `moves.hiza-geri.score`
+- `moves.hiza-geri.reach`
+- `moves.hiza-geri.staminaCost`
 - `throw.startup`
 - `throw.active`
 - `throw.recovery`
@@ -474,6 +480,12 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "moves.empi.score",
         "moves.empi.reach",
         "moves.empi.staminaCost",
+        "moves.hiza-geri.startup",
+        "moves.hiza-geri.active",
+        "moves.hiza-geri.recovery",
+        "moves.hiza-geri.score",
+        "moves.hiza-geri.reach",
+        "moves.hiza-geri.staminaCost",
         "throw.startup",
         "throw.active",
         "throw.recovery",
