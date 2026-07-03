@@ -55,8 +55,8 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     expect(MATCH).toEqual({ winGap: 8, senshu: true });
   });
 
-  it("carries BENCHMARK_VERSION v6 (Batch-1 arsenal expansion #2: shuto knife-hand)", () => {
-    expect(BENCHMARK_VERSION).toBe("v6");
+  it("carries BENCHMARK_VERSION v7 (Batch-1 arsenal expansion #3: yoko-geri side kick)", () => {
+    expect(BENCHMARK_VERSION).toBe("v7");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {
