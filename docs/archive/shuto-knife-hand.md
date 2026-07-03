@@ -1,7 +1,7 @@
 # Plan: `shuto` (knife-hand) — Batch-1 move #2
 
 **Branch**: feat/shuto-knife-hand (Slice 1) · feat/shuto-rule-readers (Slice 2)
-**Status**: Active
+**Status**: ✅ **COMPLETE** — Slice 1 MERGED (PR #120, benchmark v6) · Slice 2 MERGED (PR #121, no bump)
 **Design source**: `docs/move-roster.md` (Batch-1 resolved frame data; balance law + policies)
 
 ## Goal
@@ -58,29 +58,29 @@ so their round-robin outcomes stay byte-identical under v6 (no gauntlet re-chara
 Behaviour proven by `runFight` against `CANONICAL_RULES` (engine), `validate` (TCB), and the
 `gen-spec` / schema drift tests (spec). Observable score/accept assertions, not literals alone.
 
-- [ ] **AC-1 (yuko — high):** a clean `high` `shuto` within reach scores **1**.
-- [ ] **AC-2 (yuko — mid):** a clean `mid` `shuto` within reach scores **1** (`high·mid`, unlike
+- [x] **AC-1 (yuko — high):** a clean `high` `shuto` within reach scores **1**.
+- [x] **AC-2 (yuko — mid):** a clean `mid` `shuto` within reach scores **1** (`high·mid`, unlike
       `uraken`'s high-only gate).
-- [ ] **AC-3 (band gate — low):** `shuto` at `band:"low"` degrades to idle ⇒ **0** (`low` ∉ bands).
-- [ ] **AC-4 (out-ranges the reverse — the signature):** at a gap where `gyaku-zuki` (240k) whiffs
+- [x] **AC-3 (band gate — low):** `shuto` at `band:"low"` degrades to idle ⇒ **0** (`low` ∉ bands).
+- [x] **AC-4 (out-ranges the reverse — the signature):** at a gap where `gyaku-zuki` (240k) whiffs
       but `shuto` (260k) still lands, `shuto` scores **1** where the reverse would score **0**
       (documents `shuto.reach > gyaku-zuki.reach` — a 1-pt hand out-reaching the 2-pt reverse).
-- [ ] **AC-5 (gas-proof, priciest basic hand):** a **gassed** fighter (`stamina ≤ 30`) still commits
+- [x] **AC-5 (gas-proof, priciest basic hand):** a **gassed** fighter (`stamina ≤ 30`) still commits
       `shuto` and scores **1** (its cost 22 ≤ `gasThreshold` 30 — unlike the gas-locked kicks); the
       cost drawn is **22** (> `uraken` 12, > `kizami` 15 — the most expensive gas-proof hand).
-- [ ] **AC-6 (cancel → reverse):** a `shuto` that connects opens the cancel window; a `gyaku-zuki`
+- [x] **AC-6 (cancel → reverse):** a `shuto` that connects opens the cancel window; a `gyaku-zuki`
       started within it hit-confirms (the rekka opener works).
-- [ ] **AC-7 (TCB allowlist):** `validate` accepts `{type:"attack", move:"shuto", band:"high"}`
+- [x] **AC-7 (TCB allowlist):** `validate` accepts `{type:"attack", move:"shuto", band:"high"}`
       **and** accepts it out-of-band (`band:"low"`) — band-legality is a runtime concern; the
       validator only checks the move id + band are well-formed.
-- [ ] **AC-8 (spec teaches the move):** regenerated `spec.md` lists `shuto` in the attack-move line,
+- [x] **AC-8 (spec teaches the move):** regenerated `spec.md` lists `shuto` in the attack-move line,
       the move-stats table (with `bands: high·mid`), and the JSON-schema `move` enum; `gen-spec` +
       schema drift tests stay green; `BENCHMARK_VERSION` v5 → v6.
-- [ ] **AC-9 (rule-path accepted):** `validate` accepts a bot using `rule("moves.shuto.reach")`
+- [x] **AC-9 (rule-path accepted):** `validate` accepts a bot using `rule("moves.shuto.reach")`
       (and the other 5 paths); an unknown `moves.shuto.bands` path is **rejected**. _(Slice 2)_
-- [ ] **AC-10 (reader returns the value):** the interpreter resolves `rule("moves.shuto.reach")` to
+- [x] **AC-10 (reader returns the value):** the interpreter resolves `rule("moves.shuto.reach")` to
       **260000** and `rule("moves.shuto.staminaCost")` to **22** against `CANONICAL_RULES`. _(Slice 2)_
-- [ ] **AC-11 (spec lists the paths):** regenerated `spec.md` lists the six `moves.shuto.*` rule
+- [x] **AC-11 (spec lists the paths):** regenerated `spec.md` lists the six `moves.shuto.*` rule
       paths + the `rulePath` schema enum; drift tests green. _(Slice 2)_
 
 **Deferred (NOT this feature):** the roster-wide no-Pareto-dominance property test (add once more
@@ -92,7 +92,7 @@ separate capability, folded into a family-level re-run).
 One slice = one PR. Each follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Load the project
 CLAUDE.md + `tdd`/`testing`/`mutation-testing`/`refactoring` before any code.
 
-### Slice 1: Bot can throw `shuto` — the canonical longest-reach 1-point hand
+### Slice 1: Bot can throw `shuto` — the canonical longest-reach 1-point hand — ✅ MERGED (PR #120)
 
 **Value**: The bot author gets a `high·mid` _yuko_ poke that **out-ranges the reverse punch** and
 survives gassing, at the cost of the reverse's second point and a slower startup — a distinct
@@ -148,7 +148,7 @@ skip if no value.
 `dsl.ts`/`rules.ts`/`benchmark-config.ts` mutation 100%; typecheck + lint + format clean;
 mutation report reviewed; human approves commit.
 
-### Slice 2: Bots can introspect `shuto`'s frames via `rule("moves.shuto.*")`
+### Slice 2: Bots can introspect `shuto`'s frames via `rule("moves.shuto.*")` — ✅ MERGED (PR #121)
 
 **Value**: The bot author can read `shuto`'s frames at runtime to write adaptive logic (e.g.
 gate on `rule("moves.shuto.reach")` to open at knife-hand range), the same as every other move.
