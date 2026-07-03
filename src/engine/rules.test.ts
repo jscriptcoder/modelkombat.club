@@ -226,7 +226,8 @@ const armed =
       | "mawashi-geri"
       | "uraken"
       | "shuto"
-      | "yoko-geri",
+      | "yoko-geri"
+      | "ushiro-geri",
   ) =>
   (): MoveSpec => {
     const m = CANONICAL_RULES.moves[id];
@@ -242,6 +243,7 @@ const mawashi = armed("mawashi-geri"); // roundhouse
 const uraken = armed("uraken"); // backfist (Batch-1 expansion #1)
 const shuto = armed("shuto"); // knife-hand (Batch-1 expansion #2)
 const yoko = armed("yoko-geri"); // side kick (Batch-1 expansion #3)
+const ushiro = armed("ushiro-geri"); // back kick (Batch-1 expansion #4)
 
 // Commits a single named technique at `band` on tick 0, then idles (generalizes strikeOnce).
 const attackOnce = (move: MoveId, band: Band): BotDoc =>
@@ -863,6 +865,155 @@ describe("CANONICAL_RULES — yoko-geri (the side kick: beyond-neutral zoning th
     expect(yoko().bands).toEqual(["mid"]);
     expect(yoko().scoreByBand).toBeUndefined(); // no ippon ceiling (unlike the roundhouse)
     expect(yoko().staminaCost ?? 0).toBeGreaterThan(gas);
+  });
+});
+
+// ─── Batch-1 expansion #4: ushiro-geri (back kick) — the reach apex + jodan-ippon kick ──
+// Drains itself with the basic poke, then switches to the back kick the moment it reads
+// GASSED — where the special (52 > gasThreshold 30) is unaffordable and degrades to idle,
+// so the meter never floors past the band (the special lockout, proven for the priciest kick).
+const DRAIN_THEN_USHIRO: BotDoc = bot(
+  [
+    {
+      when: {
+        op: "eq",
+        args: [
+          { op: "field", path: "self.gassed" },
+          { op: "const", value: 1 },
+        ],
+      },
+      do: { type: "attack", move: "ushiro-geri", band: "mid" },
+    },
+  ],
+  { type: "attack", move: "gyaku-zuki", band: "mid" },
+);
+
+describe("CANONICAL_RULES — ushiro-geri (the back kick: reach apex + jodan ippon)", () => {
+  it("scores a clean mid back kick as a waza-ari (2) — the chudan base score", () => {
+    const result = runFight(
+      fight({
+        rules: deterministic({ startGap: 250000 }), // inside ushiro reach (330000)
+        botA: attackOnce("ushiro-geri", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(result.scores.a).toBe(2);
+  });
+
+  it("rewards a jodan back kick with ippon (3) and fizzles low — the high·mid gate (scoreByBand)", () => {
+    const scoreAt = (band: Band): number =>
+      runFight(
+        fight({
+          rules: deterministic({ startGap: 250000 }),
+          botA: attackOnce("ushiro-geri", band),
+          botB: IDLE,
+          maxTicks: 30,
+        }),
+      ).scores.a;
+
+    expect(scoreAt("high")).toBe(3); // jodan ⇒ ippon (the expansion's first jodan-scoring kick)
+    expect(scoreAt("mid")).toBe(2); // chudan ⇒ waza-ari fallback
+    expect(scoreAt("low")).toBe(0); // out of band ⇒ idle ⇒ no score
+  });
+
+  it("reaches the apex — lands at a gap where even the side kick whiffs", () => {
+    // A gap beyond the side kick's reach (yoko 315000) but within ushiro's (330000): ushiro-geri
+    // is now the single longest technique in the game. This is its signature.
+    const gap = { startGap: 320000 };
+
+    const backKick = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("ushiro-geri", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    const sideKick = runFight(
+      fight({
+        rules: deterministic(gap),
+        botA: attackOnce("yoko-geri", "mid"),
+        botB: IDLE,
+        maxTicks: 30,
+      }),
+    );
+
+    expect(backKick.scores.a).toBe(2); // inside the back kick's apex reach
+    expect(sideKick.scores.a).toBe(0); // …but out of the side kick's
+    expect(ushiro().reach).toBeGreaterThan(yoko().reach); // the new game-longest reach
+    expect(ushiro().reach).toBeGreaterThan(CANONICAL_RULES.startGap); // out-reaches the neutral gap
+  });
+
+  it("is gas-LOCKED — a gassed fighter can no longer commit it (the priciest special > gas line)", () => {
+    // Same as the yoko-geri lockout, one rung costlier. STRIKER keeps committing its BASIC poke
+    // (20 ≤ the band) and floors the meter to 0; the drain-then-ushiro bot can only answer the gas
+    // band with the back kick (52 > the band), which degrades to idle — so it stalls at the band.
+    const staminaSeries = (botA: BotDoc): number[] =>
+      runFight(fight({ botA, botB: IDLE, maxTicks: 150 })).events.map(
+        (e) => e.a.stamina,
+      );
+
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(ushiro().staminaCost ?? 0).toBeGreaterThan(gas); // priced above the gas line ⇒ locks out
+    expect(ushiro().staminaCost ?? 0).toBeGreaterThan(yoko().staminaCost ?? 0); // the new costliest move
+    expect(Math.min(...staminaSeries(STRIKER))).toBe(0); // basic commits even gassed ⇒ floors
+    expect(Math.min(...staminaSeries(DRAIN_THEN_USHIRO))).toBeGreaterThan(0); // back kick locked out ⇒ stalls
+  });
+
+  it("opens the rekka — a connecting back kick cancels into the reverse (kick → punch finisher)", () => {
+    const cancelTick = ushiro().startup + ushiro().active; // the first recovery frame
+
+    const result = runFight(
+      fight({
+        rules: deterministic(), // gap 200000 ⇒ both the kick and the 240k finisher reach
+        botA: comboAtTicks([
+          { tick: 0, move: "ushiro-geri", band: "mid" },
+          { tick: cancelTick, move: "gyaku-zuki", band: "mid" },
+        ]),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(3); // back kick chudan (2) + cancelled reverse (1)
+    expect(ushiro().cancelInto).toContain("gyaku-zuki");
+  });
+
+  it("is a cancel TARGET too — the reverse now cancels into it (reverse → any kick grows)", () => {
+    const cancelTick = gyaku().startup + gyaku().active;
+
+    const result = runFight(
+      fight({
+        rules: deterministic(), // gap 200000 ⇒ the reverse connects and the kick out-reaches it
+        botA: comboAtTicks([
+          { tick: 0, move: "gyaku-zuki", band: "mid" },
+          { tick: cancelTick, move: "ushiro-geri", band: "mid" },
+        ]),
+        botB: IDLE,
+        maxTicks: 40,
+      }),
+    );
+
+    expect(result.scores.a).toBe(3); // reverse (1) + cancelled back kick chudan (2)
+    expect(gyaku().cancelInto).toContain("ushiro-geri"); // the grown "reverse → any kick" edge
+  });
+
+  it("stays reactable and whiff-punishable (the invariant floor)", () => {
+    expect(ushiro().startup).toBeGreaterThanOrEqual(lAct() + 1);
+    expect(ushiro().recovery).toBeGreaterThanOrEqual(lAct() + kizami().startup);
+  });
+
+  it("is a high·mid kick — ippon jodan, waza-ari chudan — priced above the gas line", () => {
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+
+    expect(ushiro().score).toBe(2);
+    expect(ushiro().scoreByBand?.high).toBe(3); // jodan ippon ceiling (like the roundhouse)
+    expect(ushiro().bands).toEqual(["high", "mid"]);
+    expect(ushiro().staminaCost ?? 0).toBeGreaterThan(gas);
   });
 });
 

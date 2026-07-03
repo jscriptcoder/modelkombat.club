@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v7"; // Batch-1 arsenal expansion #3: yoko-geri (side kick) enters CANONICAL_RULES
+export const BENCHMARK_VERSION = "v8"; // Batch-1 arsenal expansion #4: ushiro-geri (back kick) enters CANONICAL_RULES
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -47,4 +47,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // Recompute and bump (with BENCHMARK_VERSION) whenever a scoring input changes —
 // the guard test in benchmark-config.test.ts prints the expected value on drift.
 export const INPUT_HASH =
-  "ab8e61935bb973c13f7be0d4e4cad3f47999bb9333791bcf7b49ab0a4a23e143";
+  "37794d00bdbaed99fd42080189685c0e5f6b41d9609bd975bbc549e28f33295e";

@@ -20,6 +20,9 @@ export type Band = "high" | "mid" | "low";
 // poke reaching past the 2-point `gyaku-zuki`), `high·mid`, gas-proof. `yoko-geri` (side kick)
 // is the beyond-neutral zoning thrust — the longest reach in the game (out-reaches even the
 // roundhouse and the neutral start gap), `mid`-only 2-point waza-ari, slowest and gas-locked.
+// `ushiro-geri` (back kick) is the reach APEX and highest-commitment kick — longer still than
+// the side kick, `high·mid` with a jodan-ippon bonus (score 2 / 3 jodan, like the roundhouse),
+// the slowest startup, longest recovery, and priciest cost in the roster (gas-locked).
 export type MoveId =
   | "kizami-zuki"
   | "gyaku-zuki"
@@ -27,7 +30,8 @@ export type MoveId =
   | "mawashi-geri"
   | "uraken"
   | "shuto"
-  | "yoko-geri";
+  | "yoko-geri"
+  | "ushiro-geri";
 
 // ─── Action grammar — a bot returns exactly ONE per tick ─────────────────────
 // `dir` is RELATIVE to facing: +1 = toward opponent, -1 = away, 0 = hold.
@@ -169,6 +173,7 @@ export type Rules = {
     uraken?: MoveSpec;
     shuto?: MoveSpec;
     "yoko-geri"?: MoveSpec;
+    "ushiro-geri"?: MoveSpec;
   };
   // Vertical axis (C4). Both absent ⇒ inert (a `jump` launches no arc) ⇒
   // byte-identical to the pre-vertical engine. `jumpImpulse` is the initial

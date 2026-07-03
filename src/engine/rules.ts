@@ -74,7 +74,7 @@ export const CANONICAL_RULES: Rules = {
       reach: 240000, // the locked old-strike anchor
       bands: ["high", "mid"],
       staminaCost: 20, // basic (≤ gasThreshold 30)
-      cancelInto: ["mae-geri", "mawashi-geri", "yoko-geri"], // escalate the punch into any kick
+      cancelInto: ["mae-geri", "mawashi-geri", "yoko-geri", "ushiro-geri"], // escalate the punch into any kick
     },
     "mae-geri": {
       // front kick — chudan-only (mid) for waza-ari (2); deeper than the punches, slower, special.
@@ -160,6 +160,33 @@ export const CANONICAL_RULES: Rules = {
       reach: 315000,
       bands: ["mid"],
       staminaCost: 48,
+      cancelInto: ["gyaku-zuki"],
+    },
+    // ushiro-geri (back kick, Batch-1 expansion #4): the reach APEX and highest-commitment kick —
+    // the trade-off budget / no-Pareto-dominance law at its extreme:
+    //   • reach 330000 > yoko-geri (315000) ⇒ now the single LONGEST technique in the game (and
+    //     > startGap 300000 ⇒ another beyond-neutral thrust). Its signature. Pays with the slowest
+    //     startup (13 > everything), the longest recovery (22 > everything), and the highest cost
+    //     (52 > everything) — the turn-away back kick is the most telegraphed, punishable commit.
+    //   • scoreByBand { high: 3 } ⇒ jodan ippon / chudan waza-ari (2), mirroring the roundhouse —
+    //     the expansion's FIRST jodan-scoring kick. It reaches past the side kick AND carries the
+    //     ippon bonus; that dual upside is priced by the tempo/cost floor above (dominance-free vs
+    //     both yoko-geri and mawashi-geri).
+    //   • bands ["high","mid"] ⇒ conventional jodan/chudan gate (whiffs only low).
+    //   • staminaCost 52 > gasThreshold (30) ⇒ special/gas-LOCKED, the priciest move (a gassed
+    //     fighter loses it), per "stamina tier mirrors score tier".
+    //   • startup 13 ≥ lAct+1 / recovery 22 ≥ lAct + jab.startup ⇒ the reactable + punishable floor.
+    //   • cancelInto gyaku-zuki ⇒ the kick → reverse finisher (situational, as the other kicks). It
+    //     is ALSO a cancel target — the reverse grows to cancel into it ("reverse → any kick", above).
+    "ushiro-geri": {
+      startup: 13,
+      active: 3,
+      recovery: 22,
+      score: 2,
+      scoreByBand: { high: 3 },
+      reach: 330000,
+      bands: ["high", "mid"],
+      staminaCost: 52,
       cancelInto: ["gyaku-zuki"],
     },
   },
