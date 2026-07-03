@@ -4,8 +4,8 @@
 > Every allowlist, limit, and frame-table number below is read directly from
 > the engine, so this document cannot lie about how a fight resolves.
 
-- **Benchmark version:** `v9` — a score is comparable only against another at the same version.
-- **Input hash:** `7cb8c325325b6465eb9c645d0e1731224d97547cc55f640dc760b57d1873d69e` (pins the scoring inputs: rules + gauntlet + run params).
+- **Benchmark version:** `v10` — a score is comparable only against another at the same version.
+- **Input hash:** `215fd6f4a5f7b3f94aba644630c59a3048b16f64c6af06d8d53e586ec289d4c4` (pins the scoring inputs: rules + gauntlet + run params).
 
 A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is
 validated once against the allowlists below (the security boundary), then run
@@ -210,7 +210,7 @@ A bot returns exactly **one** action per tick. `dir` is relative to facing:
 
 - action types: `idle`, `move`, `block`, `crouch`, `jump`, `attack`, `sweep`, `throw`, `throw-break`
 - `attack` takes a `move` and a `band`.
-- attack moves: `kizami-zuki`, `gyaku-zuki`, `mae-geri`, `mawashi-geri`, `uraken`, `shuto`, `yoko-geri`, `ushiro-geri`, `empi`
+- attack moves: `kizami-zuki`, `gyaku-zuki`, `mae-geri`, `mawashi-geri`, `uraken`, `shuto`, `yoko-geri`, `ushiro-geri`, `empi`, `hiza-geri`
 - bands: `high`, `mid`, `low`
 
 ## Frame table
@@ -235,6 +235,7 @@ cancel into a strike during the foe's `finishWindow` is the okizeme finish.
 | `yoko-geri` | 12 | 3 | 20 | 2 | 315000 | 48 | mid | gyaku-zuki |
 | `ushiro-geri` | 13 | 3 | 22 | 2 | 330000 | 52 | high/mid | gyaku-zuki |
 | `empi` | 8 | 2 | 14 | 2 | 95000 | 38 | high/mid | gyaku-zuki |
+| `hiza-geri` | 9 | 2 | 16 | 0 | 110000 | 40 | mid | gyaku-zuki |
 
 ### Global constants
 
@@ -512,7 +513,8 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "shuto",
         "yoko-geri",
         "ushiro-geri",
-        "empi"
+        "empi",
+        "hiza-geri"
       ]
     },
     "band": {

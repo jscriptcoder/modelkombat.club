@@ -216,6 +216,30 @@ export const CANONICAL_RULES: Rules = {
       staminaCost: 38,
       cancelInto: ["gyaku-zuki"],
     },
+    // ── hiza-geri (knee, Batch-1 expansion #6) — the only MID-band STANDING knockdown → okizeme:
+    //   • reach 110000 ⇒ empi (95k) < hiza-geri < throw (120k): the SECOND technique below the
+    //     throw, landing only point-blank (the infighting floor's next rung). Its reach signature.
+    //   • score 0 + knockdown ⇒ a clean mid hit DOWNS the foe for no score; the points live in the
+    //     okizeme finish (a hit-confirmed gyaku-zuki inside finishWindow ⇒ finishScore 3), reusing
+    //     the sweep's C8 machinery verbatim — the low sweep knockdown lifted to a standing mid angle.
+    //   • bands ["mid"] ⇒ mid-only gate (whiffs high/low); unlike the sweep it bands via bandLegal,
+    //     not occupancy. NO scoreByBand (it is a knockdown, not a scoring strike).
+    //   • staminaCost 40 > gasThreshold (30) ⇒ special/gas-LOCKED, matching the throw/sweep tier.
+    //   • startup 9 ≥ lAct+1 / recovery 16 ≥ lAct + jab.startup ⇒ the reactable + punishable floor.
+    //   • cancelInto gyaku-zuki ⇒ the okizeme finisher. Cancel SOURCE ONLY — the reverse does NOT
+    //     grow to cancel into it (that "reverse → any kick" edge is the KICKS' only). The knee ↔
+    //     throw mixup lives at the neutral action-choice level (a throw is not cancellable-into).
+    "hiza-geri": {
+      startup: 9,
+      active: 2,
+      recovery: 16,
+      score: 0,
+      reach: 110000,
+      bands: ["mid"],
+      staminaCost: 40,
+      knockdown: true,
+      cancelInto: ["gyaku-zuki"],
+    },
   },
   // Defensive depth (C5/C6), tuned to the canonical strike's startup-7 timing:
   //   • parryWindow 2 — a matching guard's first 2 ticks (age 1–2) DEFLECT instead of block: a
