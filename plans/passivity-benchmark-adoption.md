@@ -1,7 +1,7 @@
 # Plan: passivity benchmark + spec adoption (item 3, capability B / v16)
 
 **Branch**: feat/passivity-v16-report (PR 2 — Slice 2)
-**Status**: Active — **Slice 1 DONE** (PR #151, merged `main`@`e930960`); Slice 2 next
+**Status**: Active — **Slices 1 & 2 DONE** (S1 PR #151 `main`@`e930960`; S2 `414405f`); close-out (PR 3) next
 
 Second of the three deferred §7 officiating adoptions. Resolved decisions:
 `plans/item3-officiating-adoption-decisions.md` (the grill-me record — read it first).
@@ -56,7 +56,7 @@ doc's non-goals).
 - [x] The v15 jogai fire still holds under the pooled ladder (the jogai-adoption lock stays
       green at v16).
 - [x] `npm run fight` output byte-identical (no engine/rules change).
-- [ ] The CLI benchmark report surfaces the passivity foul split (bot vs opp), ranking-inert. _(Slice 2)_
+- [x] The CLI benchmark report surfaces the passivity foul split (bot vs opp), ranking-inert.
 - [x] New `docs/benchmark-gauntlet-v16.md` re-characterization; dogfood record re-pinned.
 
 ## Slices
@@ -161,7 +161,7 @@ own; default to mirroring, not premature DRY).
 **Done when**: all Slice-1 acceptance criteria met, `npm run fight` byte-identical verified,
 full suite + typecheck + lint + format green, mutation report reviewed, human approves commit.
 
-### Slice 2 (PR 2): CLI passivity foul breakdown — version-neutral reporting
+### Slice 2 (PR 2): CLI passivity foul breakdown — version-neutral reporting ✅ DONE (`414405f`)
 
 **Value**: a human running `npm run benchmark` sees passivity firing (bot-vs-opponent foul
 split), the same observability jogai got in PR #149.
