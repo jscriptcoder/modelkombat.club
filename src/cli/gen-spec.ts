@@ -41,14 +41,16 @@ import {
 
 // The WKF match parameters the benchmark scores on (winGap + the tick cap, plus
 // the optional senshu first-blood tie-break, the optional jogai ring-out penalty,
-// and the optional passivity non-engagement penalty). A narrow structural type so
-// the section/primer can be exercised against a retuned gap — or a manifest toggling
-// senshu / jogai / passivity — in tests, mirroring the `rules` parameter's purpose.
+// the optional passivity non-engagement penalty, and the optional sudden-death
+// overtime period). A narrow structural type so the section/primer can be exercised
+// against a retuned gap — or a manifest toggling senshu / jogai / passivity /
+// overtime — in tests, mirroring the `rules` parameter's purpose.
 type Match = {
   winGap: number;
   senshu?: boolean;
   jogai?: { margin: number };
   passivity?: { limit: number };
+  overtime?: { ticks: number };
 };
 
 // markdown inline-code span
@@ -223,6 +225,10 @@ const benchmarkSection = (match: Match): string =>
     "scored deterministically — the spec is the only input; there is no feedback loop.",
     "",
     `- ${code("win condition")} — a match ends the moment either fighter leads by ${code("winGap")} = ${match.winGap} points; otherwise it runs the full ${code("maxTicks")} = ${MAX_TICKS} ticks and is decided on total points${
+      match.overtime
+        ? `; if still level, one sudden-death ${code("overtime")} period of ${code("ticks")} = ${match.overtime.ticks} ticks plays — first to a 1-point gap wins`
+        : ""
+    }${
       match.senshu
         ? `; if still level, the first fighter to have scored (${code("senshu")}, first blood) wins — only a bout where neither drew first blood is a draw`
         : " (equal ⇒ a draw)"
@@ -447,6 +453,11 @@ const primerSection = (rules: Rules, match: Match): string => {
     ...(match.passivity
       ? [
           `- **Don't stall (passivity).** Go ${cv(match.passivity.limit)} ticks without landing offense and you are fouled for non-engagement — same shared warning ladder as jogai. Watch ${code("self.passivityRemaining")} (ticks left before your foul; ${cv(0)} when unconfigured) and re-engage before it expires; a purely reactive turtle bleeds points. Read ${code("opponent.passivityRemaining")} to bait a stalling foe toward the same foul.`,
+        ]
+      : []),
+    ...(match.overtime
+      ? [
+          `- **Sudden death (overtime).** A bout still LEVEL at the cap plays one sudden-death period of ${cv(match.overtime.ticks)} ticks — the first 1-point gap wins outright, decided BEFORE senshu. Watch ${code("clock.overtime")} (${cv(1)} once it starts, ${cv(0)} in regulation) and go ALL-IN — patience loses the tie, so press for the first clean score.`,
         ]
       : []),
   ].join("\n");
