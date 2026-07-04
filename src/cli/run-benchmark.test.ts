@@ -33,6 +33,8 @@ const ATTACK_MID: Action = { type: "attack", move: "gyaku-zuki", band: "mid" };
 const SUBMITTED = named("sub", ATTACK_MID);
 const TRADER = named("trader", ATTACK_MID);
 const LOSER = named("loser", { type: "idle" });
+// Backpedals into its own out-zone on either slot ⇒ a jogai self-foul source.
+const RETREATER = named("retreater", { type: "move", dir: -1 });
 
 const deps = (o: Partial<BenchmarkDeps> = {}): BenchmarkDeps => ({
   loadBot: () => SUBMITTED,
@@ -73,6 +75,7 @@ describe("runBenchmarkCli — report on stdout", () => {
         "trader      0  0  0  4       4",
         "",
         "win-rate 50.0%   net-points +4   (4W 0L 4D of 8)",
+        "ended: gap 0 / time 8 / senshu 0 / overtime 0   jogai fouls: bot=0 opp=0",
         "",
       ].join("\n"),
     );
@@ -96,6 +99,27 @@ describe("runBenchmarkCli — report on stdout", () => {
     expect(out.code).toBe(0);
     expect(out.stdout).toContain("win-rate 100.0%");
     expect(out.stdout).toContain("net-points +32");
+  });
+
+  it("prints the officiating line — endReason counts and the bot-vs-opponent jogai split", () => {
+    // The bot backs itself out of the ring on both sides (2 ring-outs per side = 4); the
+    // idle opponent never rings out; the 99-gap is never reached so both bouts run to time.
+    // Proves the line reads the bot-side foul count (4), not the opponent's (0).
+    const out = runBenchmarkCli(
+      ["bots/retreater.json"],
+      deps({
+        loadBot: () => RETREATER,
+        gauntlet: [LOSER],
+        seeds: [1],
+        maxTicks: 55,
+        match: { winGap: 99, jogai: { margin: 100000 } },
+      }),
+    );
+
+    expect(out.code).toBe(0);
+    expect(out.stdout).toContain(
+      "ended: gap 0 / time 2 / senshu 0 / overtime 0   jogai fouls: bot=4 opp=0",
+    );
   });
 });
 
@@ -176,6 +200,7 @@ describe("runBenchmarkCli — --from-reply (lenient extraction)", () => {
         "trader      0  0  0  4       4",
         "",
         "win-rate 50.0%   net-points +4   (4W 0L 4D of 8)",
+        "ended: gap 0 / time 8 / senshu 0 / overtime 0   jogai fouls: bot=0 opp=0",
         "",
       ].join("\n"),
     );

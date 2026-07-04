@@ -11,7 +11,9 @@
 // ============================================================================
 import {
   benchmark,
+  type BenchmarkConfig,
   type BenchmarkResult,
+  type OfficiatingTally,
   type OpponentScore,
 } from "../engine/benchmark.js";
 import {
@@ -32,7 +34,7 @@ export type BenchmarkDeps = {
   rules: Rules;
   seeds: readonly number[];
   maxTicks: number;
-  match?: { winGap: number }; // WKF match mode; absent ⇒ fights run to maxTicks
+  match?: BenchmarkConfig["match"]; // WKF match mode (winGap + senshu/jogai); absent ⇒ fights run to maxTicks
   version: string;
 };
 
@@ -98,8 +100,14 @@ const formatReport = (
     `net-points ${signed(result.netPoints)}   ` +
     `(${result.wins}W ${totalLosses}L ${result.draws}D of ${result.totalFights})`;
 
-  return `${header}\n\n${table}\n\n${summary}`;
+  return `${header}\n\n${table}\n\n${summary}\n${officiatingLine(result.officiating)}`;
 };
+
+// A one-line officiating read-out under the headline: how the bouts ended (per
+// endReason) and the bot-vs-opponent jogai foul split. Ranking-inert reporting.
+const officiatingLine = (o: OfficiatingTally): string =>
+  `ended: gap ${o.endedBy.gap} / time ${o.endedBy.time} / senshu ${o.endedBy.senshu} / overtime ${o.endedBy.overtime}   ` +
+  `jogai fouls: bot=${o.jogai.bot} opp=${o.jogai.opp}`;
 
 // A validated bot scored against the gauntlet and rendered to a 0-exit report.
 const scoredOutput = (bot: BotDoc, deps: BenchmarkDeps): CliOutput => {

@@ -38,6 +38,9 @@ const SUBMITTED = named("sub", ATTACK_MID);
 const TRADER = named("trader", ATTACK_MID);
 // Never scores.
 const LOSER = named("loser", { type: "idle" });
+// Always backpedals away from the opponent ⇒ backs into its OWN out-zone (the low edge
+// as fighter A, the high edge as fighter B), ringing out on either slot.
+const RETREATER = named("retreater", { type: "move", dir: -1 });
 // Byte-for-byte identical to SUBMITTED ⇒ the no-mirror skip must drop it.
 const SUBMITTED_CLONE = named("sub", ATTACK_MID);
 
@@ -213,5 +216,109 @@ describe("benchmark — senshu first-blood tie-resolution (Capability D1)", () =
     // ... while the win/draw tally diverges (win vs draw).
     expect(withSenshu.wins).not.toBe(without.wins);
     expect(withSenshu.draws).not.toBe(without.draws);
+  });
+});
+
+describe("benchmark — officiating tally (how bouts ended + jogai fouls)", () => {
+  // A supplementary aggregate on the result, alongside the ranking figures: how every
+  // bout ended (by `endReason`) and how many jogai ring-outs the SUBMITTED bot committed
+  // vs. its opponents. It never touches the ranking keys (win-rate / net-points), so it
+  // is inert to scoring — a pure read-out for the CLI report.
+
+  it("tallies every bout under endReason.time and reports zero fouls when no match mode is set", () => {
+    // No match ⇒ every one of the 8 fights runs to the tick cap ⇒ all "time"; no jogai
+    // margin ⇒ no ring-outs. The FULL object is asserted so the per-reason initial values
+    // (incl. the never-hit gap/senshu/overtime buckets) are pinned to 0.
+    const result = benchmark(config());
+
+    expect(result.officiating.endedBy).toEqual({
+      gap: 0,
+      time: 8,
+      senshu: 0,
+      overtime: 0,
+    });
+    expect(result.officiating.jogai).toEqual({ bot: 0, opp: 0 });
+  });
+
+  it("counts gap-ended bouts under endReason.gap when match mode ends on the win gap", () => {
+    // 1 seed × 2 sides vs the idle LOSER; each fight ends the instant the bot leads by 8.
+    const result = benchmark(
+      config({
+        gauntlet: [LOSER],
+        seeds: [1],
+        maxTicks: 300,
+        match: { winGap: 8 },
+      }),
+    );
+
+    expect(result.officiating.endedBy).toEqual({
+      gap: 2,
+      time: 0,
+      senshu: 0,
+      overtime: 0,
+    });
+  });
+
+  it("counts senshu-decided level bouts under endReason.senshu", () => {
+    // The SOLO-first-blood, level-at-cap matchup from the senshu block: SCORER holds
+    // senshu on both sides ⇒ each bout is decided by first blood at the cap.
+    const result = benchmark({
+      bot: SCORER,
+      gauntlet: [DELAYED],
+      seeds: [1],
+      maxTicks: 120,
+      rules: MOCK_RULES,
+      match: { winGap: 8, senshu: true },
+    });
+
+    expect(result.officiating.endedBy).toEqual({
+      gap: 0,
+      time: 0,
+      senshu: 2,
+      overtime: 0,
+    });
+  });
+
+  it("attributes jogai ring-outs to the bot vs the opponent, not to raw fighter A/B", () => {
+    // The bot RETREATS into its own out-zone on BOTH sides (low edge as A, high edge as B),
+    // ringing out twice per side (ticks ~25 and ~51, the re-arm case) = 4 total; the idle
+    // opponent never rings out. A raw fouls.a / fouls.b aggregate would mis-split these,
+    // because the bot occupies slot A in one fight and slot B in the other.
+    const result = benchmark(
+      config({
+        bot: RETREATER,
+        gauntlet: [LOSER],
+        seeds: [1],
+        maxTicks: 55,
+        match: { winGap: 99, jogai: { margin: 100000 } },
+      }),
+    );
+
+    expect(result.officiating.jogai).toEqual({ bot: 4, opp: 0 });
+    // The 99-gap is never reached (the free-then-1pt ladder only nudges the gap to 1),
+    // so both bouts still run to time.
+    expect(result.officiating.endedBy).toEqual({
+      gap: 0,
+      time: 2,
+      senshu: 0,
+      overtime: 0,
+    });
+  });
+
+  it("attributes the OPPONENT's ring-outs to opp, not bot (the mirror split)", () => {
+    // Mirror of the previous fixture: now the idle bot never rings out and the RETREATING
+    // gauntlet member backs itself out twice per side (= 4). Pins the opponent accumulator
+    // independently — a fixture where the opponent never fouls cannot distinguish it.
+    const result = benchmark(
+      config({
+        bot: LOSER,
+        gauntlet: [RETREATER],
+        seeds: [1],
+        maxTicks: 55,
+        match: { winGap: 99, jogai: { margin: 100000 } },
+      }),
+    );
+
+    expect(result.officiating.jogai).toEqual({ bot: 0, opp: 4 });
   });
 });

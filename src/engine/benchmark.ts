@@ -16,7 +16,7 @@
 // skipped (a bot vs its own clone is just side-asymmetry noise). For a real LLM
 // submission this never triggers; it only matters when self-testing a roster bot.
 // ============================================================================
-import { runFight, type FightConfig } from "./sim.js";
+import { runFight, type FightConfig, type FightResult } from "./sim.js";
 import type { Rules } from "./types.js";
 import type { BotDoc } from "./dsl.js";
 
@@ -28,6 +28,15 @@ export type OpponentScore = {
   fights: number; // |seeds| × 2
 };
 
+// A supplementary read-out of how the fights were officiated — never a ranking key.
+// `endedBy` buckets every bout by its `endReason`; `jogai` splits ring-out fouls into
+// the submitted bot's own vs. its opponents' (bot-centric, like every other figure —
+// NOT the raw fighter-A/B split, which mixes the two once both sides are played).
+export type OfficiatingTally = {
+  endedBy: Record<FightResult["endReason"], number>;
+  jogai: { bot: number; opp: number };
+};
+
 export type BenchmarkResult = {
   netPoints: number; // Σ (botScore − oppScore) — the tiebreaker ranking key
   winRate: number; // wins / totalFights — the primary ranking key; 0 when no fights ran
@@ -35,6 +44,7 @@ export type BenchmarkResult = {
   draws: number;
   totalFights: number;
   perOpponent: OpponentScore[];
+  officiating: OfficiatingTally; // inert to ranking; a read-out for the CLI report
 };
 
 export type BenchmarkConfig = {
@@ -49,8 +59,16 @@ export type BenchmarkConfig = {
   match?: FightConfig["match"];
 };
 
-// One fight reduced to the submitted bot's perspective.
-type Outcome = { net: number; botWin: boolean; draw: boolean };
+// One fight reduced to the submitted bot's perspective — the ranking figures plus the
+// officiating read-out (how it ended, and each side's jogai ring-outs).
+type Outcome = {
+  net: number;
+  botWin: boolean;
+  draw: boolean;
+  endReason: FightResult["endReason"];
+  jogaiBot: number; // the submitted bot's own ring-outs this fight
+  jogaiOpp: number; // the opponent's ring-outs this fight
+};
 
 // Deep document identity for the no-mirror rule. Both documents are validated
 // JSON (plain data, no functions/undefined), so a serialization compare is a
@@ -79,42 +97,73 @@ const playBothSides = (
       net: asA.scores.a - asA.scores.b,
       botWin: asA.winner === "A",
       draw: asA.winner === "draw",
+      endReason: asA.endReason,
+      jogaiBot: asA.fouls.a.jogai, // bot is fighter A here
+      jogaiOpp: asA.fouls.b.jogai,
     },
     {
       net: asB.scores.b - asB.scores.a,
       botWin: asB.winner === "B",
       draw: asB.winner === "draw",
+      endReason: asB.endReason,
+      jogaiBot: asB.fouls.b.jogai, // bot is fighter B here
+      jogaiOpp: asB.fouls.a.jogai,
     },
   ];
 };
 
-const scoreAgainst = (
+const outcomesAgainst = (
   bot: BotDoc,
   opp: BotDoc,
   seeds: readonly number[],
   maxTicks: number,
   rules: Rules,
   match: BenchmarkConfig["match"],
-): OpponentScore => {
-  const outcomes = seeds.flatMap((seed) =>
+): Outcome[] =>
+  seeds.flatMap((seed) =>
     playBothSides(bot, opp, seed, maxTicks, rules, match),
   );
 
-  return {
-    name: opp.name,
-    netPoints: outcomes.reduce((sum, o) => sum + o.net, 0),
-    wins: outcomes.filter((o) => o.botWin).length,
-    draws: outcomes.filter((o) => o.draw).length,
-    fights: outcomes.length,
-  };
-};
+const summarize = (name: string, outcomes: Outcome[]): OpponentScore => ({
+  name,
+  netPoints: outcomes.reduce((sum, o) => sum + o.net, 0),
+  wins: outcomes.filter((o) => o.botWin).length,
+  draws: outcomes.filter((o) => o.draw).length,
+  fights: outcomes.length,
+});
+
+// Fold every fight's officiating read-out into one aggregate: how it ended (per
+// `endReason`) and the running bot-vs-opponent jogai foul split.
+const tallyOfficiating = (outcomes: Outcome[]): OfficiatingTally =>
+  outcomes.reduce<OfficiatingTally>(
+    (acc, o) => ({
+      endedBy: { ...acc.endedBy, [o.endReason]: acc.endedBy[o.endReason] + 1 },
+      jogai: {
+        bot: acc.jogai.bot + o.jogaiBot,
+        opp: acc.jogai.opp + o.jogaiOpp,
+      },
+    }),
+    {
+      endedBy: { gap: 0, time: 0, senshu: 0, overtime: 0 },
+      jogai: { bot: 0, opp: 0 },
+    },
+  );
 
 export const benchmark = (cfg: BenchmarkConfig): BenchmarkResult => {
   const { bot, gauntlet, seeds, maxTicks, rules, match } = cfg;
 
-  const perOpponent = gauntlet
+  const outcomesByOpponent = gauntlet
     .filter((opp) => !sameDoc(opp, bot)) // no mirror
-    .map((opp) => scoreAgainst(bot, opp, seeds, maxTicks, rules, match));
+    .map((opp) => ({
+      name: opp.name,
+      outcomes: outcomesAgainst(bot, opp, seeds, maxTicks, rules, match),
+    }));
+
+  const perOpponent = outcomesByOpponent.map(({ name, outcomes }) =>
+    summarize(name, outcomes),
+  );
+
+  const allOutcomes = outcomesByOpponent.flatMap((o) => o.outcomes);
 
   const netPoints = perOpponent.reduce((sum, o) => sum + o.netPoints, 0);
   const wins = perOpponent.reduce((sum, o) => sum + o.wins, 0);
@@ -128,5 +177,6 @@ export const benchmark = (cfg: BenchmarkConfig): BenchmarkResult => {
     draws,
     totalFights,
     perOpponent,
+    officiating: tallyOfficiating(allOutcomes),
   };
 };
