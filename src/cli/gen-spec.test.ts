@@ -231,6 +231,45 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(noSenshu.toLowerCase()).toContain("draw");
     });
 
+    it("teaches jogai — ring-out ⇒ yame-style reset + shared-ladder penalty, gated on match.jogai (v15)", () => {
+      // present: the bullet names the reset, the opponent's award, and interpolates
+      // the margin from the manifest
+      const jogai = ruleLine(
+        generateSpec(CANONICAL_RULES, {
+          winGap: MATCH.winGap,
+          senshu: true,
+          jogai: { margin: 100000 },
+        }),
+        "jogai",
+      );
+
+      expect(jogai).toContain(code("margin")); // the margin is named, not a bare number
+      expect(jogai).toContain("100000"); // margin, from the manifest
+      expect(jogai.toLowerCase()).toContain("reset"); // yame-style reset
+      expect(jogai.toLowerCase()).toContain("opponent"); // 2nd+ ring-out ⇒ opponent +1
+
+      // interpolated, not a hardcoded literal — a different margin flows through
+      const retuned = ruleLine(
+        generateSpec(CANONICAL_RULES, {
+          winGap: MATCH.winGap,
+          senshu: true,
+          jogai: { margin: 50000 },
+        }),
+        "jogai",
+      );
+
+      expect(retuned).toContain("50000");
+      expect(retuned).not.toContain("100000");
+
+      // gated on the manifest — a jogai-absent match omits the bullet entirely
+      const noJogai = generateSpec(CANONICAL_RULES, {
+        winGap: MATCH.winGap,
+        senshu: true,
+      });
+
+      expect(ruleLine(noJogai, "jogai")).toBe("");
+    });
+
     it("ranks by win-rate first, net-points as the tiebreaker (corrects the stale metric)", () => {
       const metric = ruleLine(generateSpec(), "metric");
       expect(metric).toContain("win-rate");
@@ -376,6 +415,34 @@ describe("generateSpec — the factual machine-truth spec", () => {
 
       expect(noSenshuLine.toLowerCase()).not.toContain("senshu");
       expect(noSenshuLine.endsWith("hold it.")).toBe(true);
+    });
+
+    it("teaches jogai ring-awareness in the primer — names self.x and the penalties tells, gated on match.jogai (v15)", () => {
+      const jogaiLine = claimLine(
+        sectionOf(
+          generateSpec(CANONICAL_RULES, {
+            winGap: MATCH.winGap,
+            senshu: true,
+            jogai: { margin: 100000 },
+          }),
+          HEADING,
+        ),
+        "jogai",
+      );
+
+      expect(jogaiLine).toContain(code("margin")); // the margin is named, not a bare number
+      expect(jogaiLine).toContain(code("self.x")); // the boundary read
+      expect(jogaiLine).toContain(code("self.penalties")); // own warning ladder
+      expect(jogaiLine).toContain(code("opponent.penalties")); // the foe's
+      expect(jogaiLine).toContain("100000"); // margin, interpolated from the manifest
+
+      // gated on the manifest — a jogai-absent primer omits the clause entirely
+      const noJogai = sectionOf(
+        generateSpec(CANONICAL_RULES, { winGap: MATCH.winGap, senshu: true }),
+        HEADING,
+      );
+
+      expect(claimLine(noJogai, "jogai")).toBe("");
     });
   });
 

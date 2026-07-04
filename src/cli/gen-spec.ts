@@ -40,10 +40,15 @@ import {
 } from "../engine/benchmark-config.js";
 
 // The WKF match parameters the benchmark scores on (winGap + the tick cap, plus
-// the optional senshu first-blood tie-break). A narrow structural type so the
-// section/primer can be exercised against a retuned gap — or a manifest with
-// senshu off — in tests, mirroring the `rules` parameter's purpose.
-type Match = { winGap: number; senshu?: boolean };
+// the optional senshu first-blood tie-break and the optional jogai ring-out
+// penalty). A narrow structural type so the section/primer can be exercised
+// against a retuned gap — or a manifest toggling senshu / jogai — in tests,
+// mirroring the `rules` parameter's purpose.
+type Match = {
+  winGap: number;
+  senshu?: boolean;
+  jogai?: { margin: number };
+};
 
 // markdown inline-code span
 const code = (s: string): string => "`" + s + "`";
@@ -222,6 +227,11 @@ const benchmarkSection = (match: Match): string =>
         : " (equal ⇒ a draw)"
     }.`,
     `- ${code("yame")} — after each SCORING exchange resolves, both fighters reset to the neutral start (position, posture, guard, open windows) — but points, stamina, and memory PERSIST. No okizeme farm carries across exchanges.`,
+    ...(match.jogai
+      ? [
+          `- ${code("jogai")} — a fighter forced OUT of the legal region (into the outer ${code("margin")} = ${match.jogai.margin} strip of the ring) rings out: a yame-style neutral reset PLUS a shared category-2 penalty — the first ring-out is a free warning, the second and beyond each award the opponent +1 point.`,
+        ]
+      : []),
     `- ${code("metric")} — win-rate (matches won) is primary; Σ net-points over every (opponent × seed × side) fight breaks ties.`,
     `- ${code("seeds")} — ${SEEDS[0]}..${SEEDS[SEEDS.length - 1]} (${SEEDS.length} seeds), each matchup played twice (bot as A and as B).`,
     `- ${code("maxTicks")} — ${MAX_TICKS}`,
@@ -423,6 +433,11 @@ const primerSection = (rules: Rules, match: Match): string => {
         ? ` A LEVEL bout is decided by **first blood** (${code("senshu")}): score first and you win the tie — read ${code("self.senshu")} / ${code("opponent.senshu")} to know who holds it, then protect your lead or bait a reset to steal it.`
         : ""
     }`,
+    ...(match.jogai
+      ? [
+          `- **Stay in the ring (jogai).** The legal floor is bounded by an outer ${code("margin")} = ${cv(match.jogai.margin)} strip — cross into it and you ring OUT: a neutral reset, and after one free warning a point to your opponent each time. Watch ${code("self.x")} against the edge and don't over-retreat into a wall; track the shared warning ladder via ${code("self.penalties")} / ${code("opponent.penalties")}.`,
+        ]
+      : []),
   ].join("\n");
 };
 
