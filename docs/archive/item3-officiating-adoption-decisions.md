@@ -1,6 +1,10 @@
 # Item 3 — jogai / passivity / overtime benchmark + spec adoption — resolved decisions
 
-_Grill output (2026-07-04). Feeds `planning` → TDD, PR per capability. Not a plan yet._
+_Grill output (2026-07-04). Feeds `planning` → TDD, PR per capability._
+
+> **✅ ITEM 3 COMPLETE (2026-07-04).** All three officiating adoptions shipped: jogai `v15`
+> (PRs #147–#149), passivity `v16` (PRs #151–#153), overtime `v17` (PR #154). This decisions
+> doc is archived alongside the three per-capability plans; `plans/` is empty again.
 
 Wire the already-built §7 officiating mechanics (Capabilities A jogai / B passivity /
 C2 overtime) into the LLM benchmark `MATCH` config and teach their prose in

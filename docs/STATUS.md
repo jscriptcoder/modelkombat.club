@@ -681,6 +681,32 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
     mutants). Design trail: `docs/archive/passivity-benchmark-adoption.md` (shared decisions in
     `plans/item3-officiating-adoption-decisions.md`). **The passivity adoption is COMPLETE; only overtime (v17) remains
     deferred under item 3.**
+- DONE (**overtime benchmark + spec adoption — item 3 (overtime slice), v17, PR #154 — CLOSES ITEM 3**): folds the
+  built §7 **overtime** (_encho-sen_ sudden death ⇒ one `ticks 300` period, first to a 1-point gap, Capability C2)
+  into the LLM benchmark's frozen manifest, teaches it in `docs/spec.md` (taught == scored), and CI-locks that it
+  both **fires** and is **field-read** on the gauntlet — the **last** of the three deferred officiating mechanics, so
+  **item 3 is now COMPLETE** (jogai v15 + passivity v16 + overtime v17). The **thinnest** of the three: the mechanic,
+  `endReason:"overtime"`, and the `OfficiatingTally.endedBy.overtime` bucket all shipped in Capability C2 / the jogai
+  read-out, so this is a **scoring-config flip + prose + one bot rule — NO engine/DSL/TCB change** (`npm run fight`
+  byte-identical), one **atomic PR** (unlike jogai's telemetry PR / passivity's CLI PR — neither needed here).
+  **Structural finding (distinct from passivity):** overtime is **inherently decisive** — it resolves an
+  otherwise-level bout — so the clean `endReason:"overtime"` "fires" bar holds, NO passivity-style "exercised"
+  relaxation. **The v17 flip**: `MATCH += overtime: { ticks: 300 }`, `BENCHMARK_VERSION v16 → v17`, `INPUT_HASH`
+  re-pinned; `generateSpec` extends the win-condition cascade to `winGap → overtime → senshu → draw` + a primer
+  sudden-death **all-in** clause (naming `clock.overtime`), both gated on `match.overtime`; the **jabber** made the
+  field-read carrier (**MULTI-READS** — a `clock.overtime == 1 ∧ distance ≤ 260000 → shuto` all-in ALONGSIDE its
+  passivity re-engage; inert in regulation ⇒ perturbs only OT bouts, near-zero band risk); the calibration lock
+  gains the **fires** (≥1 board bout ends `endReason:"overtime"`) + **field-read** (jabber reads `clock.overtime`)
+  guards, each with a "guard bites" companion; dogfood record **unchanged** (13W/107L — one bout enters OT, winner
+  unchanged, net −1786 → −1785); `docs/benchmark-gauntlet-v17.md` added. **Measured (no victim shaping needed —
+  natural fires):** the frozen board yields **7 overtime bouts**, all resolve on a 1-point gap (none exhaust to
+  senshu), **5 flip the winner** vs senshu; all 6 ∈ `[25,75]` (rekka 61, sweeper 60, grappler 52, jabber 47, zoner
+  40, vulture 40 — the flips shift the grappler↔vulture level bouts from grappler to vulture). 1114 tests;
+  `benchmark-config.ts` mutation 100%, `gen-spec.ts` 99.46% (**0 survivors in the new overtime lines** — the 2 new
+  ones killed + 2 pre-existing primer survivors bonus-killed; the 3 remaining are pre-existing & production-equivalent
+  since `MATCH` always carries every key). Design trail: `docs/archive/overtime-benchmark-adoption.md` (+ the now-archived
+  shared decisions `docs/archive/item3-officiating-adoption-decisions.md`). **Item 3 (the deferred jogai / passivity /
+  overtime officiating adoption) is now fully CLOSED.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -733,17 +759,17 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    precision-dialed (band = dispersion, mean pinned ~50%); niche moves conflict with tight
    calibration (S2 far kicks narrow-gated; S3 close moves fed `vulture`'s parry→counter until the
    throw kept the contact band — distinguish by range, not read, as no guard tell exists).
-3. **Deferred overtime benchmark + spec adoption** — Capability D was scoped to senshu only;
-   folding the remaining officiating mechanics into the benchmark `MATCH` (+ `INPUT_HASH` /
-   `BENCHMARK_VERSION`) and teaching their prose in `generateSpec` was deliberately deferred
-   (each forces its own gauntlet re-characterization / possible rebalance). **jogai is DONE
-   (v15, PRs #147–#149)** and **passivity is DONE (v16, PRs #151–#153)** — see the build-log
-   entries (jogai: ring-aware zoner + naive-victim sweeper; passivity: jabber field-read carrier
-   - vulture standoff victim, limit 240, "fires" relaxed to EXERCISED; both with a CLI officiating
-     read-out). Only **overtime (v17)** remains — its MECHANIC is already built (Capability C2);
-     only the benchmark+spec adoption is left, its own `grill-me` → `planning` → TDD slice (carrier
-     = jabber reading `clock.overtime`, `overtime.ticks = 300`). Shared resolved decisions
-     (carriers, params) are in `plans/item3-officiating-adoption-decisions.md`.
+3. **Deferred officiating benchmark + spec adoption — ✅ COMPLETE (item 3 CLOSED).** Capability D
+   was scoped to senshu only; folding the remaining officiating mechanics into the benchmark `MATCH`
+   (+ `INPUT_HASH` / `BENCHMARK_VERSION`) and teaching their prose in `generateSpec` was deferred
+   (each forces its own gauntlet re-characterization / possible rebalance). All three now shipped,
+   one PR-slice each: **jogai (v15, PRs #147–#149)** — ring-aware zoner + naive-victim sweeper;
+   **passivity (v16, PRs #151–#153)** — jabber field-read carrier + vulture standoff victim, limit
+   240, "fires" relaxed to EXERCISED; **overtime (v17, PR #154)** — jabber multi-reads
+   `clock.overtime`, `overtime.ticks = 300`, 7 natural fires (no victim shaping), inherently
+   decisive. See the build-log entries + the archived design trail
+   (`docs/archive/{jogai,passivity,overtime}-benchmark-adoption.md`, and the shared decisions
+   `docs/archive/item3-officiating-adoption-decisions.md`). **Item 3 is fully closed.**
 4. **Rest of §7** — **rounds** (the last unbuilt match-structure piece, beyond the
    benchmark's yame + win condition + tie resolution).
 5. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap
