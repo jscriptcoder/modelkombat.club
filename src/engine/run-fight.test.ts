@@ -8476,3 +8476,65 @@ describe("runFight — senshu perception (story C3: self.senshu / opponent.sensh
     expect(result.scores.a).toBeGreaterThan(0);
   });
 });
+
+describe("runFight — per-cause foul tally (FightResult.fouls)", () => {
+  // Telemetry only: the tally is READ at the terminal return and never feeds an outcome, so
+  // it is byte-identical (proven by the determinism/replay suite staying green). jogai and
+  // passivity fouls POOL into one penaltyCount for the winGap award, but the tally counts each
+  // cause SEPARATELY so the benchmark's per-capability "fires" guard can attribute a foul.
+
+  it("reports zero fouls of either cause when no fighter fouls", () => {
+    const result = runFight(
+      getMockConfig({
+        botA: IDLE,
+        botB: IDLE,
+        maxTicks: 10,
+        match: { winGap: 99 },
+      }),
+    );
+
+    expect(result.fouls).toEqual({
+      a: { jogai: 0, passivity: 0 },
+      b: { jogai: 0, passivity: 0 },
+    });
+  });
+
+  it("counts each fighter's jogai ring-outs under fouls.<fouler>.jogai", () => {
+    // Both RETREATERs back into their OWN out-zone (A low, B high) and cross out twice each
+    // (ticks 25 and 51, the re-arm case), swap-symmetric — so EACH fighter's own foul is
+    // attributed to itself (a mis-attribution would skew the two counts apart).
+    const result = runFight(
+      getMockConfig({
+        botA: RETREATER,
+        botB: RETREATER,
+        maxTicks: 55,
+        match: { winGap: 99, jogai: { margin: 100000 } },
+      }),
+    );
+
+    expect(result.fouls.a.jogai).toBe(2);
+    expect(result.fouls.b.jogai).toBe(2);
+    // No passivity configured ⇒ the passivity sub-counter stays zero (cause routing).
+    expect(result.fouls.a.passivity).toBe(0);
+    expect(result.fouls.b.passivity).toBe(0);
+  });
+
+  it("counts passivity fouls under fouls.<fouler>.passivity, NOT under jogai", () => {
+    // Two non-engaging bots both go passive (period limit+1 = 4): with limit 3 over 8 ticks
+    // each fouls at ticks 3 and 7.
+    const result = runFight(
+      getMockConfig({
+        botA: RETREATER,
+        botB: IDLE,
+        maxTicks: 8,
+        match: { winGap: 99, passivity: { limit: 3 } },
+      }),
+    );
+
+    expect(result.fouls.a.passivity).toBe(2);
+    expect(result.fouls.b.passivity).toBe(2);
+    // No jogai configured ⇒ passivity fouls must not leak into the jogai sub-counter.
+    expect(result.fouls.a.jogai).toBe(0);
+    expect(result.fouls.b.jogai).toBe(0);
+  });
+});
