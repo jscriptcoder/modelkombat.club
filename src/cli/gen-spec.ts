@@ -40,14 +40,15 @@ import {
 } from "../engine/benchmark-config.js";
 
 // The WKF match parameters the benchmark scores on (winGap + the tick cap, plus
-// the optional senshu first-blood tie-break and the optional jogai ring-out
-// penalty). A narrow structural type so the section/primer can be exercised
-// against a retuned gap — or a manifest toggling senshu / jogai — in tests,
-// mirroring the `rules` parameter's purpose.
+// the optional senshu first-blood tie-break, the optional jogai ring-out penalty,
+// and the optional passivity non-engagement penalty). A narrow structural type so
+// the section/primer can be exercised against a retuned gap — or a manifest toggling
+// senshu / jogai / passivity — in tests, mirroring the `rules` parameter's purpose.
 type Match = {
   winGap: number;
   senshu?: boolean;
   jogai?: { margin: number };
+  passivity?: { limit: number };
 };
 
 // markdown inline-code span
@@ -230,6 +231,11 @@ const benchmarkSection = (match: Match): string =>
     ...(match.jogai
       ? [
           `- ${code("jogai")} — a fighter forced OUT of the legal region (into the outer ${code("margin")} = ${match.jogai.margin} strip of the ring) rings out: a yame-style neutral reset PLUS a shared category-2 penalty — the first ring-out is a free warning, the second and beyond each award the opponent +1 point.`,
+        ]
+      : []),
+    ...(match.passivity
+      ? [
+          `- ${code("passivity")} — a fighter that goes ${code("limit")} = ${match.passivity.limit} ticks without landing any offense (a strike that hits, is blocked, or is parried, or a live grab — a whiff at air does NOT count) is fouled for non-engagement: a yame-style neutral reset PLUS the SAME shared category-2 penalty ladder as jogai (first foul a free warning, the second and beyond each award the opponent +1 point). Landing offense resets your clock.`,
         ]
       : []),
     `- ${code("metric")} — win-rate (matches won) is primary; Σ net-points over every (opponent × seed × side) fight breaks ties.`,
@@ -436,6 +442,11 @@ const primerSection = (rules: Rules, match: Match): string => {
     ...(match.jogai
       ? [
           `- **Stay in the ring (jogai).** The legal floor is bounded by an outer ${code("margin")} = ${cv(match.jogai.margin)} strip — cross into it and you ring OUT: a neutral reset, and after one free warning a point to your opponent each time. Watch ${code("self.x")} against the edge and don't over-retreat into a wall; track the shared warning ladder via ${code("self.penalties")} / ${code("opponent.penalties")}.`,
+        ]
+      : []),
+    ...(match.passivity
+      ? [
+          `- **Don't stall (passivity).** Go ${cv(match.passivity.limit)} ticks without landing offense and you are fouled for non-engagement — same shared warning ladder as jogai. Watch ${code("self.passivityRemaining")} (ticks left before your foul; ${cv(0)} when unconfigured) and re-engage before it expires; a purely reactive turtle bleeds points. Read ${code("opponent.passivityRemaining")} to bait a stalling foe toward the same foul.`,
         ]
       : []),
   ].join("\n");

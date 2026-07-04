@@ -14,6 +14,35 @@
     },
     {
       "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.passivityRemaining" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "self.passivityRemaining" },
+              { "op": "const", "value": 10 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 260000 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "shuto", "band": "mid" }
+    },
+    {
+      "when": {
         "op": "gt",
         "args": [
           { "op": "field", "path": "self.counterWindow" },

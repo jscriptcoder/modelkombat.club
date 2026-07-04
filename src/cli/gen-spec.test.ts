@@ -270,6 +270,45 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(ruleLine(noJogai, "jogai")).toBe("");
     });
 
+    it("teaches passivity — non-engagement ⇒ yame reset + shared-ladder penalty, gated on match.passivity (v16)", () => {
+      // present: the bullet names the limit, the reset, and the opponent's award,
+      // interpolating the limit from the manifest
+      const passivity = ruleLine(
+        generateSpec(CANONICAL_RULES, {
+          winGap: MATCH.winGap,
+          senshu: true,
+          passivity: { limit: 240 },
+        }),
+        "passivity",
+      );
+
+      expect(passivity).toContain(code("limit")); // the limit is named, not a bare number
+      expect(passivity).toContain("240"); // limit, from the manifest
+      expect(passivity.toLowerCase()).toContain("reset"); // yame-style reset
+      expect(passivity.toLowerCase()).toContain("opponent"); // 2nd+ foul ⇒ opponent +1
+
+      // interpolated, not a hardcoded literal — a different limit flows through
+      const retuned = ruleLine(
+        generateSpec(CANONICAL_RULES, {
+          winGap: MATCH.winGap,
+          senshu: true,
+          passivity: { limit: 120 },
+        }),
+        "passivity",
+      );
+
+      expect(retuned).toContain("120");
+      expect(retuned).not.toContain("240");
+
+      // gated on the manifest — a passivity-absent match omits the bullet entirely
+      const noPassivity = generateSpec(CANONICAL_RULES, {
+        winGap: MATCH.winGap,
+        senshu: true,
+      });
+
+      expect(ruleLine(noPassivity, "passivity")).toBe("");
+    });
+
     it("ranks by win-rate first, net-points as the tiebreaker (corrects the stale metric)", () => {
       const metric = ruleLine(generateSpec(), "metric");
       expect(metric).toContain("win-rate");
@@ -443,6 +482,32 @@ describe("generateSpec — the factual machine-truth spec", () => {
       );
 
       expect(claimLine(noJogai, "jogai")).toBe("");
+    });
+
+    it("teaches passivity awareness in the primer — names both passivityRemaining tells, gated on match.passivity (v16)", () => {
+      const passivityLine = claimLine(
+        sectionOf(
+          generateSpec(CANONICAL_RULES, {
+            winGap: MATCH.winGap,
+            senshu: true,
+            passivity: { limit: 240 },
+          }),
+          HEADING,
+        ),
+        "passivity",
+      );
+
+      expect(passivityLine).toContain(code("self.passivityRemaining")); // the self countdown
+      expect(passivityLine).toContain(code("opponent.passivityRemaining")); // the foe's, for parity
+      expect(passivityLine).toContain("240"); // limit, interpolated from the manifest
+
+      // gated on the manifest — a passivity-absent primer omits the clause entirely
+      const noPassivity = sectionOf(
+        generateSpec(CANONICAL_RULES, { winGap: MATCH.winGap, senshu: true }),
+        HEADING,
+      );
+
+      expect(claimLine(noPassivity, "passivity")).toBe("");
     });
   });
 

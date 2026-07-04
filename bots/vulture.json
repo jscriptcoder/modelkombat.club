@@ -39,6 +39,28 @@
           {
             "op": "eq",
             "args": [
+              { "op": "field", "path": "opponent.attackBand" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 200000 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
               { "op": "field", "path": "opponent.gassed" },
               { "op": "const", "value": 1 }
             ]
