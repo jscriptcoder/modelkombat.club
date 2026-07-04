@@ -57,7 +57,11 @@ failing test. Load `tdd`, `testing`, `mutation-testing`, `refactoring` before co
 
 ---
 
-### Slice 1 (PR 1): Per-cause foul tally on `FightResult`
+### Slice 1 (PR 1): Per-cause foul tally on `FightResult` — ✅ DONE (commit `871c1ac`)
+
+_RED→GREEN→MUTATE (95%→100%, 20/20) done; full suite 1078 green, byte-identical, typecheck+lint
+clean. `FightResult.fouls: { a: {jogai,passivity}, b: {jogai,passivity} }` surfaced via a `cause`
+param on `applyPenalty`. No version bump (telemetry)._
 
 **Value**: the benchmark/CI (and a human) can see which fighter committed a jogai/passivity
 foul — the observable the "fires" guard needs. Byte-identical telemetry.
