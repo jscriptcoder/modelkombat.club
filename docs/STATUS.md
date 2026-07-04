@@ -604,6 +604,30 @@ v11 → v12` (`INPUT_HASH` re-pinned); dogfood record unchanged (18W/102L — al
   mutation 100% (10/10). Plans archived at `docs/archive/gauntlet-s4-calibration-lock.md` +
   `docs/archive/gauntlet-modernization-stories.md`; `plans/` now empty.
 
+- DONE (**roster-wide no-Pareto-dominance + distinctness property** — PRs #145–#146): the Batch-1
+  arsenal **close-out** — a pure-data guard in `src/engine/rules.test.ts` asserting the full
+  **12-move roster** (10 named `attack` moves + `sweep` + `throw`, enumerated DYNAMICALLY off
+  `CANONICAL_RULES.moves` so future moves auto-enroll) is free of **Pareto-dominance** (rule 2) AND
+  **near-duplicates** (rule 4) on the 7 strategic axes — `reach`↑, effective `score`↑ (folds
+  `scoreByBand`), `startup`↓, `recovery`↓, `staminaCost`↓, `bands` by set-inclusion (⊇),
+  `knockdown`↑ — the move-roster balance law's long-standing "Verification hook", resolved via
+  `grill-me` → `find-gaps` → `planning`. The detector + adapter are **test-local** (Stryker excludes
+  `*.test.ts`, config `!src/**/*.test.ts`), so their comparison logic is pinned by an explicit
+  **directional fixture matrix** (one per axis + the "all axes" AND-guard + the strict-`>`
+  existential + incomparable bands + a "guard bites" fabricated dominator) rather than a mutation
+  score. Heterogeneous moves are projected into the common vector: `throw` (a `ThrowSpec`) → its own
+  incomparable **`grab`** band + implicit `knockdown` (that band-incomparability alone stops `throw`
+  dominating `hiza-geri`, so no `cancelInto` axis is needed), `sweep` → its mechanical **`{low}`**
+  (it declares no `bands`), and the axis set stays MINIMAL (each extra axis is an escape hatch that
+  weakens the guard — `active`/`cancelInto` deliberately excluded). **S1 (#145)** the dominance
+  property (ordered pairs, self-pairs excluded); **S2 (#146)** the distinctness companion (unordered
+  `i<j`; same 7 axes ⇒ a move distinguishable only by the excluded `active`/`cancelInto` is
+  non-distinct and flagged — the deliberate `find-gaps` decision) + this close-out. **Test-only** ⇒
+  no `CANONICAL_RULES`/engine change ⇒ `INPUT_HASH`/`BENCHMARK_VERSION` unchanged, `npm run fight`
+  byte-identical, `gen:spec` no diff. 1075 tests; `rules.ts` mutation 100% (72/72), no regression.
+  Design trail: `docs/archive/no-pareto-dominance.md`. **The Batch-1 grounded arsenal is now fully
+  closed out (6/6 moves + the roster-wide balance guard).**
+
 ### §7 match structure built between C9 and Capability D
 
 Capabilities A (jogai), B (passivity), and C (tie resolution) — the WKF officiating
@@ -636,9 +660,10 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    **`uraken`** (#117 → v5, #118), **`shuto`** (#120 → v6, #121), **`yoko-geri`** (#123 → v7, #124),
    **`ushiro-geri`** (#126 → v8, #127), **`empi`** (#129 → v9, #130), and **`hiza-geri`** (#132 → v10,
    #133) — each a wiring PR (bumps `BENCHMARK_VERSION` via the `INPUT_HASH` flip) + a reads-only
-   `rule()`-readers PR (no bump). **Next: the roster-wide no-Pareto-dominance property test**
-   (`rules.test.ts`, asserting no move dominates another across the full 12-move roster). Air
-   (`tobi-geri`) is Batch 2, gated on the unbuilt air-strike capability (item 5).
+   `rule()`-readers PR (no bump). **The roster-wide no-Pareto-dominance + distinctness property is
+   now SHIPPED too** (PRs #145–#146 — a test-local guard over the full 12-move roster on the 7
+   strategic axes; see the build-log entry above), so the Batch-1 arsenal is **fully closed out**.
+   Air (`tobi-geri`) is Batch 2, gated on the unbuilt air-strike capability (item 5).
 2. **Gauntlet modernization + rebalance — ✅ COMPLETE (v14, PRs #135–#143).** Re-authored the
    frozen gauntlet one bot per PR until all 6 landed in `[25%,75%]` AND the roster collectively
    exercised the full 11-move arsenal, then CI-locked both. **S1 `vulture` parry→counter (v11)**

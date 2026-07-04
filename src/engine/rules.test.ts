@@ -2380,7 +2380,9 @@ const findDuplicatePairs = (
   roster.flatMap((a, i) =>
     roster
       .slice(i + 1)
-      .flatMap((b) => (axesEqual(a.axes, b.axes) ? [{ a: a.id, b: b.id }] : [])),
+      .flatMap((b) =>
+        axesEqual(a.axes, b.axes) ? [{ a: a.id, b: b.id }] : [],
+      ),
   );
 
 describe("no-Pareto-dominance — the dominance detector (balance-law rule 2)", () => {
@@ -2422,10 +2424,16 @@ describe("no-Pareto-dominance — the dominance detector (balance-law rule 2)", 
 
   it("never dominates across incomparable band sets (low vs mid)", () => {
     expect(
-      dominates(axes({ bands: bandSet("low") }), axes({ bands: bandSet("mid") })),
+      dominates(
+        axes({ bands: bandSet("low") }),
+        axes({ bands: bandSet("mid") }),
+      ),
     ).toBe(false);
     expect(
-      dominates(axes({ bands: bandSet("mid") }), axes({ bands: bandSet("low") })),
+      dominates(
+        axes({ bands: bandSet("mid") }),
+        axes({ bands: bandSet("low") }),
+      ),
     ).toBe(false);
   });
 
@@ -2442,7 +2450,8 @@ describe("no-Pareto-dominance — the dominance detector (balance-law rule 2)", 
 describe("no-Pareto-dominance — the move→axis adapter", () => {
   it("maps the sweep to its mechanical low band (its MoveSpec declares no `bands`)", () => {
     const sweep = CANONICAL_RULES.moves.sweep;
-    if (!sweep) throw new Error("CANONICAL_RULES.moves.sweep is not configured");
+    if (!sweep)
+      throw new Error("CANONICAL_RULES.moves.sweep is not configured");
     expect(sweep.bands).toBeUndefined(); // the low-ness is mechanical, not declared
     expect(moveToAxes("sweep", sweep).bands).toEqual(bandSet("low"));
   });
@@ -2508,7 +2517,11 @@ describe("no-Pareto-dominance — the roster scan", () => {
 
 describe("no-Pareto-dominance — the canonical 12-move roster (balance-law rule 2)", () => {
   it("enumerates all 12 moves (10 attack moves + sweep + throw)", () => {
-    expect(canonicalRoster().map((e) => e.id).sort()).toEqual([
+    expect(
+      canonicalRoster()
+        .map((e) => e.id)
+        .sort(),
+    ).toEqual([
       "empi",
       "gyaku-zuki",
       "hiza-geri",
@@ -2560,15 +2573,16 @@ describe("no-Pareto-dominance — distinctness (balance-law rule 4)", () => {
 
   // Every one of the 7 axes must participate in the equality — perturbing any single
   // axis (the band case a superset ⇒ bandEqual needs MUTUAL ⊇) makes the pair distinct.
-  const oneAxisApart: ReadonlyArray<{ axis: string; override: Partial<Axes> }> = [
-    { axis: "reach", override: { reach: 210000 } },
-    { axis: "score", override: { score: 3 } },
-    { axis: "startup", override: { startup: 99 } },
-    { axis: "recovery", override: { recovery: 99 } },
-    { axis: "cost", override: { cost: 99 } },
-    { axis: "bands", override: { bands: bandSet("mid") } },
-    { axis: "knockdown", override: { knockdown: true } },
-  ];
+  const oneAxisApart: ReadonlyArray<{ axis: string; override: Partial<Axes> }> =
+    [
+      { axis: "reach", override: { reach: 210000 } },
+      { axis: "score", override: { score: 3 } },
+      { axis: "startup", override: { startup: 99 } },
+      { axis: "recovery", override: { recovery: 99 } },
+      { axis: "cost", override: { cost: 99 } },
+      { axis: "bands", override: { bands: bandSet("mid") } },
+      { axis: "knockdown", override: { knockdown: true } },
+    ];
 
   it.each(oneAxisApart)(
     "does not flag moves differing on $axis alone (all 7 axes must match)",

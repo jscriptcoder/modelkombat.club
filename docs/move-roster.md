@@ -11,9 +11,11 @@ benchmark v8, `rule()` readers PR #127 → no bump; archived at `archive/ushiro-
 **`empi` SHIPPED** (move #5/6 — wiring PR #129 → benchmark v9, `rule()` readers PR #130 → no bump;
 archived at `archive/empi-elbow.md`); **`hiza-geri` SHIPPED** (move #6/6 — wiring PR #132 →
 benchmark v10, `rule()` readers PR #133 → no bump; archived at `archive/hiza-geri-knee.md`).
-**Batch 1 grounded arsenal COMPLETE (6/6)** — next is the roster-wide no-Pareto-dominance property
-test (**grill-me resolved 2026-07-04** — see the resolved spec under §Balance law "Verification
-hook") + the owed `vulture`/`sweeper` gauntlet rebalance. Living source of truth for the
+**Batch 1 grounded arsenal COMPLETE (6/6)** — and the roster-wide no-Pareto-dominance **+
+distinctness** property test is now **SHIPPED** (PRs #145–#146; resolved via grill-me → find-gaps →
+planning — the resolved spec lives under §Balance law "Verification hook", the design trail at
+`archive/no-pareto-dominance.md`). The owed `vulture`/`sweeper` gauntlet rebalance also landed
+(v14). Living source of truth for the
 fighting-move roster and the balance law that governs it. Consolidates the built
 **baseline** (authoritative in `src/engine/rules.ts` `CANONICAL_RULES`, proven by
 behavioral `runFight` tests in `rules.test.ts`, designed in `DESIGN.md §P7`) and will
