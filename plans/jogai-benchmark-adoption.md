@@ -101,7 +101,14 @@ pass if jogai incremented the passivity counter must fail).
 
 ---
 
-### Slice 2 (PR 2): `generateSpec` teaches jogai (gated on `match.jogai`)
+### Slice 2 (PR 2): `generateSpec` teaches jogai (gated on `match.jogai`) — ✅ DONE (commit `0e4c90d`)
+
+_RED (2 tests fail on absent jogai prose) → GREEN (`Match` gains `jogai?:{margin}` + two
+`...(match.jogai ? [...] : [])`-gated blocks: a benchmark rule bullet + a primer "Stay in the
+ring" clause naming `self.x` + `self.penalties`/`opponent.penalties`) → MUTATE 99.81% (both
+`margin`-label survivors killed; the lone line-474 CRLF survivor is pre-existing + equivalent on
+LF fixtures). Byte-identical: `docs/spec.md` NOT regenerated (default MATCH has no jogai) ⇒ drift
+test still byte-matches ⇒ no INPUT_HASH/version change. Full suite 1080 green; typecheck+lint clean._
 
 **Value**: an LLM bot author reading `docs/spec.md` under a jogai-scored manifest learns the
 ring-out rule and how to avoid it — taught == scored.
