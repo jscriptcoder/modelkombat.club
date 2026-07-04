@@ -1,7 +1,7 @@
 # Plan: jogai benchmark + spec adoption (v15)
 
-**Branch**: feat/jogai-v15-adoption (PR 2) · PR 1 shipped on feat/jogai-benchmark-adoption (merged, deleted)
-**Status**: Active — PR 1 merged (#147); PR 2 (Slices 2–4) in progress; PR 3 (Slice 5) pending
+**Branch**: feat/jogai-cli-officiating (PR 3) · PR 1 (#147) + PR 2 (#148) merged, branches deleted
+**Status**: Active — PR 1 merged (#147); PR 2 merged (#148); PR 3 (Slice 5) in progress
 
 Source of resolved decisions: `plans/item3-officiating-adoption-decisions.md` (item 3, PR 1 of 3).
 This is the **jogai** slice only — passivity (v16) and overtime (v17) are separate plans.
