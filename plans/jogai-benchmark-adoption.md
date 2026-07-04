@@ -198,7 +198,19 @@ sweeper (67%, non-carrier) was chosen as that victim.
 
 ---
 
-### Slice 4 (PR 2): CI-lock jogai "fires" + "field-read"
+### Slice 4 (PR 2): CI-lock jogai "fires" + "field-read" — ✅ DONE
+
+_Added the jogai-adoption lock to `gauntlet-calibration.test.ts`: **fires** — `decisiveJogaiFires()`
+scans the round-robin and asserts ∃ a bout won on a ≥2-ring-out penalty point (jogai-on vs
+jogai-off winner flip; all are sweeper→vulture); companion asserts jogai-OFF yields 0 jogai fouls
+(non-vacuous). **field-read** — `selfXConstants()` walks the zoner's condition-AST (the
+`movesReferencedBy` analog) and asserts a `self.x`-vs-const comparison in the near-edge zone
+(within δ=50000 of margin/width−margin); companion proves a mid-ring `self.x`=300000 is NOT
+counted; a 7-row directional matrix pins the `isNearEdge` predicate's boundaries (test-local ⇒
+characterized structurally, not by Stryker). Test-only ⇒ no production change. Full suite 1093
+green; typecheck + lint + format clean._
+
+
 
 **Value**: the v15 gauntlet certifies jogai is exercised, not just enabled — the durable guard.
 **Path**: two tests in `src/cli/gauntlet-calibration.test.ts`, each with a "guard bites"

@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { benchmark } from "../engine/benchmark.js";
+import { runFight } from "../engine/sim.js";
 import {
   GAUNTLET_NAMES,
   MATCH,
@@ -11,7 +12,7 @@ import {
 } from "../engine/benchmark-config.js";
 import { CANONICAL_RULES } from "../engine/rules.js";
 import type { Action } from "../engine/types.js";
-import type { BotDoc } from "../engine/dsl.js";
+import type { BotDoc, BoolExpr, NumExpr } from "../engine/dsl.js";
 import { loadBotDoc } from "./load.js";
 
 // ── The gauntlet calibration lock (S4) — the CI guard that certifies the modernized
@@ -114,6 +115,229 @@ describe("gauntlet calibration lock — the certified measuring instrument", () 
 
       expect(uncovered).toContain("empi");
       expect(uncovered).toContain("hiza-geri");
+    });
+  });
+});
+
+// ── The jogai-adoption lock (item 3 / v15) — certifies the officiating mechanic is
+// EXERCISED on the frozen board, not merely enabled. Two invariants, mirroring the
+// "exercised = fires + field-read" contract (decision 3):
+//   1. FIRES — some board bout is DECIDED by a jogai foul: a fighter rings out ≥2×
+//      (the shared category-2 ladder's 1st foul is free, so ≥2 confers ≥1 point) and
+//      that point flips the winner vs the identical fight with jogai OFF.
+//   2. FIELD-READ — the zoner (the ring-aware carrier) references `self.x` against a
+//      constant in the near-edge zone — a boundary decision, not generic mid-ring
+//      spacing (a bare / mid-ring `self.x` reference is explicitly insufficient).
+// Each ships with a companion proving it is not vacuous theatre.
+
+const rosterBot = (name: string): BotDoc => {
+  const bot = roster.find((b) => b.name === name);
+  if (!bot) throw new Error(`${name} not in the frozen roster`);
+
+  return bot;
+};
+
+// The same v15 rules with jogai turned OFF — the counterfactual for "the jogai point
+// decided it" (self-contained; the ONLY change is the match config's jogai key, never
+// the frame table or the version).
+const MATCH_NO_JOGAI = { winGap: MATCH.winGap, senshu: MATCH.senshu };
+
+type JogaiFire = { fouler: string; beneficiary: string; seed: number };
+
+// Every board bout whose winner a jogai foul decides: a fighter rings out ≥2× (so the
+// ladder confers ≥1 point) AND the winner differs from the jogai-OFF run of the same
+// (bots × seed × side) fight.
+const decisiveJogaiFires = (): JogaiFire[] => {
+  const fires: JogaiFire[] = [];
+
+  for (const a of roster) {
+    for (const b of roster) {
+      if (a.name === b.name) continue;
+
+      for (const seed of SEEDS) {
+        const cfg = {
+          rules: CANONICAL_RULES,
+          botA: a,
+          botB: b,
+          maxTicks: MAX_TICKS,
+          seed,
+        };
+
+        const on = runFight({ ...cfg, match: MATCH });
+        const aConfers = on.fouls.a.jogai >= 2;
+        const bConfers = on.fouls.b.jogai >= 2;
+        if (!aConfers && !bConfers) continue;
+
+        const off = runFight({ ...cfg, match: MATCH_NO_JOGAI });
+        if (off.winner === on.winner) continue;
+
+        if (aConfers) fires.push({ fouler: a.name, beneficiary: b.name, seed });
+        if (bConfers) fires.push({ fouler: b.name, beneficiary: a.name, seed });
+      }
+    }
+  }
+
+  return fires;
+};
+
+// Every constant the bot's CONDITIONS compare `self.x` against — the condition-AST
+// analog of `movesReferencedBy`'s action-AST walk. Walks the BoolExpr tree, recording
+// the other operand of any comparison whose one side is exactly `field self.x`.
+const selfXConstants = (bot: BotDoc): number[] => {
+  const found: number[] = [];
+
+  const isSelfX = (e: NumExpr): boolean =>
+    e.op === "field" && e.path === "self.x";
+
+  const constOf = (e: NumExpr): number | undefined =>
+    e.op === "const" ? e.value : undefined;
+
+  const record = (a: NumExpr, b: NumExpr): void => {
+    if (isSelfX(a)) {
+      const v = constOf(b);
+      if (v !== undefined) found.push(v);
+    }
+
+    if (isSelfX(b)) {
+      const v = constOf(a);
+      if (v !== undefined) found.push(v);
+    }
+  };
+
+  const walk = (node: BoolExpr): void => {
+    switch (node.op) {
+      case "gt":
+      case "lt":
+      case "gte":
+      case "lte":
+      case "eq":
+      case "neq":
+        record(node.args[0], node.args[1]);
+
+        return;
+      case "and":
+      case "or":
+        node.args.forEach(walk);
+
+        return;
+      case "not":
+        walk(node.arg);
+
+        return;
+    }
+  };
+
+  for (const rule of bot.rules) walk(rule.when);
+
+  return found;
+};
+
+// The near-edge zone: a constant within EDGE_DELTA of either legal margin. Sourced
+// from the manifest + frame table (never hardcoded) so a margin/ring retune moves it.
+const MARGIN = MATCH.jogai.margin;
+const WIDTH = CANONICAL_RULES.ring.width;
+const EDGE_DELTA = 50000;
+
+const isNearEdge = (x: number): boolean =>
+  (x >= MARGIN && x <= MARGIN + EDGE_DELTA) ||
+  (x >= WIDTH - MARGIN - EDGE_DELTA && x <= WIDTH - MARGIN);
+
+describe("jogai adoption lock — exercised on the v15 board (fires + field-read)", () => {
+  describe("fires: a jogai foul decides a bout", () => {
+    it("some board bout is won on a ≥2-ring-out penalty point (a jogai-off flip)", () => {
+      const fires = decisiveJogaiFires();
+
+      expect(fires.length).toBeGreaterThan(0);
+      // WKF-faithful: the naive sweeper rings ITSELF out, handing the bout it could
+      // never score in to the patient vulture.
+      expect(
+        fires.every(
+          (f) => f.fouler === "sweeper" && f.beneficiary === "vulture",
+        ),
+      ).toBe(true);
+    });
+
+    it("would find nothing without the mechanic (the guard bites)", () => {
+      // Same roster, jogai OFF ⇒ the ring-out foul cannot occur at all, so there is no
+      // jogai point to decide anything — proving the fires guard keys off the jogai
+      // mechanic and is not vacuously true.
+      let totalJogaiFouls = 0;
+
+      for (const a of roster) {
+        for (const b of roster) {
+          if (a.name === b.name) continue;
+
+          for (const seed of SEEDS) {
+            const r = runFight({
+              rules: CANONICAL_RULES,
+              botA: a,
+              botB: b,
+              maxTicks: MAX_TICKS,
+              seed,
+              match: MATCH_NO_JOGAI,
+            });
+
+            totalJogaiFouls += r.fouls.a.jogai + r.fouls.b.jogai;
+          }
+        }
+      }
+
+      expect(totalJogaiFouls).toBe(0);
+    });
+  });
+
+  describe("field-read: the zoner makes a boundary decision on self.x", () => {
+    it("references self.x against a near-margin constant (not generic mid-ring spacing)", () => {
+      const nearEdge = selfXConstants(rosterBot("zoner")).filter(isNearEdge);
+
+      expect(nearEdge.length).toBeGreaterThan(0);
+    });
+
+    it("would not count a bare / mid-ring self.x comparison (the guard bites)", () => {
+      // A bot that references self.x ONLY at dead-center — a generic spacing read, not a
+      // boundary decision — must NOT satisfy the field-read guard.
+      const midRing: BotDoc = {
+        version: 1,
+        name: "mid-ring",
+        rules: [
+          {
+            when: {
+              op: "gt",
+              args: [
+                { op: "field", path: "self.x" },
+                { op: "const", value: 300000 },
+              ],
+            },
+            do: { type: "idle" },
+          },
+        ],
+        default: { type: "idle" },
+      };
+
+      expect(selfXConstants(midRing)).toContain(300000); // it DOES reference self.x…
+      expect(selfXConstants(midRing).filter(isNearEdge)).toEqual([]); // …but 300000 is mid-ring
+    });
+
+    // Pin the near-edge predicate's boundaries directly (it is test-local, so its
+    // correctness is characterised by a directional matrix, not a mutation score).
+    it.each<[number, boolean, string]>([
+      [MARGIN, true, "exactly the low margin"],
+      [MARGIN + EDGE_DELTA, true, "low near-edge outer bound (inclusive)"],
+      [MARGIN + EDGE_DELTA + 1, false, "just past the low near-edge band"],
+      [WIDTH - MARGIN, true, "exactly the high margin"],
+      [
+        WIDTH - MARGIN - EDGE_DELTA,
+        true,
+        "high near-edge inner bound (inclusive)",
+      ],
+      [
+        WIDTH - MARGIN - EDGE_DELTA - 1,
+        false,
+        "just short of the high near-edge band",
+      ],
+      [WIDTH / 2, false, "dead-center mid-ring"],
+    ])("isNearEdge(%i) === %s — %s", (x, expected) => {
+      expect(isNearEdge(x)).toBe(expected);
     });
   });
 });
