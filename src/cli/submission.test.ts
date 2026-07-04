@@ -17,6 +17,12 @@ const scored = (netPoints: number, wins = 0, totalFights = 0): Submission => ({
     draws: 0,
     totalFights,
     perOpponent: [],
+    // Ranking-inert here (compareSubmission keys only off win-rate + net-points);
+    // present to satisfy the BenchmarkResult contract.
+    officiating: {
+      endedBy: { gap: 0, time: 0, senshu: 0, overtime: 0 },
+      jogai: { bot: 0, opp: 0 },
+    },
   },
 });
 

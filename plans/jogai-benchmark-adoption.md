@@ -210,8 +210,6 @@ counted; a 7-row directional matrix pins the `isNearEdge` predicate's boundaries
 characterized structurally, not by Stryker). Test-only ⇒ no production change. Full suite 1093
 green; typecheck + lint + format clean._
 
-
-
 **Value**: the v15 gauntlet certifies jogai is exercised, not just enabled — the durable guard.
 **Path**: two tests in `src/cli/gauntlet-calibration.test.ts`, each with a "guard bites"
 companion (the existing pattern): **fires** — run the round-robin and assert ∃ a bout (in
@@ -236,7 +234,21 @@ to `movesReferencedBy`) and assert a `self.x` comparison against a constant in
 
 ---
 
-### Slice 5 (PR 3): CLI officiating breakdown line
+### Slice 5 (PR 3): CLI officiating breakdown line — ✅ DONE
+
+_RED (5 engine officiating tests + 2 updated exact-stdout CLI tests + 1 new CLI line test all
+fail on the absent `officiating`/line) → GREEN. **Resolved the RED-phase question**: the CLI
+cannot derive officiating (only `benchmark()` sees each `FightResult`), so the smaller change is
+the aggregator surfacing one tally — `BenchmarkResult.officiating: { endedBy: Record<endReason,
+number>, jogai: { bot, opp } }` — folded from a widened per-fight `Outcome`; `benchmark()` split
+into `outcomesAgainst`/`summarize`/`tallyOfficiating` so `OpponentScore` (asserted verbatim) is
+untouched. The bot/opp jogai split is bot-centric (`asA.fouls.a + asB.fouls.b`), NOT raw A/B. CLI
+renders one line under the headline: `ended: gap N / time N / senshu N / overtime N   jogai fouls:
+bot=N opp=N`; `BenchmarkDeps.match` widened to the full match type (was `{winGap}`, under-typed vs
+runtime). Ranking keys untouched (decision 7); no `INPUT_HASH`/version change; `npm run fight`
+unaffected (no engine change). MUTATE 100% (188/188 — killed the opp-accumulator `+`→`-` survivor
+with a mirror fixture where the OPPONENT rings out). Full suite 1099 green; typecheck+lint+format
+clean._
 
 **Value**: a human running `npm run benchmark` sees officiating firing (how bouts ended + foul
 counts). Byte-identical; ranking untouched (decision 7).
