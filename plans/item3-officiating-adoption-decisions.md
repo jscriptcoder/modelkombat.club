@@ -36,6 +36,20 @@ re-characterize the gauntlet doc.
      count floor and no victim-identity constraint; the field's availability to _submitted_
      bots is already guaranteed by turning the rule on — the board fire only proves the
      mechanic is reachable on the frozen roster.
+     - **passivity (v16) — RELAXED to "EXERCISED" (2026-07-04, MEASURED & user-confirmed).**
+       A _decisive_ passivity fire (winner-flip) is **structurally infeasible** on the frozen
+       roster: a decisive foul needs a bot idle ~480 ticks (foul ≥2× to confer past the free
+       warning) in a bout that stays _close_ — but 480/600 idle ticks lose the bout on points
+       anyway (not close ⇒ the foul isn't the decider). The only close+low-scoring bout a foul
+       could flip is a MUTUAL standoff, which the all-aggressive roster doesn't produce (its one
+       patient bot, the vulture, is too strong to lose the bouts it stalls in). Unlike jogai (a
+       ring-out _directly_ hands a point in an already-close bout ⇒ naturally decisive), passivity
+       is slow + self-defeating. So passivity's board bar is **EXERCISED**: ∃ a board bout where a
+       real gauntlet bot commits **≥2 passivity fouls** (i.e. the ladder actually _confers_ a
+       penalty point on the frozen roster — a warn + a conferral, not merely reachable). The
+       DECISIVENESS of a conferred passivity point (it awards the opponent +1 and can decide
+       scoring) stays proven by the built Capability-B engine unit tests — exactly as move
+       _coverage_ proves the board exercises a technique while unit tests prove its scoring.
    - **field-read** — a gauntlet bot references the newly-meaningful surface, asserted by
      walking the bot's **condition AST** (the analog of the existing `movesReferencedBy`
      action-AST walk):
@@ -51,9 +65,19 @@ re-characterize the gauntlet doc.
 4. **Carriers (the field-reader per mechanic), spread across three bots:**
    - **jogai → zoner** — becomes ring-aware: reads `self.x`, zones without walling
      itself past the margin. (jogai has no dedicated field; the read is `self.x`-vs-edge.)
-   - **passivity → vulture** — the pure reactive defender is the natural staller; reads
-     `self.passivityRemaining` to force a re-engage before the foul.
-   - **overtime → jabber** — reads `clock.overtime` to go all-in in sudden death.
+   - **passivity → jabber (field-read carrier); victim → vulture** — MEASUREMENT-REVISED
+     (2026-07-04; carrier was `vulture`, victim was TBD). At limit 120 the **jabber is the sole
+     staller** (79 fouls vs the spacing zoner; the vulture never stalls — its counters reset its
+     own clock), REFUTING the "vulture is the natural staller" premise. But 120 mis-flags the
+     jabber's legitimate patient game (decision 5) ⇒ limit revised to **240**, at which the board
+     self-calibrates and NO bot naturally fouls. So the roles split: the **jabber carries the
+     field-read** (a light `self.passivityRemaining ≤ 10` re-engage that keeps it ∈ band ~31%),
+     and the **vulture is SHAPED into the exercised victim** (a standoff-idle rule ⇒ it commits
+     ~23 passivity fouls on the board, incl. ≥2-foul bouts that CONFER a penalty point; see
+     decision 10). Trigger + read on different bots (decision 3), WKF-faithful.
+   - **overtime → jabber** — reads `clock.overtime` to go all-in in sudden death. NOTE: the
+     jabber now ALSO carries passivity (above); v17 planning decides whether it multi-reads
+     (`self.passivityRemaining` + `clock.overtime`) or the overtime carrier moves to another bot.
 
    **Read scope — self-side only for the CI guard.** The field-read guard requires only the
    self-side read per carrier (above). The _also-inert_ opponent-side reads
@@ -67,8 +91,16 @@ re-characterize the gauntlet doc.
 5. **Parameters — principled constants, held FIXED; bots do the balancing.**
    - `jogai.margin = 100000` — legal region `[100000, 500000]` in the 600000 ring;
      fighters start centered (~150000/450000), 50000 inside their wall.
-   - `passivity.limit = 120` ticks — paced fighters safe, pure stallers flagged
-     (verify against the live economy in TDD).
+   - `passivity.limit = 240` ticks — MEASUREMENT-REVISED (2026-07-04; was `120`). The v16 TDD
+     calibration (the "verify against the live economy" hook below) showed `120` mis-flags the
+     **jabber's legitimate patient counter-game** vs the spacing zoner (it acts periodically,
+     just not within every 120 ticks) — it is NOT a pure staller, yet 120 craters it to 12%
+     (out of band), and no bot edit recovers it (its only non-turtle winning matchup does not
+     exist). A limit sweep (120/150/180/210/240/300) found `240` self-calibrates the whole board
+     (jabber 31 / zoner 35 / all 6 ∈ band, ≈ the v15 balance) while a pure turtle still fouls
+     80× — i.e. paced fighters safe, pure stallers flagged (decision 5's OWN stated intent).
+     240 = 40% of the 600-tick cap. Still FIXED (bots don't dial it); the param moved once, by
+     measurement, then re-froze.
    - `overtime.ticks = 300` — half of `MAX_TICKS`; OT usually ends on the first 1-point
      gap, so the length mainly bounds the rare exhaust-to-senshu fallback.
    - **Rebalance lever if the board exits `[25,75]`:** (1) re-author the carrier bot →
@@ -120,6 +152,20 @@ re-characterize the gauntlet doc.
       _decisive_ via a **conferred point** — the victim must ring out **≥2×** (the shared ladder's
       1st foul is free) in a **close** bout; ring-outs in lopsided/drawn bouts (as the zoner's
       were) do not satisfy the bar.
+    - **passivity (v16) — RESOLVED 2026-07-04 by measurement (multi-step).** (1) At limit 120 the
+      **jabber is the sole staller** (79 fouls vs the zoner), refuting "vulture is the natural
+      staller." (2) But 120 mis-flags the jabber's legitimate patient game and craters it to 12%
+      unrecoverably ⇒ **limit revised to 240** (decision 5), at which the board self-calibrates and
+      no bot naturally fouls. (3) **The grappler is a BAD victim** — it's an aggressive close-range
+      bot; every opponent engages it within 240 ticks, so it can't accumulate a foul without idling
+      so hard its band collapses (and it pushes the vulture out). (4) **The vulture is the natural
+      victim** (lowest-offense bot, 73% ⇒ huge downward headroom): a standoff-idle rule makes it
+      commit ~23 passivity fouls (incl. ≥2-foul conferring bouts) with the whole board still ∈ band.
+      (5) But NO passivity foul is **decisive** on this roster (a 480-tick stall loses the bout on
+      points regardless) ⇒ the passivity board bar is **RELAXED to EXERCISED** (decision 3): a real
+      bot confers a penalty point on the board; decisiveness stays engine-unit-tested. **Final:
+      carrier = jabber (field-read), victim = vulture (exercised, ≥2-foul conferral), limit = 240.**
+      The jogai fire (sweeper→vulture) SURVIVES the pooled ladder (≥10 decisive jogai fires).
 
 11. **Spec-prose deliverable per PR — full parity with the senshu adoption.** Each rule
     gets BOTH, all gated on its `MATCH` sub-key (taught == scored):
@@ -159,19 +205,22 @@ Item 3 is COMPLETE when:
   board a _different_ bot must actually trigger for the "fires" guard to hold. Must MEASURE
   which frozen bots ring out (jogai) / stall past 120 (passivity) / reach level-at-cap
   (overtime) once the carriers avoid — and ensure at least one trigger survives.
-  - **jogai: MEASURED & resolved (2026-07-04)** — zoner sole ring-out source ⇒ victim = sweeper
-    (decision 10). passivity/overtime still to measure in their PRs.
-- **`passivity.limit = 120` calibration.** Confirm a paced poker (regen 10/tick, move costs
-  15–52) is never flagged while a genuine staller is — empirically, in the jogai/passivity PR.
+  - **jogai: MEASURED & resolved (2026-07-04)** — zoner sole ring-out source ⇒ victim = sweeper.
+  - **passivity: MEASURED & resolved (2026-07-04)** — jabber sole staller (vs zoner) ⇒ carrier =
+    jabber (reads-to-avoid), victim = grappler (shaped). See decision 10. overtime still to measure.
+- **`passivity.limit` calibration — MEASURED & REVISED to 240 ✓ (2026-07-04).** `120` mis-flags
+  the jabber's legitimate patient counter-game (not a pure staller) ⇒ 12%, unrecoverable by bot
+  edits. A limit sweep found **240** self-calibrates the board (jabber 31 / zoner 35 / all 6 ∈
+  band) while a pure turtle still fouls 80× — decision 5's own "paced safe, stallers flagged"
+  intent. Param moved once by measurement, then re-froze. See decision 5 (revised).
 - **Per-PR board re-characterization.** Each adoption shifts the round-robin (resets perturb
   trajectories; penalties/OT re-decide bouts). Expect to re-author the carrier (± one coupled
   bot) to keep all 6 ∈ `[25,75]`, per the gauntlet-modernization findings (band = dispersion;
   the coupled round-robin can't be precision-dialed).
-- **Pooled-ladder coupling (v16).** passivity feeds the SAME `penaltyCount` as jogai, so in
-  v16 a bot's jogai + passivity fouls compose: one already-eaten (free) jogai foul makes the
-  next passivity foul confer a point. The v16 re-characterization must re-verify the v15 jogai
-  fires under the pooled ladder — a jogai fire in isolation may tip differently once passivity
-  fouls share the count.
+- **Pooled-ladder coupling (v16) — MEASURED ✓ (2026-07-04).** passivity feeds the SAME
+  `penaltyCount` as jogai, so a bot's jogai + passivity fouls compose. Confirmed the v15 jogai fire
+  (sweeper→vulture) SURVIVES the pooled ladder: 10 decisive jogai fires with passivity on. (Still
+  re-verify after the carrier/victim edits, which perturb the board.)
 - **overtime re-decides Cap D's senshu bouts.** The v14 board reports 0 draws (senshu
   resolved them); adopting overtime routes those level-at-cap bouts through sudden death
   first, which may flip winners.

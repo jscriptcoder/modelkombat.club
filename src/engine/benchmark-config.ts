@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v15"; // Item 3 / jogai adoption: MATCH scores jogai (ring-out); zoner made ring-aware (self.x guard), sweeper re-authored into the naive ring-out victim
+export const BENCHMARK_VERSION = "v16"; // Item 3 / passivity adoption: MATCH scores passivity (non-engagement, limit 240); jabber reads self.passivityRemaining (field-read), vulture shaped into the exercised standoff victim
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -30,11 +30,17 @@ export const MAX_TICKS = 600;
 // out — a yame-style reset plus a shared category-2 penalty (1st free, 2+ ⇒
 // opponent +1). Makes the officiating perception fields (self.x-vs-edge, penalties)
 // live; the zoner reads self.x to avoid it, the sweeper naively rings itself out.
+// `passivity` (v16): a fighter that goes `limit` = 240 ticks without landing offense
+// is fouled on the same shared category-2 ladder — makes `self.passivityRemaining`
+// live. The jabber reads it (a last-ditch re-engage), the vulture is shaped into a
+// standoff victim that eats the fouls. 240 (not a tighter value) is calibrated so a
+// patient counter-fighter is not mis-flagged while a genuine staller still is.
 // A scoring input ⇒ folded into INPUT_HASH; changing it forces a version bump.
 export const MATCH = {
   winGap: 8,
   senshu: true,
   jogai: { margin: 100000 },
+  passivity: { limit: 240 },
 } as const;
 
 // The 6 locked archetypes (bots/<name>.json), spanning the strategic axes —
@@ -58,4 +64,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // benchmark-config.test.ts prints the expected value on drift. (Computed over all-LF bot
 // texts, pinned by `.gitattributes`, so the digest is byte-stable on every platform.)
 export const INPUT_HASH =
-  "f8514a3f05c7069fc60db930e90528ceaf3959041433a4125f9714efa363a27c";
+  "0fcc6d0cd5c742500a4aadb5b7dcd8ea360bd219ef3fc9b7838680e45fec7bb3";

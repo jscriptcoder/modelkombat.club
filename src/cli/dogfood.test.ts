@@ -26,9 +26,14 @@ import { CANONICAL_RULES } from "../engine/rules.js";
 // (jabber block+counter), S2 (zoner's narrow-gated long kicks) and S3
 // (grappler's close-range knee + elbow) all left it unchanged — the dogfood was
 // already losing those matchups. The item-3 jogai adoption (v15: ring-aware zoner
-// + naive-victim sweeper) also leaves 18W/102L intact — the dogfood attacks (so
+// + naive-victim sweeper) also left 18W/102L intact — the dogfood attacks (so
 // the sweeper's flee-when-shut-out never triggers against it) and never rings
-// itself out, so jogai does not touch its matchup outcomes.
+// itself out, so jogai does not touch its matchup outcomes. The item-3 passivity
+// adoption (v16: jabber reads self.passivityRemaining, vulture shaped into a
+// standoff victim) shifts it 18W → 13W/107L — the re-authored jabber and vulture
+// flip the dogfood's outcomes in those two matchups. The dogfood attacks every
+// tick, so it never commits a passivity foul of its own; the change is purely the
+// two carriers' new behaviour.
 const botText = (name: string): string =>
   readFileSync(
     fileURLToPath(new URL(`../../bots/${name}.json`, import.meta.url)),
@@ -41,8 +46,8 @@ describe("dogfood bot (authored from docs/spec.md)", () => {
     expect(validate(doc).ok).toBe(true);
   });
 
-  it("competes as a real match participant in the v15 benchmark (wins some, loses most)", () => {
-    // The real aggregator over the frozen v15 gauntlet — the exact scoring inputs
+  it("competes as a real match participant in the v16 benchmark (wins some, loses most)", () => {
+    // The real aggregator over the frozen v16 gauntlet — the exact scoring inputs
     // pinned by BENCHMARK_VERSION/INPUT_HASH (a change bumps the version and this
     // characterization with it).
     const result = benchmark({
@@ -57,12 +62,13 @@ describe("dogfood bot (authored from docs/spec.md)", () => {
     const losses = result.totalFights - result.wins - result.draws;
 
     // A real competitor: it takes genuine wins (no longer the degenerate 0-wins
-    // raw-farm read) while losing the majority. Net (−1674) stays loop-inflated in
+    // raw-farm read) while losing the majority. Net (−1786) stays loop-inflated in
     // yame-starving matchups (vs rekka / sweeper), so RANKING is by win-rate
-    // (primary); net is only the tiebreaker. Under S1 the parry→counter vulture
-    // shifts the dogfood's vulture matchup, lifting it 16W → 18W (0D).
-    expect(result.wins).toBe(18);
-    expect(losses).toBe(102);
+    // (primary); net is only the tiebreaker. Its wins now come almost entirely from
+    // the grappler matchup (12W); v16's re-authored jabber + vulture cost it the
+    // handful it used to steal there (18W → 13W).
+    expect(result.wins).toBe(13);
+    expect(losses).toBe(107);
     expect(result.draws).toBe(0);
     expect(result.totalFights).toBe(120);
   });

@@ -137,10 +137,15 @@ const rosterBot = (name: string): BotDoc => {
   return bot;
 };
 
-// The same v15 rules with jogai turned OFF — the counterfactual for "the jogai point
-// decided it" (self-contained; the ONLY change is the match config's jogai key, never
-// the frame table or the version).
-const MATCH_NO_JOGAI = { winGap: MATCH.winGap, senshu: MATCH.senshu };
+// The same v16 rules with jogai turned OFF but passivity still ON — the counterfactual for
+// "the jogai point decided it". Keeping passivity on (once MATCH carries it) is essential:
+// the ONLY change vs MATCH is the jogai key, so the winner-flip isolates jogai's causal point
+// under the shared/pooled ladder rather than conflating it with passivity.
+const MATCH_NO_JOGAI = {
+  winGap: MATCH.winGap,
+  senshu: MATCH.senshu,
+  passivity: MATCH.passivity,
+};
 
 type JogaiFire = { fouler: string; beneficiary: string; seed: number };
 
@@ -338,6 +343,147 @@ describe("jogai adoption lock — exercised on the v15 board (fires + field-read
       [WIDTH / 2, false, "dead-center mid-ring"],
     ])("isNearEdge(%i) === %s — %s", (x, expected) => {
       expect(isNearEdge(x)).toBe(expected);
+    });
+  });
+});
+
+// ── The passivity-adoption lock (item 3 / v16) — certifies the non-engagement mechanic is
+// EXERCISED on the frozen board, not merely enabled. Two invariants, mirroring the jogai
+// lock's "exercised = fires + field-read" contract (decision 3):
+//   1. EXERCISED — some board bout has a real bot commit ≥2 passivity fouls, so the shared
+//      category-2 ladder CONFERS a penalty point (1st foul free, 2nd confers) on the frozen
+//      roster. This is the RELAXED fire (decision 3, passivity): a _decisive_ winner-flip is
+//      structurally infeasible on the all-aggressive roster — a bout stalled ~480 ticks (two
+//      240-tick fouls) loses on points regardless, so the foul is never the decider. That a
+//      conferred passivity point AWARDS the opponent +1 and can decide scoring is proven by the
+//      built Capability-B engine unit tests; this lock proves the board exercises the mechanic
+//      (the move-coverage analog: coverage proves the board uses a technique, unit tests prove
+//      its scoring).
+//   2. FIELD-READ — the jabber (the carrier) references `self.passivityRemaining` in a
+//      condition — the direct dedicated-path analog of `movesReferencedBy` (jogai had no field,
+//      so it settled for a `self.x`-vs-edge boundary read).
+// Each ships with a companion proving it is not vacuous theatre.
+
+// The same v16 MATCH with passivity turned OFF (jogai + senshu still on) — the counterfactual
+// proving the exercised guard keys off the passivity mechanic (no passivity ⇒ zero such fouls).
+const MATCH_NO_PASSIVITY = {
+  winGap: MATCH.winGap,
+  senshu: MATCH.senshu,
+  jogai: MATCH.jogai,
+};
+
+type MatchCfg = Parameters<typeof runFight>[0]["match"];
+
+// The most passivity fouls any single fighter commits in any one board bout, and who — a foul
+// count ≥2 means the shared ladder conferred a penalty point somewhere on the frozen roster.
+const maxPassivityFoulsInABout = (
+  match: MatchCfg,
+): { fouls: number; who: string } => {
+  let fouls = 0;
+  let who = "";
+
+  const consider = (n: number, name: string): void => {
+    if (n > fouls) {
+      fouls = n;
+      who = name;
+    }
+  };
+
+  for (const a of roster) {
+    for (const b of roster) {
+      if (a.name === b.name) continue;
+
+      for (const seed of SEEDS) {
+        const r = runFight({
+          rules: CANONICAL_RULES,
+          botA: a,
+          botB: b,
+          maxTicks: MAX_TICKS,
+          seed,
+          match,
+        });
+
+        consider(r.fouls.a.passivity, a.name);
+        consider(r.fouls.b.passivity, b.name);
+      }
+    }
+  }
+
+  return { fouls, who };
+};
+
+// Whether a bot references `self.passivityRemaining` anywhere in its CONDITIONS — the
+// dedicated-path field-read walk (the BoolExpr analog of `selfXConstants`, but a presence
+// check: the field IS the meaningful surface, no constant band to classify).
+const readsPassivityRemaining = (bot: BotDoc): boolean => {
+  const isPassivityField = (e: NumExpr): boolean =>
+    e.op === "field" && e.path === "self.passivityRemaining";
+
+  const walk = (node: BoolExpr): boolean => {
+    switch (node.op) {
+      case "gt":
+      case "lt":
+      case "gte":
+      case "lte":
+      case "eq":
+      case "neq":
+        return isPassivityField(node.args[0]) || isPassivityField(node.args[1]);
+      case "and":
+      case "or":
+        return node.args.some(walk);
+      case "not":
+        return walk(node.arg);
+    }
+  };
+
+  return bot.rules.some((rule) => walk(rule.when));
+};
+
+describe("passivity adoption lock — exercised on the v16 board (exercised + field-read)", () => {
+  describe("exercised: a passivity penalty point is conferred on the board", () => {
+    it("some board bout has a real bot commit ≥2 passivity fouls (a conferred point)", () => {
+      const { fouls, who } = maxPassivityFoulsInABout(MATCH);
+
+      expect(fouls).toBeGreaterThanOrEqual(2);
+      // WKF-faithful: the shaped vulture over-turtles in a standoff and eats the fouls, while
+      // the jabber (carrier) reads self.passivityRemaining to avoid its own.
+      expect(who).toBe("vulture");
+    });
+
+    it("would confer nothing without the mechanic (the guard bites)", () => {
+      // Same roster, passivity OFF ⇒ the non-engagement foul cannot occur at all, so no bot
+      // commits a single passivity foul — proving the exercised guard keys off the mechanic.
+      expect(maxPassivityFoulsInABout(MATCH_NO_PASSIVITY).fouls).toBe(0);
+    });
+  });
+
+  describe("field-read: the jabber reads self.passivityRemaining", () => {
+    it("references self.passivityRemaining in a condition (the carrier avoids its own foul)", () => {
+      expect(readsPassivityRemaining(rosterBot("jabber"))).toBe(true);
+    });
+
+    it("would not count a bot that reads only other fields (the guard bites)", () => {
+      // A bot referencing a DIFFERENT self field (self.x) must NOT satisfy the passivity
+      // field-read — proving the walk keys off the dedicated path, not any self read.
+      const otherReader: BotDoc = {
+        version: 1,
+        name: "other-reader",
+        rules: [
+          {
+            when: {
+              op: "gt",
+              args: [
+                { op: "field", path: "self.x" },
+                { op: "const", value: 300000 },
+              ],
+            },
+            do: { type: "idle" },
+          },
+        ],
+        default: { type: "idle" },
+      };
+
+      expect(readsPassivityRemaining(otherReader)).toBe(false);
     });
   });
 });
