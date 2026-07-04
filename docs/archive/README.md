@@ -85,3 +85,14 @@ trail): [gauntlet-modernization-stories.md](gauntlet-modernization-stories.md).
 - **S2 — `zoner` beyond-neutral long kicks** (PR #139 → benchmark v13; `yoko-geri` + `ushiro-geri` narrow-gated to preserve calibration — the "no healthy niche" finding): [gauntlet-s2-zoner.md](gauntlet-s2-zoner.md)
 - **S3 — `grappler` close-range knee + elbow** (PR #141 → benchmark v14; `empi` + `hiza-geri` knockdown→okizeme woven into the close game — **completes 11/11 coverage**; full real integration, the parry→counter-coupling finding): [gauntlet-s3-grappler.md](gauntlet-s3-grappler.md)
 - **S4 — calibration lock + close-out** (PR #143; `v14` unchanged — CI lock asserting all 6 ∈ band + 11/11 coverage, plus the LF line-ending pin for a byte-stable `INPUT_HASH`): [gauntlet-s4-calibration-lock.md](gauntlet-s4-calibration-lock.md)
+
+## Roster-wide balance-law property (PRs #145–#146) ✅ COMPLETE
+
+A pure-data guard in `rules.test.ts` asserting no move in the full 12-move roster (the 10 named
+attack moves plus `sweep` and `throw`, enumerated dynamically) Pareto-dominates another (rule 2) or
+duplicates another (rule 4) across the 7 strategic axes — the long-standing "Verification hook" of
+the move-roster balance law, closing out the Batch-1 arsenal. Detector/adapter are test-local
+(Stryker excludes `*.test.ts`), pinned by directional fixtures. Design source:
+[../move-roster.md](../move-roster.md) §Balance law.
+
+- [no-pareto-dominance.md](no-pareto-dominance.md) — the plan + grill-me/find-gaps design trail

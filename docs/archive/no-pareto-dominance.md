@@ -1,7 +1,9 @@
 # Plan: Roster-wide no-Pareto-dominance property test
 
-**Branch**: test/no-pareto-dominance
-**Status**: Active
+**Branch**: test/no-pareto-dominance (S1) · test/no-pareto-distinctness (S2)
+**Status**: ✅ COMPLETE — shipped 2026-07-04 (Slice 1 PR #145, Slice 2 + close-out PR #146).
+Both properties live in `src/engine/rules.test.ts`; `rules.ts` mutation 100% (72/72), full suite
+1075 green. Archived (not deleted) per the project convention.
 
 ## Goal
 
@@ -30,7 +32,7 @@ should. We do the same with fabricated dominant/duplicate rosters.
   surfaces loudly rather than shrinking the roster to 11.
 - **Axis vector (minimal 7):** `reach` ↑, effective `score` ↑ (`max(score, …scoreByBand)`),
   `startup` ↓, `recovery` ↓, `staminaCost` ↓, `bands` by set-inclusion (⊇) over `{high, mid, low,
-  grab}`, `knockdown` (true = strength). Excluded on purpose: `active`, `cancelInto` (each extra
+grab}`, `knockdown` (true = strength). Excluded on purpose: `active`, `cancelInto` (each extra
   axis is an escape hatch that weakens the guard). **Score-axis for knockdown moves:** `sweep` and
   `hiza-geri` take their own hit score (`0`); the okizeme `finishScore` is **not** folded in — those
   points belong to the separate `cancelInto` finisher, and the knockdown itself is credited on the
@@ -39,7 +41,7 @@ should. We do the same with fabricated dominant/duplicate rosters.
   → `bands = {low}` (its low-ness is mechanical, absent from the field), `knockdown = true`, score
   0; `throw` (a `ThrowSpec`) → `bands = {grab}` (own category, incomparable to every strike —
   this is what stops `throw` dominating `hiza-geri` without a `cancelInto` axis), `knockdown =
-  true` (implicit), score 3. Absent-`bands` + not-`sweep` ⇒ `{high, mid, low}` (a genuinely
+true` (implicit), score 3. Absent-`bands` + not-`sweep` ⇒ `{high, mid, low}` (a genuinely
   unrestricted future move). Bands are modeled test-locally as a `Set<Band | "grab">` (a test-only
   union, **not** the engine `Band` type) so the synthetic `grab` token is representable without a
   type assertion or reusing a real band.
@@ -47,7 +49,7 @@ should. We do the same with fabricated dominant/duplicate rosters.
   all 7 ∧ `A > B` on ≥1); (rule 4) distinctness — no two moves identical on all 7 axes.
   Distinctness uses the **same 7 axes** as dominance (intended): a future move distinguishable only
   by `cancelInto`/`active` (the excluded axes) is deemed **non-distinct and rejected** — the signal
-  to give it a real strength-axis niche, or to *deliberately* revisit the axis set via a new
+  to give it a real strength-axis niche, or to _deliberately_ revisit the axis set via a new
   grill-me. Never a silent override.
 
 ### Reconciliation with the "MUTATE-driven fixtures" grill-me decision
@@ -75,8 +77,7 @@ plan until it's resolved.
 
 ## Acceptance Criteria
 
-- [ ] The full 12-move roster is enumerated **dynamically** (`Object.entries(CANONICAL_RULES.moves)`
-      + appended `throw`); adding a move to `CANONICAL_RULES` auto-includes it with no test edit.
+- [ ] The full 12-move roster is enumerated **dynamically** (`Object.entries(CANONICAL_RULES.moves)` + appended `throw`); adding a move to `CANONICAL_RULES` auto-includes it with no test edit.
 - [ ] **Rule 2 (no strict Pareto-dominance):** no move in the roster `≥` another on all 7 axes and
       `>` on at least one — GREEN on the current `CANONICAL_RULES`.
 - [ ] **Rule 4 (distinctness):** no two moves are identical on all 7 axes — GREEN on the current
@@ -123,37 +124,38 @@ fabricated fixtures. No engine surface; no `CANONICAL_RULES` change. Intentional
 **Required implementation skills**: Before code, load `tdd`, `testing`, `mutation-testing`,
 `refactoring`.
 **Acceptance criteria** (present to human, confirm before coding):
-  - `findDominatedPairs` over the dynamically-built canonical roster is **empty**.
-  - A fabricated "guard bites" roster containing a clone strictly worse than `gyaku-zuki` on
-    `reach` (equal elsewhere) is **flagged** (mirrors the calibration-lock precedent).
-  - `dominates(A, B)` is pinned per axis by directional fixtures: for each of the 7 axes, a pair
-    differing only on that axis asserts the correct dominator (and the flipped direction would
-    fail).
-  - Incomparable `bands` (`{low}` vs `{mid}`) ⇒ `dominates` false both ways.
-  - A one-axis-worse pair (better on 6, worse on 1) ⇒ `dominates` false (the "all axes" AND).
-  - An all-equal pair ⇒ `dominates` false (the strict-`>` existential).
-  - `throw` (grab band, kd true, score 3), `sweep` (`{low}`, kd true, score 0), and effective
-    score (`mawashi`/`ushiro` = 3) are exercised via the canonical roster.
-**RED**: Write the directional + guard-bites + canonical-empty tests first; they fail because
-`moveToAxes`/`dominates`/`findDominatedPairs` don't exist. Mutator-awareness (from
-`mutation-testing` `resources/mutator-rules.md`) — the fixtures must pre-empt: ConditionalExpression
-& EqualityOperator on each `≥`/`>` comparator, LogicalOperator on the "all axes" ∧ / "≥1" ∨,
-ArrayDeclaration / block-statement on the axis list, the `??` defaults (`staminaCost ?? 0`,
-`bands ?? [...]`), and `max(...scoreByBand)` (effective-score) — each gets a fixture whose verdict
-flips if that operator is mutated. (These fixtures stand in for Stryker, which won't mutate this
-test file.)
-**GREEN**: Implement `moveToAxes` (with the `sweep`→`{low}` and `throw`→`{grab}` special cases + a
-`bandSuperset`/`bandEqual` set helper), `dominates(a, b)`, `findDominatedPairs(roster)`, and a
-`buildCanonicalRoster()` that enumerates `Object.entries(CANONICAL_RULES.moves)` + `throw`.
-**MUTATE**: Run `npm run mutation` (`mutation-testing` skill). Confirm **no `rules.ts` regression**
-and note any incidental `CANONICAL_RULES`-literal kills. The detector itself is test-local ⇒ not
-mutated ⇒ its coverage is proven by the directional fixtures above (see Reconciliation note).
-**KILL MUTANTS**: Address any newly-surviving `rules.ts` mutants (ask human if a survivor's value
-is ambiguous). Re-inspect the directional fixtures for any axis/operator not yet pinned.
-**REFACTOR**: Assess only if it adds value — e.g. extract a shared `Band` universe constant,
-collapse the directional fixtures into a table-driven `it.each`. Keep the adapter pure.
-**Done when**: All acceptance criteria met, mutation report reviewed (no regression), typecheck +
-lint green, human approves commit.
+
+- `findDominatedPairs` over the dynamically-built canonical roster is **empty**.
+- A fabricated "guard bites" roster containing a clone strictly worse than `gyaku-zuki` on
+  `reach` (equal elsewhere) is **flagged** (mirrors the calibration-lock precedent).
+- `dominates(A, B)` is pinned per axis by directional fixtures: for each of the 7 axes, a pair
+  differing only on that axis asserts the correct dominator (and the flipped direction would
+  fail).
+- Incomparable `bands` (`{low}` vs `{mid}`) ⇒ `dominates` false both ways.
+- A one-axis-worse pair (better on 6, worse on 1) ⇒ `dominates` false (the "all axes" AND).
+- An all-equal pair ⇒ `dominates` false (the strict-`>` existential).
+- `throw` (grab band, kd true, score 3), `sweep` (`{low}`, kd true, score 0), and effective
+  score (`mawashi`/`ushiro` = 3) are exercised via the canonical roster.
+  **RED**: Write the directional + guard-bites + canonical-empty tests first; they fail because
+  `moveToAxes`/`dominates`/`findDominatedPairs` don't exist. Mutator-awareness (from
+  `mutation-testing` `resources/mutator-rules.md`) — the fixtures must pre-empt: ConditionalExpression
+  & EqualityOperator on each `≥`/`>` comparator, LogicalOperator on the "all axes" ∧ / "≥1" ∨,
+  ArrayDeclaration / block-statement on the axis list, the `??` defaults (`staminaCost ?? 0`,
+  `bands ?? [...]`), and `max(...scoreByBand)` (effective-score) — each gets a fixture whose verdict
+  flips if that operator is mutated. (These fixtures stand in for Stryker, which won't mutate this
+  test file.)
+  **GREEN**: Implement `moveToAxes` (with the `sweep`→`{low}` and `throw`→`{grab}` special cases + a
+  `bandSuperset`/`bandEqual` set helper), `dominates(a, b)`, `findDominatedPairs(roster)`, and a
+  `buildCanonicalRoster()` that enumerates `Object.entries(CANONICAL_RULES.moves)` + `throw`.
+  **MUTATE**: Run `npm run mutation` (`mutation-testing` skill). Confirm **no `rules.ts` regression**
+  and note any incidental `CANONICAL_RULES`-literal kills. The detector itself is test-local ⇒ not
+  mutated ⇒ its coverage is proven by the directional fixtures above (see Reconciliation note).
+  **KILL MUTANTS**: Address any newly-surviving `rules.ts` mutants (ask human if a survivor's value
+  is ambiguous). Re-inspect the directional fixtures for any axis/operator not yet pinned.
+  **REFACTOR**: Assess only if it adds value — e.g. extract a shared `Band` universe constant,
+  collapse the directional fixtures into a table-driven `it.each`. Keep the adapter pure.
+  **Done when**: All acceptance criteria met, mutation report reviewed (no regression), typecheck +
+  lint green, human approves commit.
 
 ### Slice 2: No two moves are identical on all 7 axes (rule 4, distinctness)
 
@@ -164,28 +166,30 @@ CI red, closing the gap Pareto alone leaves (an all-axes tie strictly-dominates 
 non-empty on a fabricated duplicate. Additive; no change to Slice 1's Pareto property.
 **Required implementation skills**: load `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (present to human, confirm before coding):
-  - `findDuplicatePairs` over the canonical roster is **empty**.
-  - A fabricated roster with two moves identical on all 7 axes (but differing in an excluded
-    dimension, e.g. `active` or `cancelInto`) is **flagged** — proving distinctness catches what
-    Pareto does not.
-  - A pair differing on exactly one axis is **not** flagged (proves `axesEqual` requires all-7
-    equality, incl. `bandEqual`).
-**RED**: Write the duplicate-flagged, one-axis-different-not-flagged, and canonical-empty tests
-first; they fail until `axesEqual`/`findDuplicatePairs` exist. Mutator-awareness: the all-7 ∧ in
-`axesEqual` (LogicalOperator), each `===` (EqualityOperator), and `bandEqual` (set-equality vs
-subset) each get a flipping fixture.
-**GREEN**: Implement `axesEqual(a, b)` (7 equalities incl. `bandEqual`) + `findDuplicatePairs`.
-**MUTATE**: Run `npm run mutation`; confirm no `rules.ts` regression. `axesEqual` is test-local ⇒
-proven by its fixtures.
-**KILL MUTANTS**: Address any `rules.ts` survivors; re-check fixtures pin every equality.
-**REFACTOR**: Fold `bandEqual` into the shared set helper from Slice 1 if not already; assess
-table-driven fixtures. Only if it adds value.
-**Done when**: All acceptance criteria met, mutation report reviewed, typecheck + lint green, human
-approves commit.
+
+- `findDuplicatePairs` over the canonical roster is **empty**.
+- A fabricated roster with two moves identical on all 7 axes (but differing in an excluded
+  dimension, e.g. `active` or `cancelInto`) is **flagged** — proving distinctness catches what
+  Pareto does not.
+- A pair differing on exactly one axis is **not** flagged (proves `axesEqual` requires all-7
+  equality, incl. `bandEqual`).
+  **RED**: Write the duplicate-flagged, one-axis-different-not-flagged, and canonical-empty tests
+  first; they fail until `axesEqual`/`findDuplicatePairs` exist. Mutator-awareness: the all-7 ∧ in
+  `axesEqual` (LogicalOperator), each `===` (EqualityOperator), and `bandEqual` (set-equality vs
+  subset) each get a flipping fixture.
+  **GREEN**: Implement `axesEqual(a, b)` (7 equalities incl. `bandEqual`) + `findDuplicatePairs`.
+  **MUTATE**: Run `npm run mutation`; confirm no `rules.ts` regression. `axesEqual` is test-local ⇒
+  proven by its fixtures.
+  **KILL MUTANTS**: Address any `rules.ts` survivors; re-check fixtures pin every equality.
+  **REFACTOR**: Fold `bandEqual` into the shared set helper from Slice 1 if not already; assess
+  table-driven fixtures. Only if it adds value.
+  **Done when**: All acceptance criteria met, mutation report reviewed, typecheck + lint green, human
+  approves commit.
 
 ## Pre-PR Quality Gate
 
 Before the PR:
+
 1. Mutation testing — `npm run mutation`; confirm **no `rules.ts` regression** (the detector is
    test-local by design; its coverage is the directional fixtures, per the Reconciliation note).
 2. Refactoring assessment — run `refactoring` skill on the new test code.
@@ -211,4 +215,6 @@ Resolved (7):
 Parked (0): none. Vacuous-pass (Nice) folded into the two-level-fixture resolution.
 
 ---
-*Delete this file when the plan is complete. If `plans/` is empty, delete the directory.*
+
+_Archived design record — the feature shipped in PRs #145–#146. Kept (not deleted) as the design
+trail behind the two `rules.test.ts` balance-law properties._
