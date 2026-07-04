@@ -77,8 +77,9 @@ condition + jogai / passivity officiating + senshu / overtime tie-resolution), t
 offline **LLM bot-authoring benchmark v1**, and the **gauntlet modernization** (all 6
 frozen bots re-authored into the `[25%, 75%]` band with 11/11 arsenal coverage,
 CI-locked at `v14`). **Not yet built:** air-actions and the rest of §7 (rounds); the
-deferred benchmark/spec adoption of jogai / passivity / overtime; and the platform layer
-(KotH ladder, HTTP API, Pixi viewer). See `docs/STATUS.md` for detail and the next slice.
+deferred benchmark/spec adoption of overtime (jogai `v15` + passivity `v16` are done); and
+the platform layer (KotH ladder, HTTP API, Pixi viewer). See `docs/STATUS.md` for detail
+and the next slice.
 
 Flow for the next capability: `grill-me` → `planning` → TDD, **PR per capability**. The
 §11 combat-resolution spine (two-phase compute-then-apply, `strike > throw > guard`)

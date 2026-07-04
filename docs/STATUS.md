@@ -651,6 +651,36 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
     `run-benchmark.ts` mutation 100% (188/188). Design trail: `docs/archive/jogai-benchmark-adoption.md` (shared
     decisions in `plans/item3-officiating-adoption-decisions.md`). **The jogai adoption is COMPLETE; passivity
     (v16) + overtime (v17) remain deferred under item 3.**
+- DONE (**passivity benchmark + spec adoption — item 3 (passivity slice), v16, PRs #151–#153**): folds the built
+  §7 **passivity** (non-engagement clock ⇒ yame-style reset + shared category-2 penalty, Capability B) into the LLM
+  benchmark's frozen manifest, teaches it in `docs/spec.md` (taught == scored), and CI-locks that it is **exercised**
+  and **field-read** on the gauntlet — the second of the three deferred officiating mechanics (overtime still pending).
+  The mechanic + its `FightResult.fouls.*.passivity` telemetry shipped in Capability B / the jogai PR #147, so this is
+  a **scoring-config flip + prose + a CLI read-out — NO engine/DSL/TCB change** (`npm run fight` byte-identical
+  throughout). **Structural finding (a durable item-3 lesson, distinct from jogai):** a **decisive** passivity fire is
+  infeasible on the all-aggressive frozen roster — a passivity foul needs ~480 idle ticks (2× the limit) in a CLOSE
+  bout, but 480/600 idle ticks lose on points regardless ⇒ not close ⇒ not decisive; jogai's ring-out is naturally
+  decisive (it hands a point directly), passivity is slow + self-defeating. So the "fires" bar was **relaxed to
+  EXERCISED** (user-confirmed): a real bot CONFERS a penalty point (≥2 passivity fouls in a bout), with
+  conferral-decisiveness left proven by the Capability-B engine unit tests. **Two PRs + close-out. S1 (#151, the atomic
+  v16 flip)**: `MATCH += passivity: { limit: 240 }`, `BENCHMARK_VERSION v15 → v16`, `INPUT_HASH` re-pinned;
+  `generateSpec` gains a gated passivity rule bullet + a primer "don't stall" clause (naming `self.passivityRemaining`
+  - `opponent.passivityRemaining`); the **jabber** made the field-read carrier (a `self.passivityRemaining > 0 AND ≤ 10`
+    last-ditch re-engage — the `> 0` lower gate excludes the **sentinel-0 that reads when passivity is OFF**, keeping the
+    rule inert off-benchmark) and the **vulture** shaped into the standoff **victim** (an `attackBand == 0 ∧ distance >
+200000 → idle` rule ⇒ commits ≥2-foul conferring bouts); the calibration lock gains the **exercised** + **field-read**
+    guards (each with a "guard bites" companion), all 6 ∈ `[25,75]`, and the v15 jogai fire re-verified to SURVIVE the
+    pooled ladder; dogfood re-pinned 18W → **13W/107L** (the re-authored jabber + vulture flip those two matchups);
+    `docs/benchmark-gauntlet-v16.md` added. **Calibration finding:** `limit 120` mis-flagged the jabber's legitimate
+    patient counter-game (its only non-turtle win is out-pointing the zoner by blocking — exactly what passivity punishes);
+    **240** self-calibrates the board while a pure turtle still fouls 80× (user-confirmed). **S2 (#152, CLI read-out)**,
+    VERSION-NEUTRAL: the `OfficiatingTally` gains a bot-centric `passivity: { bot, opp }` split rendered alongside the
+    jogai one — `… jogai fouls: bot=N opp=N   passivity fouls: bot=N opp=N`; ranking keys untouched, no `INPUT_HASH`
+    change, `npm run fight` byte-identical. 1108 tests; S1 `benchmark-config.ts` mutation 100%, S2 `benchmark.ts` +
+    `run-benchmark.ts` mutation 100% (0 survivors — mirror idle-vs-attacker fixtures kill the accumulator + attribution
+    mutants). Design trail: `docs/archive/passivity-benchmark-adoption.md` (shared decisions in
+    `plans/item3-officiating-adoption-decisions.md`). **The passivity adoption is COMPLETE; only overtime (v17) remains
+    deferred under item 3.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -703,15 +733,17 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    precision-dialed (band = dispersion, mean pinned ~50%); niche moves conflict with tight
    calibration (S2 far kicks narrow-gated; S3 close moves fed `vulture`'s parry→counter until the
    throw kept the contact band — distinguish by range, not read, as no guard tell exists).
-3. **Deferred passivity / overtime benchmark + spec adoption** — Capability D was scoped
-   to senshu only; folding the remaining officiating mechanics into the benchmark `MATCH`
-   (+ `INPUT_HASH` / `BENCHMARK_VERSION`) and teaching their prose in `generateSpec` was
-   deliberately deferred (each forces its own gauntlet re-characterization / possible
-   rebalance). **jogai is now DONE (v15, PRs #147–#149** — see the build-log entry; ring-aware
-   zoner + naive-victim sweeper + CLI officiating read-out). **passivity (v16)** and **overtime
-   (v17)** remain — their MECHANICS are already built (Capabilities B / C2); only the
-   benchmark+spec adoption is left, each its own `grill-me` → `planning` → TDD slice. Shared
-   resolved decisions (carriers, params) are in `plans/item3-officiating-adoption-decisions.md`.
+3. **Deferred overtime benchmark + spec adoption** — Capability D was scoped to senshu only;
+   folding the remaining officiating mechanics into the benchmark `MATCH` (+ `INPUT_HASH` /
+   `BENCHMARK_VERSION`) and teaching their prose in `generateSpec` was deliberately deferred
+   (each forces its own gauntlet re-characterization / possible rebalance). **jogai is DONE
+   (v15, PRs #147–#149)** and **passivity is DONE (v16, PRs #151–#153)** — see the build-log
+   entries (jogai: ring-aware zoner + naive-victim sweeper; passivity: jabber field-read carrier
+   - vulture standoff victim, limit 240, "fires" relaxed to EXERCISED; both with a CLI officiating
+     read-out). Only **overtime (v17)** remains — its MECHANIC is already built (Capability C2);
+     only the benchmark+spec adoption is left, its own `grill-me` → `planning` → TDD slice (carrier
+     = jabber reading `clock.overtime`, `overtime.ticks = 300`). Shared resolved decisions
+     (carriers, params) are in `plans/item3-officiating-adoption-decisions.md`.
 4. **Rest of §7** — **rounds** (the last unbuilt match-structure piece, beyond the
    benchmark's yame + win condition + tie resolution).
 5. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap
