@@ -113,6 +113,14 @@ re-characterize the gauntlet doc.
     to thin or fall back to synthetic-only — the thick "fires on the real board" bar is
     preserved. (Victim-shaping is an additional round-robin perturbation to absorb per
     decision 5's rebalance ladder.)
+    - **jogai (v15) — RESOLVED 2026-07-04 by measurement.** With `jogai:{margin:100000}` on the
+      frozen v14 roster, the **zoner is the sole ring-out source (47/47 fouls; every other bot
+      0)**. So the ring-aware zoner alone leaves **zero** fires ⇒ escalation IS required. **Victim
+      = sweeper** (67%, the most band headroom to absorb self-inflicted losses; a non-carrier, so
+      never re-touched by v16/v17). Refinement the measurement surfaced: the fire must be
+      *decisive* via a **conferred point** — the victim must ring out **≥2×** (the shared ladder's
+      1st foul is free) in a **close** bout; ring-outs in lopsided/drawn bouts (as the zoner's
+      were) do not satisfy the bar.
 
 11. **Spec-prose deliverable per PR — full parity with the senshu adoption.** Each rule
     gets BOTH, all gated on its `MATCH` sub-key (taught == scored):
@@ -151,6 +159,8 @@ Item 3 is COMPLETE when:
   board a *different* bot must actually trigger for the "fires" guard to hold. Must MEASURE
   which frozen bots ring out (jogai) / stall past 120 (passivity) / reach level-at-cap
   (overtime) once the carriers avoid — and ensure at least one trigger survives.
+  - **jogai: MEASURED & resolved (2026-07-04)** — zoner sole ring-out source ⇒ victim = sweeper
+    (decision 10). passivity/overtime still to measure in their PRs.
 - **`passivity.limit = 120` calibration.** Confirm a paced poker (regen 10/tick, move costs
   15–52) is never flagged while a genuine staller is — empirically, in the jogai/passivity PR.
 - **Per-PR board re-characterization.** Each adoption shifts the round-robin (resets perturb
