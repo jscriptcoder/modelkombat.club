@@ -238,6 +238,7 @@ describe("benchmark — officiating tally (how bouts ended + jogai fouls)", () =
       overtime: 0,
     });
     expect(result.officiating.jogai).toEqual({ bot: 0, opp: 0 });
+    expect(result.officiating.passivity).toEqual({ bot: 0, opp: 0 });
   });
 
   it("counts gap-ended bouts under endReason.gap when match mode ends on the win gap", () => {
@@ -320,5 +321,50 @@ describe("benchmark — officiating tally (how bouts ended + jogai fouls)", () =
     );
 
     expect(result.officiating.jogai).toEqual({ bot: 0, opp: 4 });
+  });
+
+  it("attributes passivity fouls to the bot vs the opponent, not to raw fighter A/B", () => {
+    // The bot IDLES on BOTH sides (fighter A in one fight, B in the other) ⇒ its no-offense
+    // clock climbs past the limit and it is fouled 9× per side = 18; the always-attacking
+    // opponent resets its own clock on every landed hit ⇒ never passive. A raw fouls.a / fouls.b
+    // aggregate would mis-split these, because the bot occupies slot A in one fight and B in the
+    // other — exactly the bot-centric attribution the jogai split above proves for ring-outs.
+    const result = benchmark(
+      config({
+        bot: LOSER,
+        gauntlet: [SUBMITTED],
+        seeds: [1],
+        maxTicks: 55,
+        match: { winGap: 99, passivity: { limit: 5 } },
+      }),
+    );
+
+    expect(result.officiating.passivity).toEqual({ bot: 18, opp: 0 });
+    // The 99-gap is never reached (the free-then-1pt ladder never nears it), so both bouts
+    // still run to time.
+    expect(result.officiating.endedBy).toEqual({
+      gap: 0,
+      time: 2,
+      senshu: 0,
+      overtime: 0,
+    });
+  });
+
+  it("attributes the OPPONENT's passivity fouls to opp, not bot (the mirror split)", () => {
+    // Mirror of the previous fixture: now the always-attacking bot never goes passive and the
+    // IDLE gauntlet member is fouled 9× per side (= 18). Pins the opponent accumulator
+    // independently — a fixture where the opponent never fouls cannot distinguish it (the exact
+    // `+`→`-` survivor the jogai opp accumulator hit).
+    const result = benchmark(
+      config({
+        bot: SUBMITTED,
+        gauntlet: [LOSER],
+        seeds: [1],
+        maxTicks: 55,
+        match: { winGap: 99, passivity: { limit: 5 } },
+      }),
+    );
+
+    expect(result.officiating.passivity).toEqual({ bot: 0, opp: 18 });
   });
 });

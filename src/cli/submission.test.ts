@@ -22,6 +22,7 @@ const scored = (netPoints: number, wins = 0, totalFights = 0): Submission => ({
     officiating: {
       endedBy: { gap: 0, time: 0, senshu: 0, overtime: 0 },
       jogai: { bot: 0, opp: 0 },
+      passivity: { bot: 0, opp: 0 },
     },
   },
 });

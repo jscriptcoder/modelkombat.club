@@ -104,10 +104,11 @@ const formatReport = (
 };
 
 // A one-line officiating read-out under the headline: how the bouts ended (per
-// endReason) and the bot-vs-opponent jogai foul split. Ranking-inert reporting.
+// endReason) and the bot-vs-opponent jogai + passivity foul splits. Ranking-inert reporting.
 const officiatingLine = (o: OfficiatingTally): string =>
   `ended: gap ${o.endedBy.gap} / time ${o.endedBy.time} / senshu ${o.endedBy.senshu} / overtime ${o.endedBy.overtime}   ` +
-  `jogai fouls: bot=${o.jogai.bot} opp=${o.jogai.opp}`;
+  `jogai fouls: bot=${o.jogai.bot} opp=${o.jogai.opp}   ` +
+  `passivity fouls: bot=${o.passivity.bot} opp=${o.passivity.opp}`;
 
 // A validated bot scored against the gauntlet and rendered to a 0-exit report.
 const scoredOutput = (bot: BotDoc, deps: BenchmarkDeps): CliOutput => {
