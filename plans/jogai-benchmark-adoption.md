@@ -40,7 +40,7 @@ work splits into three independently-mergeable PRs, staying close to `main`:
       `width − margin`), and it zones without ringing itself out.
 - [ ] The **sweeper** is the naive over-retreating **jogai victim** (decision 10 escalation,
       confirmed necessary by the 2026-07-04 measurement — see Slice 3): it over-backs into the
-      out-zone and rings out **≥2×** in at least one *close* bout so the 2nd foul confers the
+      out-zone and rings out **≥2×** in at least one _close_ bout so the 2nd foul confers the
       opponent's deciding point. Stays ∈ `[25%, 75%]`.
 - [ ] All 6 gauntlet members' round-robin win-rate ∈ `[25%, 75%]` on v15.
 - [ ] `gauntlet-calibration.test.ts` gains two guards (each with a "guard bites" companion):
@@ -77,6 +77,7 @@ counter, threaded through a `cause` param on `applyPenalty` (sim.ts:896) → sur
 outcome effect.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (confirm before code):
+
 - `FightResult.fouls = { a: { jogai, passivity }, b: { jogai, passivity } }`, all `0` when no
   foul occurs.
 - A fight with `match: { winGap: 99, jogai: { margin: 100000 } }` where fighter A retreats into
@@ -86,18 +87,18 @@ outcome effect.
   though the benchmark won't use it until v16).
 - **Byte-identical**: an existing replay/determinism fixture yields an identical `events` log
   and `scores` with/without reading `fouls`.
-**RED**: a test asserting `fouls.a.jogai` counts A's ring-outs (using an existing jogai
-run-fight scenario) and stays `0` for B; plus the passivity-cause test; plus a byte-identical
-assertion. Mutator watch (per `resources/mutator-rules.md`): the `++counter` (arithmetic/update
-operator), the `> 1` ladder guard is **unchanged** (already covered), and the object-literal
-`fouls` shape (ObjectLiteral/`{}` mutant — kill by asserting a specific non-zero count, not just
-truthiness).
-**GREEN**: add the counters + `cause` param + the `fouls` return field.
-**MUTATE**: run `mutation-testing` on the changed `sim.ts` regions.
-**KILL MUTANTS**: strengthen for any survivor (esp. the per-cause routing — a test that would
-pass if jogai incremented the passivity counter must fail).
-**REFACTOR**: assess only if it adds value.
-**Done when**: all AC met, byte-identical proven, mutation report reviewed, human approves.
+  **RED**: a test asserting `fouls.a.jogai` counts A's ring-outs (using an existing jogai
+  run-fight scenario) and stays `0` for B; plus the passivity-cause test; plus a byte-identical
+  assertion. Mutator watch (per `resources/mutator-rules.md`): the `++counter` (arithmetic/update
+  operator), the `> 1` ladder guard is **unchanged** (already covered), and the object-literal
+  `fouls` shape (ObjectLiteral/`{}` mutant — kill by asserting a specific non-zero count, not just
+  truthiness).
+  **GREEN**: add the counters + `cause` param + the `fouls` return field.
+  **MUTATE**: run `mutation-testing` on the changed `sim.ts` regions.
+  **KILL MUTANTS**: strengthen for any survivor (esp. the per-cause routing — a test that would
+  pass if jogai incremented the passivity counter must fail).
+  **REFACTOR**: assess only if it adds value.
+  **Done when**: all AC met, byte-identical proven, mutation report reviewed, human approves.
 
 ---
 
@@ -119,21 +120,33 @@ primer "play the match" clause naming `self.x`-vs-edge + `self.penalties`/`oppon
 the committed spec is unchanged; the new prose is covered by unit tests passing a jogai-`Match`.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (confirm before code):
+
 - `benchmarkSection(match)` with `match.jogai` present includes the jogai rule bullet;
   absent ⇒ the bullet is **not** rendered (taught == scored).
 - `primerSection` with `match.jogai` present includes the jogai strategy clause naming
   `self.x` and the penalties fields; absent ⇒ not rendered.
-**RED**: gen-spec factual tests — a jogai-`Match` renders the bullet + clause; a jogai-absent
-`Match` renders neither. (StringLiteral mutants on the new prose die on the factual assertions;
-the `match.jogai ? … : ""` gate — Conditional mutant — dies on the present/absent pair.)
-**GREEN**: add the gated prose.
-**MUTATE / KILL / REFACTOR**: as standard on the changed `gen-spec.ts` region.
-**Done when**: AC met, mutation report reviewed, human approves. (No `INPUT_HASH`/version
-change — spec is not a scoring input.)
+  **RED**: gen-spec factual tests — a jogai-`Match` renders the bullet + clause; a jogai-absent
+  `Match` renders neither. (StringLiteral mutants on the new prose die on the factual assertions;
+  the `match.jogai ? … : ""` gate — Conditional mutant — dies on the present/absent pair.)
+  **GREEN**: add the gated prose.
+  **MUTATE / KILL / REFACTOR**: as standard on the changed `gen-spec.ts` region.
+  **Done when**: AC met, mutation report reviewed, human approves. (No `INPUT_HASH`/version
+  change — spec is not a scoring input.)
 
 ---
 
-### Slice 3 (PR 2): Wire jogai into MATCH + zoner ring-aware + rebalance to v15
+### Slice 3 (PR 2): Wire jogai into MATCH + zoner ring-aware + rebalance to v15 — ✅ DONE
+
+_`MATCH += jogai:{margin:100000}`, `BENCHMARK_VERSION="v15"`, `INPUT_HASH` recomputed over
+LF-canonical bot texts. Zoner ring-aware (both retreat rules gate on `self.x ∈ (110000,490000)`,
+rings out 0) + ring-aware characterization tests in `zoner.test.ts`. Sweeper re-authored into the
+naive victim (panic-flee when shut out by a passive foe ⇒ 9 ring-outs vs vulture, a clean
+draw→vulture flip on all 10 seeds × both sides). Board rebalanced via the carrier lever (zoner
+guard δ 30000→10000): all 6 ∈ [25,75] — vulture 73, grappler 60, sweeper 60, rekka 41, zoner 35,
+jabber 31. Spec regenerated (jogai prose now live, drift green); dogfood 18W/102L unchanged;
+`docs/benchmark-gauntlet-v15.md` added. Full suite 1082 green; benchmark-config.ts mutation 100%;
+`npm run fight` byte-identical. The Slice-4 "fires" guard will lock the sweeper→vulture decisive
+fire._
 
 **Value**: jogai is scored in the benchmark; the zoner reads `self.x` to zone without ringing
 out; a naive sweeper rings out so jogai still FIRES; the board stays calibrated. This is the
@@ -151,12 +164,13 @@ retreat-under-pressure rule that over-backs past the margin so it rings out ≥2
 100000}` on the frozen v14 roster, the **zoner is the sole ring-out source (47/47 fouls; all
 other bots 0)**, ringing out almost only vs the jabber. Turning jogai on barely moves the band
 (±1pt, all still in `[25,75]`) and is decisive in only 2/24 ring-out bouts — one of which flipped
-on a *reset* with a single (free) foul, conferring no point. Conclusion: once the ring-aware
+on a _reset_ with a single (free) foul, conferring no point. Conclusion: once the ring-aware
 zoner stops ringing out, **zero fires remain**, so a separate victim (decision 10) is mandatory,
-and it must ring out **≥2× in a *close* bout** for the conferred point to actually decide it. The
+and it must ring out **≥2× in a _close_ bout** for the conferred point to actually decide it. The
 sweeper (67%, non-carrier) was chosen as that victim.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (confirm before code):
+
 - `MATCH` includes `jogai: { margin: 100000 }`; `INPUT_HASH` re-pinned; `BENCHMARK_VERSION` v15.
 - The zoner references `self.x` compared to a near-margin constant and, in a fixture where the
   old zoner rings out, the new zoner does **not**.
@@ -164,23 +178,23 @@ sweeper (67%, non-carrier) was chosen as that victim.
   opponent's deciding point (the raw material the Slice-4 fires guard asserts).
 - All 6 members ∈ `[25%, 75%]` (the existing band guard stays GREEN on v15).
 - `docs/spec.md` drift test passes (regenerated with jogai prose); `npm run fight` byte-identical.
-**RED**: the `INPUT_HASH` guard goes RED on the MATCH edit (re-pin to GREEN); the band guard may
-go RED as the board shifts (drive the zoner + sweeper re-authors — and per **decision 5's lever
-ladder**, one more coupled bot only if needed — back to GREEN); a zoner characterization test
-(rings-out-before vs. holds-after) and a sweeper characterization test (does NOT ring out before
-vs. rings out ≥2× decisively after).
-**GREEN**: the MATCH edit + zoner document + sweeper victim document + re-pins + regen.
-**MUTATE**: `benchmark-config.ts` (the manifest is data — Stryker doesn't mutate the bot JSON;
-effectiveness is structural via the RED characterizations + the band guard).
-**KILL MUTANTS / REFACTOR**: as applicable.
-**Open risk (RESOLVED by the 2026-07-04 measurement)**: the zoner was the sole ring-out source
-(47/47), so the ring-aware zoner alone would leave **zero** fires ⇒ decision-10 escalation is
-confirmed necessary. Victim = **sweeper** (67%, best band headroom, non-carrier). Residual risk
-for TDD: the fire must be *decisive* (≥2 sweeper ring-outs in a close bout) — a single free foul,
-or ring-outs only in lopsided/drawn bouts, will not satisfy the Slice-4 fires bar. Tune the
-sweeper's retreat depth/trigger against the live board and re-verify with the (recreatable)
-measurement harness before locking the guard.
-**Done when**: AC met, board re-characterized, mutation/report reviewed, human approves.
+  **RED**: the `INPUT_HASH` guard goes RED on the MATCH edit (re-pin to GREEN); the band guard may
+  go RED as the board shifts (drive the zoner + sweeper re-authors — and per **decision 5's lever
+  ladder**, one more coupled bot only if needed — back to GREEN); a zoner characterization test
+  (rings-out-before vs. holds-after) and a sweeper characterization test (does NOT ring out before
+  vs. rings out ≥2× decisively after).
+  **GREEN**: the MATCH edit + zoner document + sweeper victim document + re-pins + regen.
+  **MUTATE**: `benchmark-config.ts` (the manifest is data — Stryker doesn't mutate the bot JSON;
+  effectiveness is structural via the RED characterizations + the band guard).
+  **KILL MUTANTS / REFACTOR**: as applicable.
+  **Open risk (RESOLVED by the 2026-07-04 measurement)**: the zoner was the sole ring-out source
+  (47/47), so the ring-aware zoner alone would leave **zero** fires ⇒ decision-10 escalation is
+  confirmed necessary. Victim = **sweeper** (67%, best band headroom, non-carrier). Residual risk
+  for TDD: the fire must be _decisive_ (≥2 sweeper ring-outs in a close bout) — a single free foul,
+  or ring-outs only in lopsided/drawn bouts, will not satisfy the Slice-4 fires bar. Tune the
+  sweeper's retreat depth/trigger against the live board and re-verify with the (recreatable)
+  measurement harness before locking the guard.
+  **Done when**: AC met, board re-characterized, mutation/report reviewed, human approves.
 
 ---
 
@@ -195,17 +209,18 @@ to `movesReferencedBy`) and assert a `self.x` comparison against a constant in
 `[.., margin+δ] ∪ [width−margin−δ, ..]`.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (confirm before code):
+
 - **fires** guard GREEN on the v15 roster; its "guard bites" companion (a roster/scenario with
   no ring-out) is RED-proven-then-inverted (asserts absence), like the coverage companion.
 - **field-read** guard GREEN for the ring-aware zoner; its companion asserts a bot with only a
   generic mid-ring `self.x` (or none) is flagged — proving a bare `self.x` reference is
   insufficient.
-**RED**: both guards written first (fail on pre-Slice-3 state / a fabricated non-firing roster).
-**GREEN**: they pass on v15.
-**MUTATE**: the near-margin predicate is **test-local** (like the no-Pareto detector) ⇒ pin its
-comparison logic with a directional fixture matrix (in-zone near low edge, near high edge,
-mid-ring negative, boundary `= margin` / `= margin+δ`) rather than a mutation score.
-**Done when**: AC met, guards + companions GREEN/biting, human approves.
+  **RED**: both guards written first (fail on pre-Slice-3 state / a fabricated non-firing roster).
+  **GREEN**: they pass on v15.
+  **MUTATE**: the near-margin predicate is **test-local** (like the no-Pareto detector) ⇒ pin its
+  comparison logic with a directional fixture matrix (in-zone near low edge, near high edge,
+  mid-ring negative, boundary `= margin` / `= margin+δ`) rather than a mutation score.
+  **Done when**: AC met, guards + companions GREEN/biting, human approves.
 
 ---
 
@@ -219,13 +234,14 @@ in TDD**: whether the aggregate `benchmark()` result must surface per-bout `endR
 the smaller.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (confirm before code):
+
 - The report includes an officiating line (e.g. `ended: gap N / time N / senshu N`,
   `jogai fouls: a=N b=N`).
 - Ranking (win-rate primary / net tiebreak) and all scoring outputs are unchanged.
-**RED**: a CLI/format test asserting the breakdown line renders for a result carrying fouls +
-endReasons; a test asserting the ranking is unchanged.
-**GREEN / MUTATE / KILL / REFACTOR**: as standard.
-**Done when**: AC met, mutation report reviewed, human approves.
+  **RED**: a CLI/format test asserting the breakdown line renders for a result carrying fouls +
+  endReasons; a test asserting the ranking is unchanged.
+  **GREEN / MUTATE / KILL / REFACTOR**: as standard.
+  **Done when**: AC met, mutation report reviewed, human approves.
 
 ## Pre-PR Quality Gate (each PR)
 
@@ -236,6 +252,7 @@ endReasons; a test asserting the ranking is unchanged.
    unaffected.
 
 ---
+
 **Close-out (NOT delete):** when all 3 PRs are merged, **archive this plan under
 `docs/archive/`** (with a `README.md` index entry) per the archive-plans-not-delete policy —
 do **not** delete it. Then close the `docs/STATUS.md` item-3 jogai entry. (This overrides the

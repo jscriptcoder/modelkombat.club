@@ -24,10 +24,29 @@
     },
     {
       "when": {
-        "op": "lte",
+        "op": "and",
         "args": [
-          { "op": "field", "path": "opponent.distance" },
-          { "op": "const", "value": 120000 }
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 120000 }
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.x" },
+              { "op": "const", "value": 110000 }
+            ]
+          },
+          {
+            "op": "lt",
+            "args": [
+              { "op": "field", "path": "self.x" },
+              { "op": "const", "value": 490000 }
+            ]
+          }
         ]
       },
       "do": { "type": "move", "dir": -1 }
@@ -56,10 +75,29 @@
     },
     {
       "when": {
-        "op": "eq",
+        "op": "and",
         "args": [
-          { "op": "field", "path": "self.gassed" },
-          { "op": "const", "value": 1 }
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.gassed" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.x" },
+              { "op": "const", "value": 110000 }
+            ]
+          },
+          {
+            "op": "lt",
+            "args": [
+              { "op": "field", "path": "self.x" },
+              { "op": "const", "value": 490000 }
+            ]
+          }
         ]
       },
       "do": { "type": "move", "dir": -1 }

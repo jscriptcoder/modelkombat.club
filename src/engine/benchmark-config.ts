@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v14"; // Gauntlet modernization S3: grappler gains close-range empi + hiza-geri knockdown→okizeme (completes 11/11 coverage)
+export const BENCHMARK_VERSION = "v15"; // Item 3 / jogai adoption: MATCH scores jogai (ring-out); zoner made ring-aware (self.x guard), sweeper re-authored into the naive ring-out victim
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -26,8 +26,16 @@ export const MAX_TICKS = 600;
 // `senshu` (v4): a level-at-cap bout is decided by first blood (the first fighter
 // to score) instead of drawing — so win-rate discriminates the close, low-scoring
 // matchups that previously drew.
+// `jogai` (v15): a fighter driven into the outer `margin` strip of the ring rings
+// out — a yame-style reset plus a shared category-2 penalty (1st free, 2+ ⇒
+// opponent +1). Makes the officiating perception fields (self.x-vs-edge, penalties)
+// live; the zoner reads self.x to avoid it, the sweeper naively rings itself out.
 // A scoring input ⇒ folded into INPUT_HASH; changing it forces a version bump.
-export const MATCH = { winGap: 8, senshu: true } as const;
+export const MATCH = {
+  winGap: 8,
+  senshu: true,
+  jogai: { margin: 100000 },
+} as const;
 
 // The 6 locked archetypes (bots/<name>.json), spanning the strategic axes —
 // pressure (jabber poke + rekka cancel-combo), zoner, grappler, sweeper/okizeme,
@@ -47,7 +55,7 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // The gauntlet file texts are hashed with LF line endings, pinned by `.gitattributes`
 // (`bots/*.json text eol=lf`) so the digest is byte-stable on every platform. Recompute
 // and bump (with BENCHMARK_VERSION) whenever a scoring input changes — the guard test in
-// benchmark-config.test.ts prints the expected value on drift. (This value canonicalized
-// to all-LF; the version stayed `v14` because line endings do not affect parsing/fights.)
+// benchmark-config.test.ts prints the expected value on drift. (Computed over all-LF bot
+// texts, pinned by `.gitattributes`, so the digest is byte-stable on every platform.)
 export const INPUT_HASH =
-  "5a503468bff0888c2196ab9259ae51d811c7101a68413ddb3b7c764a4cd05834";
+  "f8514a3f05c7069fc60db930e90528ceaf3959041433a4125f9714efa363a27c";

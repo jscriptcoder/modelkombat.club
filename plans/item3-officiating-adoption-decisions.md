@@ -33,7 +33,7 @@ re-characterize the gauntlet doc.
      fire is a stable, reproducible proof-of-life — not a flaky threshold): ∃ a board bout
      whose outcome is decided by this rule's cause — `fouls.x.<cause> ≥ 1` conferring the
      deciding point (jogai/passivity, see decision 6), or `endReason === "overtime"`. No
-     count floor and no victim-identity constraint; the field's availability to *submitted*
+     count floor and no victim-identity constraint; the field's availability to _submitted_
      bots is already guaranteed by turning the rule on — the board fire only proves the
      mechanic is reachable on the frozen roster.
    - **field-read** — a gauntlet bot references the newly-meaningful surface, asserted by
@@ -56,7 +56,7 @@ re-characterize the gauntlet doc.
    - **overtime → jabber** — reads `clock.overtime` to go all-in in sudden death.
 
    **Read scope — self-side only for the CI guard.** The field-read guard requires only the
-   self-side read per carrier (above). The *also-inert* opponent-side reads
+   self-side read per carrier (above). The _also-inert_ opponent-side reads
    (`opponent.penalties` live; `opponent.passivityRemaining` L_act-delayed) are **not**
    gauntlet-exercise-required, but the spec primer still NAMES them for parity with senshu
    (decision 11) — they go LIVE for submitted bots the moment the rule is on; the frozen
@@ -72,7 +72,7 @@ re-characterize the gauntlet doc.
    - `overtime.ticks = 300` — half of `MAX_TICKS`; OT usually ends on the first 1-point
      gap, so the length mainly bounds the rare exhaust-to-senshu fallback.
    - **Rebalance lever if the board exits `[25,75]`:** (1) re-author the carrier bot →
-     (2) re-author one coupled bot → (3) *last resort* revisit the param. The param is
+     (2) re-author one coupled bot → (3) _last resort_ revisit the param. The param is
      NOT the primary balance knob (unlike the C10 `knockdownDuration` de-wall).
 
 6. **"Fires" observable — expose a per-CAUSE foul tally on `FightResult`.** Add an additive
@@ -105,7 +105,7 @@ re-characterize the gauntlet doc.
    win-condition prose extends to the full cascade: `winGap → overtime → senshu → draw`.
 
 10. **"Fires"-unsatisfiable fallback — author a deliberate victim bot.** Because the
-    carrier reads *to avoid* its foul, a *different* bot must trigger for the board "fires"
+    carrier reads _to avoid_ its foul, a _different_ bot must trigger for the board "fires"
     guard to hold. If measurement shows no trigger survives on the frozen board without a
     contrived / out-of-band bot, the escalation is: re-author a **non-carrier** gauntlet
     bot into a plausibly-naive victim that reliably triggers the foul (over-retreats into
@@ -114,11 +114,10 @@ re-characterize the gauntlet doc.
     preserved. (Victim-shaping is an additional round-robin perturbation to absorb per
     decision 5's rebalance ladder.)
     - **jogai (v15) — RESOLVED 2026-07-04 by measurement.** With `jogai:{margin:100000}` on the
-      frozen v14 roster, the **zoner is the sole ring-out source (47/47 fouls; every other bot
-      0)**. So the ring-aware zoner alone leaves **zero** fires ⇒ escalation IS required. **Victim
+      frozen v14 roster, the **zoner is the sole ring-out source (47/47 fouls; every other bot 0)**. So the ring-aware zoner alone leaves **zero** fires ⇒ escalation IS required. **Victim
       = sweeper** (67%, the most band headroom to absorb self-inflicted losses; a non-carrier, so
       never re-touched by v16/v17). Refinement the measurement surfaced: the fire must be
-      *decisive* via a **conferred point** — the victim must ring out **≥2×** (the shared ladder's
+      _decisive_ via a **conferred point** — the victim must ring out **≥2×** (the shared ladder's
       1st foul is free) in a **close** bout; ring-outs in lopsided/drawn bouts (as the zoner's
       were) do not satisfy the bar.
 
@@ -130,8 +129,8 @@ re-characterize the gauntlet doc.
     - a **primer "play the match" clause** naming the now-live field(s) + the actionable
       strategy (avoid ringing out via `self.x` vs. the edge; don't stall — watch
       `self.passivityRemaining`; go all-in when `clock.overtime`).
-    Mirrors the senshu win-condition prose + primer clause exactly. `docs/spec.md`
-    regenerated per PR via `gen:spec`.
+      Mirrors the senshu win-condition prose + primer clause exactly. `docs/spec.md`
+      regenerated per PR via `gen:spec`.
 
 ## Non-goals
 
@@ -139,13 +138,14 @@ re-characterize the gauntlet doc.
 - **No `Rules` / `CANONICAL_RULES` change** — `match` is scoring-only ⇒ `npm run fight`
   byte-identical throughout.
 - **No new DSL / TCB surface** — every officiating perception field already shipped in
-  Caps A/B/C; only the *value* goes live.
+  Caps A/B/C; only the _value_ goes live.
 - **Dogfood character bot** left behaviorally as-is (re-pin its W/L record per version).
 - **No officiating-aware ranking metric** (rejected option C in decision 7).
 
 ## Definition of done (item 3)
 
 Item 3 is COMPLETE when:
+
 - All three PRs are merged: jogai (v15), passivity (v16), overtime (v17).
 - The `docs/STATUS.md` "deferred jogai / passivity / overtime benchmark + spec adoption"
   entry (roadmap item 3) is closed.
@@ -155,8 +155,8 @@ Item 3 is COMPLETE when:
 
 ## Open risks to resolve in planning / TDD
 
-- **Reader/trigger circularity.** The carrier reads *to avoid* its foul, so on the frozen
-  board a *different* bot must actually trigger for the "fires" guard to hold. Must MEASURE
+- **Reader/trigger circularity.** The carrier reads _to avoid_ its foul, so on the frozen
+  board a _different_ bot must actually trigger for the "fires" guard to hold. Must MEASURE
   which frozen bots ring out (jogai) / stall past 120 (passivity) / reach level-at-cap
   (overtime) once the carriers avoid — and ensure at least one trigger survives.
   - **jogai: MEASURED & resolved (2026-07-04)** — zoner sole ring-out source ⇒ victim = sweeper
