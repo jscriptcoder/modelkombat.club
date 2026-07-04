@@ -2219,3 +2219,286 @@ describe("CANONICAL_RULES — the C9 arsenal: the cross-move cancel web (rekka)"
     expect(result.scores.a).toBe(3); // sweep knockdown (0) + okizeme finish (finishScore 3)
   });
 });
+
+// ─── No-Pareto-dominance balance-law property (rule 2) ─────────────────────────
+// The full 12-move roster (10 named attack moves + sweep + throw) must be free of
+// Pareto dominance on the 7 strategic axes — no move equal-or-better on EVERY axis
+// and strictly better on ONE — so move variety never collapses into a single best
+// move (docs/move-roster.md §Balance law → "Verification hook"). The detector and
+// adapter below are test-local (Stryker excludes *.test.ts), so their logic is
+// pinned by explicit directional fixtures, not by a mutation run.
+//
+// Axis vector: reach↑, effective score↑ (max over scoreByBand), startup↓, recovery↓,
+// staminaCost↓, bands (set-inclusion ⊇), knockdown (true↑). `grab` is a synthetic
+// band token for the throw — incomparable to every strike, kept out of engine `Band`.
+type BandToken = Band | "grab";
+type Axes = {
+  reach: number;
+  score: number;
+  startup: number;
+  recovery: number;
+  cost: number;
+  bands: Set<BandToken>;
+  knockdown: boolean;
+};
+
+const bandSet = (...b: BandToken[]): Set<BandToken> => new Set(b);
+
+// Axis-vector fixture factory — override one axis at a time to pin each direction.
+const axes = (o?: Partial<Axes>): Axes => ({
+  reach: 200000,
+  score: 1,
+  startup: 10,
+  recovery: 15,
+  cost: 20,
+  bands: bandSet("high", "mid"),
+  knockdown: false,
+  ...o,
+});
+
+// The 7 axes as strength comparators: `atLeast` = A is ≥ B on this axis; `better` =
+// A is strictly stronger. Numeric axes are total orders (higher- or lower-is-better);
+// bands is a PARTIAL order by set-inclusion; knockdown is boolean (true is a strength).
+type Axis = {
+  atLeast: (a: Axes, b: Axes) => boolean;
+  better: (a: Axes, b: Axes) => boolean;
+};
+
+const higher = (of: (x: Axes) => number): Axis => ({
+  atLeast: (a, b) => of(a) >= of(b),
+  better: (a, b) => of(a) > of(b),
+});
+
+const lower = (of: (x: Axes) => number): Axis => ({
+  atLeast: (a, b) => of(a) <= of(b),
+  better: (a, b) => of(a) < of(b),
+});
+
+const superset = (a: Set<BandToken>, b: Set<BandToken>): boolean =>
+  [...b].every((band) => a.has(band));
+
+const AXES: Axis[] = [
+  higher((x) => x.reach),
+  higher((x) => x.score),
+  lower((x) => x.startup),
+  lower((x) => x.recovery),
+  lower((x) => x.cost),
+  {
+    atLeast: (a, b) => superset(a.bands, b.bands),
+    better: (a, b) => superset(a.bands, b.bands) && !superset(b.bands, a.bands),
+  },
+  {
+    atLeast: (a, b) => a.knockdown || !b.knockdown,
+    better: (a, b) => a.knockdown && !b.knockdown,
+  },
+];
+
+// A Pareto-dominates B iff A is at-least-as-strong on EVERY axis AND strictly
+// stronger on at least ONE.
+const dominates = (a: Axes, b: Axes): boolean =>
+  AXES.every((axis) => axis.atLeast(a, b)) &&
+  AXES.some((axis) => axis.better(a, b));
+
+// ── Project each move into the common axis vector. The two heterogeneous cases:
+//   • sweep — its low band is MECHANICAL (it declares no `bands`), so hard-map {low}
+//     (a bare `?? all` would read it as unrestricted and let it dominate hiza-geri).
+//   • a non-sweep move with no `bands` is genuinely unrestricted ⇒ {high, mid, low}.
+const moveToAxes = (id: string, m: MoveSpec): Axes => {
+  const bands: BandToken[] =
+    id === "sweep" ? ["low"] : (m.bands ?? ["high", "mid", "low"]);
+
+  return {
+    reach: m.reach,
+    score: Math.max(m.score, ...Object.values(m.scoreByBand ?? {})),
+    startup: m.startup,
+    recovery: m.recovery,
+    cost: m.staminaCost ?? 0,
+    bands: bandSet(...bands),
+    knockdown: m.knockdown ?? false,
+  };
+};
+
+// A throw is a ThrowSpec (no bands / knockdown / scoreByBand): its own incomparable
+// `grab` band (never a high/mid/low strike), an implicit knockdown, its flat ippon.
+const throwToAxes = (t: ThrowSpec): Axes => ({
+  reach: t.reach,
+  score: t.score,
+  startup: t.startup,
+  recovery: t.recovery,
+  cost: t.staminaCost ?? 0,
+  bands: bandSet("grab"),
+  knockdown: true,
+});
+
+type RosterEntry = { id: string; axes: Axes };
+
+// Every ORDERED pair (i ≠ j — self-pairs excluded) where the first dominates the second.
+const findDominatedPairs = (
+  roster: RosterEntry[],
+): Array<{ dominator: string; dominated: string }> =>
+  roster.flatMap((a, i) =>
+    roster.flatMap((b, j) =>
+      i !== j && dominates(a.axes, b.axes)
+        ? [{ dominator: a.id, dominated: b.id }]
+        : [],
+    ),
+  );
+
+// The full 12-move roster, enumerated DYNAMICALLY (future moves auto-enroll): every
+// configured `moves` entry + the throw (its presence asserted, never silently skipped).
+const canonicalRoster = (): RosterEntry[] => {
+  const moves = Object.entries(CANONICAL_RULES.moves).flatMap(([id, spec]) =>
+    spec ? [{ id, axes: moveToAxes(id, spec) }] : [],
+  );
+
+  const t = CANONICAL_RULES.throw;
+  if (!t) throw new Error("CANONICAL_RULES.throw is not configured");
+
+  return [...moves, { id: "throw", axes: throwToAxes(t) }];
+};
+
+describe("no-Pareto-dominance — the dominance detector (balance-law rule 2)", () => {
+  it("flags a move with longer reach alone (equal on every other axis)", () => {
+    expect(dominates(axes({ reach: 250000 }), axes())).toBe(true);
+    expect(dominates(axes(), axes({ reach: 250000 }))).toBe(false);
+  });
+
+  it("flags a move scoring higher alone", () => {
+    expect(dominates(axes({ score: 3 }), axes())).toBe(true);
+    expect(dominates(axes(), axes({ score: 3 }))).toBe(false);
+  });
+
+  it("treats a lower startup as the stronger move (faster is better)", () => {
+    expect(dominates(axes({ startup: 5 }), axes())).toBe(true);
+    expect(dominates(axes(), axes({ startup: 5 }))).toBe(false);
+  });
+
+  it("treats a lower recovery as the stronger move", () => {
+    expect(dominates(axes({ recovery: 10 }), axes())).toBe(true);
+    expect(dominates(axes(), axes({ recovery: 10 }))).toBe(false);
+  });
+
+  it("treats a lower stamina cost as the stronger move (cheaper is better)", () => {
+    expect(dominates(axes({ cost: 10 }), axes())).toBe(true);
+    expect(dominates(axes(), axes({ cost: 10 }))).toBe(false);
+  });
+
+  it("treats a superset of legal bands as the stronger move", () => {
+    const wide = axes({ bands: bandSet("high", "mid", "low") });
+    expect(dominates(wide, axes())).toBe(true);
+    expect(dominates(axes(), wide)).toBe(false);
+  });
+
+  it("treats a knockdown as a strength over a non-knockdown", () => {
+    expect(dominates(axes({ knockdown: true }), axes())).toBe(true);
+    expect(dominates(axes(), axes({ knockdown: true }))).toBe(false);
+  });
+
+  it("never dominates across incomparable band sets (low vs mid)", () => {
+    expect(
+      dominates(axes({ bands: bandSet("low") }), axes({ bands: bandSet("mid") })),
+    ).toBe(false);
+    expect(
+      dominates(axes({ bands: bandSet("mid") }), axes({ bands: bandSet("low") })),
+    ).toBe(false);
+  });
+
+  it("does not dominate when better on one axis but worse on another (needs ALL axes ≥)", () => {
+    // Longer reach, but slower startup — the single worse axis blocks dominance.
+    expect(dominates(axes({ reach: 250000, startup: 20 }), axes())).toBe(false);
+  });
+
+  it("does not dominate an identical move (needs a strictly-better axis)", () => {
+    expect(dominates(axes(), axes())).toBe(false);
+  });
+});
+
+describe("no-Pareto-dominance — the move→axis adapter", () => {
+  it("maps the sweep to its mechanical low band (its MoveSpec declares no `bands`)", () => {
+    const sweep = CANONICAL_RULES.moves.sweep;
+    if (!sweep) throw new Error("CANONICAL_RULES.moves.sweep is not configured");
+    expect(sweep.bands).toBeUndefined(); // the low-ness is mechanical, not declared
+    expect(moveToAxes("sweep", sweep).bands).toEqual(bandSet("low"));
+  });
+
+  it("maps the throw to an incomparable `grab` band, a knockdown, and its ippon score", () => {
+    const t = CANONICAL_RULES.throw;
+    if (!t) throw new Error("CANONICAL_RULES.throw is not configured");
+    const a = throwToAxes(t);
+    expect(a.bands).toEqual(bandSet("grab"));
+    expect(a.knockdown).toBe(true);
+    expect(a.score).toBe(3);
+  });
+
+  it("folds scoreByBand into the effective score (mawashi/ushiro read as their jodan 3)", () => {
+    expect(moveToAxes("mawashi-geri", mawashi()).score).toBe(3);
+    expect(moveToAxes("ushiro-geri", ushiro()).score).toBe(3);
+  });
+
+  it("keeps a move's flat score when it declares no scoreByBand", () => {
+    expect(moveToAxes("empi", empi()).score).toBe(2);
+  });
+
+  it("maps the frame fields straight onto the axes (reach / startup / recovery / cost)", () => {
+    const g = gyaku();
+    const a = moveToAxes("gyaku-zuki", g);
+    expect(a.reach).toBe(g.reach);
+    expect(a.startup).toBe(g.startup);
+    expect(a.recovery).toBe(g.recovery);
+    expect(a.cost).toBe(g.staminaCost);
+  });
+
+  it("treats a non-sweep move with no declared bands as unrestricted (high·mid·low)", () => {
+    const unrestricted: MoveSpec = {
+      startup: 7,
+      active: 2,
+      recovery: 13,
+      score: 1,
+      reach: 100000,
+    };
+
+    const a = moveToAxes("hypothetical", unrestricted);
+
+    expect(a.bands).toEqual(bandSet("high", "mid", "low"));
+    expect(a.cost).toBe(0); // no staminaCost ⇒ the `?? 0` fallback
+  });
+});
+
+describe("no-Pareto-dominance — the roster scan", () => {
+  it("flags a dominated move: a clone strictly worse on reach alone (the guard bites)", () => {
+    const strong: RosterEntry = { id: "strong", axes: axes({ reach: 240000 }) };
+    const weak: RosterEntry = { id: "weak", axes: axes({ reach: 200000 }) };
+    expect(findDominatedPairs([strong, weak])).toEqual([
+      { dominator: "strong", dominated: "weak" },
+    ]);
+  });
+
+  it("finds nothing in a roster of mutually non-dominating moves (reach ↔ cost trade-off)", () => {
+    const a: RosterEntry = { id: "a", axes: axes({ reach: 240000, cost: 30 }) };
+    const b: RosterEntry = { id: "b", axes: axes({ reach: 200000, cost: 20 }) };
+    expect(findDominatedPairs([a, b])).toEqual([]);
+  });
+});
+
+describe("no-Pareto-dominance — the canonical 12-move roster (balance-law rule 2)", () => {
+  it("enumerates all 12 moves (10 attack moves + sweep + throw)", () => {
+    expect(canonicalRoster().map((e) => e.id).sort()).toEqual([
+      "empi",
+      "gyaku-zuki",
+      "hiza-geri",
+      "kizami-zuki",
+      "mae-geri",
+      "mawashi-geri",
+      "shuto",
+      "sweep",
+      "throw",
+      "uraken",
+      "ushiro-geri",
+      "yoko-geri",
+    ]);
+  });
+
+  it("contains no Pareto-dominated move", () => {
+    expect(findDominatedPairs(canonicalRoster())).toEqual([]);
+  });
+});

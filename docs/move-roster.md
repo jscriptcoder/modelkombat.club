@@ -12,7 +12,8 @@ benchmark v8, `rule()` readers PR #127 → no bump; archived at `archive/ushiro-
 archived at `archive/empi-elbow.md`); **`hiza-geri` SHIPPED** (move #6/6 — wiring PR #132 →
 benchmark v10, `rule()` readers PR #133 → no bump; archived at `archive/hiza-geri-knee.md`).
 **Batch 1 grounded arsenal COMPLETE (6/6)** — next is the roster-wide no-Pareto-dominance property
-test + the owed `vulture`/`sweeper` gauntlet rebalance. Living source of truth for the
+test (**grill-me resolved 2026-07-04** — see the resolved spec under §Balance law "Verification
+hook") + the owed `vulture`/`sweeper` gauntlet rebalance. Living source of truth for the
 fighting-move roster and the balance law that governs it. Consolidates the built
 **baseline** (authoritative in `src/engine/rules.ts` `CANONICAL_RULES`, proven by
 behavioral `runFight` tests in `rules.test.ts`, designed in `DESIGN.md §P7`) and will
@@ -82,8 +83,40 @@ Every new move must pass all four rules:
 4. **Distinct niche (closes S1).** It must differ from every existing move on ≥1 meaningful
    axis — no near-duplicates (the two baseline kicks already brush this limit).
 
-**Verification hook:** once the expansion lands, add a `rules.test.ts` property asserting
-no move Pareto-dominates another across the full roster.
+**Verification hook — resolved spec (grill-me, 2026-07-04).** A pure-data property in
+`rules.test.ts` asserting no move Pareto-dominates another across the **full 12-move roster**
+(no `CANONICAL_RULES`/engine change ⇒ no `INPUT_HASH`/`BENCHMARK_VERSION` bump; `npm run fight`
+byte-identical). Resolved decisions:
+
+- **Roster (12, dynamic enumeration):** iterate `Object.entries(CANONICAL_RULES.moves)` (the 10
+  named `attack` moves + `sweep`) and append `CANONICAL_RULES.throw`. Future Batch-2 moves
+  auto-enroll the moment they land in `CANONICAL_RULES` — the forward-guard purpose.
+- **Axis vector (minimal 7 — each extra axis is an escape hatch that weakens the guard):**
+  `reach` ↑, effective `score` ↑ (`max(score, …scoreByBand)` — the jodan ceiling), `startup` ↓,
+  `recovery` ↓, `staminaCost` ↓ (load-bearing for `uraken`), `bands` by set-inclusion (⊇) over the
+  universe `{high, mid, low, grab}`, `knockdown` (true = strength; load-bearing for `hiza-geri`).
+  **Excluded** on purpose: `active` (noise, not in the strength/weakness lists) and `cancelInto`
+  (not needed once `throw` is a grab category — it would only add an escape hatch).
+- **Heterogeneous-move adapter (test-local):** named attack moves take `bands`/`knockdown` from
+  their fields; `sweep` → `bands = {low}` (its low-ness is mechanical, absent from the field) +
+  `knockdown = true` + score 0; `throw` (a `ThrowSpec`) → `bands = {grab}` (its OWN category,
+  incomparable to every strike — this band-incomparability is what stops `throw` dominating
+  `hiza-geri` without needing a `cancelInto` axis) + `knockdown = true` (implicit) + score 3. An
+  absent-`bands` move that is NOT `sweep` ⇒ `{high, mid, low}` (a genuinely unrestricted future
+  move).
+- **Two properties (law rules 2 + 4):** (1) **no strict Pareto-dominance** — for every ordered
+  pair, NOT (`A ≥ B` on all 7 axes ∧ `A > B` on ≥1); (2) **distinctness** — no two moves identical
+  on all 7 axes.
+- **RED / mutation strategy** (mirrors `src/cli/gauntlet-calibration.test.ts` "guard bites"): a
+  fabricated fixture roster with a deliberately-dominated pair drives RED + kills the comparator
+  mutants; a one-axis-worse-NOT-flagged fixture proves the "all axes" AND; an all-equal fixture
+  proves distinctness catches what Pareto does not. Then MUTATE and add per-axis directional
+  fixtures only for surviving mutants (RED-GREEN-MUTATE-KILL). The detector/adapter stays
+  test-local (verified by the fixtures — no test-only logic leaks into `rules.ts`).
+- **Accepted limitation:** Pareto ≠ "meaningfully different" — a future move differing only
+  trivially (e.g. `reach` by 1 sub-unit) is technically non-dominated AND distinct, so it passes.
+  This property mechanically guards rules 2 & 4; the law's rule 3 ("at most a dual specialist") and
+  the "meaningful axis" bar remain design-review judgment calls.
 
 **Score class by category** (the WKF rubric rule 1 enforces — resolved 2026-07-03):
 
