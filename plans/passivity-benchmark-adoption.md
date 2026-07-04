@@ -39,19 +39,19 @@ doc's non-goals).
 
 ## Acceptance Criteria
 
-- [ ] `MATCH` scores `passivity:{limit:120}`; `BENCHMARK_VERSION` = `v16`; `INPUT_HASH`
+- [ ] `MATCH` scores `passivity:{limit:240}`; `BENCHMARK_VERSION` = `v16`; `INPUT_HASH`
       recomputed; the `benchmark-config.test.ts` drift guard passes at v16.
 - [ ] `docs/spec.md` (regenerated via `gen:spec`) teaches passivity — a `benchmarkSection`
       rule bullet (non-engagement clock ⇒ reset + shared-ladder penalty) and a primer
       "play the match" clause naming `self.passivityRemaining` (+ `opponent.passivityRemaining`
       for parity), both gated on `match.passivity` (taught == scored).
-- [ ] The **jabber** carrier (the measured natural staller) references `self.passivityRemaining`
-      in a condition to step in / commit a reaching technique before its own foul (the
-      field-read), asserted by an AST walk in the calibration lock.
-- [ ] A gauntlet bout is **decided** by a passivity foul (the fire): turning passivity OFF
-      (jogai still ON) flips that bout's winner, with `fouls.<fouler>.passivity ≥ 1` — the
-      **shaped grappler victim** (headroom bot) pays off the point. CI-locked, with a
-      companion "guard bites" test.
+- [ ] The **jabber** carrier references `self.passivityRemaining` in a condition (a light
+      last-ditch re-engage), asserted by an AST walk in the calibration lock (the field-read).
+- [ ] The mechanic is **EXERCISED** on the board (the relaxed fire, per decision 3): ∃ a board
+      bout where the **shaped vulture victim** commits **≥2 passivity fouls** — the shared ladder
+      confers a penalty point on the frozen roster. CI-locked, with a companion "guard bites"
+      test (passivity OFF ⇒ 0 fouls). (A _decisive_ winner-flip is structurally infeasible on the
+      all-aggressive roster; conferral-decisiveness stays proven by the Capability-B engine tests.)
 - [ ] All 6 gauntlet members' round-robin win-rate stays ∈ `[25%, 75%]` on the v16 board.
 - [ ] The v15 jogai fire still holds under the pooled ladder (the jogai-adoption lock stays
       green at v16).
@@ -69,7 +69,7 @@ Every slice follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Before code, load `t
 **Value**: an LLM author (and the gauntlet) is now ranked on WKF passivity — stalling is
 punished and `self.passivityRemaining` is a live, taught, exercised strategy field.
 
-**Path**: `MATCH` (benchmark-config.ts) gains `passivity:{limit:120}` → `runFight`
+**Path**: `MATCH` (benchmark-config.ts) gains `passivity:{limit:240}` → `runFight`
 already honours it → `benchmark()` scores every matchup under it → the gauntlet
 re-characterizes → `gen:spec` teaches it → the calibration + adoption locks certify it.
 This is necessarily **one atomic PR**: the `MATCH` change, the `INPUT_HASH`/`BENCHMARK_VERSION`
@@ -83,40 +83,42 @@ criteria, the jabber field-read, the passivity fire (winner-flip + companion), a
 band, the v15 jogai lock still green, spec prose gated on `match.passivity`, byte-identical
 `npm run fight`. **Present to human before writing any code.**
 
-**Pre-code MEASUREMENT — ✅ DONE (2026-07-04).** Ran a throwaway diagnostic turning
-`passivity:{limit:120}` on over the frozen v15 roster (per bots × seed × side). Findings,
-written back into the decisions doc (decision 4 revised, decision 10 passivity resolution):
+**Pre-code MEASUREMENT — ✅ DONE (2026-07-04).** Throwaway diagnostics turning passivity on over
+the frozen v15 roster (per bots × seed × side) + a `limit` sweep. Findings written back into the
+decisions doc (decisions 4, 5, 10 revised):
 
-- **Sole staller = jabber** (79 fouls, all vs the zoner — its jabs whiff at a spacing zoner,
-  so the no-offense clock never resets). Every other bot 0. The decisions-doc premise
-  "vulture is the natural staller" is REFUTED (the vulture's counters reset its own clock).
-- **Decisive & stable**: jabber→zoner flips the winner in **19/20** seed-sides.
-- **Band impact**: jabber craters 31% → **12%** (out-of-band low); zoner rises 35% → 54%;
-  all others unchanged.
-- **Pooled-ladder jogai fire SURVIVES** ✓: sweeper→vulture still decisive (10 fires) with
-  passivity on.
-- **`limit=120` calibrated** ✓: only genuine non-engagement fouls; every paced poker = 0.
+- **Sole staller at limit 120 = jabber** (79 fouls, all vs the zoner — it blocks the zoner's kick
+  ladder, and blocking does NOT reset the attacker's no-offense clock; only its own offense does).
+  Every other bot 0. The decisions-doc premise "vulture is the natural staller" is REFUTED.
+- **`limit=120` mis-flags the jabber's LEGITIMATE patient counter-game.** Its only non-turtle
+  winning matchup does not exist (it loses 0-20 to grappler/sweeper/vulture; its whole v15
+  viability was out-pointing the zoner by patient blocking — exactly what passivity punishes).
+  120 craters it to 12%; NO bot edit recovers it (an aggressive redesign → 0%).
+- **`limit` sweep ⇒ 240** self-calibrates the board (jabber 31 / zoner 35 / all 6 ∈ band ≈ the v15
+  balance) while a pure turtle still fouls 80× — paced safe, stallers flagged. **User confirmed
+  limit 120 → 240** (decision 5 revised; the calibration hook resolving against data).
+- **Pooled-ladder jogai fire SURVIVES** ✓: sweeper→vulture still decisive (12 fires) at limit 240.
 
-**Resolved assignment (confirmed with the user):**
+**Resolved design (confirmed with the user):**
 
-- **Carrier = jabber** (was vulture) — the natural staller reads `self.passivityRemaining` and
-  steps in / commits a reaching technique before its foul. This BOTH satisfies the field-read
-  AND lifts jabber back to ~31% (fixing the band with one edit; the read genuinely bites).
-- **Victim = grappler** (60%, headroom, not a carrier, not the jogai victim) — SHAPED to
-  over-turtle into a decisive passivity foul in a close bout while staying ∈ band. (The natural
-  staller jabber is a BAD victim — no headroom — so the fire moves to a headroom bot, exactly
-  the jogai carrier-avoids / headroom-victim pattern.)
+- **`passivity.limit = 240`** (was 120) — the board self-calibrates, so NO rebalancing edits are
+  needed for band; the bot work is now minimal.
+- **Carrier = jabber** — a light `self.passivityRemaining ≤ 10` re-engage (fires only in a true
+  deep stall, so it keeps jabber ∈ band ~31%) satisfies the field-read.
+- **Victim = vulture** (was grappler — the grappler is too aggressive to stall selectively; every
+  foe engages it within 240 ticks). The vulture is the lowest-offense bot (73% ⇒ huge downward
+  headroom): a standoff-idle rule (`opponent.attackBand == 0 AND opponent.distance > 200000 → idle`)
+  makes it commit ~23 passivity fouls (incl. ≥2-foul conferring bouts) with the whole board ∈ band.
+- **Fire = EXERCISED, not decisive** — no passivity foul flips a bout on the all-aggressive roster
+  (a 480-tick stall loses on points regardless); the board bar is a real bot CONFERRING a penalty
+  point (≥2 fouls in a bout). Conferral-decisiveness stays engine-unit-tested (Capability B).
 
 **Remaining GREEN-time tuning (measure as I author):**
 
-- Pick the jabber re-engage move + `self.passivityRemaining` threshold empirically.
-- Shape the grappler's over-turtle so its foul is _decisive_ (≥2 fouls / winner-flip in a close
-  bout) AND grappler stays ∈ band.
-- **Rebalance to `[25,75]`** (decision-5 lever order: carrier → one coupled bot → last-resort
-  param). Band = dispersion; can't be precision-dialed.
-- **Re-verify the jogai fire** after the carrier/victim edits perturb the board (the jogai lock's
-  `MATCH_NO_JOGAI` counterfactual must keep passivity ON once `MATCH` carries it, else it
-  conflates the two causes — a Slice-1 edit).
+- Confirm the vulture-victim edit produces a ≥2-foul bout AND keeps all 6 ∈ `[25,75]`.
+- Confirm the jabber's `self.passivityRemaining ≤ 10` read leaves it ∈ band at limit 240.
+- **Re-verify the jogai fire** after the edits (the jogai lock's `MATCH_NO_JOGAI` counterfactual
+  must keep passivity ON once `MATCH` carries it, else it conflates the two causes — a Slice-1 edit).
 
 **RED**: failing tests, added/extended across:
 
@@ -124,12 +126,10 @@ written back into the decisions doc (decision 4 revised, decision 10 passivity r
   v16 digest (fails until `MATCH` + version + hash are updated together). Mutator focus:
   the exact version string + hash constant.
 - `gauntlet-calibration.test.ts` — a **passivity-adoption lock** mirroring the jogai lock:
-  - _fires_: ∃ a board bout whose winner flips between `MATCH` (passivity ON) and
-    `MATCH_NO_PASSIVITY` (jogai still ON), with `fouls.<fouler>.passivity ≥ 1`. Winner-flip
-    isolates passivity's causal point under the pooled ladder better than a raw `≥2` count
-    (recommended over jogai's `≥2` form precisely because the shared warning may already be
-    spent on jogai). Companion "guard bites": with passivity OFF, total passivity fouls == 0.
-  - _field-read_: an AST walk (`passivityReaders`, analog of `movesReferencedBy` /
+  - _exercised_ (relaxed fire): ∃ a board bout where a real bot commits **≥2 passivity fouls**
+    under `MATCH` (the shared ladder confers a penalty point). The vulture is the ≥2-foul victim.
+    Companion "guard bites": with passivity OFF (`MATCH_NO_PASSIVITY`), total passivity fouls == 0.
+  - _field-read_: an AST walk (`readsPassivityRemaining`, analog of `movesReferencedBy` /
     `selfXConstants`) asserts the **jabber's** conditions reference the path
     `self.passivityRemaining`. Companion "guard bites": a bot referencing some _other_ self
     field is NOT counted.
@@ -229,11 +229,12 @@ approves commit.
 
 - **Reader/trigger circularity** — ✅ MEASURED & resolved. Carrier = jabber (natural staller,
   reads-to-avoid), victim = grappler (shaped headroom bot). Trigger + read on different bots.
-- **`limit=120` calibration** — ✅ MEASURED. Only genuine non-engagement fouls; paced pokers 0.
+- **`passivity.limit` calibration** — ✅ MEASURED & REVISED to **240**. 120 mis-flagged the jabber's
+  legitimate patient game; 240 self-calibrates the board while a pure turtle still fouls 80×.
 - **Pooled-ladder coupling (v16)** — ✅ MEASURED. v15 jogai fire (sweeper→vulture) survives the
-  pooled ladder; re-verify once more after the carrier/victim edits perturb the board.
-- **Per-PR board re-characterization** — resets/penalties perturb the round-robin; expect to
-  re-author the carrier ± one coupled bot to hold all 6 ∈ band (GREEN-time tuning).
+  pooled ladder (12 fires at limit 240); re-verify once more after the two bot edits.
+- **Per-PR board re-characterization** — at limit 240 the board self-calibrates (all 6 ∈ band with
+  no bot edits), so re-characterization is minimal — just the jabber field-read + shaped grappler.
 
 ---
 
