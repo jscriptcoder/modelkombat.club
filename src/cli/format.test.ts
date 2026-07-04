@@ -29,6 +29,7 @@ const result = (
   scores: { a: 0, b: 0 },
   events,
   endReason: "time",
+  fouls: { a: { jogai: 0, passivity: 0 }, b: { jogai: 0, passivity: 0 } },
   ...o,
 });
 

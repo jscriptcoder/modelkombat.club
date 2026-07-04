@@ -107,12 +107,19 @@ export type FightConfig = {
   };
 };
 
+// A per-cause split of a fighter's category-2 fouls (jogai ring-out vs passivity). The pooled
+// `penaltyCount` drives the winGap award; this attributes the cause for telemetry / the
+// benchmark's per-capability "fires" guard.
+type FoulCause = "jogai" | "passivity";
+type FoulTally = { jogai: number; passivity: number };
+
 export type FightResult = {
   winner: "A" | "B" | "draw";
   ticks: number; // ticks actually executed (= maxTicks unless a match ended early)
   scores: { a: number; b: number };
   events: FightEvent[];
   endReason: "gap" | "time" | "senshu" | "overtime"; // "gap" = ended on the winGap; "time" = ran to the cap (decided on points); "senshu" = level at the cap, decided by first-blood (C1); "overtime" = a 1-point gap opened during sudden death (C2)
+  fouls: { a: FoulTally; b: FoulTally }; // per-cause foul tally per fighter (telemetry; read only here ⇒ byte-identical)
 };
 
 // A fighter is either free to act (neutral) or locked into a committed move —
@@ -151,6 +158,7 @@ type Fighter = {
   stamina: number; // C10 conditioning meter; init to rules.stamina.max (0 when unconfigured)
   penaltyCount: number; // jogai/passivity fouls this bout (shared category-2 ladder); 1st free, 2+ ⇒ opponent +1
   ticksSinceOffense: number; // B1 passivity no-offense clock; resets on contact, zeroed on any re-engage
+  fouls: FoulTally; // per-cause telemetry split of penaltyCount (jogai vs passivity); read only at the terminal return ⇒ byte-identical
 };
 
 // The perceived-attack-band encoding (invariant #4 layer): height-ordered so a
@@ -893,7 +901,12 @@ const resetToNeutral = (f: Fighter, startX: number): void => {
 
 // The shared category-2 warning-ladder award (jogai A2 + passivity B2): the fouler's per-fighter
 // penaltyCount increments; past the one free warning (> 1) its opponent scores +1 — feeding winGap.
-const applyPenalty = (fouler: Fighter, opponent: Fighter): void => {
+const applyPenalty = (
+  fouler: Fighter,
+  opponent: Fighter,
+  cause: FoulCause,
+): void => {
+  fouler.fouls[cause] += 1; // every foul counts (incl. the free 1st); telemetry only
   if (++fouler.penaltyCount > 1) opponent.points += 1;
 };
 
@@ -920,6 +933,7 @@ export function runFight(cfg: FightConfig): FightResult {
     stamina: rules.stamina?.max ?? 0,
     penaltyCount: 0,
     ticksSinceOffense: 0,
+    fouls: { jogai: 0, passivity: 0 },
   };
 
   const b: Fighter = {
@@ -937,6 +951,7 @@ export function runFight(cfg: FightConfig): FightResult {
     stamina: rules.stamina?.max ?? 0,
     penaltyCount: 0,
     ticksSinceOffense: 0,
+    fouls: { jogai: 0, passivity: 0 },
   };
 
   const events: FightEvent[] = [];
@@ -1224,8 +1239,8 @@ export function runFight(cfg: FightConfig): FightResult {
       if (aOut || bOut) {
         // Each fighter's OWN foul count decides whether ITS opponent scores; both may fire the
         // same tick (mutual +1, net-zero gap change), which keeps the tick swap-symmetric.
-        if (aOut) applyPenalty(a, b);
-        if (bOut) applyPenalty(b, a);
+        if (aOut) applyPenalty(a, b, "jogai");
+        if (bOut) applyPenalty(b, a, "jogai");
 
         // Senshu (C1) revocation: a holder that commits its OWN jogai foul (incl. the free 1st
         // warning) loses senshu to `none` — permanent, not transferred to the opponent. A non-holder
@@ -1272,8 +1287,8 @@ export function runFight(cfg: FightConfig): FightResult {
         // mutual +1, net-zero). Fires independent of any same-tick score (only yame's reset pre-empts,
         // via the clock-zeroing above); the shared counter means a warning already spent on jogai
         // makes the first passivity foul cost.
-        if (aPassive) applyPenalty(a, b);
-        if (bPassive) applyPenalty(b, a);
+        if (aPassive) applyPenalty(a, b, "passivity");
+        if (bPassive) applyPenalty(b, a, "passivity");
 
         // Senshu (C1) revocation: identical to jogai — a holder that goes passive loses senshu to
         // `none`; a non-holder's passivity foul leaves it intact.
@@ -1333,5 +1348,6 @@ export function runFight(cfg: FightConfig): FightResult {
     scores: { a: a.points, b: b.points },
     events,
     endReason,
+    fouls: { a: { ...a.fouls }, b: { ...b.fouls } },
   };
 }
