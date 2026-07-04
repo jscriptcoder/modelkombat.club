@@ -1,7 +1,7 @@
 # Plan: passivity benchmark + spec adoption (item 3, capability B / v16)
 
-**Branch**: feat/passivity-v16-report (PR 2 — Slice 2)
-**Status**: Active — **Slices 1 & 2 DONE** (S1 PR #151 `main`@`e930960`; S2 `414405f`); close-out (PR 3) next
+**Branch**: feat/passivity-v16-adoption (S1) · feat/passivity-v16-report (S2)
+**Status**: ✅ COMPLETE — S1 PR #151, S2 PR #152, close-out PR #153. `BENCHMARK_VERSION` = `v16`.
 
 Second of the three deferred §7 officiating adoptions. Resolved decisions:
 `plans/item3-officiating-adoption-decisions.md` (the grill-me record — read it first).
