@@ -1,0 +1,316 @@
+{
+  "version": 1,
+  "name": "tactician",
+  "memory": { "combo": 0 },
+  "rules": [
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.canAct" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.canAct" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "combo", "to": { "op": "const", "value": 0 } }]
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "opponent.knockdown" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.finishWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.throwing" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "throw-break" }
+    },
+    {
+      "when": {
+        "op": "gt",
+        "args": [
+          { "op": "field", "path": "self.counterWindow" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "mem", "cell": "combo" },
+              { "op": "const", "value": 2 }
+            ]
+          },
+          {
+            "op": "gte",
+            "args": [
+              { "op": "field", "path": "self.stamina" },
+              { "op": "rule", "path": "moves.mawashi-geri.staminaCost" }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.gassed" },
+              { "op": "const", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "combo", "to": { "op": "const", "value": 3 } }],
+      "do": { "type": "attack", "move": "mawashi-geri", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.cancelWindow" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "mem", "cell": "combo" },
+              { "op": "const", "value": 1 }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "combo", "to": { "op": "const", "value": 2 } }],
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "clock.overtime" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.gyaku-zuki.reach" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.passivityRemaining" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "self.passivityRemaining" },
+              { "op": "const", "value": 20 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.gyaku-zuki.reach" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 3 }
+        ]
+      },
+      "do": { "type": "block", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 2 }
+        ]
+      },
+      "do": { "type": "block", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "block", "band": "low" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "throw.reach" }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "opponent.attacking" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "opponent.throwing" },
+              { "op": "const", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "throw" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "opponent.gassed" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.mae-geri.reach" }
+            ]
+          },
+          {
+            "op": "gte",
+            "args": [
+              { "op": "field", "path": "self.stamina" },
+              { "op": "rule", "path": "moves.mae-geri.staminaCost" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "mae-geri", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.canAct" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.kizami-zuki.reach" }
+            ]
+          }
+        ]
+      },
+      "set": [{ "cell": "combo", "to": { "op": "const", "value": 1 } }],
+      "do": { "type": "attack", "move": "kizami-zuki", "band": "mid" }
+    }
+  ],
+  "default": { "type": "move", "dir": 1 }
+}

@@ -1,0 +1,252 @@
+{
+  "version": 1,
+  "name": "crane",
+  "rules": [
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "self.canAct" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.throwing" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "throw-break" }
+    },
+    {
+      "when": {
+        "op": "gt",
+        "args": [
+          { "op": "field", "path": "self.counterWindow" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "attack", "move": "shuto", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "clock.overtime" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.shuto.reach" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "shuto", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.passivityRemaining" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "self.passivityRemaining" },
+              { "op": "const", "value": 20 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.shuto.reach" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "shuto", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 3 }
+        ]
+      },
+      "do": { "type": "block", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 2 }
+        ]
+      },
+      "do": { "type": "block", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "block", "band": "low" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "lt",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.kizami-zuki.reach" }
+            ]
+          },
+          {
+            "op": "or",
+            "args": [
+              {
+                "op": "and",
+                "args": [
+                  {
+                    "op": "lt",
+                    "args": [
+                      { "op": "field", "path": "self.x" },
+                      { "op": "field", "path": "opponent.x" }
+                    ]
+                  },
+                  {
+                    "op": "gt",
+                    "args": [
+                      { "op": "field", "path": "self.x" },
+                      { "op": "const", "value": 160000 }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "and",
+                "args": [
+                  {
+                    "op": "gt",
+                    "args": [
+                      { "op": "field", "path": "self.x" },
+                      { "op": "field", "path": "opponent.x" }
+                    ]
+                  },
+                  {
+                    "op": "lt",
+                    "args": [
+                      { "op": "field", "path": "self.x" },
+                      { "op": "const", "value": 440000 }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "move", "dir": -1 }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.ushiro-geri.reach" }
+            ]
+          },
+          {
+            "op": "gte",
+            "args": [
+              { "op": "field", "path": "self.stamina" },
+              { "op": "rule", "path": "moves.ushiro-geri.staminaCost" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "ushiro-geri", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.shuto.reach" }
+            ]
+          },
+          {
+            "op": "gte",
+            "args": [
+              { "op": "field", "path": "self.stamina" },
+              { "op": "rule", "path": "moves.shuto.staminaCost" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "shuto", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "moves.uraken.reach" }
+            ]
+          },
+          {
+            "op": "gte",
+            "args": [
+              { "op": "field", "path": "self.stamina" },
+              { "op": "rule", "path": "moves.uraken.staminaCost" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "uraken", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "lte",
+        "args": [
+          { "op": "field", "path": "opponent.distance" },
+          { "op": "rule", "path": "moves.gyaku-zuki.reach" }
+        ]
+      },
+      "do": { "type": "idle" }
+    }
+  ],
+  "default": { "type": "move", "dir": 1 }
+}
