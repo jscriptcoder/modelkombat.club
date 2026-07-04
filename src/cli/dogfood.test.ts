@@ -25,7 +25,10 @@ import { CANONICAL_RULES } from "../engine/rules.js";
 // gains a parry→counter) shifted its record 16W/104L → 18W/102L; S-jabber
 // (jabber block+counter), S2 (zoner's narrow-gated long kicks) and S3
 // (grappler's close-range knee + elbow) all left it unchanged — the dogfood was
-// already losing those matchups.
+// already losing those matchups. The item-3 jogai adoption (v15: ring-aware zoner
+// + naive-victim sweeper) also leaves 18W/102L intact — the dogfood attacks (so
+// the sweeper's flee-when-shut-out never triggers against it) and never rings
+// itself out, so jogai does not touch its matchup outcomes.
 const botText = (name: string): string =>
   readFileSync(
     fileURLToPath(new URL(`../../bots/${name}.json`, import.meta.url)),
@@ -38,8 +41,8 @@ describe("dogfood bot (authored from docs/spec.md)", () => {
     expect(validate(doc).ok).toBe(true);
   });
 
-  it("competes as a real match participant in the v14 benchmark (wins some, loses most)", () => {
-    // The real aggregator over the frozen v14 gauntlet — the exact scoring inputs
+  it("competes as a real match participant in the v15 benchmark (wins some, loses most)", () => {
+    // The real aggregator over the frozen v15 gauntlet — the exact scoring inputs
     // pinned by BENCHMARK_VERSION/INPUT_HASH (a change bumps the version and this
     // characterization with it).
     const result = benchmark({

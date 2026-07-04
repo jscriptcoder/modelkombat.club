@@ -159,17 +159,49 @@ describe("zoner — beyond-neutral long-kick zoning", () => {
     expect(action).toEqual({ type: "attack", move: "mae-geri", band: "mid" });
   });
 
-  it("retreats rather than attempting an unaffordable long kick when gassed", () => {
+  it("retreats rather than attempting an unaffordable long kick when gassed (with room behind)", () => {
     // A gassed zoner (stamina at/below the gas line) cannot afford the gas-LOCKED
     // long kicks (cost 48/52). The gassed-retreat rule sits ABOVE the new kicks, so
-    // even at 325000 (an ushiro band) it backs off instead of degrading to idle.
+    // even at 325000 (an ushiro band) it backs off instead of degrading to idle —
+    // PROVIDED it has room behind it (self.x safely inside the ring; see ring-aware
+    // tests below).
     const action = runTick(
       zoner,
-      state({ self: { gassed: 1 }, opponent: { distance: 325000 } }),
+      state({ self: { gassed: 1, x: 300000 }, opponent: { distance: 325000 } }),
       {},
       CANONICAL_RULES,
     );
 
     expect(action).toEqual({ type: "move", dir: -1 });
+  });
+
+  // ── Ring-awareness (v15 jogai adoption): both retreat rules gate on `self.x`
+  // being inside the safe band (110000, 490000) — a near-edge boundary read — so
+  // the zoner never back-pedals itself out of the ring (jogai). Near a wall it
+  // falls through to its offense instead.
+  it("retreats from a crowding opponent when it has room behind (mid-ring)", () => {
+    const action = runTick(
+      zoner,
+      state({ self: { x: 300000 }, opponent: { distance: 100000 } }),
+      {},
+      CANONICAL_RULES,
+    );
+
+    expect(action).toEqual({ type: "move", dir: -1 });
+  });
+
+  it("is ring-aware: cornered against its back wall it fights instead of backing out", () => {
+    // self.x = 105000 lies in the near-edge zone (just inside margin 100000); the
+    // close-retreat rule's `self.x > 110000` guard is false, so it is suppressed and
+    // the zoner falls through to its point-blank gyaku-zuki (dist ≤ 240k) — a boundary
+    // decision that keeps it in bounds rather than ringing itself out.
+    const action = runTick(
+      zoner,
+      state({ self: { x: 105000 }, opponent: { distance: 100000 } }),
+      {},
+      CANONICAL_RULES,
+    );
+
+    expect(action).toEqual({ type: "attack", move: "gyaku-zuki", band: "mid" });
   });
 });

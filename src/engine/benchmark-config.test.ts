@@ -49,14 +49,18 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     ]);
   });
 
-  it("freezes the run parameters: seeds 1..10 at 600 ticks, WKF match at an 8-point gap with senshu", () => {
+  it("freezes the run parameters: seeds 1..10 at 600 ticks, WKF match at an 8-point gap with senshu + jogai", () => {
     expect(SEEDS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(MAX_TICKS).toBe(600);
-    expect(MATCH).toEqual({ winGap: 8, senshu: true });
+    expect(MATCH).toEqual({
+      winGap: 8,
+      senshu: true,
+      jogai: { margin: 100000 },
+    });
   });
 
-  it("carries BENCHMARK_VERSION v14 (gauntlet modernization S3: grappler close-range knee + elbow)", () => {
-    expect(BENCHMARK_VERSION).toBe("v14");
+  it("carries BENCHMARK_VERSION v15 (item 3 / jogai adoption: ring-aware zoner + naive-victim sweeper)", () => {
+    expect(BENCHMARK_VERSION).toBe("v15");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {
