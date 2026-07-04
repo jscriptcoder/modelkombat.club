@@ -309,6 +309,52 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(ruleLine(noPassivity, "passivity")).toBe("");
     });
 
+    it("teaches overtime — a level bout plays sudden death before senshu (winGap → overtime → senshu → draw), gated on match.overtime (v17)", () => {
+      // present: the win-condition cascade names sudden-death overtime and interpolates the
+      // period length from the manifest, placed BEFORE senshu (overtime is the first fallback)
+      const winCond = ruleLine(
+        generateSpec(CANONICAL_RULES, {
+          winGap: MATCH.winGap,
+          senshu: true,
+          overtime: { ticks: 300 },
+        }),
+        "win condition",
+      );
+
+      expect(winCond).toContain(code("overtime")); // the mechanic is named
+      expect(winCond.toLowerCase()).toContain("sudden"); // sudden death
+      expect(winCond).toContain("300"); // the period length, from the manifest
+      // overtime-first: sudden death is offered before senshu in the cascade
+      expect(winCond.toLowerCase().indexOf("overtime")).toBeLessThan(
+        winCond.toLowerCase().indexOf("senshu"),
+      );
+
+      // interpolated, not a hardcoded literal — a different period flows through
+      const retuned = ruleLine(
+        generateSpec(CANONICAL_RULES, {
+          winGap: MATCH.winGap,
+          senshu: true,
+          overtime: { ticks: 500 },
+        }),
+        "win condition",
+      );
+
+      expect(retuned).toContain("500");
+      expect(retuned).not.toContain("300");
+
+      // gated on the manifest — an overtime-absent match omits it from the cascade
+      const noOvertime = ruleLine(
+        generateSpec(CANONICAL_RULES, { winGap: MATCH.winGap, senshu: true }),
+        "win condition",
+      );
+
+      expect(noOvertime.toLowerCase()).not.toContain("overtime");
+      // overtime-off inserts NOTHING before the senshu clause — the tie-break reads
+      // straight from "points" into "if still level" (kills the empty-else mutant that
+      // would splice a stray string into the cascade)
+      expect(noOvertime).toContain("points; if still level");
+    });
+
     it("ranks by win-rate first, net-points as the tiebreaker (corrects the stale metric)", () => {
       const metric = ruleLine(generateSpec(), "metric");
       expect(metric).toContain("win-rate");
@@ -508,6 +554,35 @@ describe("generateSpec — the factual machine-truth spec", () => {
       );
 
       expect(claimLine(noPassivity, "passivity")).toBe("");
+    });
+
+    it("teaches overtime awareness in the primer — names clock.overtime + the all-in play, gated on match.overtime (v17)", () => {
+      const overtimeLine = claimLine(
+        sectionOf(
+          generateSpec(CANONICAL_RULES, {
+            winGap: MATCH.winGap,
+            senshu: true,
+            overtime: { ticks: 300 },
+          }),
+          HEADING,
+        ),
+        "overtime",
+      );
+
+      expect(overtimeLine).toContain(code("clock.overtime")); // the sudden-death tell
+      expect(overtimeLine.toLowerCase()).toContain("all-in"); // the actionable strategy
+
+      // gated on the manifest — an overtime-absent primer omits the clause entirely
+      const noOvertime = sectionOf(
+        generateSpec(CANONICAL_RULES, { winGap: MATCH.winGap, senshu: true }),
+        HEADING,
+      );
+
+      expect(claimLine(noOvertime, "overtime")).toBe("");
+      // with every officiating clause off, the primer ends on the senshu match-objective
+      // bullet — no stray trailing content (kills the array-else mutants on the jogai /
+      // passivity / overtime clause blocks, all trailing-empty in this config)
+      expect(noOvertime.trimEnd().endsWith("steal it.")).toBe(true);
     });
   });
 

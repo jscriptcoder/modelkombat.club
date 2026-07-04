@@ -4,8 +4,8 @@
 > Every allowlist, limit, and frame-table number below is read directly from
 > the engine, so this document cannot lie about how a fight resolves.
 
-- **Benchmark version:** `v16` — a score is comparable only against another at the same version.
-- **Input hash:** `0fcc6d0cd5c742500a4aadb5b7dcd8ea360bd219ef3fc9b7838680e45fec7bb3` (pins the scoring inputs: rules + gauntlet + run params).
+- **Benchmark version:** `v17` — a score is comparable only against another at the same version.
+- **Input hash:** `7b15c1dff1b533bfb2274507fc67f4fe72260b206ef38b211479b0539a925acb` (pins the scoring inputs: rules + gauntlet + run params).
 
 A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is
 validated once against the allowlists below (the security boundary), then run
@@ -885,6 +885,7 @@ frame table above, so a rules retune updates this prose.
 - **Play the match, not the scoreboard.** You are ranked by WKF **match win-rate**, not raw points: a fight ends at a `8`-point lead, else on total points at the `600`-tick cap. Between scoring exchanges the ring resets to neutral (bodies reset; points / stamina / memory persist), so there is no okizeme farm — turn a lead into a decisive gap and hold it. A LEVEL bout is decided by **first blood** (`senshu`): score first and you win the tie — read `self.senshu` / `opponent.senshu` to know who holds it, then protect your lead or bait a reset to steal it.
 - **Stay in the ring (jogai).** The legal floor is bounded by an outer `margin` = `100000` strip — cross into it and you ring OUT: a neutral reset, and after one free warning a point to your opponent each time. Watch `self.x` against the edge and don't over-retreat into a wall; track the shared warning ladder via `self.penalties` / `opponent.penalties`.
 - **Don't stall (passivity).** Go `240` ticks without landing offense and you are fouled for non-engagement — same shared warning ladder as jogai. Watch `self.passivityRemaining` (ticks left before your foul; `0` when unconfigured) and re-engage before it expires; a purely reactive turtle bleeds points. Read `opponent.passivityRemaining` to bait a stalling foe toward the same foul.
+- **Sudden death (overtime).** A bout still LEVEL at the cap plays one sudden-death period of `300` ticks — the first 1-point gap wins outright, decided BEFORE senshu. Watch `clock.overtime` (`1` once it starts, `0` in regulation) and go ALL-IN — patience loses the tie, so press for the first clean score.
 
 ## Example bots
 
@@ -907,6 +908,28 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
         ]
       },
       "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "clock.overtime" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 260000 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "attack", "move": "shuto", "band": "mid" }
     },
     {
       "when": {
@@ -1262,7 +1285,7 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
 A submitted bot fights **WKF matches** against a frozen, versioned gauntlet,
 scored deterministically — the spec is the only input; there is no feedback loop.
 
-- `win condition` — a match ends the moment either fighter leads by `winGap` = 8 points; otherwise it runs the full `maxTicks` = 600 ticks and is decided on total points; if still level, the first fighter to have scored (`senshu`, first blood) wins — only a bout where neither drew first blood is a draw.
+- `win condition` — a match ends the moment either fighter leads by `winGap` = 8 points; otherwise it runs the full `maxTicks` = 600 ticks and is decided on total points; if still level, one sudden-death `overtime` period of `ticks` = 300 ticks plays — first to a 1-point gap wins; if still level, the first fighter to have scored (`senshu`, first blood) wins — only a bout where neither drew first blood is a draw.
 - `yame` — after each SCORING exchange resolves, both fighters reset to the neutral start (position, posture, guard, open windows) — but points, stamina, and memory PERSIST. No okizeme farm carries across exchanges.
 - `jogai` — a fighter forced OUT of the legal region (into the outer `margin` = 100000 strip of the ring) rings out: a yame-style neutral reset PLUS a shared category-2 penalty — the first ring-out is a free warning, the second and beyond each award the opponent +1 point.
 - `passivity` — a fighter that goes `limit` = 240 ticks without landing any offense (a strike that hits, is blocked, or is parried, or a live grab — a whiff at air does NOT count) is fouled for non-engagement: a yame-style neutral reset PLUS the SAME shared category-2 penalty ladder as jogai (first foul a free warning, the second and beyond each award the opponent +1 point). Landing offense resets your clock.

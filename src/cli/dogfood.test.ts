@@ -33,7 +33,12 @@ import { CANONICAL_RULES } from "../engine/rules.js";
 // standoff victim) shifts it 18W → 13W/107L — the re-authored jabber and vulture
 // flip the dogfood's outcomes in those two matchups. The dogfood attacks every
 // tick, so it never commits a passivity foul of its own; the change is purely the
-// two carriers' new behaviour.
+// two carriers' new behaviour. The item-3 overtime adoption (v17: jabber
+// multi-reads clock.overtime for a sudden-death all-in) leaves the RECORD at
+// 13W/107L: overtime turns exactly one dogfood bout (vs grappler, seed 2) into
+// sudden death, but its winner is unchanged — only the dogfood's net shifts +1
+// (−1786 → −1785). The jabber's overtime rule never fires against the dogfood
+// (their bouts never reach the cap level, so the jabber never enters OT vs it).
 const botText = (name: string): string =>
   readFileSync(
     fileURLToPath(new URL(`../../bots/${name}.json`, import.meta.url)),
@@ -46,8 +51,8 @@ describe("dogfood bot (authored from docs/spec.md)", () => {
     expect(validate(doc).ok).toBe(true);
   });
 
-  it("competes as a real match participant in the v16 benchmark (wins some, loses most)", () => {
-    // The real aggregator over the frozen v16 gauntlet — the exact scoring inputs
+  it("competes as a real match participant in the v17 benchmark (wins some, loses most)", () => {
+    // The real aggregator over the frozen v17 gauntlet — the exact scoring inputs
     // pinned by BENCHMARK_VERSION/INPUT_HASH (a change bumps the version and this
     // characterization with it).
     const result = benchmark({
@@ -62,7 +67,7 @@ describe("dogfood bot (authored from docs/spec.md)", () => {
     const losses = result.totalFights - result.wins - result.draws;
 
     // A real competitor: it takes genuine wins (no longer the degenerate 0-wins
-    // raw-farm read) while losing the majority. Net (−1786) stays loop-inflated in
+    // raw-farm read) while losing the majority. Net (−1785) stays loop-inflated in
     // yame-starving matchups (vs rekka / sweeper), so RANKING is by win-rate
     // (primary); net is only the tiebreaker. Its wins now come almost entirely from
     // the grappler matchup (12W); v16's re-authored jabber + vulture cost it the

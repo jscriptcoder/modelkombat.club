@@ -49,7 +49,7 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     ]);
   });
 
-  it("freezes the run parameters: seeds 1..10 at 600 ticks, WKF match at an 8-point gap with senshu + jogai + passivity", () => {
+  it("freezes the run parameters: seeds 1..10 at 600 ticks, WKF match at an 8-point gap with senshu + jogai + passivity + overtime", () => {
     expect(SEEDS).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(MAX_TICKS).toBe(600);
     expect(MATCH).toEqual({
@@ -57,11 +57,12 @@ describe("benchmark config — the frozen, versioned manifest", () => {
       senshu: true,
       jogai: { margin: 100000 },
       passivity: { limit: 240 },
+      overtime: { ticks: 300 },
     });
   });
 
-  it("carries BENCHMARK_VERSION v16 (item 3 / passivity adoption: jabber field-read + vulture standoff victim)", () => {
-    expect(BENCHMARK_VERSION).toBe("v16");
+  it("carries BENCHMARK_VERSION v17 (item 3 / overtime adoption: jabber multi-reads clock.overtime — sudden-death all-in)", () => {
+    expect(BENCHMARK_VERSION).toBe("v17");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {

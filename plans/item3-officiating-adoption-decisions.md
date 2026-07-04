@@ -75,9 +75,14 @@ re-characterize the gauntlet doc.
      and the **vulture is SHAPED into the exercised victim** (a standoff-idle rule ⇒ it commits
      ~23 passivity fouls on the board, incl. ≥2-foul bouts that CONFER a penalty point; see
      decision 10). Trigger + read on different bots (decision 3), WKF-faithful.
-   - **overtime → jabber** — reads `clock.overtime` to go all-in in sudden death. NOTE: the
-     jabber now ALSO carries passivity (above); v17 planning decides whether it multi-reads
-     (`self.passivityRemaining` + `clock.overtime`) or the overtime carrier moves to another bot.
+   - **overtime → jabber (MULTI-READ) — RESOLVED 2026-07-04 by measurement + user.** The jabber
+     multi-reads: its existing `self.passivityRemaining ≤ 10` re-engage PLUS a new
+     `clock.overtime == 1` all-in rule. Chosen because the board-level "fires + pays off" bar is
+     ALREADY met by 7 natural OT bouts (4 flipping winners) with zero bot changes, so the
+     field-read is a lighter surface-reachability guard — and the jabber is in only 1 of the 7 OT
+     bouts, so the edit touches ~1 bout ⇒ near-zero band risk (measured: all 6 stay ∈ [25,75]),
+     leaving grappler/vulture shaping untouched. The read evaluates TRUE on the board (the
+     vulture-vs-jabber seed-3 bout enters OT), so it is an exercised read, not an inert one.
 
    **Read scope — self-side only for the CI guard.** The field-read guard requires only the
    self-side read per carrier (above). The _also-inert_ opponent-side reads
@@ -207,7 +212,11 @@ Item 3 is COMPLETE when:
   (overtime) once the carriers avoid — and ensure at least one trigger survives.
   - **jogai: MEASURED & resolved (2026-07-04)** — zoner sole ring-out source ⇒ victim = sweeper.
   - **passivity: MEASURED & resolved (2026-07-04)** — jabber sole staller (vs zoner) ⇒ carrier =
-    jabber (reads-to-avoid), victim = grappler (shaped). See decision 10. overtime still to measure.
+    jabber (reads-to-avoid), victim = vulture (shaped standoff-idle). See decision 10.
+  - **overtime: MEASURED & resolved (2026-07-04)** — the frozen board yields 7 natural OT bouts
+    with NO bot change, so no victim/trigger shaping is needed (the carrier does not "read to
+    avoid" — it reads to go all-in, and the OT bouts arise from other bots reaching level at cap).
+    See the overtime-fires precondition risk below.
 - **`passivity.limit` calibration — MEASURED & REVISED to 240 ✓ (2026-07-04).** `120` mis-flags
   the jabber's legitimate patient counter-game (not a pure staller) ⇒ 12%, unrecoverable by bot
   edits. A limit sweep found **240** self-calibrates the board (jabber 31 / zoner 35 / all 6 ∈
@@ -221,10 +230,15 @@ Item 3 is COMPLETE when:
   `penaltyCount` as jogai, so a bot's jogai + passivity fouls compose. Confirmed the v15 jogai fire
   (sweeper→vulture) SURVIVES the pooled ladder: 10 decisive jogai fires with passivity on. (Still
   re-verify after the carrier/victim edits, which perturb the board.)
-- **overtime re-decides Cap D's senshu bouts.** The v14 board reports 0 draws (senshu
-  resolved them); adopting overtime routes those level-at-cap bouts through sudden death
-  first, which may flip winners.
-- **overtime-fires precondition (v17).** Overtime can only fire if ≥1 **level-at-regulation-cap**
-  bout exists in the v16 board (post jogai + passivity). The v14 board had senshu-resolved
-  level bouts, but the shifted v16 board must be **re-checked** — if none survive, the v17 PR
-  must shape the board (per decision 10's victim/carrier levers) to produce one.
+- **overtime re-decides Cap D's senshu bouts — MEASURED ✓ (2026-07-04).** Adopting overtime
+  routes the 7 level bouts through sudden death first. **4 flip the winner** — all 4 are
+  grappler↔vulture, shifting from grappler (senshu first-blood) to vulture (OT winner). Board
+  impact: grappler .56→.52, vulture .35→.39; **all 6 stay ∈ [25,75]** ⇒ no coupled rebalance.
+- **overtime-fires precondition (v17) — MEASURED & RESOLVED ✓ (2026-07-04).** The v16 board has
+  **7 level-at-cap bouts** (grappler↔vulture ×4, grappler↔rekka ×2, vulture↔jabber ×1), all
+  currently senshu-resolved. With `overtime:{ticks:300}` on, **all 7 resolve via
+  `endReason:"overtime"`** (a 1-point gap opens in sudden death every time; none exhaust to the
+  senshu/draw fallback) ⇒ the "fires" guard is met with margin 7, NO board-shaping / victim
+  required (decision 10's overtime escalation is moot). Overtime is inherently DECISIVE (unlike
+  passivity — 4 of the 7 even flip the winner vs senshu) ⇒ NO "exercised" relaxation needed;
+  the `endReason:"overtime"` "fires" bar (decision 3) is met cleanly.

@@ -487,3 +487,124 @@ describe("passivity adoption lock — exercised on the v16 board (exercised + fi
     });
   });
 });
+
+// ── The overtime-adoption lock (item 3 / v17) — certifies the sudden-death mechanic FIRES on
+// the frozen board, not merely enabled. Two invariants, mirroring the jogai/passivity locks'
+// "fires + field-read" contract (decision 3):
+//   1. FIRES — some board bout ends `endReason: "overtime"`: it was LEVEL at the regulation cap,
+//      so one sudden-death period played and a 1-point gap opened. Unlike passivity (relaxed to
+//      "exercised" because a decisive foul is structurally infeasible on the all-aggressive
+//      roster), overtime is INHERENTLY decisive — it resolves an otherwise-level bout (measured:
+//      7 such bouts, 4 flipping the winner vs senshu) — so the clean `endReason: "overtime"` fire
+//      is the bar, no relaxation.
+//   2. FIELD-READ — the jabber (the carrier) references `clock.overtime` in a condition — the
+//      dedicated-path analog of `readsPassivityRemaining` (jabber MULTI-READS: its passivity
+//      re-engage PLUS this sudden-death all-in).
+// Each ships with a companion proving it is not vacuous theatre.
+
+// The same v17 MATCH with overtime turned OFF (senshu + jogai + passivity still on) — the
+// counterfactual proving the fires guard keys off the overtime mechanic (no overtime ⇒ a level
+// bout falls straight through to the senshu fallback, never `endReason: "overtime"`).
+const MATCH_NO_OVERTIME = {
+  winGap: MATCH.winGap,
+  senshu: MATCH.senshu,
+  jogai: MATCH.jogai,
+  passivity: MATCH.passivity,
+};
+
+// How many board bouts are decided in sudden death (`endReason: "overtime"`) under a given match
+// config — the round-robin over every ordered pair × seed (both sides), like the jogai fires walk.
+const overtimeFireCount = (match: MatchCfg): number => {
+  let count = 0;
+
+  for (const a of roster) {
+    for (const b of roster) {
+      if (a.name === b.name) continue;
+
+      for (const seed of SEEDS) {
+        const r = runFight({
+          rules: CANONICAL_RULES,
+          botA: a,
+          botB: b,
+          maxTicks: MAX_TICKS,
+          seed,
+          match,
+        });
+
+        if (r.endReason === "overtime") count++;
+      }
+    }
+  }
+
+  return count;
+};
+
+// Whether a bot references `clock.overtime` anywhere in its CONDITIONS — the dedicated-path
+// field-read walk (the BoolExpr presence check, parallel to `readsPassivityRemaining`).
+const readsClockOvertime = (bot: BotDoc): boolean => {
+  const isOvertimeField = (e: NumExpr): boolean =>
+    e.op === "field" && e.path === "clock.overtime";
+
+  const walk = (node: BoolExpr): boolean => {
+    switch (node.op) {
+      case "gt":
+      case "lt":
+      case "gte":
+      case "lte":
+      case "eq":
+      case "neq":
+        return isOvertimeField(node.args[0]) || isOvertimeField(node.args[1]);
+      case "and":
+      case "or":
+        return node.args.some(walk);
+      case "not":
+        return walk(node.arg);
+    }
+  };
+
+  return bot.rules.some((rule) => walk(rule.when));
+};
+
+describe("overtime adoption lock — fires on the v17 board (fires + field-read)", () => {
+  describe("fires: a level-at-cap bout is decided in sudden death", () => {
+    it("some board bout ends `endReason: overtime` (a 1-point gap opens in sudden death)", () => {
+      expect(overtimeFireCount(MATCH)).toBeGreaterThan(0);
+    });
+
+    it("would find no overtime without the mechanic (the guard bites)", () => {
+      // Same roster, overtime OFF ⇒ a level-at-cap bout cannot enter sudden death at all, so no
+      // bout ends `overtime` — proving the fires guard keys off the overtime mechanic.
+      expect(overtimeFireCount(MATCH_NO_OVERTIME)).toBe(0);
+    });
+  });
+
+  describe("field-read: the jabber reads clock.overtime", () => {
+    it("references clock.overtime in a condition (the carrier goes all-in in sudden death)", () => {
+      expect(readsClockOvertime(rosterBot("jabber"))).toBe(true);
+    });
+
+    it("would not count a bot that reads only other fields (the guard bites)", () => {
+      // A bot referencing a DIFFERENT field (self.x) must NOT satisfy the overtime field-read —
+      // proving the walk keys off the dedicated `clock.overtime` path, not any condition read.
+      const otherReader: BotDoc = {
+        version: 1,
+        name: "other-reader",
+        rules: [
+          {
+            when: {
+              op: "gt",
+              args: [
+                { op: "field", path: "self.x" },
+                { op: "const", value: 300000 },
+              ],
+            },
+            do: { type: "idle" },
+          },
+        ],
+        default: { type: "idle" },
+      };
+
+      expect(readsClockOvertime(otherReader)).toBe(false);
+    });
+  });
+});
