@@ -627,6 +627,30 @@ v11 → v12` (`INPUT_HASH` re-pinned); dogfood record unchanged (18W/102L — al
   byte-identical, `gen:spec` no diff. 1075 tests; `rules.ts` mutation 100% (72/72), no regression.
   Design trail: `docs/archive/no-pareto-dominance.md`. **The Batch-1 grounded arsenal is now fully
   closed out (6/6 moves + the roster-wide balance guard).**
+- DONE (**jogai benchmark + spec adoption — item 3 (jogai slice), v15, PRs #147–#149**): folds the built
+  §7 **jogai** (ring-out penalty, Capability A) into the LLM benchmark's frozen manifest, teaches it in
+  `docs/spec.md` (taught == scored), and CI-locks that it both **fires** and is **field-read** on the
+  gauntlet — the first of the three deferred officiating mechanics (passivity / overtime still pending under
+  item 3). Three PRs. **PR 1 (#147, telemetry)**: `FightResult.fouls: { a, b: { jogai, passivity } }` — a
+  per-cause split threaded through a `cause` param on `applyPenalty`, read only at the terminal return ⇒
+  **byte-identical**, no version bump; the observable the "fires" guard needs. **PR 2 (#148, the v15 flip)**:
+  the atomic `INPUT_HASH` change — `MATCH += jogai: { margin: 100000 }`, `BENCHMARK_VERSION v14 → v15`;
+  `generateSpec` gains a gated jogai rule bullet + a primer "stay in the ring" clause (naming `self.x`-vs-edge
+  - `self.penalties`/`opponent.penalties`); the **zoner** made ring-aware (both retreat rules gate on
+    `self.x ∈ (110000, 490000)` ⇒ rings out 0 — the field-read carrier) and the **sweeper** re-authored as the
+    naive over-retreating **victim** (panic-flees a shut-out passive foe ⇒ a decisive `draw → vulture` flip on
+    all seeds — decision-10 escalation, since the ring-aware zoner alone leaves zero fires); board rebalanced via
+    the zoner-guard lever (δ 30000 → 10000) to keep all 6 ∈ `[25,75]` (vulture 73, grappler 60, sweeper 60, rekka
+    41, zoner 35, jabber 31); `gauntlet-calibration.test.ts` gains the **fires** + **field-read** guards (each
+    with a "guard bites" companion + a directional matrix pinning the test-local near-edge predicate); dogfood
+    18W/102L unchanged; `docs/benchmark-gauntlet-v15.md` added (`v14` kept intact). **PR 3 (#149, CLI read-out)**,
+    VERSION-NEUTRAL: `BenchmarkResult` gains an `officiating` tally (`endedBy` per `endReason` + a bot-centric
+    `jogai: { bot, opp }` split) that the CLI renders under the headline — `ended: gap N / time N / senshu N /
+overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no `INPUT_HASH` change,
+    `npm run fight` byte-identical. 1099 tests; PR 2 `benchmark-config.ts` mutation 100%, PR 3 `benchmark.ts` +
+    `run-benchmark.ts` mutation 100% (188/188). Design trail: `docs/archive/jogai-benchmark-adoption.md` (shared
+    decisions in `plans/item3-officiating-adoption-decisions.md`). **The jogai adoption is COMPLETE; passivity
+    (v16) + overtime (v17) remain deferred under item 3.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -679,13 +703,15 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    precision-dialed (band = dispersion, mean pinned ~50%); niche moves conflict with tight
    calibration (S2 far kicks narrow-gated; S3 close moves fed `vulture`'s parry→counter until the
    throw kept the contact band — distinguish by range, not read, as no guard tell exists).
-3. **Deferred jogai / passivity / overtime benchmark + spec adoption** — Capability D
-   was scoped to senshu only; folding jogai / passivity / overtime into the benchmark
-   `MATCH` (+ `INPUT_HASH` / `BENCHMARK_VERSION`) and teaching their prose in
-   `generateSpec` was deliberately deferred (each would force its own gauntlet
-   re-characterization / possible rebalance). The jogai + passivity + overtime
-   MECHANICS are already built (Capabilities A / B / C2); only their benchmark+spec
-   adoption remains.
+3. **Deferred passivity / overtime benchmark + spec adoption** — Capability D was scoped
+   to senshu only; folding the remaining officiating mechanics into the benchmark `MATCH`
+   (+ `INPUT_HASH` / `BENCHMARK_VERSION`) and teaching their prose in `generateSpec` was
+   deliberately deferred (each forces its own gauntlet re-characterization / possible
+   rebalance). **jogai is now DONE (v15, PRs #147–#149** — see the build-log entry; ring-aware
+   zoner + naive-victim sweeper + CLI officiating read-out). **passivity (v16)** and **overtime
+   (v17)** remain — their MECHANICS are already built (Capabilities B / C2); only the
+   benchmark+spec adoption is left, each its own `grill-me` → `planning` → TDD slice. Shared
+   resolved decisions (carriers, params) are in `plans/item3-officiating-adoption-decisions.md`.
 4. **Rest of §7** — **rounds** (the last unbuilt match-structure piece, beyond the
    benchmark's yame + win condition + tie resolution).
 5. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap
