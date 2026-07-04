@@ -2357,6 +2357,32 @@ const canonicalRoster = (): RosterEntry[] => {
   return [...moves, { id: "throw", axes: throwToAxes(t) }];
 };
 
+// Two moves are duplicates iff they share an IDENTICAL axis vector on all 7 axes
+// (bandEqual = mutual set-inclusion). `active` / `cancelInto` are NOT axes ⇒ moves
+// differing only in those are treated as non-distinct (balance-law rule 4).
+const bandEqual = (a: Set<BandToken>, b: Set<BandToken>): boolean =>
+  superset(a, b) && superset(b, a);
+
+const axesEqual = (a: Axes, b: Axes): boolean =>
+  a.reach === b.reach &&
+  a.score === b.score &&
+  a.startup === b.startup &&
+  a.recovery === b.recovery &&
+  a.cost === b.cost &&
+  bandEqual(a.bands, b.bands) &&
+  a.knockdown === b.knockdown;
+
+// Every UNORDERED pair (i < j — self-pairs excluded, no double-count) with an
+// identical axis vector.
+const findDuplicatePairs = (
+  roster: RosterEntry[],
+): Array<{ a: string; b: string }> =>
+  roster.flatMap((a, i) =>
+    roster
+      .slice(i + 1)
+      .flatMap((b) => (axesEqual(a.axes, b.axes) ? [{ a: a.id, b: b.id }] : [])),
+  );
+
 describe("no-Pareto-dominance — the dominance detector (balance-law rule 2)", () => {
   it("flags a move with longer reach alone (equal on every other axis)", () => {
     expect(dominates(axes({ reach: 250000 }), axes())).toBe(true);
@@ -2500,5 +2526,63 @@ describe("no-Pareto-dominance — the canonical 12-move roster (balance-law rule
 
   it("contains no Pareto-dominated move", () => {
     expect(findDominatedPairs(canonicalRoster())).toEqual([]);
+  });
+});
+
+// ─── Distinctness (balance-law rule 4) ─────────────────────────────────────────
+// No two moves may share an IDENTICAL axis vector — the near-duplicate guard Pareto
+// alone leaves open (an all-axes tie strictly-dominates nothing). Uses the SAME 7
+// axes as dominance: a move distinguishable only by the EXCLUDED dimensions (active,
+// cancelInto) is deemed non-distinct and flagged (docs/move-roster.md §Balance law).
+describe("no-Pareto-dominance — distinctness (balance-law rule 4)", () => {
+  it("flags two moves identical on all 7 axes but differing only in excluded dimensions", () => {
+    // Same 7-axis vector; differ ONLY in `active` + `cancelInto`, which are NOT axes.
+    const base: MoveSpec = {
+      startup: 7,
+      active: 2,
+      recovery: 13,
+      score: 1,
+      reach: 200000,
+      bands: ["high", "mid"],
+      staminaCost: 20,
+      cancelInto: ["gyaku-zuki"],
+    };
+
+    const twin: MoveSpec = { ...base, active: 5, cancelInto: [] };
+
+    const roster: RosterEntry[] = [
+      { id: "a", axes: moveToAxes("a", base) },
+      { id: "b", axes: moveToAxes("b", twin) },
+    ];
+
+    expect(findDuplicatePairs(roster)).toEqual([{ a: "a", b: "b" }]);
+  });
+
+  // Every one of the 7 axes must participate in the equality — perturbing any single
+  // axis (the band case a superset ⇒ bandEqual needs MUTUAL ⊇) makes the pair distinct.
+  const oneAxisApart: ReadonlyArray<{ axis: string; override: Partial<Axes> }> = [
+    { axis: "reach", override: { reach: 210000 } },
+    { axis: "score", override: { score: 3 } },
+    { axis: "startup", override: { startup: 99 } },
+    { axis: "recovery", override: { recovery: 99 } },
+    { axis: "cost", override: { cost: 99 } },
+    { axis: "bands", override: { bands: bandSet("mid") } },
+    { axis: "knockdown", override: { knockdown: true } },
+  ];
+
+  it.each(oneAxisApart)(
+    "does not flag moves differing on $axis alone (all 7 axes must match)",
+    ({ override }) => {
+      expect(
+        findDuplicatePairs([
+          { id: "a", axes: axes() },
+          { id: "b", axes: axes(override) },
+        ]),
+      ).toEqual([]);
+    },
+  );
+
+  it("contains no duplicate move in the canonical 12-move roster", () => {
+    expect(findDuplicatePairs(canonicalRoster())).toEqual([]);
   });
 });
