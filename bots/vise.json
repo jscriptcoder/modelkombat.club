@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "name": "vise",
+  "rules": [
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "self.canAct" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "idle" }
+    },
+    {
+      "when": {
+        "op": "gt",
+        "args": [
+          { "op": "field", "path": "self.finishWindow" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.throwing" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "throw-break" }
+    },
+    {
+      "when": {
+        "op": "gt",
+        "args": [
+          { "op": "field", "path": "self.counterWindow" },
+          { "op": "const", "value": 0 }
+        ]
+      },
+      "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "clock.overtime" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "throw.reach" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "throw" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "self.passivityRemaining" },
+              { "op": "const", "value": 0 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "self.passivityRemaining" },
+              { "op": "const", "value": 20 }
+            ]
+          },
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "throw.reach" }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "throw" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 3 }
+        ]
+      },
+      "do": { "type": "block", "band": "high" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 2 }
+        ]
+      },
+      "do": { "type": "block", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "opponent.attackBand" },
+          { "op": "const", "value": 1 }
+        ]
+      },
+      "do": { "type": "block", "band": "low" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "lte",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "rule", "path": "throw.reach" }
+            ]
+          },
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "opponent.attacking" },
+              { "op": "const", "value": 0 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "throw" }
+    }
+  ],
+  "default": { "type": "move", "dir": 1 }
+}
