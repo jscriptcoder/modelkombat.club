@@ -75,7 +75,7 @@ describe("runBenchmarkCli — report on stdout", () => {
         "trader      0  0  0  4       4",
         "",
         "win-rate 50.0%   net-points +4   (4W 0L 4D of 8)",
-        "ended: gap 0 / time 8 / senshu 0 / overtime 0   jogai fouls: bot=0 opp=0",
+        "ended: gap 0 / time 8 / senshu 0 / overtime 0   jogai fouls: bot=0 opp=0   passivity fouls: bot=0 opp=0",
         "",
       ].join("\n"),
     );
@@ -118,7 +118,29 @@ describe("runBenchmarkCli — report on stdout", () => {
 
     expect(out.code).toBe(0);
     expect(out.stdout).toContain(
-      "ended: gap 0 / time 2 / senshu 0 / overtime 0   jogai fouls: bot=4 opp=0",
+      "ended: gap 0 / time 2 / senshu 0 / overtime 0   jogai fouls: bot=4 opp=0   passivity fouls: bot=0 opp=0",
+    );
+  });
+
+  it("prints the passivity foul split — the bot's own non-engagement fouls vs the opponent's", () => {
+    // The bot IDLES on both sides ⇒ its no-offense clock exceeds the limit and it is fouled
+    // 9× per side (= 18); the always-attacking opponent resets on every hit ⇒ never passive.
+    // No jogai config ⇒ that split stays 0/0, and the 99-gap is never reached (both run to time).
+    // Proves the line reads the bot-side passivity count (18), not the opponent's (0).
+    const out = runBenchmarkCli(
+      ["bots/loser.json"],
+      deps({
+        loadBot: () => LOSER,
+        gauntlet: [SUBMITTED],
+        seeds: [1],
+        maxTicks: 55,
+        match: { winGap: 99, passivity: { limit: 5 } },
+      }),
+    );
+
+    expect(out.code).toBe(0);
+    expect(out.stdout).toContain(
+      "ended: gap 0 / time 2 / senshu 0 / overtime 0   jogai fouls: bot=0 opp=0   passivity fouls: bot=18 opp=0",
     );
   });
 });
@@ -200,7 +222,7 @@ describe("runBenchmarkCli — --from-reply (lenient extraction)", () => {
         "trader      0  0  0  4       4",
         "",
         "win-rate 50.0%   net-points +4   (4W 0L 4D of 8)",
-        "ended: gap 0 / time 8 / senshu 0 / overtime 0   jogai fouls: bot=0 opp=0",
+        "ended: gap 0 / time 8 / senshu 0 / overtime 0   jogai fouls: bot=0 opp=0   passivity fouls: bot=0 opp=0",
         "",
       ].join("\n"),
     );

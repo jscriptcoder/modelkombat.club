@@ -29,12 +29,13 @@ export type OpponentScore = {
 };
 
 // A supplementary read-out of how the fights were officiated — never a ranking key.
-// `endedBy` buckets every bout by its `endReason`; `jogai` splits ring-out fouls into
-// the submitted bot's own vs. its opponents' (bot-centric, like every other figure —
-// NOT the raw fighter-A/B split, which mixes the two once both sides are played).
+// `endedBy` buckets every bout by its `endReason`; `jogai` and `passivity` each split their
+// category-2 fouls into the submitted bot's own vs. its opponents' (bot-centric, like every
+// other figure — NOT the raw fighter-A/B split, which mixes the two once both sides are played).
 export type OfficiatingTally = {
   endedBy: Record<FightResult["endReason"], number>;
   jogai: { bot: number; opp: number };
+  passivity: { bot: number; opp: number };
 };
 
 export type BenchmarkResult = {
@@ -60,7 +61,7 @@ export type BenchmarkConfig = {
 };
 
 // One fight reduced to the submitted bot's perspective — the ranking figures plus the
-// officiating read-out (how it ended, and each side's jogai ring-outs).
+// officiating read-out (how it ended, and each side's jogai ring-outs + passivity fouls).
 type Outcome = {
   net: number;
   botWin: boolean;
@@ -68,6 +69,8 @@ type Outcome = {
   endReason: FightResult["endReason"];
   jogaiBot: number; // the submitted bot's own ring-outs this fight
   jogaiOpp: number; // the opponent's ring-outs this fight
+  passivityBot: number; // the submitted bot's own passivity fouls this fight
+  passivityOpp: number; // the opponent's passivity fouls this fight
 };
 
 // Deep document identity for the no-mirror rule. Both documents are validated
@@ -100,6 +103,8 @@ const playBothSides = (
       endReason: asA.endReason,
       jogaiBot: asA.fouls.a.jogai, // bot is fighter A here
       jogaiOpp: asA.fouls.b.jogai,
+      passivityBot: asA.fouls.a.passivity,
+      passivityOpp: asA.fouls.b.passivity,
     },
     {
       net: asB.scores.b - asB.scores.a,
@@ -108,6 +113,8 @@ const playBothSides = (
       endReason: asB.endReason,
       jogaiBot: asB.fouls.b.jogai, // bot is fighter B here
       jogaiOpp: asB.fouls.a.jogai,
+      passivityBot: asB.fouls.b.passivity,
+      passivityOpp: asB.fouls.a.passivity,
     },
   ];
 };
@@ -133,7 +140,7 @@ const summarize = (name: string, outcomes: Outcome[]): OpponentScore => ({
 });
 
 // Fold every fight's officiating read-out into one aggregate: how it ended (per
-// `endReason`) and the running bot-vs-opponent jogai foul split.
+// `endReason`) and the running bot-vs-opponent jogai + passivity foul splits.
 const tallyOfficiating = (outcomes: Outcome[]): OfficiatingTally =>
   outcomes.reduce<OfficiatingTally>(
     (acc, o) => ({
@@ -142,10 +149,15 @@ const tallyOfficiating = (outcomes: Outcome[]): OfficiatingTally =>
         bot: acc.jogai.bot + o.jogaiBot,
         opp: acc.jogai.opp + o.jogaiOpp,
       },
+      passivity: {
+        bot: acc.passivity.bot + o.passivityBot,
+        opp: acc.passivity.opp + o.passivityOpp,
+      },
     }),
     {
       endedBy: { gap: 0, time: 0, senshu: 0, overtime: 0 },
       jogai: { bot: 0, opp: 0 },
+      passivity: { bot: 0, opp: 0 },
     },
   );
 
