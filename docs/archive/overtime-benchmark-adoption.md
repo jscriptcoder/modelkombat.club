@@ -1,7 +1,7 @@
 # Plan: Overtime benchmark + spec adoption (item 3, overtime slice — v17)
 
 **Branch**: feat/overtime-v17-adoption
-**Status**: Active
+**Status**: ✅ COMPLETE — Slice 1 PR #154 (merged), close-out this PR. `BENCHMARK_VERSION` = `v17`.
 
 ## Goal
 
