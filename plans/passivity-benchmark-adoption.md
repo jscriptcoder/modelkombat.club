@@ -1,7 +1,7 @@
 # Plan: passivity benchmark + spec adoption (item 3, capability B / v16)
 
-**Branch**: feat/passivity-v16-adoption (PR 1)
-**Status**: Active — planning complete, awaiting Slice-1 RED approval
+**Branch**: feat/passivity-v16-report (PR 2 — Slice 2)
+**Status**: Active — **Slice 1 DONE** (PR #151, merged `main`@`e930960`); Slice 2 next
 
 Second of the three deferred §7 officiating adoptions. Resolved decisions:
 `plans/item3-officiating-adoption-decisions.md` (the grill-me record — read it first).
@@ -39,32 +39,32 @@ doc's non-goals).
 
 ## Acceptance Criteria
 
-- [ ] `MATCH` scores `passivity:{limit:240}`; `BENCHMARK_VERSION` = `v16`; `INPUT_HASH`
+- [x] `MATCH` scores `passivity:{limit:240}`; `BENCHMARK_VERSION` = `v16`; `INPUT_HASH`
       recomputed; the `benchmark-config.test.ts` drift guard passes at v16.
-- [ ] `docs/spec.md` (regenerated via `gen:spec`) teaches passivity — a `benchmarkSection`
+- [x] `docs/spec.md` (regenerated via `gen:spec`) teaches passivity — a `benchmarkSection`
       rule bullet (non-engagement clock ⇒ reset + shared-ladder penalty) and a primer
       "play the match" clause naming `self.passivityRemaining` (+ `opponent.passivityRemaining`
       for parity), both gated on `match.passivity` (taught == scored).
-- [ ] The **jabber** carrier references `self.passivityRemaining` in a condition (a light
+- [x] The **jabber** carrier references `self.passivityRemaining` in a condition (a light
       last-ditch re-engage), asserted by an AST walk in the calibration lock (the field-read).
-- [ ] The mechanic is **EXERCISED** on the board (the relaxed fire, per decision 3): ∃ a board
+- [x] The mechanic is **EXERCISED** on the board (the relaxed fire, per decision 3): ∃ a board
       bout where the **shaped vulture victim** commits **≥2 passivity fouls** — the shared ladder
       confers a penalty point on the frozen roster. CI-locked, with a companion "guard bites"
       test (passivity OFF ⇒ 0 fouls). (A _decisive_ winner-flip is structurally infeasible on the
       all-aggressive roster; conferral-decisiveness stays proven by the Capability-B engine tests.)
-- [ ] All 6 gauntlet members' round-robin win-rate stays ∈ `[25%, 75%]` on the v16 board.
-- [ ] The v15 jogai fire still holds under the pooled ladder (the jogai-adoption lock stays
+- [x] All 6 gauntlet members' round-robin win-rate stays ∈ `[25%, 75%]` on the v16 board.
+- [x] The v15 jogai fire still holds under the pooled ladder (the jogai-adoption lock stays
       green at v16).
-- [ ] `npm run fight` output byte-identical (no engine/rules change).
-- [ ] The CLI benchmark report surfaces the passivity foul split (bot vs opp), ranking-inert.
-- [ ] New `docs/benchmark-gauntlet-v16.md` re-characterization; dogfood record re-pinned.
+- [x] `npm run fight` output byte-identical (no engine/rules change).
+- [ ] The CLI benchmark report surfaces the passivity foul split (bot vs opp), ranking-inert. _(Slice 2)_
+- [x] New `docs/benchmark-gauntlet-v16.md` re-characterization; dogfood record re-pinned.
 
 ## Slices
 
 Every slice follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Before code, load `tdd`,
 `testing`, `mutation-testing`, `refactoring`. No production code without a failing test.
 
-### Slice 1 (PR 1): the atomic v16 passivity flip — scored, taught, locked
+### Slice 1 (PR 1): the atomic v16 passivity flip — scored, taught, locked ✅ DONE (PR #151, `main`@`e930960`)
 
 **Value**: an LLM author (and the gauntlet) is now ranked on WKF passivity — stalling is
 punished and `self.passivityRemaining` is a live, taught, exercised strategy field.
