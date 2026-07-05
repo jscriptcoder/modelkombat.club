@@ -14,9 +14,9 @@ scoring with *yame* resets, king-of-the-hill ladder, all-TS platform) and
 the generated **`docs/spec.md`** (the bot API). All engine code is built **from the
 resolved design via TDD** under a single top-level **`src/`** (no `packages/` nesting). The
 **walking skeleton is done** (headless validate → fight → byte-identical replay,
-with 1D approach + one *mid* strike that can score / block / trade); combat depth
-now grows one capability slice at a time. See **Status & roadmap** below (full
-build log + what's next in **`docs/STATUS.md`**).
+with 1D approach + one *mid* strike that can score / block / trade); the deep-karate
+**combat tree is now complete**, and the next build phase is the **platform layer**.
+See **Status & roadmap** below (full build log + what's next in **`docs/STATUS.md`**).
 
 ## Non-negotiable invariants
 
@@ -69,24 +69,27 @@ vertical-slice **plan** + its design records (resolved decisions + acceptance cr
 is archived under **`docs/archive/`** (indexed by its `README.md`).
 
 **Where things stand:** the deterministic headless core is **built and canonical** —
-validate → fight → byte-identical replay over the full deep-karate combat tree
+validate → fight → byte-identical replay over the **complete** deep-karate combat tree
 (perception latency, height bands, vertical axis + occupancy, parry/counter windows,
-on-contact cancel combos, throws, sweeps + okizeme), the **C9** multi-move "real
-karate" arsenal, the **C10** stamina economy, **WKF match structure** (yame + win
-condition + jogai / passivity officiating + senshu / overtime tie-resolution), the
-offline **LLM bot-authoring benchmark v1**, the **gauntlet modernization** (all 6
-frozen bots re-authored into the `[25%, 75%]` band with 11/11 arsenal coverage,
-CI-locked at `v14`), and the **officiating benchmark adoption** (jogai `v15` +
-passivity `v16` + overtime `v17` — all three §7 officiating mechanics now scored +
-taught + CI-locked; item 3 CLOSED). **§7 is now complete** — "rounds" was resolved by
-reframe (WKF is single-round; best-of-N dropped; the level-bout gap became tie
-resolution, built as Capability C + adopted `v4`/`v17`). **Not yet built:** air-actions;
-and the platform layer (KotH ladder, HTTP API, Pixi viewer). See `docs/STATUS.md` for
-detail and the next slice.
+on-contact cancel combos, throws, sweeps + okizeme, and **air-actions** — horizontal
+jump displacement + air strikes + the canonical `tobi-geri` jump-in), the **C9**
+multi-move "real karate" arsenal, the **C10** stamina economy, **WKF match structure**
+(yame + win condition + jogai / passivity officiating + senshu / overtime tie-resolution),
+the offline **LLM bot-authoring benchmark v1**, the **gauntlet modernization** (all 6
+frozen bots re-authored into the `[25%, 75%]` band, CI-locked), the **officiating
+benchmark adoption** (jogai `v15` + passivity `v16` + overtime `v17` — item 3 CLOSED),
+and the **air-actions gauntlet exercise** (rekka's `tobi-geri` jump-in weaponized so the
+frozen board actually exercises aerial combat — `v19`, 12/12 arsenal coverage, all 6 ∈
+`[25%, 75%]`). **§7 is complete** ("rounds" resolved by reframe → tie resolution,
+Capability C, adopted `v4`/`v17`). **The deep-karate combat tree is now COMPLETE** —
+air-actions was the last combat capability. **Not yet built — the platform layer only:**
+the KotH ladder, the HTTP API (`/spec` / `/validate` / `/fight`), and the Pixi viewer.
+See `docs/STATUS.md` for detail and the next slice.
 
-Flow for the next capability: `grill-me` → `planning` → TDD, **PR per capability**. The
-§11 combat-resolution spine (two-phase compute-then-apply, `strike > throw > guard`)
-is pinned in `docs/DESIGN.md`.
+Flow for the next build — **the platform layer** (KotH ladder / HTTP API / Pixi viewer):
+`grill-me` → `story-splitting` → `planning` → TDD, **PR per slice**. The §11
+combat-resolution spine (two-phase compute-then-apply, `strike > throw > guard`) is
+pinned in `docs/DESIGN.md` for any future combat work.
 
 ## Commands
 
