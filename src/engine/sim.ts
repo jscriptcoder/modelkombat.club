@@ -135,7 +135,7 @@ type MoveState =
       scored: boolean; // terminal flag: the strike has resolved (scored OR was deflected)
       extra: number; // extra recovery ticks added when this strike is parried (§5 deflect)
     }
-  | { kind: "airborne"; vy: number }
+  | { kind: "airborne"; vy: number; vx: number } // `vx`: horizontal displacement/tick, locked at launch (air-actions S1)
   | { kind: "throwing"; elapsed: number; stuffed: boolean } // committed grab; `stuffed` once a strike beats it (§11.4) ⇒ cannot grab
   | { kind: "downed"; elapsed: number; finish: number }; // knocked down for rules.knockdownDuration ticks; `finish` = remaining okizeme finish-window ticks (C8, counts down to 0 ⇒ wake-up i-frames)
 
@@ -520,10 +520,16 @@ const intake = (
   }
 
   if (action.type === "jump") {
-    // Launch: commit to a gravity arc with the initial upward velocity. `y` rises
-    // in `advance`; `dir` is reserved (vertical-only for now). Absent impulse ⇒ 0
-    // ⇒ an inert jump that lands the same tick (forward-compatible with no-y rules).
-    f.state = { kind: "airborne", vy: rules.jumpImpulse ?? 0 };
+    // Launch: commit to a gravity arc with the initial upward velocity, plus a horizontal
+    // velocity locked at launch (air-actions S1). `y` rises and `x` travels in `advance`;
+    // `vx = jumpXSpeed × dir × facing` (dir +1 toward the foe, −1 away, 0 = pure vertical).
+    // Absent impulse/jumpXSpeed ⇒ 0 ⇒ an inert vertical-only jump (byte-identical to the
+    // pre-displacement engine).
+    f.state = {
+      kind: "airborne",
+      vy: rules.jumpImpulse ?? 0,
+      vx: (rules.jumpXSpeed ?? 0) * action.dir * f.facing,
+    };
 
     return null;
   }
@@ -837,6 +843,10 @@ const advance = (f: Fighter, rules: Rules): void => {
   }
 
   if (st.kind === "airborne") {
+    // Horizontal displacement (air-actions S1): travel the launch-locked vx each tick,
+    // clamped to the ring — the clamp is horizontal-only, so a jump into a wall still
+    // completes its vertical arc. Then integrate the arc / landing.
+    f.x = clamp(f.x + st.vx, 0, rules.ring.width);
     f.y += st.vy;
 
     if (f.y <= 0) {
