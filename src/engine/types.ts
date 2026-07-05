@@ -193,6 +193,11 @@ export type Rules = {
   // applied to that velocity. Integer sub-units only — the arc is replay-stable.
   jumpImpulse?: number;
   gravity?: number;
+  // Horizontal jump displacement (air-actions S1). The sub-units/tick a jump travels
+  // in its `dir × facing` — captured at launch and applied unchanged every airborne
+  // tick (no air control, no decay). Absent ⇒ 0 ⇒ jumps are vertical-only ⇒
+  // byte-identical to the pre-displacement engine. Integer sub-units only (replay-stable).
+  jumpXSpeed?: number;
   // The height (sub-units) at/above which an airborne fighter vacates the `low`
   // band — a sweep passes under it. Absent ⇒ `low` is never vacated ⇒ an airborne
   // fighter stays hittable everywhere (byte-identical to the pre-vacate engine).

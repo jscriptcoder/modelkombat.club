@@ -915,6 +915,231 @@ describe("runFight — airborne occupancy (a jumper vacates the low band)", () =
   });
 });
 
+describe("runFight — horizontal jump displacement (a jump's dir carries the fighter through the arc)", () => {
+  // jumpImpulse 12000 / gravity 4000 ⇒ a 7-tick arc (y: 12000,20000,24000,24000,20000,12000,0)
+  // that lands at tick 6. jumpXSpeed 5000 ⇒ the fighter travels 5000 sub-units horizontally on
+  // every airborne tick (launch through landing), in `dir × facing`.
+  const flightRules = (o: Partial<Rules> = {}): Rules =>
+    getMockRules({ jumpImpulse: 12000, gravity: 4000, jumpXSpeed: 5000, ...o });
+
+  // Jump `dir` on every neutral tick, else idle (committed mid-arc).
+  const jumpToward = (dir: -1 | 0 | 1): BotDoc =>
+    bot(
+      [
+        {
+          when: {
+            op: "eq",
+            args: [
+              { op: "field", path: "self.canAct" },
+              { op: "const", value: 1 },
+            ],
+          },
+          do: { type: "jump", dir },
+        },
+      ],
+      { type: "idle" },
+    );
+
+  const atTick = (n: number): BoolExpr => ({
+    op: "eq",
+    args: [
+      { op: "field", path: "clock.tick" },
+      { op: "const", value: n },
+    ],
+  });
+
+  it("carries the launcher toward the foe on a forward jump, away on a back jump, nowhere on a neutral jump", () => {
+    const launchX = (dir: -1 | 0 | 1): number =>
+      runFight(
+        getMockConfig({
+          rules: flightRules(),
+          botA: jumpToward(dir),
+          botB: IDLE,
+          maxTicks: 1,
+        }),
+      ).events[0].a.x;
+
+    const startX = aStartX(flightRules()); // 200000; A faces +1 (B is to the right)
+    expect(launchX(1)).toBe(startX + 5000); // dir +1 ⇒ toward the foe
+    expect(launchX(-1)).toBe(startX - 5000); // dir −1 ⇒ away from the foe
+    expect(launchX(0)).toBe(startX); // dir 0 ⇒ pure vertical (today's behaviour)
+  });
+
+  it("multiplies displacement by facing: a left-facing jumper going dir=+1 moves LEFT toward its foe", () => {
+    // B starts on the right facing −1 (toward A). A forward jump (dir +1) must DECREASE B.x —
+    // if `× facing` were dropped it would (wrongly) increase, retreating into the wall behind it.
+    const result = runFight(
+      getMockConfig({
+        rules: flightRules(),
+        botA: IDLE,
+        botB: jumpToward(1),
+        maxTicks: 1,
+      }),
+    );
+
+    expect(result.events[0].b.x).toBe(bStartX(flightRules()) - 5000); // 395000, toward A
+  });
+
+  it("accrues jumpXSpeed on every airborne tick across the whole arc, launch and landing included", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: flightRules(),
+        botA: jumpToward(1),
+        botB: IDLE,
+        maxTicks: 7, // ticks 0..6 — the full arc, landing at tick 6
+      }),
+    );
+
+    const startX = aStartX(flightRules());
+    expect(result.events.map((e) => e.a.x)).toEqual([
+      startX + 5000, // 205000  launch tick (vx applied on the launch advance)
+      startX + 10000, // 210000
+      startX + 15000, // 215000
+      startX + 20000, // 220000
+      startX + 25000, // 225000
+      startX + 30000, // 230000
+      startX + 35000, // 235000  landing tick (vx applied before the y≤0 landing)
+    ]);
+    expect(result.events[6].a.y).toBe(0); // the vertical arc still lands on that tick
+    for (const e of result.events) expect(Number.isInteger(e.a.x)).toBe(true);
+  });
+
+  it("leaves a directional jump vertical-only when jumpXSpeed is absent (byte-identical to the pre-displacement engine)", () => {
+    const r = getMockRules({ jumpImpulse: 12000, gravity: 4000 }); // no jumpXSpeed
+
+    const result = runFight(
+      getMockConfig({ rules: r, botA: jumpToward(1), botB: IDLE, maxTicks: 7 }),
+    );
+
+    for (const e of result.events) expect(e.a.x).toBe(aStartX(r)); // dir ignored ⇒ no travel
+  });
+
+  it("clamps a horizontal jump at both ring edges while the vertical arc still lands", () => {
+    // A huge jumpXSpeed drives the jumper into a wall; x saturates at the edge, the arc still
+    // completes and lands at y=0 (the clamp is horizontal-only — it never shortens the airtime).
+    const fast = flightRules({ jumpXSpeed: 100000 });
+
+    const forward = runFight(
+      getMockConfig({
+        rules: fast,
+        botA: jumpToward(1),
+        botB: IDLE,
+        maxTicks: 7,
+      }),
+    );
+
+    const forwardXs = forward.events.map((e) => e.a.x);
+    expect(Math.max(...forwardXs)).toBe(600000); // pinned to the right edge (ring.width)
+    expect(forwardXs.every((x) => x <= 600000)).toBe(true);
+    expect(forward.events[6].a.y).toBe(0);
+
+    const backward = runFight(
+      getMockConfig({
+        rules: fast,
+        botA: jumpToward(-1),
+        botB: IDLE,
+        maxTicks: 7,
+      }),
+    );
+
+    const backwardXs = backward.events.map((e) => e.a.x);
+    expect(Math.min(...backwardXs)).toBe(0); // pinned to the left edge
+    expect(backwardXs.every((x) => x >= 0)).toBe(true);
+    expect(backward.events[6].a.y).toBe(0);
+  });
+
+  it("allows a cross-up: a forward jump carries past the foe and lands on the far side (no collision)", () => {
+    // jumpXSpeed 50000 over a 200000 gap ⇒ A draws level with B at tick 3 and crosses at tick 4.
+    // vx is locked at launch, so the mid-arc facing flip (once A is on B's right) does NOT reverse
+    // the travel — A keeps climbing to landing on the far side.
+    const bx = bStartX(flightRules()); // 400000, B never moves
+
+    const result = runFight(
+      getMockConfig({
+        rules: flightRules({ jumpXSpeed: 50000 }),
+        botA: jumpToward(1),
+        botB: IDLE,
+        maxTicks: 7,
+      }),
+    );
+
+    expect(result.events[3].a.x).toBe(bx); // level with B
+    expect(result.events[4].a.x).toBeGreaterThan(bx); // crossed to the far side
+    expect(result.events[6].a.x).toBeGreaterThan(result.events[4].a.x); // travel not reversed
+    expect(result.events[6].a.x).toBe(bx + 150000); // 550000 — 7 steps of 50000 from 200000
+  });
+
+  it("commits a jump only from neutral: a mid-attack fighter's jump is refused (characterization)", () => {
+    // Attack on tick 0 (12 committed frames), then request a forward jump every tick. While
+    // committed the jump degrades to `locked` — no arc launches (y stays 0), no vx displaces x.
+    const attackThenJump = bot(
+      [
+        {
+          when: atTick(0),
+          do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+        },
+      ],
+      { type: "jump", dir: 1 },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: flightRules(),
+        botA: attackThenJump,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    const startX = aStartX(flightRules());
+
+    for (const tick of [1, 5]) {
+      expect(result.events[tick].a.degrade).toBe("locked"); // committed ⇒ jump ignored
+      expect(result.events[tick].a.y).toBe(0); // no arc launched
+      expect(result.events[tick].a.x).toBe(startX); // no horizontal displacement
+    }
+  });
+
+  it("replays byte-identically and mirrors a swapped start (deterministic integer arc)", () => {
+    const cfg = getMockConfig({
+      rules: flightRules(),
+      botA: jumpToward(1),
+      botB: jumpToward(1),
+      maxTicks: 12,
+    });
+
+    const first = runFight(cfg);
+    const second = runFight(cfg);
+    expect(JSON.stringify(first.events)).toBe(JSON.stringify(second.events));
+
+    // A's forward jump from the left mirrors B's forward jump from the right about the ring
+    // centre — the same physics resolved from either slot.
+    const width = flightRules().ring.width; // 600000
+
+    const aForward = runFight(
+      getMockConfig({
+        rules: flightRules(),
+        botA: jumpToward(1),
+        botB: IDLE,
+        maxTicks: 7,
+      }),
+    );
+
+    const bForward = runFight(
+      getMockConfig({
+        rules: flightRules(),
+        botA: IDLE,
+        botB: jumpToward(1),
+        maxTicks: 7,
+      }),
+    );
+
+    for (let k = 0; k < 7; k++) {
+      expect(width - aForward.events[k].a.x).toBe(bForward.events[k].b.x);
+    }
+  });
+});
+
 describe("runFight — parry windows (a freshly-raised matching guard deflects the attacker)", () => {
   // A defender that raises a `band` guard from tick `from` onward (open/idle before).
   // The guard's *age* at any tick is how many consecutive ticks it has been held, so
