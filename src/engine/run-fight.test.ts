@@ -2472,6 +2472,84 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
     expect(withJogai.events[3].a.x).toBe(aStartX(airRules())); // snapped back to its start position
     expect(noJogai.events[3].a.y).toBeGreaterThan(0); // no margin ⇒ still airborne, arc uninterrupted
   });
+
+  // ── air-actions Story 4 (AC-4.2): passivity × jump ────────────────────────────
+  // The passivity no-offense clock (§7 B1) zeroes a fighter's `ticksSinceOffense` on any
+  // LANDED offense (a non-null strike outcome or a throw), attacker-only. Air strikes ride
+  // `computeStrike` as active strikers, so this composes for free — a CONNECTING air strike
+  // re-engages exactly like a ground strike, while a bare jump (or a whiffed air strike)
+  // lands nothing and does NOT. Characterization: no engine change, the behavior is emergent.
+  // limit 6 / maxTicks 8 keeps the window BEFORE the air strike's landing + any yame (tick 9),
+  // so in the connecting case the connect (tick 2) is the ONLY thing that can reset the clock.
+  const passivityMatch: FightConfig["match"] = {
+    winGap: 99,
+    passivity: { limit: 6 },
+  };
+
+  it("a bare jump is NOT engagement — its passivity clock climbs uninterrupted, exactly like an idler", () => {
+    // A jumps once (tick 0) then idles. The jump makes A airborne for the arc but lands no offense,
+    // so its no-offense clock is never zeroed ⇒ A fouls on the SAME tick as a fighter that only
+    // idled. (If a bare jump re-engaged, the jumper would foul later / not at all.)
+    const bareJumper = bot(
+      [{ when: atTick(0), do: { type: "jump", dir: 0 } }],
+      {
+        type: "idle",
+      },
+    );
+
+    const run = (botA: BotDoc) =>
+      runFight(
+        getMockConfig({
+          rules: airRules(),
+          botA,
+          botB: IDLE,
+          maxTicks: 8,
+          match: passivityMatch,
+        }),
+      );
+
+    const jumped = run(bareJumper);
+    const idled = run(IDLE);
+
+    expect(jumped.fouls.a.passivity).toBeGreaterThanOrEqual(1); // the jump did not stave off the foul
+    expect(jumped.fouls.a.passivity).toBe(idled.fouls.a.passivity); // ...it is inert: same as pure idle
+  });
+
+  it("a connecting air strike IS engagement — it re-engages, zeroing the striker's passivity clock", () => {
+    // Jump (tick 0), air-strike (tick 1) connecting at tick 2 (mid waza-ari vs the standing foe).
+    // That landed offense re-engages: the clock resets at tick 2, so within the limit-6 window
+    // (before landing/yame at tick 9) A never reaches the foul threshold ⇒ 0 passivity fouls.
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(), // reach 250000 > the 200000 gap ⇒ the mid strike connects
+        botA: jumpThenAir(1, "mid"),
+        botB: IDLE,
+        maxTicks: 8,
+        match: passivityMatch,
+      }),
+    );
+
+    expect(result.events[2].a.points).toBe(2); // sanity: the air strike connected (chudan waza-ari)
+    expect(result.fouls.a.passivity).toBe(0); // the connect re-engaged ⇒ no passivity foul
+  });
+
+  it("a whiffed air strike is NOT engagement — landing no offense, the clock climbs and A fouls (like a ground whiff)", () => {
+    // The SAME jump-then-air bot, but reach 1 ⇒ the strike whiffs (null outcome). A lands no offense
+    // ⇒ the clock is not zeroed ⇒ A fouls at the limit, like the bare jumper. Only the reach differs
+    // from the connecting case ⇒ the CONNECT is what re-engages.
+    const result = runFight(
+      getMockConfig({
+        rules: airRules({ reach: 1 }),
+        botA: jumpThenAir(1, "mid"),
+        botB: IDLE,
+        maxTicks: 8,
+        match: passivityMatch,
+      }),
+    );
+
+    expect(result.events[2].a.points).toBe(0); // sanity: the air strike whiffed (out of reach)
+    expect(result.fouls.a.passivity).toBeGreaterThanOrEqual(1); // no offense landed ⇒ passivity foul
+  });
 });
 
 describe("runFight — parry windows (a freshly-raised matching guard deflects the attacker)", () => {
