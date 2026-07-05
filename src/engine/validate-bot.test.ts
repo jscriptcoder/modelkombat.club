@@ -1089,10 +1089,15 @@ describe("validate — rule(path) ruleset reads", () => {
     "moves.hiza-geri.score",
     "moves.hiza-geri.reach",
     "moves.hiza-geri.staminaCost",
+    "moves.tobi-geri.startup",
+    "moves.tobi-geri.reach",
+    "moves.tobi-geri.staminaCost",
+    "moves.tobi-geri.scoreByBand.high",
     "throw.score",
     "jumpImpulse",
     "gravity",
     "lowClearance",
+    "jumpXSpeed",
     "parryWindow",
     "counterBonus",
     "cancelWindow",
@@ -1113,6 +1118,8 @@ describe("validate — rule(path) ruleset reads", () => {
     "moves.empi.bands", // a real empi field, but non-numeric ⇒ not a reader
     "moves.hiza-geri.bands", // a real hiza-geri field, but non-numeric ⇒ not a reader
     "moves.hiza-geri.knockdown", // a real hiza-geri field, but boolean ⇒ not a reader
+    "moves.tobi-geri.bands", // a real tobi-geri field, but non-numeric ⇒ not a reader
+    "moves.tobi-geri.air", // a real tobi-geri field, but boolean ⇒ not a reader
     "perception.lol", // typo
     "self.x", // a field path, not a rule path
     "stamina", // a non-leaf object

@@ -183,6 +183,13 @@ the frame table below.
 - `moves.hiza-geri.score`
 - `moves.hiza-geri.reach`
 - `moves.hiza-geri.staminaCost`
+- `moves.tobi-geri.startup`
+- `moves.tobi-geri.active`
+- `moves.tobi-geri.recovery`
+- `moves.tobi-geri.score`
+- `moves.tobi-geri.reach`
+- `moves.tobi-geri.staminaCost`
+- `moves.tobi-geri.scoreByBand.high`
 - `throw.startup`
 - `throw.active`
 - `throw.recovery`
@@ -192,6 +199,7 @@ the frame table below.
 - `jumpImpulse`
 - `gravity`
 - `lowClearance`
+- `jumpXSpeed`
 - `parryWindow`
 - `parryRecovery`
 - `counterWindow`
@@ -260,6 +268,7 @@ cancel into a strike during the foe's `finishWindow` is the okizeme finish.
 - `jumpImpulse` — 12000
 - `gravity` — 4000
 - `lowClearance` — 8000
+- `jumpXSpeed` — 10000
 - `parryWindow` — 2
 - `parryRecovery` — 12
 - `counterWindow` — 10
@@ -489,6 +498,13 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "moves.hiza-geri.score",
         "moves.hiza-geri.reach",
         "moves.hiza-geri.staminaCost",
+        "moves.tobi-geri.startup",
+        "moves.tobi-geri.active",
+        "moves.tobi-geri.recovery",
+        "moves.tobi-geri.score",
+        "moves.tobi-geri.reach",
+        "moves.tobi-geri.staminaCost",
+        "moves.tobi-geri.scoreByBand.high",
         "throw.startup",
         "throw.active",
         "throw.recovery",
@@ -498,6 +514,7 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "jumpImpulse",
         "gravity",
         "lowClearance",
+        "jumpXSpeed",
         "parryWindow",
         "parryRecovery",
         "counterWindow",

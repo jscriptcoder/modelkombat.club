@@ -52,7 +52,7 @@ The hardened ACs live in `plans/air-actions-stories.md` §"Story 2 — Air strik
 - [x] throws can't grab an air-attacking fighter — Slice 3 ✅
 - [x] canonical `tobi-geri` + `jumpXSpeed` wired; one version bump (`v17`→`v18`); `spec.md`
       regen + primer teaching; `air` is an incomparable island in the no-Pareto test — Slice 4 ✅
-- [ ] reads-only `rule("moves.tobi-geri.*")` + `rule("jumpXSpeed")` readers, no bump — Slice 5
+- [x] reads-only `rule("moves.tobi-geri.*")` + `rule("jumpXSpeed")` readers, no bump — Slice 5 ✅
 
 ## Slice map
 
@@ -306,6 +306,23 @@ Stryker survivor) and `jumpXSpeed`. No `CANONICAL_RULES` / scoring change ⇒
 / REFACTOR** as standard.
 
 **Done when**: AC met, mutation reviewed, checks clean, human approves commit.
+
+**DELIVERED (2026-07-05):** 8 new `RULE_READERS` leaf entries — 7 `moves.tobi-geri.*`
+(`startup 4 / active 3 / recovery 14 / score 2 / reach 250000 / staminaCost 50 /
+scoreByBand.high 3`) + top-level `jumpXSpeed 10000`, each mirroring the roster's
+bracket-key + `?.` + `?? 0` convention. Per precedent, only `scoreByBand.high` is
+exposed (not `.mid`, which equals base `score`); booleans (`air`) are never on the
+number-returning reader surface (the `.air`/`.bands` reject cases pin this). The
+`scoreByBand.high` reader carries the inner-`?.` guard test (tobi-geri present but
+`scoreByBand` absent ⇒ 0), mirroring mawashi/ushiro. Reads-only ⇒ `CANONICAL_RULES`
+untouched ⇒ `INPUT_HASH` / `BENCHMARK_VERSION` UNCHANGED (`v18`, `a23c05f9…`); the
+only doc drift is `docs/spec.md`'s readable-rule-path list + JSON-schema enum +
+`jumpXSpeed` scalar value (regenerated — the spec is not in the hash payload).
+Mutation **31/31 (100%)** on the changed reader lines incl. the inner-`?.`
+OptionalChaining survivor the guard test kills; 1195 tests green. **Stryker gotcha:**
+two `--mutate` flags is last-wins (silently mutated only `jumpXSpeed`, 2/2) — a single
+`--mutate "f:245-253,f:263-263"` with comma-separated ranges mutates both (31/31).
+**Story 2 COMPLETE** (Slices 1–5, PRs #159/#161/#162/#163/this).
 
 ## Pre-PR Quality Gate (every slice)
 

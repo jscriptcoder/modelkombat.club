@@ -658,6 +658,13 @@ describe("runTick — rule(path) ruleset reads", () => {
     ["moves.hiza-geri.score", 0, 0],
     ["moves.hiza-geri.reach", 110000, 0],
     ["moves.hiza-geri.staminaCost", 40, 0],
+    ["moves.tobi-geri.startup", 4, 0],
+    ["moves.tobi-geri.active", 3, 0],
+    ["moves.tobi-geri.recovery", 14, 0],
+    ["moves.tobi-geri.score", 2, 0],
+    ["moves.tobi-geri.reach", 250000, 0],
+    ["moves.tobi-geri.staminaCost", 50, 0],
+    ["moves.tobi-geri.scoreByBand.high", 3, 0],
     ["throw.startup", 7, 0],
     ["throw.active", 2, 0],
     ["throw.recovery", 14, 0],
@@ -667,6 +674,7 @@ describe("runTick — rule(path) ruleset reads", () => {
     ["jumpImpulse", 12000, 0],
     ["gravity", 4000, 0],
     ["lowClearance", 8000, 0],
+    ["jumpXSpeed", 10000, 0],
     ["parryWindow", 2, 0],
     ["parryRecovery", 12, 0],
     ["counterWindow", 10, 0],
@@ -756,6 +764,29 @@ describe("runTick — rule(path) ruleset reads", () => {
 
     expect(
       evalsToRule("moves.ushiro-geri.scoreByBand.high", 0, noBandScore),
+    ).toBe(true);
+  });
+
+  it("reads tobi-geri's scoreByBand.high as 0 when the jump kick has no scoreByBand", () => {
+    // tobi-geri PRESENT but scoreByBand absent ⇒ the INNER `?.` must guard it
+    // (the move-level `?.` short-circuit never reaches this branch otherwise).
+    const noBandScore: Rules = {
+      ...MINIMAL_RULES,
+      moves: {
+        ...MINIMAL_RULES.moves,
+        "tobi-geri": {
+          startup: 4,
+          active: 3,
+          recovery: 14,
+          score: 2,
+          reach: 250000,
+          air: true,
+        },
+      },
+    };
+
+    expect(
+      evalsToRule("moves.tobi-geri.scoreByBand.high", 0, noBandScore),
     ).toBe(true);
   });
 
