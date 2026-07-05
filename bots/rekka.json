@@ -141,7 +141,7 @@
             "op": "gt",
             "args": [
               { "op": "field", "path": "opponent.distance" },
-              { "op": "const", "value": 300000 }
+              { "op": "const", "value": 250000 }
             ]
           }
         ]

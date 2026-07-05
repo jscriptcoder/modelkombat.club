@@ -39,6 +39,13 @@ import { CANONICAL_RULES } from "../engine/rules.js";
 // sudden death, but its winner is unchanged — only the dogfood's net shifts +1
 // (−1786 → −1785). The jabber's overtime rule never fires against the dogfood
 // (their bouts never reach the cap level, so the jabber never enters OT vs it).
+// The Story-2 air arsenal (v18: CANONICAL_RULES gains tobi-geri + jumpXSpeed) left
+// the record at 13W/107L — the dogfood neither jumps nor uses tobi-geri, and the
+// gauntlet's jump-in was still dormant, so its matchups were byte-identical. The
+// item-4 aerial adoption (v19: rekka's weaponized tobi-geri jump-in) also leaves the
+// RECORD at 13W/107L — the dogfood was already losing all its rekka matchups, so
+// rekka landing more tobi-geri points flips no win↔loss outcome (its net shifts as
+// rekka closes those bouts faster on the winGap, but ranking is by win-rate).
 const botText = (name: string): string =>
   readFileSync(
     fileURLToPath(new URL(`../../bots/${name}.json`, import.meta.url)),
@@ -51,8 +58,8 @@ describe("dogfood bot (authored from docs/spec.md)", () => {
     expect(validate(doc).ok).toBe(true);
   });
 
-  it("competes as a real match participant in the v17 benchmark (wins some, loses most)", () => {
-    // The real aggregator over the frozen v17 gauntlet — the exact scoring inputs
+  it("competes as a real match participant in the v19 benchmark (wins some, loses most)", () => {
+    // The real aggregator over the frozen v19 gauntlet — the exact scoring inputs
     // pinned by BENCHMARK_VERSION/INPUT_HASH (a change bumps the version and this
     // characterization with it).
     const result = benchmark({

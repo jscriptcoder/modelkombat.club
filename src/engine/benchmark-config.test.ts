@@ -61,8 +61,8 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     });
   });
 
-  it("carries BENCHMARK_VERSION v18 (air arsenal: the airborne tobi-geri + jumpXSpeed reach the canonical frame table)", () => {
-    expect(BENCHMARK_VERSION).toBe("v18");
+  it("carries BENCHMARK_VERSION v19 (aerial exercise: rekka's weaponized tobi-geri jump-in connects on the board)", () => {
+    expect(BENCHMARK_VERSION).toBe("v19");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {
