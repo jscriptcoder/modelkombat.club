@@ -100,3 +100,19 @@ the move-roster balance law, closing out the Batch-1 arsenal. Detector/adapter a
 [../move-roster.md](../move-roster.md) §Balance law.
 
 - [no-pareto-dominance.md](no-pareto-dominance.md) — the plan + grill-me/find-gaps design trail
+
+## Air-actions — the last combat capability (PRs #158–#167) ✅ COMPLETE
+
+The fighter leaves the ground: horizontal jump displacement, the `air-attacking` strike
+mechanic + air defense, the canonical `tobi-geri` jump-in, the `self.y` / `self.vy` /
+`self.posture` air-perception surface, and the gauntlet weaponization that makes the frozen
+board actually **exercise** aerial combat (v19 — rekka's jump-in connects 100/100 for a jodan
+ippon, all 6 ∈ `[25%, 75%]`). See the build-log entry in `docs/STATUS.md`; final board:
+[../benchmark-gauntlet-v19.md](../benchmark-gauntlet-v19.md).
+
+- **Story split** (story-splitting tracker): [air-actions-stories.md](air-actions-stories.md)
+- **Resolved decisions** (grill-me / find-gaps record): [air-actions-decisions.md](air-actions-decisions.md)
+- **Story 1 — aerial mobility** (horizontal jump displacement, `jumpXSpeed` + `vx`, PR #158): [aerial-mobility.md](aerial-mobility.md)
+- **Story 2 — air strikes** (the `air-attacking` mechanic + air defense + canonical `tobi-geri`, 5 slices, PRs #159/#161/#162/#163 → benchmark v18/#164): [air-strikes.md](air-strikes.md)
+- **Story 3 — precise air timing** (`self.y` / `self.vy` air-perception reads, PR #165): [precise-air-timing.md](precise-air-timing.md)
+- **Story 4 — gauntlet exercises aerial combat** (passivity × jump characterization + rekka `tobi-geri` weaponization + the tobi-geri adoption lock, 3 slices, PRs #166/#167 → benchmark v19): [gauntlet-aerial-rebalance.md](gauntlet-aerial-rebalance.md)

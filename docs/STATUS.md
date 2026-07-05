@@ -707,6 +707,38 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   since `MATCH` always carries every key). Design trail: `docs/archive/overtime-benchmark-adoption.md` (+ the now-archived
   shared decisions `docs/archive/item3-officiating-adoption-decisions.md`). **Item 3 (the deferred jogai / passivity /
   overtime officiating adoption) is now fully CLOSED.**
+- DONE (**air-actions — the last combat capability**, PRs #158–#167): the fighter leaves the ground.
+  Built `grill-me → story-splitting → find-gaps → planning → TDD`, PR-per-slice, across four stories.
+  **Story 1 — aerial mobility** (#158): `Rules.jumpXSpeed?` + a `vx` on the airborne state; `advance`
+  applies `x = clamp(x + vx, 0, width)` each airborne tick, so a horizontal `jump dir` finally
+  **displaces** (validated-but-inert since C4). **Story 2 — air strikes** (5 slices, #159/#161/#162/
+  #163/#164): the `air-attacking` MoveState merges the airborne arc with an attack — two clocks
+  (`x+=vx`/`y+=vy` AND move `elapsed++`), landing is master (converts to a grounded recovery past the
+  active window ⇒ one strike per jump); intake routes an airborne `attack` (the one commitment
+  exception alongside cancel) with a typed `wrong-context` degrade + air-commit `spend`/`gasRecovery`
+  (a bare jump costs 0 stamina); three `|| air-attacking` widenings make the strike **perceivable**
+  (`frameOf`), airborne for the whole arc (`postureOf`) and un-grabbable (`computeThrow`) — block /
+  parry / trade / okizeme-finish all emergent on the C5 union (`computeStrike` already handled it);
+  the **single version-bump slice** (#163, **v17→v18**) wires the canonical `tobi-geri`
+  `{ startup 4, active 3, recovery 14, score 2, scoreByBand {high 3, mid 2}, reach 250000, bands
+[high,mid], staminaCost 50, air:true }` + `jumpXSpeed 10000` into `CANONICAL_RULES` (the ~7-tick arc
+  IS the tell, so `startup 4 < lAct+1` is intentional; a no-Pareto `air`-island keeps it incomparable
+  with ground); the reads-only readers slice (#164, no bump) adds 8 `rule("moves.tobi-geri.*")` +
+  `jumpXSpeed` leaves. **Story 3 — precise air timing** (#165, no bump): `self.y` (live height, on the
+  fighter) + `self.vy` (`(airborne||air-attacking) ? st.vy : 0`; sign = motion, sentinel 0 grounded)
+  close the air-perception surface (`self.posture` shipped in Story 2). **Story 4 — the gauntlet
+  exercises aerial combat** (3 slices, #166/#167 + this close-out): a characterization pins that a
+  **connecting** air strike zeroes the passivity clock (engagement) while a bare / whiffed one does not
+  — emergent, no engine change (#166); then rekka's reachable-but-dormant `tobi-geri` jump-in is
+  **weaponized** (jump gate `300000 → 250000`) so it connects for a jodan ippon in **100/100** of its
+  bouts, locked by a new **tobi-geri adoption lock** + **v18→v19** bump (#167 — board
+  37/59/40/64/60/40, all 6 ∈ `[25,75]`, every officiating lock still green, coverage 12/12);
+  `docs/benchmark-gauntlet-v19.md` records the board. 1211 tests; each mechanic slice byte-identical
+  absent its config, mutation 100% on changed regions (S1 air path 2 documented equivalents; the
+  tobi-geri lock's move-specificity clause is equivalent-for-rekka — ground scores credit on idle
+  frames, only tobi-geri re-emits its attack action through the arc). **TCB untouched throughout** (no
+  new host / network / fs / time / randomness op). **Air-actions is COMPLETE — the last combat
+  capability; only the platform layer (KotH ladder / HTTP API / Pixi viewer) remains unbuilt.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -779,9 +811,17 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    engine-level "rounds" mechanic left to add. The only WKF-authentic sense of "rounds"
    still unbuilt is the **tournament bracket** — that is the **KotH ladder** in the
    platform layer below, not a §7 combat piece.
-5. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap
-   capability; `self.y`/`self.vy`/`self.posture` are the deferred perception surface).
-   Unblocks Batch 2 of the arsenal expansion (`tobi-geri`, item 1).
+5. **Air-actions — ✅ COMPLETE (the last combat capability, PRs #158–#167).** The fighter
+   leaves the ground: horizontal jump displacement (`jumpXSpeed` + `vx`, Story 1); the
+   `air-attacking` strike mechanic + air defense + the canonical `tobi-geri` jump-in
+   (Story 2, **v18**); the `self.y` / `self.vy` / `self.posture` air-perception surface
+   (Stories 2–3); and the gauntlet weaponization that makes the frozen board actually
+   **exercise** aerial combat (Story 4, **v19** — rekka's jump-in connects 100/100 for a
+   jodan ippon, all 6 ∈ `[25,75]`). Unblocked + shipped Batch 2 of the arsenal (`tobi-geri`,
+   item 1). See the build-log entry above; board `docs/benchmark-gauntlet-v19.md`; design
+   trail archived under `docs/archive/` (`aerial-mobility`, `air-strikes`,
+   `precise-air-timing`, `air-actions-{decisions,stories}`, `gauntlet-aerial-rebalance`).
 
-Also unbuilt (platform layer, later): the KotH ladder (the tournament-_bracket_ sense
-of "rounds"), the HTTP API (`/spec` / `/validate` / `/fight`), and the Pixi viewer.
+**The deep-karate combat tree is now COMPLETE.** Everything remaining is the **platform
+layer** (a separate build phase): the **KotH ladder** (the tournament-_bracket_ sense of
+"rounds"), the **HTTP API** (`/spec` / `/validate` / `/fight`), and the **Pixi viewer**.

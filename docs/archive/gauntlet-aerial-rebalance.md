@@ -1,7 +1,7 @@
 # Plan: Gauntlet exercises aerial combat (air-actions Story 4)
 
 **Branch**: feat/air-actions-s4-gauntlet-rebalance (Slice 2); per-slice branches below
-**Status**: Active — CONFIRM gate (awaiting AC approval before any code)
+**Status**: Complete — Slice 1 PR #166, Slice 2 PR #167, Slice 3 (this close-out). Archived at capability close.
 
 ## Goal
 
@@ -53,7 +53,7 @@ gap (passivity × jump). This is the LAST air-actions slice; it closes the capab
       **connects** zeroes the striker's passivity clock (engagement), while a **bare jump**
       does not — consistent with ground strikes, no engine change. (A whiffed air strike
       also does not reset — same as a ground whiff.)
-- [ ] **AC-4.3 (capability close).** `docs/benchmark-gauntlet-v19.md` records the board +
+- [x] **AC-4.3 (capability close).** `docs/benchmark-gauntlet-v19.md` records the board +
       weaponization narrative + dogfood re-characterization; `docs/STATUS.md` item 5 gets the
       air-actions DONE build-log entry; all air-actions plans archived under `docs/archive/`
       (git mv + README); memory updated. `plans/` ends empty (directory removed).
@@ -140,7 +140,7 @@ rekka fails the new lock, so weaponization + lock + bump must land together or C
    **Done when**: AC-4.1 met, full determinism/replay + calibration suites green, mutation
    reviewed, human approves.
 
-### Slice 3 — capability close-out (AC-4.3)
+### Slice 3 — capability close-out (AC-4.3) — DONE
 
 **One sentence**: Document the v19 board, record air-actions as DONE, and archive the plans.
 **Value**: The capability's build log + calibrated board are recorded; `plans/` is emptied.
