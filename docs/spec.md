@@ -82,6 +82,8 @@ constants in the frame table); `opponent.points` is a live scoreboard read.
 - `self.passivityRemaining`
 - `self.senshu`
 - `self.posture`
+- `self.y`
+- `self.vy`
 - `opponent.x`
 - `opponent.y`
 - `opponent.facing`
@@ -400,6 +402,8 @@ declared-before-use cells — the `validate()` gate remains the authority.
         "self.passivityRemaining",
         "self.senshu",
         "self.posture",
+        "self.y",
+        "self.vy",
         "opponent.x",
         "opponent.y",
         "opponent.facing",

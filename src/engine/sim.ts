@@ -346,6 +346,11 @@ const viewFor = (
       passivityRemaining, // live — the countdown to the passivity foul (B3), derived above
       senshu: selfSenshu, // live — the first-blood tell off the bout-level senshuHolder (C3)
       posture: POSTURE_CODE[self.posture], // air-actions S2: own stance, live (zero delay) — mirrors opponent.posture
+      y: self.y, // air-actions S3: own height, live (zero delay) — the fighter's arc position; 0 grounded
+      // air-actions S3: own vertical velocity, live — sign = motion; vy lives on the airborne
+      vy:
+        // AND air-attacking states (a mid-strike fighter is still falling), 0 in every grounded state
+        st.kind === "airborne" || st.kind === "air-attacking" ? st.vy : 0,
     },
     opponent: {
       ...opponent,
