@@ -242,6 +242,15 @@ export const RULE_READERS = {
   "moves.hiza-geri.reach": (r: Rules) => r.moves["hiza-geri"]?.reach ?? 0,
   "moves.hiza-geri.staminaCost": (r: Rules) =>
     r.moves["hiza-geri"]?.staminaCost ?? 0,
+  "moves.tobi-geri.startup": (r: Rules) => r.moves["tobi-geri"]?.startup ?? 0,
+  "moves.tobi-geri.active": (r: Rules) => r.moves["tobi-geri"]?.active ?? 0,
+  "moves.tobi-geri.recovery": (r: Rules) => r.moves["tobi-geri"]?.recovery ?? 0,
+  "moves.tobi-geri.score": (r: Rules) => r.moves["tobi-geri"]?.score ?? 0,
+  "moves.tobi-geri.reach": (r: Rules) => r.moves["tobi-geri"]?.reach ?? 0,
+  "moves.tobi-geri.staminaCost": (r: Rules) =>
+    r.moves["tobi-geri"]?.staminaCost ?? 0,
+  "moves.tobi-geri.scoreByBand.high": (r: Rules) =>
+    r.moves["tobi-geri"]?.scoreByBand?.high ?? 0,
   "throw.startup": (r: Rules) => r.throw?.startup ?? 0,
   "throw.active": (r: Rules) => r.throw?.active ?? 0,
   "throw.recovery": (r: Rules) => r.throw?.recovery ?? 0,
@@ -251,6 +260,7 @@ export const RULE_READERS = {
   jumpImpulse: (r: Rules) => r.jumpImpulse ?? 0,
   gravity: (r: Rules) => r.gravity ?? 0,
   lowClearance: (r: Rules) => r.lowClearance ?? 0,
+  jumpXSpeed: (r: Rules) => r.jumpXSpeed ?? 0,
   parryWindow: (r: Rules) => r.parryWindow ?? 0,
   parryRecovery: (r: Rules) => r.parryRecovery ?? 0,
   counterWindow: (r: Rules) => r.counterWindow ?? 0,
