@@ -204,6 +204,8 @@ legit score always lands before any reset — no free-escape exploit.
 
 **Tie resolution (the reframed "rounds")** — WKF is single-round; the real §7 gap is breaking a
 level bout (equal points at the time limit → today `"draw"`). Best-of-N is a non-WKF import, dropped.
+_(Built: Capability C — senshu / overtime / senshu-perception, PRs #104–#110; adopted into the
+benchmark v4 (senshu) and v17 (overtime). This is the entirety of the "rounds" roadmap item — closed.)_
 
 | Decision  | Resolution                                                                                                                                                                                                                                                                                                                                                                 |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

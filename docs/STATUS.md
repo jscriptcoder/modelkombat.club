@@ -770,11 +770,18 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    decisive. See the build-log entries + the archived design trail
    (`docs/archive/{jogai,passivity,overtime}-benchmark-adoption.md`, and the shared decisions
    `docs/archive/item3-officiating-adoption-decisions.md`). **Item 3 is fully closed.**
-4. **Rest of §7** — **rounds** (the last unbuilt match-structure piece, beyond the
-   benchmark's yame + win condition + tie resolution).
+4. **Rest of §7 — rounds — ✅ RESOLVED BY REFRAME (no engine work).** `docs/DESIGN.md`
+   §7 established that **WKF kumite is single-round** and dropped **best-of-N** as a
+   non-WKF import. The genuine gap — _breaking a level bout at the time cap_ — was
+   reframed as **tie resolution**, which is fully **built** (Capability C: senshu C1 /
+   sudden-death overtime C2 / senshu perception C3, PRs #104–#110) and **adopted** into
+   the benchmark (senshu `v4`/Capability D, overtime `v17`/item 3). So there is no
+   engine-level "rounds" mechanic left to add. The only WKF-authentic sense of "rounds"
+   still unbuilt is the **tournament bracket** — that is the **KotH ladder** in the
+   platform layer below, not a §7 combat piece.
 5. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap
    capability; `self.y`/`self.vy`/`self.posture` are the deferred perception surface).
    Unblocks Batch 2 of the arsenal expansion (`tobi-geri`, item 1).
 
-Also unbuilt (platform layer, later): the KotH ladder, the HTTP API
-(`/spec` / `/validate` / `/fight`), and the Pixi viewer.
+Also unbuilt (platform layer, later): the KotH ladder (the tournament-_bracket_ sense
+of "rounds"), the HTTP API (`/spec` / `/validate` / `/fight`), and the Pixi viewer.
