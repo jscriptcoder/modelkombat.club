@@ -146,6 +146,13 @@ export type MoveSpec = {
   // Stamina drained ON COMMIT when this move is started (C10), whiff or not. Charged only
   // when `Rules.stamina` is configured. Absent ⇒ 0 ⇒ this move is free (byte-identical).
   staminaCost?: number;
+  // Air technique flag (air-actions S2). When true, this move may be committed only while
+  // AIRBORNE (mid-jump) — an air-route in intake converts the arc into an air-attacking state
+  // that carries the launch velocities, integrates the arc AND the move's frames, then lands
+  // into a grounded landing-recovery (`recovery` ticks). Absent/false ⇒ a normal grounded
+  // technique (byte-identical to the pre-air engine); an `air` move committed while grounded
+  // is inert (later slices type the degrade). Trusted Rules data, not bot-validated.
+  air?: boolean;
 };
 
 // One throw/grapple's frame data (C7). A throw is NOT height-banded — it beats any
