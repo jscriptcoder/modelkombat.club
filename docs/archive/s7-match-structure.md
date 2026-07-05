@@ -1174,7 +1174,11 @@ context alongside the design records:
    into `MATCH` (+ `INPUT_HASH`/version) and teaching their prose in `generateSpec` was deliberately deferred
    (each would force its own gauntlet re-characterization / possible rebalance). The jogai + passivity
    MECHANICS are already built (Capability A / B); only their benchmark+spec adoption remains.
-3. **Rest of §7** — **rounds** (the last unbuilt match-structure piece).
+3. **Rest of §7** — **rounds**. **✅ Superseded — closed by reframe** (see
+   `docs/STATUS.md` item 4): WKF is single-round, best-of-N was dropped, and the
+   level-bout gap it stood for _is_ tie resolution (Capability C), now built + adopted.
+   No engine-level "rounds" work exists; the tournament-_bracket_ sense lives in the KotH
+   ladder (platform layer).
 4. **Air-actions** — air strikes / horizontal jump displacement (a separate roadmap capability).
 
 This archived document is KEPT as the §7 design record — the resolved-decisions/AC sections above remain

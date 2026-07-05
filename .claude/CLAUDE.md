@@ -78,9 +78,11 @@ offline **LLM bot-authoring benchmark v1**, the **gauntlet modernization** (all 
 frozen bots re-authored into the `[25%, 75%]` band with 11/11 arsenal coverage,
 CI-locked at `v14`), and the **officiating benchmark adoption** (jogai `v15` +
 passivity `v16` + overtime `v17` — all three §7 officiating mechanics now scored +
-taught + CI-locked; item 3 CLOSED). **Not yet built:** air-actions and the rest of §7
-(rounds); and the platform layer (KotH ladder, HTTP API, Pixi viewer). See
-`docs/STATUS.md` for detail and the next slice.
+taught + CI-locked; item 3 CLOSED). **§7 is now complete** — "rounds" was resolved by
+reframe (WKF is single-round; best-of-N dropped; the level-bout gap became tie
+resolution, built as Capability C + adopted `v4`/`v17`). **Not yet built:** air-actions;
+and the platform layer (KotH ladder, HTTP API, Pixi viewer). See `docs/STATUS.md` for
+detail and the next slice.
 
 Flow for the next capability: `grill-me` → `planning` → TDD, **PR per capability**. The
 §11 combat-resolution spine (two-phase compute-then-apply, `strike > throw > guard`)
