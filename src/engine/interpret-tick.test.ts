@@ -51,6 +51,7 @@ const getMockState = (o: StateOverrides = {}): State => ({
     penalties: 0,
     passivityRemaining: 0,
     senshu: 0,
+    posture: 0,
     ...o.self,
   },
   opponent: {
@@ -219,6 +220,7 @@ describe("runTick — numeric reads", () => {
     ["self.penalties", { self: { penalties: 2 } }, 2],
     ["self.passivityRemaining", { self: { passivityRemaining: 8 } }, 8],
     ["self.senshu", { self: { senshu: 1 } }, 1],
+    ["self.posture", { self: { posture: 2 } }, 2],
     ["opponent.x", { opponent: { x: 250 } }, 250],
     ["opponent.facing", { opponent: { facing: -1 } }, -1],
     ["opponent.distance", { opponent: { distance: 88 } }, 88],

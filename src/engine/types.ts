@@ -71,6 +71,7 @@ export type SelfState = {
   penalties: number; // shared jogai/passivity warning count (live scoreboard, like points); 0 = none
   passivityRemaining: number; // B3: ticks until the passivity foul (live self-proprioception); max(0, limit − ticksSinceOffense), 0 = foul imminent / no passivity configured (the sentinel)
   senshu: number; // C3 first-blood tell (live, egocentric): 1 iff I hold senshu, else 0 (0 = undecided/none, or no senshu configured — the sentinel)
+  posture: number; // air-actions S2: own stance enum, 0 standing / 1 crouching / 2 airborne — mirrors opponent.posture, but LIVE (zero delay); sentinel 0 when grounded/standing
 };
 
 export type OpponentState = {

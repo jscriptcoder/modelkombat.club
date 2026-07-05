@@ -41,10 +41,10 @@ The hardened ACs live in `plans/air-actions-stories.md` §"Story 2 — Air strik
 - [x] Table happy-path: airborne `{attack, <air move>, high}` in range/active ⇒ ippon;
       high whiffs a croucher (crouch vacates high); `{…, mid}` ⇒ 2 vs standing AND
       crouching — Slice 1 (fixture move) ✅ (PR #159) + Slice 4 (canonical, pending)
-- [ ] **AC-2.8** typed degrade for wrong-context air paths — Slice 2
-- [ ] **AC-2.9** one air strike per jump; non-attacks airborne degrade to idle — Slice 2
-- [ ] **AC-2.4** jump-while-gassed launches; unaffordable air strike degrades — Slice 2
-- [ ] `self.posture` ∈ {0,1,2} live read (the AC-3.1 posture portion) — Slice 2
+- [x] **AC-2.8** typed degrade for wrong-context air paths — Slice 2 ✅ (PR #TBD)
+- [x] **AC-2.9** one air strike per jump; non-attacks airborne degrade to idle — Slice 2 ✅
+- [x] **AC-2.4** jump-while-gassed launches; unaffordable air strike degrades — Slice 2 ✅
+- [x] `self.posture` ∈ {0,1,2} live read (the AC-3.1 posture portion) — Slice 2 ✅
 - [ ] **AC-2.1** reactable + blockable + parry/counter — Slice 3
 - [ ] **AC-2.3** swap-symmetry of air resolutions (trade / clean-stuff) — Slice 3
 - [ ] **AC-2.5** air strike can be the okizeme finish — Slice 3
