@@ -56,6 +56,8 @@ const state = (o: StateOverrides = {}): State => ({
     passivityRemaining: 0,
     senshu: 0,
     posture: 0,
+    y: 0,
+    vy: 0,
     ...o.self,
   },
   opponent: {

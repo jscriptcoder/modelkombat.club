@@ -77,6 +77,8 @@ export type SelfState = {
   passivityRemaining: number; // B3: ticks until the passivity foul (live self-proprioception); max(0, limit − ticksSinceOffense), 0 = foul imminent / no passivity configured (the sentinel)
   senshu: number; // C3 first-blood tell (live, egocentric): 1 iff I hold senshu, else 0 (0 = undecided/none, or no senshu configured — the sentinel)
   posture: number; // air-actions S2: own stance enum, 0 standing / 1 crouching / 2 airborne — mirrors opponent.posture, but LIVE (zero delay); sentinel 0 when grounded/standing
+  y: number; // air-actions S3: own height in sub-units (live, zero delay); 0 grounded (mirrors opponent.y, but undelayed)
+  vy: number; // air-actions S3: own vertical velocity (live) — sign = motion: > 0 rising, < 0 falling, 0 at apex; sentinel 0 when grounded (no opponent mirror — the first self-velocity read)
 };
 
 export type OpponentState = {

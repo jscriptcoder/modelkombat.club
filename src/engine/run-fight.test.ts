@@ -1892,6 +1892,203 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
     expect(JSON.stringify(gated.events)).toBe(JSON.stringify(idle.events));
   });
 
+  // ── Story 3: precise air timing (self.y height + self.vy vertical velocity) ──
+  // self.posture (Slice 2) tells a bot IF it is airborne; self.y / self.vy tell it
+  // WHERE in the arc — the height, and (via the SIGN of vy) rising / apex / falling.
+  // Both are live (zero delay); grounded reads are sentinel 0.
+
+  const cmp = (
+    path: FieldPath,
+    op: "gt" | "lt" | "gte" | "lte",
+    value: number,
+  ): BoolExpr => ({
+    op,
+    args: [
+      { op: "field", path },
+      { op: "const", value },
+    ],
+  });
+
+  const firstAttackTick = (evs: { a: { action: Action } }[]): number =>
+    evs.findIndex((e) => e.a.action.type === "attack");
+
+  const airAttackMid: Action = {
+    type: "attack",
+    move: "mawashi-geri",
+    band: "mid",
+  };
+
+  it("reads self.y as the live arc height so a bot gates its air strike on altitude", () => {
+    // The arc peaks at y = 24000 (jumpImpulse 12000 / gravity 4000). A gate at the apex height
+    // fires; a gate ABOVE the apex never does — proving self.y reads the real, bounded height.
+    const gatedAt = (h: number): BotDoc =>
+      bot(
+        [
+          { when: atTick(0), do: { type: "jump", dir: 0 } },
+          { when: cmp("self.y", "gte", h), do: airAttackMid },
+        ],
+        { type: "idle" },
+      );
+
+    const reachesApex = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: gatedAt(24000),
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    const aboveApex = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: gatedAt(30000),
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    expect(firstAttackTick(reachesApex.events)).toBeGreaterThan(0); // self.y climbs to 24000 ⇒ the gate fires
+    expect(firstAttackTick(aboveApex.events)).toBe(-1); // self.y never reaches 30000 ⇒ it never fires
+  });
+
+  it("reads self.vy with sign = motion: > 0 rising, < 0 falling — a bot times its strike to the descent", () => {
+    const gatedBy = (op: "gt" | "lt"): BotDoc =>
+      bot(
+        [
+          { when: atTick(0), do: { type: "jump", dir: 0 } },
+          { when: cmp("self.vy", op, 0), do: airAttackMid },
+        ],
+        { type: "idle" },
+      );
+
+    const rising = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: gatedBy("gt"),
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    const falling = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: gatedBy("lt"),
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    const tr = firstAttackTick(rising.events);
+    const tf = firstAttackTick(falling.events);
+
+    expect(tr).toBeGreaterThan(0); // vy > 0 (rising) fires on the way up
+    expect(tf).toBeGreaterThan(0); // vy < 0 (falling) fires on the way down
+    expect(tf).toBeGreaterThan(tr); // ...strictly LATER — the rising half precedes the falling half, so
+    // the sign is not inverted (else tf < tr) and not constant (else one gate never fires ⇒ -1).
+  });
+
+  it("reads self.y / self.vy as sentinel 0 when grounded: a never-jumping air-gated bot is byte-identical to idle", () => {
+    const byHeight = bot([{ when: cmp("self.y", "gt", 0), do: airAttackMid }], {
+      type: "idle",
+    });
+
+    const byVy = bot([{ when: cmp("self.vy", "lt", 0), do: airAttackMid }], {
+      type: "idle",
+    });
+
+    const base = runFight(
+      getMockConfig({ rules: airRules(), botA: IDLE, botB: IDLE, maxTicks: 8 }),
+    );
+
+    const h = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: byHeight,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    const v = runFight(
+      getMockConfig({ rules: airRules(), botA: byVy, botB: IDLE, maxTicks: 8 }),
+    );
+
+    // Never airborne ⇒ self.y = 0 (not > 0) and self.vy = 0 (not < 0) ⇒ neither gate fires ⇒ identical.
+    expect(JSON.stringify(h.events)).toBe(JSON.stringify(base.events));
+    expect(JSON.stringify(v.events)).toBe(JSON.stringify(base.events));
+  });
+
+  it("reads a grounded self.vy as the numeric sentinel 0 (not an undefined/stale read): a `self.vy >= 0` gate fires immediately", () => {
+    // Pins that grounded vy is exactly 0: `0 >= 0` fires the move, whereas an undefined/NaN read
+    // (e.g. reading a non-airborne state's absent velocity) would make `>= 0` false and never move.
+    const vyGeZero = bot(
+      [{ when: cmp("self.vy", "gte", 0), do: { type: "move", dir: 1 } }],
+      { type: "idle" },
+    );
+
+    const rules = airRules();
+
+    const r = runFight(
+      getMockConfig({ rules, botA: vyGeZero, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(r.events[r.events.length - 1].a.x).toBeGreaterThan(aStartX(rules)); // grounded ⇒ vy is 0 ⇒ it advances
+  });
+
+  it("reads self.vy while air-attacking too: a mid-strike bot observes its own descent (the reader covers airborne AND air-attacking)", () => {
+    // Jump, commit the air strike while still RISING (posture == 2), so the ENTIRE descent happens
+    // during the air-attacking state. A TRACKER records whether self.vy ever read < 0 mid-strike;
+    // after landing a forward move reveals it. reach 1 ⇒ the strike whiffs (no connect/yame confound).
+    const watchDescent: BotDoc = {
+      ...bot(
+        [
+          { when: atTick(0), do: { type: "jump", dir: 0 } },
+          {
+            when: cmp("self.vy", "lt", 0),
+            set: [{ cell: "sawDescent", to: { op: "const", value: 1 } }],
+          }, // tracker (no `do`) ⇒ applies + continues, even while locked mid-strike
+          { when: whenPosture(2), do: airAttackMid },
+          {
+            when: {
+              op: "and",
+              args: [
+                whenPosture(0),
+                {
+                  op: "eq",
+                  args: [
+                    { op: "mem", cell: "sawDescent" },
+                    { op: "const", value: 1 },
+                  ],
+                },
+              ],
+            },
+            do: { type: "move", dir: 1 },
+          },
+        ],
+        { type: "idle" },
+      ),
+      memory: { sawDescent: 0 },
+    };
+
+    const rules = airRules({ reach: 1 }, { lowClearance: 10000 });
+
+    const r = runFight(
+      getMockConfig({
+        rules,
+        botA: watchDescent,
+        botB: IDLE,
+        maxTicks: 14,
+      }),
+    );
+
+    // After landing the fighter moves forward ⇒ it read self.vy < 0 DURING the air-attacking arc.
+    // With an airborne-only reader (self.vy = 0 mid-strike), sawDescent stays 0 ⇒ it never moves.
+    const finalX = r.events[r.events.length - 1].a.x;
+    expect(finalX).toBeGreaterThan(aStartX(rules));
+  });
+
   // ── Slice 3: air defense (a grounded defender answers an air strike) ──────────
   // The air-attacking fighter is "just an active striker", so block / parry / counter /
   // trade / clean-stuff / okizeme-finish all compose through the existing §11 union
