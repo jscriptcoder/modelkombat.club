@@ -1513,10 +1513,9 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
       }),
     );
 
-    const plainJump = bot(
-      [{ when: atTick(0), do: { type: "jump", dir: 1 } }],
-      { type: "idle" },
-    );
+    const plainJump = bot([{ when: atTick(0), do: { type: "jump", dir: 1 } }], {
+      type: "idle",
+    });
 
     const plain = runFight(
       getMockConfig({ rules, botA: plainJump, botB: IDLE, maxTicks: 7 }),
