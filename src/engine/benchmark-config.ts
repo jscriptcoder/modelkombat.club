@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v18"; // Air arsenal: CANONICAL_RULES gains the airborne `tobi-geri` (jump-in jodan-3 / chudan-2) + `jumpXSpeed` (horizontal jump displacement) — the first canonical air technique reaches the benchmark, so the frame table + spec change (one INPUT_HASH flip)
+export const BENCHMARK_VERSION = "v19"; // Aerial exercise: rekka's reachable-but-dormant `tobi-geri` jump-in is weaponized (its gate `opponent.distance > 300000`, which the ~286k opening gap never cleared, is lowered to > 250000) so the gauntlet actually EXERCISES aerial combat — rekka jumps off the opening gap and connects for a jodan ippon, all 6 members stay ∈ [25,75]. Only the rekka bot text changes (one INPUT_HASH flip); CANONICAL_RULES + the spec's move table are unchanged
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -71,4 +71,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // benchmark-config.test.ts prints the expected value on drift. (Computed over all-LF bot
 // texts, pinned by `.gitattributes`, so the digest is byte-stable on every platform.)
 export const INPUT_HASH =
-  "a23c05f94615b4e2e9cea671ff438714851dfd7632070c39bcc405d4156d6c6b";
+  "4764cdd7a51fbded720070f52e1cc34e5b7486d173b4fd5772583fc6e75f8926";

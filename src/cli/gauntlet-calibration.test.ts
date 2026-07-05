@@ -99,7 +99,7 @@ describe("gauntlet calibration lock — the certified measuring instrument", () 
   describe("coverage: the roster exercises the full arsenal", () => {
     const arsenal = Object.keys(CANONICAL_RULES.moves);
 
-    it("references every CANONICAL_RULES.moves technique (11/11)", () => {
+    it("references every CANONICAL_RULES.moves technique (12/12)", () => {
       const covered = new Set(roster.flatMap(movesReferencedBy));
       const uncovered = arsenal.filter((move) => !covered.has(move));
 
@@ -605,6 +605,180 @@ describe("overtime adoption lock — fires on the v17 board (fires + field-read)
       };
 
       expect(readsClockOvertime(otherReader)).toBe(false);
+    });
+  });
+});
+
+// ── The tobi-geri adoption lock (air-actions Story 4 / v19) — certifies the gauntlet EXERCISES
+// aerial combat, not merely that the arsenal LISTS the airborne technique. Two invariants,
+// mirroring the officiating locks' "fires + field-read" contract:
+//   1. CONNECTS — rekka (the aerial carrier) lands ≥1 `tobi-geri` on the frozen board: a tick
+//      where it is committed to a tobi-geri AND its points jump by ≥2 (a chudan waza-ari (2) or
+//      jodan ippon (3) landed; the ≥2 delta excludes the +1 penalty-point confound the shared
+//      foul ladder could otherwise inject). The jump-in was reachable-but-DORMANT through v18 (its
+//      gate `opponent.distance > 300000`, which the ~286k opening gap never clears, so rekka never
+//      jumped); v19 lowers the gate to > 250000 so it fires and connects.
+//   2. FIELD-READ — rekka references `self.posture` (the airborne-state read) to release the
+//      strike only while aloft — the dedicated air-perception path (the direct analog of
+//      `readsPassivityRemaining` / `readsClockOvertime`).
+// Each ships with a companion proving it is not vacuous theatre.
+
+// Rekka with its jump-in gate set to `gate` (µdist). Structurally clones the doc and rewrites the
+// sole `opponent.distance`-vs-const comparison inside the jump rule (the rule whose action is
+// `{type:"jump"}`), leaving everything else identical. Used to build the DORMANT counterfactual
+// (gate 300000, which the ~286k opening gap never clears) that proves the connects guard keys off
+// the live jump-in — the gate lowering — not merely off tobi-geri existing in the arsenal.
+const rekkaWithJumpGate = (gate: number): BotDoc => {
+  const rekka = rosterBot("rekka");
+
+  const isOppDistance = (e: NumExpr): boolean =>
+    e.op === "field" && e.path === "opponent.distance";
+
+  // In a comparison's operand pair, replace the const being compared against
+  // `opponent.distance` with `gate`; pass any other comparison through unchanged.
+  const swapGate = ([l, r]: [NumExpr, NumExpr]): [NumExpr, NumExpr] => {
+    if (isOppDistance(l) && r.op === "const")
+      return [l, { op: "const", value: gate }];
+    if (isOppDistance(r) && l.op === "const")
+      return [{ op: "const", value: gate }, r];
+
+    return [l, r];
+  };
+
+  const rewrite = (node: BoolExpr): BoolExpr => {
+    switch (node.op) {
+      case "gt":
+      case "lt":
+      case "gte":
+      case "lte":
+      case "eq":
+      case "neq":
+        return { op: node.op, args: swapGate(node.args) };
+      case "and":
+      case "or":
+        return { op: node.op, args: node.args.map(rewrite) };
+      case "not":
+        return { op: "not", arg: rewrite(node.arg) };
+    }
+  };
+
+  return {
+    ...rekka,
+    rules: rekka.rules.map((rule) =>
+      rule.do?.type === "jump" ? { ...rule, when: rewrite(rule.when) } : rule,
+    ),
+  };
+};
+
+// How many `tobi-geri` connects the given rekka variant lands across the round-robin (rekka vs
+// each other roster member, both sides, all seeds). A connect = a tick where the variant is
+// committed to a tobi-geri (its frame action is `attack tobi-geri`, incl. the locked re-emission
+// through startup/active) AND its points jump by ≥2 vs the prior tick. The score resolves off the
+// pre-advance airborne snapshot and the strike then lands (AC-2.2 connect-then-land), so the frame
+// on the scoring tick already shows y=0 — attribution rides the committed action + the ≥2 delta,
+// not the y coordinate.
+const tobiGeriConnects = (rekka: BotDoc): number => {
+  let connects = 0;
+
+  // Only a tobi-geri ever credits points on a rekka ATTACK frame: rekka's rule 1 emits `idle`
+  // while locked in a ground move's active window (so ground scores land on idle frames), whereas
+  // rule 0 re-emits `attack tobi-geri` throughout the airborne arc (posture stays 2), so the
+  // jump-in's score lands while its action still reads tobi-geri. `move === "tobi-geri"` is thus
+  // equivalent to a bare `type === "attack"` for THIS detector — kept explicit for fidelity.
+  const scan = (r: ReturnType<typeof runFight>, side: "a" | "b"): void => {
+    for (let t = 1; t < r.events.length; t++) {
+      const cur = r.events[t][side];
+      const prev = r.events[t - 1][side];
+
+      const committed =
+        cur.action.type === "attack" && cur.action.move === "tobi-geri";
+
+      if (committed && cur.points - prev.points >= 2) connects++;
+    }
+  };
+
+  for (const other of roster) {
+    if (other.name === "rekka") continue;
+
+    for (const seed of SEEDS) {
+      const cfg = { rules: CANONICAL_RULES, maxTicks: MAX_TICKS, seed };
+
+      scan(runFight({ ...cfg, botA: rekka, botB: other, match: MATCH }), "a");
+      scan(runFight({ ...cfg, botA: other, botB: rekka, match: MATCH }), "b");
+    }
+  }
+
+  return connects;
+};
+
+// Whether a bot references `self.posture` anywhere in its CONDITIONS — the air-perception
+// field-read walk (the BoolExpr presence check, parallel to `readsPassivityRemaining` /
+// `readsClockOvertime`; the field IS the meaningful surface, no constant band to classify).
+const readsSelfPosture = (bot: BotDoc): boolean => {
+  const isPostureField = (e: NumExpr): boolean =>
+    e.op === "field" && e.path === "self.posture";
+
+  const walk = (node: BoolExpr): boolean => {
+    switch (node.op) {
+      case "gt":
+      case "lt":
+      case "gte":
+      case "lte":
+      case "eq":
+      case "neq":
+        return isPostureField(node.args[0]) || isPostureField(node.args[1]);
+      case "and":
+      case "or":
+        return node.args.some(walk);
+      case "not":
+        return walk(node.arg);
+    }
+  };
+
+  return bot.rules.some((rule) => walk(rule.when));
+};
+
+describe("tobi-geri adoption lock — exercised on the v19 board (connects + field-read)", () => {
+  describe("connects: rekka lands a tobi-geri on the board", () => {
+    it("some board bout has rekka score a tobi-geri connect (points jump ≥2 while committed)", () => {
+      expect(tobiGeriConnects(rosterBot("rekka"))).toBeGreaterThan(0);
+    });
+
+    it("would connect nothing with the jump-in dormant (the guard bites)", () => {
+      // Raise rekka's jump gate back to the v18 value (300000): the ~286k opening gap never
+      // clears it, so rekka never jumps, so no tobi-geri is ever thrown — proving the connects
+      // guard keys off the live jump-in (the gate lowering), not merely off tobi-geri existing.
+      expect(tobiGeriConnects(rekkaWithJumpGate(300000))).toBe(0);
+    });
+  });
+
+  describe("field-read: rekka reads self.posture to time the strike", () => {
+    it("references self.posture in a condition (releases tobi-geri only while airborne)", () => {
+      expect(readsSelfPosture(rosterBot("rekka"))).toBe(true);
+    });
+
+    it("would not count a bot that reads only other fields (the guard bites)", () => {
+      // A bot referencing a DIFFERENT self field (self.x) must NOT satisfy the air-perception
+      // field-read — proving the walk keys off the dedicated `self.posture` path, not any self read.
+      const otherReader: BotDoc = {
+        version: 1,
+        name: "other-reader",
+        rules: [
+          {
+            when: {
+              op: "gt",
+              args: [
+                { op: "field", path: "self.x" },
+                { op: "const", value: 300000 },
+              ],
+            },
+            do: { type: "idle" },
+          },
+        ],
+        default: { type: "idle" },
+      };
+
+      expect(readsSelfPosture(otherReader)).toBe(false);
     });
   });
 });

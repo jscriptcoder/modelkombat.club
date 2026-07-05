@@ -41,13 +41,15 @@ gap (passivity × jump). This is the LAST air-actions slice; it closes the capab
 
 ## Acceptance Criteria
 
-- [ ] **AC-4.1 (tobi-geri really connects, band stays green).** A new calibration lock
+- [x] **AC-4.1 (tobi-geri really connects, band stays green).** A new calibration lock
       proves `tobi-geri` **connects (scores a jodan ippon) in ≥1 frozen-board bout** carried
       by rekka; a "guard bites" companion (dormant rekka) yields **0** such connects. The
       band guard (all 6 ∈ `[0.25, 0.75]`) and coverage guard (12/12) stay green. A new
       `BENCHMARK_VERSION` (v18→**v19**) + recomputed `INPUT_HASH` + regenerated `spec.md`
-      version string + `docs/benchmark-gauntlet-v19.md`.
-- [ ] **AC-4.2 (passivity × jump).** A characterization test proves an air strike that
+      version string + `docs/benchmark-gauntlet-v19.md`. _(Slice 2 — this branch; board
+      37/59/40/64/60/40, all officiating locks still green, INPUT_HASH `4764cdd7…`. The
+      `docs/benchmark-gauntlet-v19.md` board doc lands in Slice 3.)_
+- [x] **AC-4.2 (passivity × jump).** A characterization test proves an air strike that
       **connects** zeroes the striker's passivity clock (engagement), while a **bare jump**
       does not — consistent with ground strikes, no engine change. (A whiffed air strike
       also does not reset — same as a ground whiff.)
@@ -61,7 +63,7 @@ gap (passivity × jump). This is the LAST air-actions slice; it closes the capab
 Every slice follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. Load `tdd` + `testing` +
 `mutation-testing` + `refactoring` (and `characterisation-tests` for Slice 1) before code.
 
-### Slice 1 — passivity × jump characterization (AC-4.2)
+### Slice 1 — passivity × jump characterization (AC-4.2) — DONE (PR #166)
 
 **One sentence**: Pin that a connecting air strike counts as passivity engagement while a
 bare jump does not.
@@ -95,7 +97,7 @@ no new production mutants introduced; the value is regression coverage of the ai
 **REFACTOR**: Assess fixture-helper reuse only.
 **Done when**: AC-4.2 met, byte-identical `npm run fight` confirmed, mutation reviewed, human approves.
 
-### Slice 2 — weaponize rekka + `tobi-geri` connects-lock + v19 bump (AC-4.1)
+### Slice 2 — weaponize rekka + `tobi-geri` connects-lock + v19 bump (AC-4.1) — DONE
 
 **One sentence**: Lower rekka's jump gate so `tobi-geri` connects on the board, and lock it
 in with a calibration guard + a version bump.
