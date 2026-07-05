@@ -1248,7 +1248,8 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
 
   it("refuses an air strike at a band the move cannot reach (band-legality gate)", () => {
     // bands [high, mid] ⇒ an air `low` attack is not band-legal ⇒ it does not start (degrades to
-    // `locked`, like an out-of-band ground attack), so nothing scores.
+    // `out-of-band`, exactly like an out-of-band ground attack — S2 mirrors the ground routing), so
+    // nothing scores.
     const result = runFight(
       getMockConfig({
         rules: airRules(),
@@ -1258,7 +1259,7 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
       }),
     );
 
-    expect(result.events[1].a.degrade).toBe("locked"); // the air `low` attack is refused
+    expect(result.events[1].a.degrade).toBe("out-of-band"); // the air `low` attack is refused
     for (const e of result.events) expect(e.a.points).toBe(0); // never connects
   });
 
@@ -1390,7 +1391,7 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
     expect(result.events[3].a.points).toBe(3); // NOT 6 — `scored` latches after the first connect
   });
 
-  it("leaves a non-air airborne attack inert: it degrades to `locked` and the arc is unchanged", () => {
+  it("degrades a non-air airborne attack to `wrong-context` and leaves the arc unchanged", () => {
     const noAir = getMockRules({ jumpImpulse: 12000, gravity: 4000 }); // no air move configured
 
     const jumpThenGround = bot(
@@ -1427,7 +1428,7 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
       }),
     );
 
-    expect(attempted.events[1].a.degrade).toBe("locked"); // airborne gyaku-zuki (no air flag) refused
+    expect(attempted.events[1].a.degrade).toBe("wrong-context"); // airborne gyaku-zuki: a ground move mid-air
     // Physics identical to a plain jump — the refused attack has zero effect on x/y/points.
     expect(attempted.events.map((e) => [e.a.x, e.a.y, e.a.points])).toEqual(
       plain.events.map((e) => [e.a.x, e.a.y, e.a.points]),
@@ -1472,8 +1473,9 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
   });
 
   it("refuses an airborne attack naming an unconfigured move (no air strike, no crash)", () => {
-    // `mae-geri` is not in the fixture move table ⇒ the air-route reads `undefined` and refuses
-    // (falls through to `locked`) rather than dereferencing it. No air strike starts; nothing scores.
+    // `mae-geri` is not in the fixture move table ⇒ the air-route reads `undefined` and refuses as
+    // `inert` (an unconfigured slot, exactly as when grounded) rather than dereferencing it. No air
+    // strike starts; nothing scores.
     const jumpThenUnconfigured = bot(
       [
         { when: atTick(0), do: { type: "jump", dir: 1 } },
@@ -1494,7 +1496,7 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
       }),
     );
 
-    expect(result.events[1].a.degrade).toBe("locked"); // unconfigured slot ⇒ refused
+    expect(result.events[1].a.degrade).toBe("inert"); // unconfigured slot ⇒ inert (as when grounded)
     for (const e of result.events) expect(e.a.points).toBe(0); // never connects
   });
 
@@ -1567,6 +1569,327 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
     }
 
     expect(forward.events[2].a.points).toBe(mirrored.events[2].b.points); // same score from either slot
+  });
+
+  // ── Slice 2: air routing (wrong-context degrade, one-per-jump, affordability, self.posture) ──
+
+  const whenPosture = (k: number): BoolExpr => ({
+    op: "eq",
+    args: [
+      { op: "field", path: "self.posture" },
+      { op: "const", value: k },
+    ],
+  });
+
+  it("degrades an air move committed from the GROUND with `wrong-context` (an air technique can't launch grounded)", () => {
+    const groundedAirMove = bot(
+      [
+        {
+          when: atTick(0),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: groundedAirMove,
+        botB: IDLE,
+        maxTicks: 4,
+      }),
+    );
+
+    expect(result.events[0].a.degrade).toBe("wrong-context"); // an air move is not a grounded action
+
+    for (const e of result.events) {
+      expect(e.a.y).toBe(0); // never leaves the ground (no state started)
+      expect(e.a.points).toBe(0); // and never scores
+    }
+  });
+
+  it.each<[string, Action]>([
+    ["block", { type: "block", band: "mid" }],
+    ["crouch", { type: "crouch" }],
+    ["move", { type: "move", dir: 1 }],
+    ["throw", { type: "throw" }],
+    ["sweep", { type: "sweep" }],
+    ["throw-break", { type: "throw-break" }],
+    ["jump", { type: "jump", dir: 1 }],
+  ])(
+    "degrades an airborne %s to `wrong-context` (a grounded intent mid-air)",
+    (_label, action) => {
+      const jumpThenAction = bot(
+        [
+          { when: atTick(0), do: { type: "jump", dir: 1 } },
+          { when: atTick(1), do: action },
+        ],
+        { type: "idle" },
+      );
+
+      const result = runFight(
+        getMockConfig({
+          rules: airRules(),
+          botA: jumpThenAction,
+          botB: IDLE,
+          maxTicks: 8,
+        }),
+      );
+
+      expect(result.events[1].a.degrade).toBe("wrong-context");
+    },
+  );
+
+  it("leaves an airborne idle un-degraded (no frustration) and rides the arc identically", () => {
+    const jumpThenIdle = bot(
+      [{ when: atTick(0), do: { type: "jump", dir: 1 } }],
+      {
+        type: "idle",
+      },
+    );
+
+    const jumpThenBlock = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        { when: atTick(1), do: { type: "block", band: "mid" } },
+      ],
+      { type: "idle" },
+    );
+
+    const idle = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenIdle,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    const blocked = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenBlock,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    expect(idle.events[1].a.degrade).toBe(null); // airborne idle wanted nothing
+    // The wrong-context block is a pure idle-ride: identical trajectory to a plain airborne idle.
+    expect(blocked.events.map((e) => [e.a.x, e.a.y])).toEqual(
+      idle.events.map((e) => [e.a.x, e.a.y]),
+    );
+  });
+
+  it("permits only ONE air strike per jump: a second air attack degrades to `locked`", () => {
+    const jumpThenTwoAir = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        {
+          when: atTick(1),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+        {
+          when: atTick(3),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenTwoAir,
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    expect(result.events[2].a.points).toBe(3); // the first strike connects
+    expect(result.events[3].a.degrade).toBe("locked"); // the second is refused (already committed)
+    for (const e of result.events) expect(e.a.points).toBeLessThanOrEqual(3); // never a second score
+  });
+
+  it("launches a jump even while gassed — a jump costs no stamina (AC-2.4)", () => {
+    const rules = airRules({}, { stamina: { max: 10, gasThreshold: 20 } }); // starts gassed (10 ≤ 20)
+
+    const jumpOnly = bot([{ when: atTick(0), do: { type: "jump", dir: 1 } }], {
+      type: "idle",
+    });
+
+    const result = runFight(
+      getMockConfig({ rules, botA: jumpOnly, botB: IDLE, maxTicks: 3 }),
+    );
+
+    expect(result.events[0].a.degrade).toBe(null); // the jump is honoured
+    expect(result.events[0].a.y).toBeGreaterThan(0); // it launches despite being gassed
+    expect(result.events[0].a.stamina).toBe(10); // and spends nothing
+  });
+
+  it("degrades an UNAFFORDABLE air strike (no spend) and rides the arc to landing (AC-2.4)", () => {
+    const rules = airRules({ staminaCost: 40 }, { stamina: { max: 30 } }); // 30 < 40 ⇒ unaffordable
+
+    const jumpOnly = bot([{ when: atTick(0), do: { type: "jump", dir: 1 } }], {
+      type: "idle",
+    });
+
+    const striker = runFight(
+      getMockConfig({
+        rules,
+        botA: jumpThenAir(2, "high"),
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    const plain = runFight(
+      getMockConfig({ rules, botA: jumpOnly, botB: IDLE, maxTicks: 10 }),
+    );
+
+    expect(striker.events[2].a.degrade).toBe("unaffordable"); // the strike can't be afforded
+    // A pure no-op: no spend, no strike, no altered arc — identical physics to a plain jump.
+    expect(
+      striker.events.map((e) => [e.a.x, e.a.y, e.a.points, e.a.stamina]),
+    ).toEqual(plain.events.map((e) => [e.a.x, e.a.y, e.a.points, e.a.stamina]));
+  });
+
+  it("spends stamina when an air strike is affordable (the meter drains on commit)", () => {
+    const rules = airRules({ staminaCost: 20 }, { stamina: { max: 100 } });
+
+    const result = runFight(
+      getMockConfig({
+        rules,
+        botA: jumpThenAir(2, "high"),
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    expect(result.events[1].a.stamina).toBe(100); // airborne, pre-strike — no spend, no regen
+    expect(result.events[2].a.stamina).toBe(80); // the commit drains 20
+    expect(result.events[3].a.points).toBe(3); // and the strike still connects
+  });
+
+  it("serves a longer landing recovery when the air strike is committed GASSED (gasRecovery, like a ground commit)", () => {
+    // Measure recovery length by when the queued relaunch (default jump) fires after landing (tick 6).
+    const jumpAirThenRelaunch = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        {
+          when: atTick(1),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "jump", dir: 1 }, // relaunch the instant the fighter is free again
+    );
+
+    const freeTick = (rules: Rules): number =>
+      runFight(
+        getMockConfig({
+          rules,
+          botA: jumpAirThenRelaunch,
+          botB: IDLE,
+          maxTicks: 20,
+        }),
+      ).events.findIndex((e, t) => t > 6 && e.a.y > 0); // first airborne tick AFTER landing
+
+    const nonGassed = freeTick(
+      airRules({ staminaCost: 20 }, { stamina: { max: 100 } }), // 80 left, no gas line ⇒ no penalty
+    );
+
+    const gassed = freeTick(
+      airRules(
+        { staminaCost: 20 },
+        { stamina: { max: 20, gasThreshold: 50, gasRecoveryPenalty: 4 } }, // drains to 0 ≤ 50 ⇒ gassed
+      ),
+    );
+
+    expect(gassed - nonGassed).toBe(4); // exactly gasRecoveryPenalty extra recovery ticks
+  });
+
+  it("reads self.posture === 2 mid-arc so a bot can gate its air strike on being airborne", () => {
+    const airGatedByPosture = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        {
+          when: whenPosture(2),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: airRules({}, { lowClearance: 10000 }),
+        botA: airGatedByPosture,
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    // posture first reads 2 at tick 2 ⇒ the strike commits then (startup 1) and connects at tick 3.
+    expect(result.events[1].a.points).toBe(0);
+    expect(result.events[3].a.points).toBe(3); // the posture-gated air strike lands the ippon
+  });
+
+  it("reads self.posture === 1 while crouching (distinct from standing/airborne)", () => {
+    const crouchThenMove = bot(
+      [
+        { when: atTick(0), do: { type: "crouch" } },
+        { when: whenPosture(1), do: { type: "move", dir: 1 } },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: crouchThenMove,
+        botB: IDLE,
+        maxTicks: 4,
+      }),
+    );
+
+    const startX = aStartX(airRules());
+    expect(result.events[0].a.x).toBe(startX); // tick 0: crouched (posture read 0) ⇒ no move
+    expect(result.events[1].a.x).toBe(startX + 4000); // tick 1: posture read 1 ⇒ the move fires
+    expect(result.events[2].a.x).toBe(startX + 4000); // tick 2: posture back to 0 ⇒ no further move
+  });
+
+  it("reads self.posture === 0 while standing: a grounded posture-gated bot is byte-identical to idle", () => {
+    const groundedPostureGated = bot(
+      [
+        {
+          when: whenPosture(2),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const gated = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: groundedPostureGated,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    const idle = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: IDLE,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    // Standing ⇒ posture is 0, never 2 ⇒ the gate never fires ⇒ identical to a plain idle bot.
+    expect(JSON.stringify(gated.events)).toBe(JSON.stringify(idle.events));
   });
 });
 

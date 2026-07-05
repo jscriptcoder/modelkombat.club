@@ -67,7 +67,12 @@ import { mulberry32 } from "./prng.js";
 // a committed fighter's action ignored (its move can't be interrupted); `inert`: a move /
 // sweep / throw this Rules doesn't configure. `null` (on the frame) ⇒ the action was
 // honoured (or an idle asked for nothing).
-export type DegradeReason = "unaffordable" | "out-of-band" | "locked" | "inert";
+export type DegradeReason =
+  | "unaffordable"
+  | "out-of-band"
+  | "locked"
+  | "inert"
+  | "wrong-context"; // air-actions S2: an air move grounded, or a grounded action mid-air
 
 export type FighterFrame = {
   x: number;
@@ -335,6 +340,7 @@ const viewFor = (
       penalties: self.penaltyCount, // live — the shared jogai/passivity warning count is self-proprioception (A3)
       passivityRemaining, // live — the countdown to the passivity foul (B3), derived above
       senshu: selfSenshu, // live — the first-blood tell off the bout-level senshuHolder (C3)
+      posture: POSTURE_CODE[self.posture], // air-actions S2: own stance, live (zero delay) — mirrors opponent.posture
     },
     opponent: {
       ...opponent,
@@ -526,23 +532,35 @@ const intake = (
       }
     }
 
-    // Air strike (air-actions S2): an AIRBORNE fighter may commit an `air` move — the other
-    // deliberate exception to commitment (alongside cancel). The arc converts into an air-attacking
-    // state carrying its CURRENT launch velocities, so the arc continues seamlessly while the move's
-    // frames run. A non-air move, an unconfigured slot, or an out-of-band request is refused here
-    // (falls through to `locked`; Slice 2 types the wrong-context / affordability reasons).
-    if (f.state.kind === "airborne" && action.type === "attack") {
-      const spec = rules.moves[action.move];
+    // Airborne routing (air-actions S2): an AIRBORNE fighter may commit an `air` move — the other
+    // deliberate exception to commitment (alongside cancel). Its `attack` routing MIRRORS the grounded
+    // one (inert / out-of-band / unaffordable), with a `wrong-context` arm for a GROUND move mid-air;
+    // the arc converts into an air-attacking state carrying its CURRENT launch velocities, so the arc
+    // continues seamlessly while the move's frames run (and it spends stamina like a ground commit).
+    // Every OTHER airborne action is a grounded intent mid-air ⇒ `wrong-context` idle-ride (idle asks
+    // for nothing ⇒ null). One air strike per jump: once air-attacking, the fighter is `locked` below.
+    if (f.state.kind === "airborne") {
+      if (action.type === "attack") {
+        const spec = rules.moves[action.move];
 
-      if (spec !== undefined && spec.air && bandLegal(spec, action.band)) {
-        f.state = startAirAttack(spec, action.band, f.state.vy, f.state.vx);
+        if (spec === undefined) return "inert"; // unconfigured slot — as when grounded
+        if (!spec.air) return "wrong-context"; // a ground technique can't be thrown mid-air
+        if (!bandLegal(spec, action.band)) return "out-of-band";
+        if (!affordable(f, spec, rules)) return "unaffordable"; // C10 gate — no spend, rides to landing
+
+        const move = startAirAttack(spec, action.band, f.state.vy, f.state.vx);
+        f.state = move;
+        spend(f, spec, rules); // C10: the air strike drains stamina on commit
+        move.extra += gasRecovery(f, rules); // C10 Story 3: a gassed commit lengthens the landing recovery
 
         return null; // the air strike took effect
       }
+
+      return action.type === "idle" ? null : "wrong-context";
     }
 
-    // Committed and not cancelling: an idle asked for nothing (no frustration ⇒ null);
-    // any other action wanted something the commitment denied ⇒ `locked`.
+    // Committed (attacking / air-attacking / throwing / downed) and not cancelling: an idle asked for
+    // nothing (no frustration ⇒ null); any other action wanted something the commitment denied ⇒ `locked`.
     return action.type === "idle" ? null : "locked";
   }
 
@@ -550,6 +568,7 @@ const intake = (
     const spec = rules.moves[action.move]; // C9: undefined ⇒ move not configured ⇒ idle (inert)
 
     if (spec === undefined) return "inert";
+    if (spec.air) return "wrong-context"; // air-actions S2: an air technique can only launch mid-jump
     if (!bandLegal(spec, action.band)) return "out-of-band"; // C9: an out-of-band attack degrades to idle
     if (!affordable(f, spec, rules)) return "unaffordable"; // C10: too little stamina to commit
 

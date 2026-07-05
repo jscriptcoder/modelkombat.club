@@ -34,6 +34,7 @@ export type FieldPath =
   | "self.penalties"
   | "self.passivityRemaining"
   | "self.senshu"
+  | "self.posture"
   | "opponent.x"
   | "opponent.y"
   | "opponent.facing"
@@ -116,6 +117,7 @@ const FIELD_READERS: Record<FieldPath, (s: State) => number> = {
   "self.penalties": (s) => s.self.penalties,
   "self.passivityRemaining": (s) => s.self.passivityRemaining,
   "self.senshu": (s) => s.self.senshu,
+  "self.posture": (s) => s.self.posture,
   "opponent.x": (s) => s.opponent.x,
   "opponent.y": (s) => s.opponent.y,
   "opponent.facing": (s) => s.opponent.facing,

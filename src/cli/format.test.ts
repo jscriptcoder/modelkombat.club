@@ -148,6 +148,25 @@ describe("formatFight — degrade reason", () => {
     expect(out).toContain("unaffordable");
   });
 
+  it("surfaces the wrong-context degrade reason in the CLI read-out (air-actions S2)", () => {
+    const out = formatFight(
+      result([
+        event(
+          0,
+          {
+            action: { type: "attack", move: "mawashi-geri", band: "high" },
+            degrade: "wrong-context",
+          },
+          {},
+        ),
+      ]),
+      { seed: 1, mode: "full" },
+    );
+
+    expect(out).toContain("mawashi-geri high");
+    expect(out).toContain("wrong-context");
+  });
+
   it("leaves an honoured (non-degraded) action unannotated — no reason in parentheses", () => {
     const out = formatFight(
       result([
