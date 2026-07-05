@@ -5,6 +5,16 @@
   "rules": [
     {
       "when": {
+        "op": "eq",
+        "args": [
+          { "op": "field", "path": "self.posture" },
+          { "op": "const", "value": 2 }
+        ]
+      },
+      "do": { "type": "attack", "move": "tobi-geri", "band": "high" }
+    },
+    {
+      "when": {
         "op": "and",
         "args": [
           {
@@ -115,6 +125,28 @@
       },
       "set": [{ "cell": "stage", "to": { "op": "const", "value": 2 } }],
       "do": { "type": "attack", "move": "gyaku-zuki", "band": "mid" }
+    },
+    {
+      "when": {
+        "op": "and",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              { "op": "field", "path": "self.canAct" },
+              { "op": "const", "value": 1 }
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              { "op": "field", "path": "opponent.distance" },
+              { "op": "const", "value": 300000 }
+            ]
+          }
+        ]
+      },
+      "do": { "type": "jump", "dir": 1 }
     },
     {
       "when": {

@@ -464,6 +464,30 @@ describe("generateSpec — the factual machine-truth spec", () => {
       expect(claimLine(primer, "GASSED")).toContain(code("0")); // stamina sentinel
     });
 
+    it("teaches horizontal jump displacement + the air strike in the occupancy primer (v18)", () => {
+      const primer = sectionOf(generateSpec(), HEADING);
+      // anchored on `jumpImpulse` — the phrase unique to the height & occupancy bullet
+      // (the word "occupancy" also appears in the okizeme bullet)
+      const occupancy = claimLine(primer, "jumpImpulse");
+
+      expect(occupancy).toContain(code("jumpXSpeed")); // the horizontal-displacement tell is named
+      expect(occupancy).toContain(String(CANONICAL_RULES.jumpXSpeed)); // paired with its value
+      expect(occupancy).toContain(code("air")); // the air-move mechanic
+      expect(occupancy).toContain(code("tobi-geri")); // the concrete air technique
+
+      // interpolated, not a hardcoded literal — a retuned jumpXSpeed flows into the prose
+      const retuned = claimLine(
+        sectionOf(
+          generateSpec({ ...CANONICAL_RULES, jumpXSpeed: 7777 }),
+          HEADING,
+        ),
+        "jumpImpulse",
+      );
+
+      expect(retuned).toContain("7777");
+      expect(retuned).not.toContain(String(CANONICAL_RULES.jumpXSpeed));
+    });
+
     it("teaches the match objective — win-rate, the win gap, and the tick cap (interpolated from the manifest)", () => {
       const primer = sectionOf(generateSpec(), HEADING);
       const match = claimLine(primer, "match win-rate");

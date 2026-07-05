@@ -40,7 +40,7 @@ The hardened ACs live in `plans/air-actions-stories.md` §"Story 2 — Air strik
 - [x] **AC-2.7** landing recovery is a normal punishable window — Slice 1 ✅ (PR #159)
 - [x] Table happy-path: airborne `{attack, <air move>, high}` in range/active ⇒ ippon;
       high whiffs a croucher (crouch vacates high); `{…, mid}` ⇒ 2 vs standing AND
-      crouching — Slice 1 (fixture move) ✅ (PR #159) + Slice 4 (canonical, pending)
+      crouching — Slice 1 (fixture move) ✅ (PR #159) + Slice 4 (canonical `tobi-geri`) ✅
 - [x] **AC-2.8** typed degrade for wrong-context air paths — Slice 2 ✅ (PR #TBD)
 - [x] **AC-2.9** one air strike per jump; non-attacks airborne degrade to idle — Slice 2 ✅
 - [x] **AC-2.4** jump-while-gassed launches; unaffordable air strike degrades — Slice 2 ✅
@@ -50,8 +50,8 @@ The hardened ACs live in `plans/air-actions-stories.md` §"Story 2 — Air strik
 - [x] **AC-2.5** air strike can be the okizeme finish — Slice 3 ✅
 - [x] **AC-2.6** yame can't fire mid-arc; jogai can — Slice 3 ✅
 - [x] throws can't grab an air-attacking fighter — Slice 3 ✅
-- [ ] canonical `tobi-geri` + `jumpXSpeed` wired; one version bump; `spec.md` regen;
-      `air` is an incomparable island in the no-Pareto test — Slice 4
+- [x] canonical `tobi-geri` + `jumpXSpeed` wired; one version bump (`v17`→`v18`); `spec.md`
+      regen + primer teaching; `air` is an incomparable island in the no-Pareto test — Slice 4 ✅
 - [ ] reads-only `rule("moves.tobi-geri.*")` + `rule("jumpXSpeed")` readers, no bump — Slice 5
 
 ## Slice map
@@ -258,6 +258,30 @@ assertion; the version/hash drift tests; the spec drift test. **GREEN**: the
 REFACTOR** on `rules.ts` (target 100%, per the arsenal pattern).
 
 **Done when**: AC met, mutation reviewed, checks clean, human approves commit.
+
+**DELIVERED (2026-07-05):** `tobi-geri` `{ startup 4, active 3, recovery 14, score 2,
+scoreByBand {high:3, mid:2}, reach 250000, bands [high,mid], staminaCost 50, air:true }`
+
+- `jumpXSpeed 10000` (2.5× walkSpeed). `startup 4` is intentionally < the `lAct+1` (7)
+  ground-reactability floor — the jump arc is the tell (resolved design §S4). `v17`→`v18`,
+  `INPUT_HASH` recomputed (twice: once for the rules, once after the rekka edit below), spec
+  regenerated. **Two refinements beyond the plan's terse "regen only" GREEN:**
+
+1. **gen-spec teaching clause** — a bare `gen:spec` does NOT teach `jumpXSpeed` (no template)
+   and `moveRow` surfaces neither `air` nor `scoreByBand`, so `tobi-geri` would render as an
+   ordinary ground row. Extended the height/occupancy primer bullet to teach `jumpXSpeed`
+   (interpolated) + the air-strike mechanic (naming `air` / `tobi-geri`), with a mutation-covered
+   test. `scoreByBand` left to the existing table convention (base score only, as mawashi/ushiro).
+2. **rekka coverage reference** — adding `tobi-geri` to `CANONICAL_RULES` trips the calibration
+   lock's COVERAGE guard (every arsenal move must be referenced by a gauntlet bot). Per the
+   Batch-1 wiring pattern (zoner's beyond-neutral niche kicks) + the user's decision (2026-07-05),
+   rekka gains a narrow jump-in (`self.posture==2` ⇒ `tobi-geri high`; jump gated to
+   `opponent.distance > 300000`, a beyond-neutral sliver). Reachable-in-principle but dormant in
+   the frozen round-robin (rekka always advances from the 300k start ⇒ never sits beyond neutral,
+   exactly like zoner's kicks); all 6 stay ∈ [25,75] (calibration lock green). Full weaponization +
+   the passivity×jump AC + the `docs/benchmark-gauntlet-v18.md` board doc remain **Story 4**.
+   Mutation 14/14 (100%) on all changed regions (rules.ts 6, gen-spec.ts 5, benchmark-config.ts 2,
+   dsl.ts 1). 1179 tests green.
 
 ### Slice 5: `rule("moves.tobi-geri.*")` + `rule("jumpXSpeed")` readers (reads-only)
 

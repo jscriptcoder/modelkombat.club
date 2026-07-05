@@ -30,7 +30,11 @@ export type Band = "high" | "mid" | "low";
 // technique — a point-blank `mid`-only knee (reach above the elbow, below the throw) that scores
 // 0 on the hit but DOWNS the foe (`knockdown`), the points living in the okizeme finish (a
 // hit-confirmed `gyaku-zuki` inside the finish window ⇒ 3), gas-locked, and a cancel SOURCE only —
-// the sweep's low knockdown game lifted to a standing mid angle.
+// the sweep's low knockdown game lifted to a standing mid angle. `tobi-geri` (jumping kick, the
+// Batch-2 air arsenal) is the only AIRBORNE technique — committed mid-jump (`air`), it scores the
+// jodan ippon (3) / chudan waza-ari (2) like the roundhouse but must be launched from a jump: the
+// leap closes distance (`jumpXSpeed`) and telegraphs the strike, and a whiff lands into a
+// punishable recovery. Pure scoring, gas-locked, and OUT of the cancel web.
 export type MoveId =
   | "kizami-zuki"
   | "gyaku-zuki"
@@ -41,7 +45,8 @@ export type MoveId =
   | "yoko-geri"
   | "ushiro-geri"
   | "empi"
-  | "hiza-geri";
+  | "hiza-geri"
+  | "tobi-geri";
 
 // ─── Action grammar — a bot returns exactly ONE per tick ─────────────────────
 // `dir` is RELATIVE to facing: +1 = toward opponent, -1 = away, 0 = hold.
@@ -194,6 +199,7 @@ export type Rules = {
     "ushiro-geri"?: MoveSpec;
     empi?: MoveSpec;
     "hiza-geri"?: MoveSpec;
+    "tobi-geri"?: MoveSpec;
   };
   // Vertical axis (C4). Both absent ⇒ inert (a `jump` launches no arc) ⇒
   // byte-identical to the pre-vertical engine. `jumpImpulse` is the initial
