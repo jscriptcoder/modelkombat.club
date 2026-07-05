@@ -61,8 +61,8 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     });
   });
 
-  it("carries BENCHMARK_VERSION v17 (item 3 / overtime adoption: jabber multi-reads clock.overtime — sudden-death all-in)", () => {
-    expect(BENCHMARK_VERSION).toBe("v17");
+  it("carries BENCHMARK_VERSION v18 (air arsenal: the airborne tobi-geri + jumpXSpeed reach the canonical frame table)", () => {
+    expect(BENCHMARK_VERSION).toBe("v18");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {

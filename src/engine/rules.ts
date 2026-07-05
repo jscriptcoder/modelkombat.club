@@ -240,6 +240,41 @@ export const CANONICAL_RULES: Rules = {
       knockdown: true,
       cancelInto: ["gyaku-zuki"],
     },
+    // ── tobi-geri (jumping kick, Batch-2 air arsenal) — the only AIRBORNE technique. It rides the
+    // C4/S1 jump arc: a bot jumps in (closing the gap via `jumpXSpeed`) and commits it mid-flight, its
+    // move frames running alongside the arc until landing converts it into a grounded recovery. The
+    // no-Pareto-dominance law treats `air: true` as an incomparable island (like the throw's `grab`) —
+    // an airborne technique is non-substitutable for a grounded one, so it never Pareto-compares.
+    //   • air: true ⇒ committed only while airborne (an airborne-`attack` route); a grounded `tobi-geri`
+    //     is `wrong-context` (S2). `canAct` stays neutral-only — the jump is what unlocks the strike.
+    //   • bands ["high","mid"] + scoreByBand { high: 3, mid: 2 } ⇒ the airborne read mirrors the
+    //     roundhouse: aim jodan for the ippon (3) but risk a crouch-dodge (crouch vacates high), or aim
+    //     chudan for the un-duckable waza-ari (2). Pure scoring, NO knockdown (keeps the roster's
+    //     score-vs-knockdown separation — no score-3-AND-okizeme monster).
+    //   • reach 250000 ⇒ MODERATE (jab 210k < tobi 250k < reverse... no — between reverse 240k and
+    //     front 270k). The jump-in supplies the closing, not the reach: straight-up (no jumpXSpeed) it
+    //     whiffs from the neutral gap; only a directional leap brings it into range.
+    //   • startup 4 is DELIBERATELY below the lAct+1 (7) ground-reactability floor — the ~7-tick jump
+    //     arc is itself the tell (perceived via posture/attackBand ~6 ticks ahead), so the move's own
+    //     startup need not re-satisfy the ground invariant. Active 3 opens the window on the descending
+    //     approach (elapsed 4–5).
+    //   • recovery 14 ⇒ the LANDING recovery is punishable (≥ lAct + kizami.startup = 13), so a whiffed
+    //     or blocked air strike is answered on the ground (AC-2.7). Matches the reverse's recovery.
+    //   • staminaCost 50 > gasThreshold (30) ⇒ special/gas-LOCKED, the most athletic technique (a gassed
+    //     fighter loses it), per "stamina tier mirrors score tier". 2nd-priciest (< ushiro 52).
+    //   • NO cancelInto, and NOT a cancel target (gyaku-zuki does NOT grow to cancel into it) ⇒ air
+    //     strikes are OUT of the rekka cancel web — a distinct approach tool, not a ground-combo link.
+    "tobi-geri": {
+      startup: 4,
+      active: 3,
+      recovery: 14,
+      score: 2,
+      scoreByBand: { high: 3, mid: 2 },
+      reach: 250000,
+      bands: ["high", "mid"],
+      staminaCost: 50,
+      air: true,
+    },
   },
   // Defensive depth (C5/C6), tuned to the canonical strike's startup-7 timing:
   //   • parryWindow 2 — a matching guard's first 2 ticks (age 1–2) DEFLECT instead of block: a
@@ -302,6 +337,13 @@ export const CANONICAL_RULES: Rules = {
   jumpImpulse: 12000,
   gravity: 4000,
   lowClearance: 8000,
+  // Horizontal jump displacement (air-actions S1, wired here in S4 alongside tobi-geri). A directional
+  // jump travels `jumpXSpeed` sub-units/tick in its dir × facing, locked at launch. 10000 = 2.5×
+  // walkSpeed (4000) — a committed leap covers ground faster than a walk, the reward for the telegraphed
+  // jump. Over the ~6 airborne ticks it closes ~60000, enough to bring the moderate-reach tobi-geri
+  // (250000) into range from the 300000 start gap (a straight-up jump, dir 0, does NOT ⇒ the aerial
+  // strike must be a genuine jump-IN, not a free full-range poke). Absent ⇒ 0 ⇒ vertical-only.
+  jumpXSpeed: 10000,
   // The perception keystone (C2): position lags 1 tick, the action tell lags 6, with
   // ±1 seeded jitter. lAct 6 with strike.startup 7 puts the read on the knife-edge
   // (S ≥ lAct + 1 holds with equality), so jitter + sharp timing decide the exchange.

@@ -229,7 +229,8 @@ const armed =
       | "yoko-geri"
       | "ushiro-geri"
       | "empi"
-      | "hiza-geri",
+      | "hiza-geri"
+      | "tobi-geri",
   ) =>
   (): MoveSpec => {
     const m = CANONICAL_RULES.moves[id];
@@ -1769,6 +1770,108 @@ describe("CANONICAL_RULES — the jump arc is a deterministic integer parabola",
   });
 });
 
+// ─── Canonical tobi-geri (air-actions S2 Slice 4): the jump-in aerial ippon ─────
+// The only AIRBORNE technique — committed mid-jump, closing the start gap via the
+// wired `jumpXSpeed`, and scored jodan-3 / chudan-2 like the roundhouse. This is
+// the one slice that changes the canonical frame table (⇒ a benchmark version bump).
+const tobiGeri = armed("tobi-geri"); // jumping kick (Batch-2 air arsenal)
+
+// Jump toward the foe on tick 0, then commit tobi-geri (while airborne) on tick 1 —
+// a jump-in that closes the 300k start gap via jumpXSpeed and lands the aerial
+// technique on the descending approach. Times the strike off the tick clock (the
+// canonical `self.posture` timing is the gauntlet bot's job in a later story).
+const jumpInTobi = (band: Band): BotDoc =>
+  bot(
+    [
+      { when: clk("eq", 0), do: { type: "jump", dir: 1 } },
+      { when: clk("eq", 1), do: { type: "attack", move: "tobi-geri", band } },
+    ],
+    { type: "idle" },
+  );
+
+describe("CANONICAL_RULES — tobi-geri, the jump-in aerial technique", () => {
+  it("lands a jodan tobi-geri for the ippon (3) against a standing foe", () => {
+    const result = runFight(
+      fight({ botA: jumpInTobi("high"), botB: IDLE, maxTicks: 12 }),
+    );
+
+    expect(result.scores.a).toBe(3); // jodan ⇒ ippon
+  });
+
+  it("lands a chudan tobi-geri for the waza-ari (2)", () => {
+    const result = runFight(
+      fight({ botA: jumpInTobi("mid"), botB: IDLE, maxTicks: 12 }),
+    );
+
+    expect(result.scores.a).toBe(2); // chudan ⇒ waza-ari
+  });
+
+  it("whiffs a jodan tobi-geri over a croucher (crouch vacates high) yet mid still lands", () => {
+    const high = runFight(
+      fight({ botA: jumpInTobi("high"), botB: crouchUntil(60), maxTicks: 12 }),
+    );
+
+    const mid = runFight(
+      fight({ botA: jumpInTobi("mid"), botB: crouchUntil(60), maxTicks: 12 }),
+    );
+
+    expect(high.scores.a).toBe(0); // high passes over the crouch ⇒ no score
+    expect(mid.scores.a).toBe(2); // mid connects (crouch occupies mid)
+  });
+
+  it("scores nothing without the jump-in — a stationary air strike cannot close the gap", () => {
+    // Same air move, but launched straight up (dir 0 ⇒ no jumpXSpeed displacement):
+    // the foe stays a full start-gap away (300k > tobi-geri reach), so it whiffs.
+    // Proves the connect is EARNED by the jump-in, not a free full-range poke.
+    const straightUp = bot(
+      [
+        { when: clk("eq", 0), do: { type: "jump", dir: 0 } },
+        {
+          when: clk("eq", 1),
+          do: { type: "attack", move: "tobi-geri", band: "high" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      fight({ botA: straightUp, botB: IDLE, maxTicks: 12 }),
+    );
+
+    expect(result.scores.a).toBe(0);
+  });
+
+  // ── Identity / relationship pins (mirroring the C9 arsenal relationship tests) ──
+  it("is an air technique scored jodan-3 / chudan-2, pure scoring (no knockdown)", () => {
+    const t = tobiGeri();
+    expect(t.air).toBe(true);
+    expect(t.bands).toEqual(["high", "mid"]);
+    expect(t.scoreByBand?.high).toBe(3); // jodan ippon
+    expect(t.scoreByBand?.mid).toBe(2); // chudan waza-ari
+    expect(t.knockdown ?? false).toBe(false); // pure scoring, no okizeme monster
+  });
+
+  it("is gas-locked — the most athletic technique (staminaCost > gasThreshold)", () => {
+    const gas = CANONICAL_RULES.stamina?.gasThreshold ?? 0;
+    expect(tobiGeri().staminaCost ?? 0).toBeGreaterThan(gas);
+  });
+
+  it("has a punishable landing recovery (recovery ≥ lAct + the fastest punish startup)", () => {
+    expect(tobiGeri().recovery).toBeGreaterThanOrEqual(
+      lAct() + kizami().startup,
+    );
+  });
+
+  it("is out of the cancel web — no cancelInto, and the reverse cannot cancel into it", () => {
+    expect(tobiGeri().cancelInto).toBeUndefined();
+    expect(gyaku().cancelInto ?? []).not.toContain("tobi-geri");
+  });
+
+  it("wires jumpXSpeed into the canonical table (a committed leap closes ground)", () => {
+    expect(CANONICAL_RULES.jumpXSpeed ?? 0).toBeGreaterThan(0);
+  });
+});
+
 // ─── Canonical stamina, Slice 1: the conditioning meter paces the fight ────────
 
 // Strikes mid ONLY when the meter is at the cap (self.stamina ≥ 100 = stamina.max,
@@ -2231,7 +2334,10 @@ describe("CANONICAL_RULES — the C9 arsenal: the cross-move cancel web (rekka)"
 // Axis vector: reach↑, effective score↑ (max over scoreByBand), startup↓, recovery↓,
 // staminaCost↓, bands (set-inclusion ⊇), knockdown (true↑). `grab` is a synthetic
 // band token for the throw — incomparable to every strike, kept out of engine `Band`.
-type BandToken = Band | "grab";
+// `air` is the same device for air moves (`air: true`): an airborne technique is
+// genuinely non-substitutable for a grounded one (no jump ⇒ no air move), so it maps
+// to its own incomparable band and never Pareto-compares with a ground move.
+type BandToken = Band | "grab" | "air";
 type Axes = {
   reach: number;
   score: number;
@@ -2299,13 +2405,18 @@ const dominates = (a: Axes, b: Axes): boolean =>
   AXES.every((axis) => axis.atLeast(a, b)) &&
   AXES.some((axis) => axis.better(a, b));
 
-// ── Project each move into the common axis vector. The two heterogeneous cases:
+// ── Project each move into the common axis vector. The three heterogeneous cases:
+//   • an `air` move — maps to its own incomparable `air` band (like the throw's `grab`),
+//     so an airborne technique never Pareto-compares with a grounded one.
 //   • sweep — its low band is MECHANICAL (it declares no `bands`), so hard-map {low}
 //     (a bare `?? all` would read it as unrestricted and let it dominate hiza-geri).
 //   • a non-sweep move with no `bands` is genuinely unrestricted ⇒ {high, mid, low}.
 const moveToAxes = (id: string, m: MoveSpec): Axes => {
-  const bands: BandToken[] =
-    id === "sweep" ? ["low"] : (m.bands ?? ["high", "mid", "low"]);
+  const bands: BandToken[] = m.air
+    ? ["air"]
+    : id === "sweep"
+      ? ["low"]
+      : (m.bands ?? ["high", "mid", "low"]);
 
   return {
     reach: m.reach,
@@ -2437,6 +2548,24 @@ describe("no-Pareto-dominance — the dominance detector (balance-law rule 2)", 
     ).toBe(false);
   });
 
+  it("never dominates across the air island — a ground move cannot substitute for an air move", () => {
+    // A STRONG ground move (the default axes, {high, mid}) vs a strictly-WORSE air move
+    // (worse on every numeric axis). Numerically the ground move dominates outright — but
+    // the incomparable `air` band blocks it BOTH ways: air is non-substitutable, exactly
+    // like the throw's `grab`. Proves the island survives even a lopsided matchup.
+    const air = axes({
+      bands: bandSet("air"),
+      reach: 100000,
+      score: 1,
+      startup: 20,
+      recovery: 30,
+      cost: 60,
+    });
+
+    expect(dominates(axes(), air)).toBe(false); // the strong ground move can't dominate the air move
+    expect(dominates(air, axes())).toBe(false); // nor vice versa
+  });
+
   it("does not dominate when better on one axis but worse on another (needs ALL axes ≥)", () => {
     // Longer reach, but slower startup — the single worse axis blocks dominance.
     expect(dominates(axes({ reach: 250000, startup: 20 }), axes())).toBe(false);
@@ -2463,6 +2592,23 @@ describe("no-Pareto-dominance — the move→axis adapter", () => {
     expect(a.bands).toEqual(bandSet("grab"));
     expect(a.knockdown).toBe(true);
     expect(a.score).toBe(3);
+  });
+
+  it("maps an `air` move to its own incomparable `air` band (regardless of its real bands)", () => {
+    const airKick: MoveSpec = {
+      startup: 4,
+      active: 3,
+      recovery: 14,
+      score: 2,
+      reach: 250000,
+      bands: ["high", "mid"], // real occupancy bands — but the axis projection ignores them
+      air: true,
+    };
+
+    // the projection collapses the real high/mid to the single incomparable `air`
+    // token, so a ground move's {high, mid} can never be a superset of it (and vice
+    // versa) ⇒ air and ground never Pareto-compare
+    expect(moveToAxes("tobi-geri", airKick).bands).toEqual(bandSet("air"));
   });
 
   it("folds scoreByBand into the effective score (mawashi/ushiro read as their jodan 3)", () => {
@@ -2515,8 +2661,8 @@ describe("no-Pareto-dominance — the roster scan", () => {
   });
 });
 
-describe("no-Pareto-dominance — the canonical 12-move roster (balance-law rule 2)", () => {
-  it("enumerates all 12 moves (10 attack moves + sweep + throw)", () => {
+describe("no-Pareto-dominance — the canonical 13-move roster (balance-law rule 2)", () => {
+  it("enumerates all 13 moves (11 attack moves + sweep + throw)", () => {
     expect(
       canonicalRoster()
         .map((e) => e.id)
@@ -2531,6 +2677,7 @@ describe("no-Pareto-dominance — the canonical 12-move roster (balance-law rule
       "shuto",
       "sweep",
       "throw",
+      "tobi-geri",
       "uraken",
       "ushiro-geri",
       "yoko-geri",

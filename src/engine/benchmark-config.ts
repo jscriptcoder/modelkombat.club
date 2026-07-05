@@ -13,7 +13,7 @@
 // determinism/replay tests catch.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v17"; // Item 3 / overtime adoption: MATCH scores sudden-death overtime (ticks 300); the jabber MULTI-READS clock.overtime (a sudden-death all-in) alongside its passivity re-engage — closes the deferred officiating adoption
+export const BENCHMARK_VERSION = "v18"; // Air arsenal: CANONICAL_RULES gains the airborne `tobi-geri` (jump-in jodan-3 / chudan-2) + `jumpXSpeed` (horizontal jump displacement) — the first canonical air technique reaches the benchmark, so the frame table + spec change (one INPUT_HASH flip)
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -71,4 +71,4 @@ export const GAUNTLET_NAMES: readonly string[] = [
 // benchmark-config.test.ts prints the expected value on drift. (Computed over all-LF bot
 // texts, pinned by `.gitattributes`, so the digest is byte-stable on every platform.)
 export const INPUT_HASH =
-  "7b15c1dff1b533bfb2274507fc67f4fe72260b206ef38b211479b0539a925acb";
+  "a23c05f94615b4e2e9cea671ff438714851dfd7632070c39bcc405d4156d6c6b";
