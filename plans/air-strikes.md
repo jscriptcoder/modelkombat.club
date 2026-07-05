@@ -45,11 +45,11 @@ The hardened ACs live in `plans/air-actions-stories.md` §"Story 2 — Air strik
 - [x] **AC-2.9** one air strike per jump; non-attacks airborne degrade to idle — Slice 2 ✅
 - [x] **AC-2.4** jump-while-gassed launches; unaffordable air strike degrades — Slice 2 ✅
 - [x] `self.posture` ∈ {0,1,2} live read (the AC-3.1 posture portion) — Slice 2 ✅
-- [ ] **AC-2.1** reactable + blockable + parry/counter — Slice 3
-- [ ] **AC-2.3** swap-symmetry of air resolutions (trade / clean-stuff) — Slice 3
-- [ ] **AC-2.5** air strike can be the okizeme finish — Slice 3
-- [ ] **AC-2.6** yame can't fire mid-arc; jogai can — Slice 3
-- [ ] throws can't grab an air-attacking fighter — Slice 3
+- [x] **AC-2.1** reactable + blockable + parry/counter — Slice 3 ✅
+- [x] **AC-2.3** swap-symmetry of air resolutions (trade / clean-stuff) — Slice 3 ✅
+- [x] **AC-2.5** air strike can be the okizeme finish — Slice 3 ✅
+- [x] **AC-2.6** yame can't fire mid-arc; jogai can — Slice 3 ✅
+- [x] throws can't grab an air-attacking fighter — Slice 3 ✅
 - [ ] canonical `tobi-geri` + `jumpXSpeed` wired; one version bump; `spec.md` regen;
       `air` is an incomparable island in the no-Pareto test — Slice 4
 - [ ] reads-only `rule("moves.tobi-geri.*")` + `rule("jumpXSpeed")` readers, no bump — Slice 5
@@ -182,14 +182,19 @@ literal, the routing booleans, the `?? 0` sentinel, the interpreter branch.
 trades, gets cleanly stuffed on a mistimed startup, can finish okizeme, and can't be
 grabbed. Proves the §11 "air-attacking is just an active striker" claim end to end.
 
-**Path**: two small production changes make the composition total — the perception
-feed (`frameOf` at `sim.ts:200-201`: `attacking`/`attackBand` include the
-air-attacking kind, so a defender reads the incoming strike on `L_act`) and the throw
-immunity (`sim.ts:776`: extend `def.state.kind === "airborne"` to the air-attacking
-kind) — after which block / parry / counter / trade / clean-stuff / okizeme finish
-all fall out of the existing `computeStrike`/`applyStrike` union. The rest of the
-slice is **characterization**: proving the emergent behaviour and pinning it against
-regression.
+**Path**: three small production changes make the composition total — the perception
+feed (`frameOf`: `attacking`/`attackBand` include the air-attacking kind via the
+existing `activeAttack` accessor, so a defender reads the incoming strike on `L_act`),
+the throw immunity (`sim.ts:871`: extend `def.state.kind === "airborne"` to the
+air-attacking kind), AND `postureOf` (`sim.ts:665`: extend the same `kind ===
+"airborne"` guard so an air-attacking fighter reports `airborne` throughout the arc —
+mirroring the `y ≥ lowClearance` gate) — after which block / parry / counter / trade /
+clean-stuff / okizeme finish all fall out of the existing `computeStrike`/`applyStrike`
+union. The `postureOf` widening (a deviation from the original 2-change scope, approved
+2026-07-05) delivers AC-2.1's `opponent.posture: airborne` pre-read "for the whole arc"
+faithfully and keeps occupancy physically coherent (an air-attacker vacates `low`,
+exactly like the pure-airborne jumper). The rest of the slice is **characterization**:
+proving the emergent behaviour and pinning it against regression.
 
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`,
 `refactoring`, `characterisation-tests`.
@@ -212,8 +217,9 @@ an air strike, yame-suppressed-mid-arc + jogai-resets-mid-arc, throw-whiffs-an-
 air-attacker; each swap-symmetric where applicable. Mutants: the widened perception
 `||`, the widened throw-immunity `||`.
 
-**GREEN**: the two `||` widenings. **MUTATE / KILL / REFACTOR** as standard — most
-value is in the characterization assertions.
+**GREEN**: the three `||` widenings (`frameOf`, throw-immunity, `postureOf`).
+**MUTATE / KILL / REFACTOR** as standard — most value is in the characterization
+assertions.
 
 **Done when**: AC met, mutation reviewed, checks clean, human approves commit.
 

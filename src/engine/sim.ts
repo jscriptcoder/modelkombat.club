@@ -217,8 +217,13 @@ const frameOf = (f: Fighter, prev: Frame | undefined): Frame => ({
   x: f.x,
   y: f.y,
   facing: f.facing,
-  attacking: f.state.kind === "attacking",
-  attackBand: f.state.kind === "attacking" ? BAND_CODE[f.state.band] : 0,
+  // air-actions S2: an air-attacking fighter is an active striker too, so it perceives as
+  // `attacking` at its own band — a grounded defender reads (and can answer) the incoming air strike.
+  attacking: f.state.kind === "attacking" || f.state.kind === "air-attacking",
+  attackBand:
+    f.state.kind === "attacking" || f.state.kind === "air-attacking"
+      ? BAND_CODE[f.state.band]
+      : 0,
   posture: POSTURE_CODE[f.posture],
   throwing: f.state.kind === "throwing",
   knockdown: f.state.kind === "downed",
@@ -662,7 +667,10 @@ const guardAgeOf = (fighter: Fighter, band: Band | null): number =>
 type Posture = "standing" | "crouching" | "airborne";
 
 const postureOf = (fighter: Fighter, action: Action, rules: Rules): Posture =>
-  fighter.state.kind === "airborne"
+  // air-actions S2: an air-attacking fighter is airborne for occupancy AND perception too — it
+  // vacates `low` (a sweep passes under it) and telegraphs `airborne` for the whole arc, exactly
+  // like the pure jumper, gated by the same `y >= lowClearance` clearance.
+  fighter.state.kind === "airborne" || fighter.state.kind === "air-attacking"
     ? rules.lowClearance !== undefined && fighter.y >= rules.lowClearance
       ? "airborne"
       : "standing"
@@ -864,11 +872,16 @@ const computeThrow = (
   if (!inGrabWindow) return null;
   if (Math.abs(def.x - att.x) > spec.reach) return null;
   // Grabbable iff GROUNDED and not already down: open / guarding / crouching (neutral),
-  // mid-strike (attacking), or mid-throw (throwing). An airborne (jumper) or downed (no
-  // pile-on) defender cannot be grabbed. The grab can still be DEFEATED in runFight's §11.4
-  // resolver — beaten by an opposing active strike, escaped by a throw-break, or mutually
+  // mid-strike (attacking), or mid-throw (throwing). An airborne or air-attacking (jumper) or
+  // downed (no pile-on) defender cannot be grabbed. The grab can still be DEFEATED in runFight's
+  // §11.4 resolver — beaten by an opposing active strike, escaped by a throw-break, or mutually
   // cancelled when both throws are live (a clash) — none of which is a grabbability concern here.
-  if (def.state.kind === "airborne" || def.state.kind === "downed") return null;
+  if (
+    def.state.kind === "airborne" ||
+    def.state.kind === "air-attacking" ||
+    def.state.kind === "downed"
+  )
+    return null;
 
   return { score: spec.score, finish: rules.finishWindow ?? 0 };
 };

@@ -1891,6 +1891,390 @@ describe("runFight — air strikes (an airborne fighter commits an air move and 
     // Standing ⇒ posture is 0, never 2 ⇒ the gate never fires ⇒ identical to a plain idle bot.
     expect(JSON.stringify(gated.events)).toBe(JSON.stringify(idle.events));
   });
+
+  // ── Slice 3: air defense (a grounded defender answers an air strike) ──────────
+  // The air-attacking fighter is "just an active striker", so block / parry / counter /
+  // trade / clean-stuff / okizeme-finish all compose through the existing §11 union
+  // (Slice 1 widened computeStrike). Three small production widenings make the loop
+  // TOTAL: the perception feed (a defender can SEE the incoming air strike), postureOf
+  // (the air-attacker reports `airborne` — a pre-read AND it vacates `low`), and
+  // throw-immunity (an air-attacker cannot be grabbed). The rest is characterization.
+  // Reach 150000 (< the 200000 gap) makes A's OWN air strike whiff, isolating the
+  // DEFENSE under test from A's scoring.
+
+  const whenOppAttacking: BoolExpr = {
+    op: "eq",
+    args: [
+      { op: "field", path: "opponent.attacking" },
+      { op: "const", value: 1 },
+    ],
+  };
+
+  const whenOppBand = (k: number): BoolExpr => ({
+    op: "eq",
+    args: [
+      { op: "field", path: "opponent.attackBand" },
+      { op: "const", value: k },
+    ],
+  });
+
+  const whenOppPosture = (k: number): BoolExpr => ({
+    op: "eq",
+    args: [
+      { op: "field", path: "opponent.posture" },
+      { op: "const", value: k },
+    ],
+  });
+
+  // A defender that steps forward (a non-committing, observable reaction) exactly on the
+  // ticks its gate perceives the incoming strike — so events[t].b.action reveals what it saw.
+  const reactWhen = (gate: BoolExpr): BotDoc =>
+    bot([{ when: gate, do: { type: "move", dir: 1 } }], { type: "idle" });
+
+  it("lets a grounded defender PERCEIVE the incoming air strike (opponent.attacking)", () => {
+    // A jumps in (tick 0) and commits an air strike (tick 1) ⇒ air-attacking from tick 2 on.
+    // The reactive defender steps forward the first tick it reads `opponent.attacking`. Without
+    // the frameOf widening the air-attacking state reports `attacking:false` ⇒ it stays idle.
+    const result = runFight(
+      getMockConfig({
+        rules: airRules({ reach: 150000 }),
+        botA: jumpThenAir(1, "high"),
+        botB: reactWhen(whenOppAttacking),
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.events[1].b.action).toEqual({ type: "idle" }); // pure-airborne ⇒ not yet attacking
+    expect(result.events[2].b.action).toEqual({ type: "move", dir: 1 }); // air-attacking perceived ⇒ reacts
+    expect(result.events[4].b.action).toEqual({ type: "move", dir: 1 }); // sustained for the whole strike
+  });
+
+  it("perceives the air strike's BAND (opponent.attackBand carries high=3 / mid=2)", () => {
+    const firstReadReaction = (strikeBand: Band, gateBand: number): Action =>
+      runFight(
+        getMockConfig({
+          rules: airRules({ reach: 150000 }),
+          botA: jumpThenAir(1, strikeBand),
+          botB: reactWhen(whenOppBand(gateBand)),
+          maxTicks: 8,
+        }),
+      ).events[2].b.action;
+
+    expect(firstReadReaction("high", 3)).toEqual({ type: "move", dir: 1 }); // high air strike ⇒ band 3
+    expect(firstReadReaction("high", 2)).toEqual({ type: "idle" }); // not mid ⇒ the band is specifically 3
+    expect(firstReadReaction("mid", 2)).toEqual({ type: "move", dir: 1 }); // a mid air strike ⇒ band 2
+  });
+
+  it("telegraphs the jump as opponent.posture:airborne for the WHOLE arc, including mid-air-strike", () => {
+    // With the postureOf widening the air-attacker keeps reporting `airborne` (2) AFTER it commits
+    // the strike, so the defender reacts through the air-attacking ticks (3+). Without it, posture
+    // reverts to 0 the instant the strike commits ⇒ the reaction stops after the pure-airborne tick 2.
+    const result = runFight(
+      getMockConfig({
+        rules: airRules({ reach: 150000 }, { lowClearance: 10000 }),
+        botA: jumpThenAir(1, "high"),
+        botB: reactWhen(whenOppPosture(2)),
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.events[2].b.action).toEqual({ type: "move", dir: 1 }); // pure-airborne (both ways)
+    expect(result.events[3].b.action).toEqual({ type: "move", dir: 1 }); // STILL airborne mid-air-strike (the widening)
+    expect(result.events[5].b.action).toEqual({ type: "move", dir: 1 }); // sustained through the descent
+  });
+
+  it("an air-attacker vacates the low band: a grounded LOW strike whiffs it, a MID connects", () => {
+    // Same postureOf widening: an air-attacker reports `airborne`, which vacates `low` (a sweep
+    // passes under it) exactly like the pure jumper. A grounded gyaku-zuki aimed LOW at the mid-air
+    // fighter whiffs; the same strike aimed MID connects (mid is always occupied). Without the
+    // widening the air-attacker reports `standing` ⇒ even the low strike would connect.
+    const bScore = (band: Band): number =>
+      runFight(
+        getMockConfig({
+          rules: airRules({ reach: 150000 }, { lowClearance: 10000 }),
+          botA: jumpThenAir(1, "high"), // air-attacking through the arc (its own strike whiffs)
+          botB: bot(
+            [
+              {
+                when: atTick(0),
+                do: { type: "attack", move: "gyaku-zuki", band },
+              },
+            ],
+            {
+              type: "idle",
+            },
+          ),
+          maxTicks: 10,
+        }),
+      ).scores.b;
+
+    expect(bScore("low")).toBe(0); // low passes under the airborne hurtbox ⇒ whiff
+    expect(bScore("mid")).toBe(1); // mid is always occupied ⇒ gyaku-zuki (score 1) connects
+  });
+
+  it("a throw cannot grab an air-attacking fighter (the grab whiffs)", () => {
+    // B (grounded) grabs while A is mid-air-strike. An air-attacker is un-grabbable exactly like
+    // the pure jumper (§11: airborne/downed cannot be grabbed) — the grab finds no grounded target
+    // and whiffs. Without the throw-immunity widening the air-attacking state falls through as
+    // grabbable ⇒ B would grab A and score 3.
+    const throwRules = {
+      startup: 2,
+      active: 1,
+      recovery: 3,
+      reach: 250000,
+      score: 3,
+    };
+
+    const throwAt = (t: number): BotDoc =>
+      bot([{ when: atTick(t), do: { type: "throw" } }], { type: "idle" });
+
+    const grabScore = runFight(
+      getMockConfig({
+        rules: airRules(
+          { reach: 150000 },
+          { throw: throwRules, knockdownDuration: 6 },
+        ),
+        botA: jumpThenAir(1, "high"), // air-attacking at tick 3 (B's grab-active tick)
+        botB: throwAt(1),
+        maxTicks: 10,
+      }),
+    ).scores.b;
+
+    expect(grabScore).toBe(0); // the grab found no grounded target ⇒ no score
+
+    // Swap-symmetric: the immunity holds from either slot (A grabs a jumping B).
+    const grabScoreSwapped = runFight(
+      getMockConfig({
+        rules: airRules(
+          { reach: 150000 },
+          { throw: throwRules, knockdownDuration: 6 },
+        ),
+        botA: throwAt(1),
+        botB: jumpThenAir(1, "high"),
+        maxTicks: 10,
+      }),
+    ).scores.a;
+
+    expect(grabScoreSwapped).toBe(0);
+  });
+
+  // ── Characterization: the DEFENSE composes through the existing §11 union ────
+  // These pin the emergent behaviour Slice 1 already unlocked (air-attacking is an
+  // active striker in computeStrike/applyStrike) — block / parry / trade / clean-stuff /
+  // okizeme-finish — against regression. No production change of their own.
+
+  it("a matching-band guard blocks an air strike; a wrong-band guard is hit (AC-2.1)", () => {
+    const aScoreVsGuard = (guardBand: Band): number =>
+      runFight(
+        getMockConfig({
+          rules: airRules(),
+          botA: jumpThenAir(1, "high"),
+          botB: bot([], { type: "block", band: guardBand }), // holds the guard every tick
+          maxTicks: 8,
+        }),
+      ).scores.a;
+
+    expect(aScoreVsGuard("high")).toBe(0); // matching-height guard blocks the ippon
+    expect(aScoreVsGuard("mid")).toBe(3); // wrong-height guard ⇒ the high strike lands for 3
+  });
+
+  it("a FRESH matching guard parries an air strike — deflected AND thrown into longer landing recovery (AC-2.1)", () => {
+    // parryWindow 2 / parryRecovery 8. A HELD high guard (age 3 at the strike tick) only BLOCKS; a
+    // guard raised on the strike tick (age 1) PARRIES — the air striker eats +8 recovery, so it
+    // re-launches its next jump exactly 8 ticks later. Both deflect (A never scores).
+    const rules = airRules({}, { parryWindow: 2, parryRecovery: 8 });
+
+    // Jump straight up, air-strike at tick 1, and re-jump whenever free — its next launch (y > 0
+    // after landing) marks the end of the landing recovery.
+    const jumpAirRelaunch = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 0 } },
+        {
+          when: atTick(1),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "jump", dir: 0 },
+    );
+
+    const run = (defender: BotDoc) =>
+      runFight(
+        getMockConfig({
+          rules,
+          botA: jumpAirRelaunch,
+          botB: defender,
+          maxTicks: 24,
+        }),
+      );
+
+    const stale = run(bot([], { type: "block", band: "high" })); // held ⇒ blocks
+
+    const fresh = run(
+      bot([{ when: atTick(2), do: { type: "block", band: "high" } }], {
+        type: "idle",
+      }),
+    ); // age 1 on the tick-2 strike ⇒ parries
+
+    const relaunchTick = (r: ReturnType<typeof run>): number =>
+      r.events.findIndex((e, t) => t > 6 && e.a.y > 0);
+
+    expect(stale.scores.a).toBe(0); // blocked ⇒ no score
+    expect(fresh.scores.a).toBe(0); // parried ⇒ no score
+    expect(relaunchTick(fresh)).toBe(relaunchTick(stale) + 8); // parry adds exactly parryRecovery
+  });
+
+  it("a grounded strike active during the jumper's air-strike startup stuffs it (only the grounded scores, AC-2.3)", () => {
+    // B's gyaku-zuki (startup 4) is active at tick 4, while A is still in its air-strike STARTUP
+    // (startup 4 ⇒ active only from tick 5). So B connects on the mid-air A, and A's own strike
+    // (reach 150000 < the 200000 gap) whiffs — the §11 interleave lands only the grounded strike.
+    const result = runFight(
+      getMockConfig({
+        rules: airRules({ reach: 150000, startup: 4 }),
+        botA: jumpThenAir(1, "high"),
+        botB: bot(
+          [
+            {
+              when: atTick(0),
+              do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+            },
+          ],
+          {
+            type: "idle",
+          },
+        ),
+        maxTicks: 10,
+      }),
+    );
+
+    expect(result.scores.b).toBe(1); // the grounded strike stuffs the mid-startup jumper
+    expect(result.scores.a).toBe(0); // the air strike whiffs (out of reach) ⇒ only B scores
+  });
+
+  it("two aligned air strikes trade — both score, swap-symmetric (AC-2.3)", () => {
+    // Both fighters jump in and air-strike high on the same schedule ⇒ both active + in range at
+    // tick 2 ⇒ both score, a symmetric trade (air-attacking is just an active striker on each side).
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenAir(1, "high"),
+        botB: jumpThenAir(1, "high"),
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.events[2].a.points).toBe(3); // A's air strike connects
+    expect(result.events[2].b.points).toBe(3); // B's connects too — a trade, swap-symmetric by construction
+  });
+
+  it("an air strike lands the okizeme finish on a downed foe within its finishWindow (AC-2.5)", () => {
+    // A sweeps B down (tick 1), frees (sweep recovery 1), jumps (tick 3) and air-strikes (tick 4).
+    // Its active frame (tick 5) meets B still prone inside the finish window ⇒ computeStrike's finish
+    // branch scores finishScore, band/occupancy ignored — composing exactly like a grounded finish.
+    const rules = getMockRules({
+      startGap: 200000,
+      jumpImpulse: 12000,
+      gravity: 4000,
+      jumpXSpeed: 0,
+      knockdownDuration: 14,
+      finishWindow: 12,
+      finishScore: 3,
+      moves: {
+        sweep: {
+          startup: 1,
+          active: 1,
+          recovery: 1,
+          score: 0,
+          reach: 250000,
+          knockdown: true,
+        },
+        "mawashi-geri": airMove(),
+        "gyaku-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+        },
+      },
+    });
+
+    const sweepThenAirFinish = bot(
+      [
+        { when: atTick(0), do: { type: "sweep" } },
+        { when: atTick(3), do: { type: "jump", dir: 0 } },
+        {
+          when: atTick(4),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules,
+        botA: sweepThenAirFinish,
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.scores.a).toBe(3); // sweep scored 0; the air strike lands the finishScore ippon
+  });
+
+  it("yame does NOT fire mid-arc: a scored air strike is never amputated (AC-2.6)", () => {
+    // Match mode arms yame (reset both fighters on a score at a mutual-neutral boundary). An air
+    // striker that scores is NOT neutral (it's air-attacking), so yame cannot fire at the scoring
+    // tick — the fighter keeps arcing and its point stands (it lands + recovers, THEN yame checks).
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenAir(1, "high"),
+        botB: IDLE,
+        maxTicks: 8,
+        match: { winGap: 8 },
+      }),
+    );
+
+    expect(result.events[2].a.points).toBe(3); // the air strike scores at tick 2
+    expect(result.events[3].a.y).toBeGreaterThan(0); // still airborne next tick — NOT yame-reset to the ground
+  });
+
+  it("jogai DOES reset a mid-arc out-zone crossing (state-agnostic, AC-2.6)", () => {
+    // Jogai is a pure x-position edge read, so it fires on an air-attacking fighter too: a jump
+    // arcing its x across the out-zone boundary is reset to grounded neutral mid-flight. Contrast:
+    // the same jump WITHOUT a jogai margin stays airborne and completes its arc.
+    const jogaiArc = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: -1 } }, // jump toward its own back wall (x decreasing)
+        {
+          when: atTick(1),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const run = (match: FightConfig["match"]) =>
+      runFight(
+        getMockConfig({
+          rules: airRules({}, { jumpXSpeed: 40000 }), // travels 40000/tick ⇒ crosses margin 100000 by tick 2
+          botA: jogaiArc,
+          botB: IDLE,
+          maxTicks: 8,
+          match,
+        }),
+      );
+
+    // A crosses below margin 100000 at tick 2 (x: 160000, 120000, 80000). The jogai reset applies
+    // after that tick's frame ⇒ tick 3 shows the reset: grounded neutral, snapped back to the start.
+    const withJogai = run({ winGap: 8, jogai: { margin: 100000 } });
+    const noJogai = run({ winGap: 8 });
+
+    expect(withJogai.events[3].a.y).toBe(0); // reset to the ground mid-arc
+    expect(withJogai.events[3].a.x).toBe(aStartX(airRules())); // snapped back to its start position
+    expect(noJogai.events[3].a.y).toBeGreaterThan(0); // no margin ⇒ still airborne, arc uninterrupted
+  });
 });
 
 describe("runFight — parry windows (a freshly-raised matching guard deflects the attacker)", () => {
