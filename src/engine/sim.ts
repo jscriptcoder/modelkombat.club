@@ -136,6 +136,21 @@ type MoveState =
       extra: number; // extra recovery ticks added when this strike is parried (§5 deflect)
     }
   | { kind: "airborne"; vy: number; vx: number } // `vx`: horizontal displacement/tick, locked at launch (air-actions S1)
+  | {
+      // An air technique in flight (air-actions S2). It carries the launch arc velocities (`vy`/`vx`,
+      // integrated in `advance` exactly like `airborne`) AND the committed move's frames (`spec`/
+      // `band`/`elapsed`/`scored`/`extra`, resolved by computeStrike/applyStrike exactly like
+      // `attacking`). Landing (y ≤ 0) is master — it ends the aerial phase into a grounded
+      // landing-recovery. `extra` mirrors `attacking`'s parry/gas recovery accumulator.
+      kind: "air-attacking";
+      vy: number;
+      vx: number;
+      spec: MoveSpec;
+      band: Band;
+      elapsed: number;
+      scored: boolean;
+      extra: number;
+    }
   | { kind: "throwing"; elapsed: number; stuffed: boolean } // committed grab; `stuffed` once a strike beats it (§11.4) ⇒ cannot grab
   | { kind: "downed"; elapsed: number; finish: number }; // knocked down for rules.knockdownDuration ticks; `finish` = remaining okizeme finish-window ticks (C8, counts down to 0 ⇒ wake-up i-frames)
 
@@ -348,6 +363,43 @@ const startAttack = (spec: MoveSpec, band: Band): AttackingState => ({
   extra: 0,
 });
 
+// The airborne-attack variant — the type `startAirAttack` returns (air-actions S2).
+type AirAttackingState = Extract<MoveState, { kind: "air-attacking" }>;
+
+// Start an air technique in flight (air-actions S2): carry the CURRENT arc velocities off the
+// airborne state so the arc continues seamlessly, plus the move frames (like `startAttack`).
+// Landing converts this into a grounded landing-recovery in `advance`.
+const startAirAttack = (
+  spec: MoveSpec,
+  band: Band,
+  vy: number,
+  vx: number,
+): AirAttackingState => ({
+  kind: "air-attacking",
+  vy,
+  vx,
+  spec,
+  band,
+  elapsed: 0,
+  scored: false,
+  extra: 0,
+});
+
+// The active-strike view of a fighter's state — the frame data shared by a grounded `attacking`
+// move and an `air-attacking` one (air-actions S2), so `computeStrike` resolves both through one
+// path. `null` for any non-attacking state (its caller returns "no strike").
+type ActiveAttack = {
+  spec: MoveSpec;
+  band: Band;
+  elapsed: number;
+  scored: boolean;
+};
+
+const activeAttack = (st: MoveState): ActiveAttack | null =>
+  st.kind === "attacking" || st.kind === "air-attacking"
+    ? { spec: st.spec, band: st.band, elapsed: st.elapsed, scored: st.scored }
+    : null;
+
 // Drain a committed move's stamina cost (C10), on commit, whiff or not. Charged ONLY
 // when a meter is configured (`rules.stamina` present) — absent ⇒ no meter simulated ⇒
 // no charge (byte-identical). A move with no `staminaCost` is free (`?? 0`). No floor
@@ -471,6 +523,21 @@ const intake = (
         f.cancelRemaining = 0; // the fresh move re-opens the window only when IT connects
 
         return null; // the cancel took effect
+      }
+    }
+
+    // Air strike (air-actions S2): an AIRBORNE fighter may commit an `air` move — the other
+    // deliberate exception to commitment (alongside cancel). The arc converts into an air-attacking
+    // state carrying its CURRENT launch velocities, so the arc continues seamlessly while the move's
+    // frames run. A non-air move, an unconfigured slot, or an out-of-band request is refused here
+    // (falls through to `locked`; Slice 2 types the wrong-context / affordability reasons).
+    if (f.state.kind === "airborne" && action.type === "attack") {
+      const spec = rules.moves[action.move];
+
+      if (spec !== undefined && spec.air && bandLegal(spec, action.band)) {
+        f.state = startAirAttack(spec, action.band, f.state.vy, f.state.vx);
+
+        return null; // the air strike took effect
       }
     }
 
@@ -632,12 +699,15 @@ const computeStrike = (
   guardAge: number,
   defPosture: Posture,
 ): StrikeOutcome | null => {
-  const st = att.state;
-  if (st.kind !== "attacking" || st.scored) return null;
-  const spec = st.spec;
+  // An `attacking` OR `air-attacking` fighter is an active striker (air-actions S2); both carry the
+  // same frame data, read through one accessor so the whole resolution below is shape-agnostic.
+  const active = activeAttack(att.state);
+  if (active === null || active.scored) return null;
+  const spec = active.spec;
 
   const inActiveWindow =
-    st.elapsed >= spec.startup && st.elapsed < spec.startup + spec.active;
+    active.elapsed >= spec.startup &&
+    active.elapsed < spec.startup + spec.active;
 
   if (!inActiveWindow) return null;
   if (Math.abs(def.x - att.x) > spec.reach) return null;
@@ -653,9 +723,9 @@ const computeStrike = (
       : null;
   }
 
-  if (!occupies(defPosture, st.band)) return null; // vacated band ⇒ whiff (over/under)
+  if (!occupies(defPosture, active.band)) return null; // vacated band ⇒ whiff (over/under)
 
-  if (guardBand === st.band) {
+  if (guardBand === active.band) {
     // Matching-height guard: a fresh guard (age within the window) parries; a stale guard
     // blocks. guardAge is ≥ 1 here (the defender guards st.band), so `guardAge <= window`
     // already makes an absent/zero parry window inert. A block scores nothing but opens the
@@ -685,7 +755,7 @@ const computeStrike = (
   // C9: band-dependent score — `scoreByBand[band]` overrides the flat `score`, missing ⇒ falls
   // back to it (absent `scoreByBand` ⇒ flat `score` everywhere ⇒ byte-identical). The okizeme
   // finish above stays band-agnostic and is deliberately NOT band-resolved.
-  const baseScore = spec.scoreByBand?.[st.band] ?? spec.score;
+  const baseScore = spec.scoreByBand?.[active.band] ?? spec.score;
   const bonus = att.counterRemaining > 0 ? (rules.counterBonus ?? 0) : 0;
 
   return {
@@ -742,7 +812,7 @@ const applyStrike = (
   // while still active), and a PARRY also adds the deflect's extra recovery. A FINISH likewise
   // leaves `scored` untouched — its exactly-once is enforced by the defender's finish → 0, not here.
   const st = att.state;
-  if (st.kind !== "attacking") return;
+  if (st.kind !== "attacking" && st.kind !== "air-attacking") return; // air-actions S2: both latch
   if (outcome.result === "hit" || outcome.result === "parry") st.scored = true;
   if (outcome.result === "parry") st.extra = outcome.extra;
 };
@@ -854,6 +924,37 @@ const advance = (f: Fighter, rules: Rules): void => {
       f.state = { kind: "neutral" };
     } else {
       st.vy -= rules.gravity ?? 0;
+    }
+
+    return;
+  }
+
+  if (st.kind === "air-attacking") {
+    // Two clocks (air-actions S2): integrate the arc (x += vx, y += vy) like `airborne` AND advance
+    // the move frames (elapsed). Landing (y ≤ 0) is MASTER — regardless of the move clock, touching
+    // the ground ends the aerial phase and converts to a grounded landing-recovery: a plain
+    // `attacking` state parked at the start of its recovery frames (elapsed = startup + active,
+    // `scored` so it cannot ground-strike), which serves `spec.recovery` (+ any `extra`) committed
+    // ticks — it cannot guard, so a whiffed air strike is punishable on landing (AC-2.7).
+    f.x = clamp(f.x + st.vx, 0, rules.ring.width);
+    f.y += st.vy;
+
+    if (f.y <= 0) {
+      f.y = 0;
+      f.state = {
+        kind: "attacking",
+        spec: st.spec,
+        band: st.band,
+        // Park at the start of the recovery frames: `elapsed` is already past the active window, so
+        // computeStrike can never re-fire on the ground regardless of `scored` (the `scored: true`
+        // is belt-and-suspenders intent, not load-bearing — a known equivalent mutant here).
+        elapsed: st.spec.startup + st.spec.active,
+        scored: true,
+        extra: st.extra,
+      };
+    } else {
+      st.vy -= rules.gravity ?? 0;
+      st.elapsed += 1;
     }
 
     return;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { runFight, type FightConfig } from "./sim.js";
 import type { BotDoc, BoolExpr, FieldPath, Rule } from "./dsl.js";
-import type { Rules, Action, Band, MoveId } from "./types.js";
+import type { Rules, Action, Band, MoveId, MoveSpec } from "./types.js";
 
 // ─── factories ───────────────────────────────────────────────────────────────
 const bot = (rules: BotDoc["rules"], dflt: Action): BotDoc => ({
@@ -1137,6 +1137,437 @@ describe("runFight — horizontal jump displacement (a jump's dir carries the fi
     for (let k = 0; k < 7; k++) {
       expect(width - aForward.events[k].a.x).toBe(bForward.events[k].b.x);
     }
+  });
+});
+
+describe("runFight — air strikes (an airborne fighter commits an air move and lands it for points)", () => {
+  // Slice 1 (air-actions S2) uses a FIXTURE air move: the `mawashi-geri` slot is repurposed with
+  // `air: true` (the canonical air technique `tobi-geri` arrives as its own MoveId in Slice 4). The
+  // arc is the Story-1 arc (jumpImpulse 12000 / gravity 4000 ⇒ 7 airborne ticks, lands at tick 6);
+  // jumpXSpeed 0 keeps the fighter over a fixed 200000 gap so occupancy/reach/timing read cleanly.
+  const airMove = (o: Partial<MoveSpec> = {}): MoveSpec => ({
+    startup: 1,
+    active: 2,
+    recovery: 3,
+    score: 2,
+    reach: 250000,
+    bands: ["high", "mid"],
+    scoreByBand: { high: 3, mid: 2 },
+    air: true,
+    ...o,
+  });
+
+  const airRules = (
+    move: Partial<MoveSpec> = {},
+    o: Partial<Rules> = {},
+  ): Rules =>
+    getMockRules({
+      jumpImpulse: 12000,
+      gravity: 4000,
+      jumpXSpeed: 0,
+      moves: {
+        "gyaku-zuki": {
+          startup: 4,
+          active: 2,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+        },
+        "mawashi-geri": airMove(move),
+      },
+      ...o,
+    });
+
+  const atTick = (n: number): BoolExpr => ({
+    op: "eq",
+    args: [
+      { op: "field", path: "clock.tick" },
+      { op: "const", value: n },
+    ],
+  });
+
+  // Jump toward the foe on tick 0, then commit the fixture air move on `commitTick` (while airborne).
+  const jumpThenAir = (commitTick: number, band: Band): BotDoc =>
+    bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        {
+          when: atTick(commitTick),
+          do: { type: "attack", move: "mawashi-geri", band },
+        },
+      ],
+      { type: "idle" },
+    );
+
+  it("lands an airborne strike for the move's score when active and in reach", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenAir(1, "high"),
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    // Committed tick 1 (startup 1) ⇒ active at elapsed 1 = tick 2.
+    expect(result.events[1].a.points).toBe(0); // startup — not yet active
+    expect(result.events[2].a.points).toBe(3); // connects: scoreByBand.high = ippon
+  });
+
+  it("whiffs an airborne strike when the target is out of reach", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: airRules({ reach: 150000 }),
+        botA: jumpThenAir(1, "high"),
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    // The 200000 gap exceeds reach 150000 ⇒ the active window never connects.
+    for (const e of result.events) expect(e.a.points).toBe(0);
+  });
+
+  it("respects occupancy: a high air strike whiffs a croucher, a mid connects vs standing and crouching", () => {
+    const CROUCHER = bot([], { type: "crouch" });
+
+    const pointsAtConnect = (band: Band, botB: BotDoc): number =>
+      runFight(
+        getMockConfig({
+          rules: airRules(),
+          botA: jumpThenAir(1, band),
+          botB,
+          maxTicks: 8,
+        }),
+      ).events[2].a.points;
+
+    expect(pointsAtConnect("high", CROUCHER)).toBe(0); // crouch vacates high ⇒ sails over
+    expect(pointsAtConnect("mid", CROUCHER)).toBe(2); // mid is always occupied ⇒ chudan waza-ari
+    expect(pointsAtConnect("mid", IDLE)).toBe(2); // mid connects a standing foe too
+  });
+
+  it("refuses an air strike at a band the move cannot reach (band-legality gate)", () => {
+    // bands [high, mid] ⇒ an air `low` attack is not band-legal ⇒ it does not start (degrades to
+    // `locked`, like an out-of-band ground attack), so nothing scores.
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenAir(1, "low"),
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.events[1].a.degrade).toBe("locked"); // the air `low` attack is refused
+    for (const e of result.events) expect(e.a.points).toBe(0); // never connects
+  });
+
+  it("can connect on the landing tick, then touches down that same tick (AC-2.2 ordering)", () => {
+    // Commit at tick 5 (startup 1) ⇒ active at elapsed 1 = tick 6, the tick the arc returns to the
+    // ground. computeStrike runs BEFORE advance, so the strike connects off the pre-advance snapshot
+    // and THEN the fighter lands.
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenAir(5, "high"),
+        botB: IDLE,
+        maxTicks: 10,
+      }),
+    );
+
+    expect(result.events[5].a.points).toBe(0); // startup, at altitude
+    expect(result.events[6].a.points).toBe(3); // connects on the landing tick
+    expect(result.events[6].a.y).toBe(0); // and lands that very tick
+    expect(result.events[7].a.y).toBe(0); // grounded the next tick (landing-recovery)
+  });
+
+  it("serves a grounded landing-recovery: the fighter is committed for `recovery` ticks after touchdown", () => {
+    // jump tick 0, air strike tick 1 (lands tick 6); recovery 3 ⇒ committed on the ground for ticks
+    // 7,8,9 (its attempted jumps degrade to `locked`), free again at tick 10 (a fresh arc launches).
+    const jumpAirThenJump = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        {
+          when: atTick(1),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "jump", dir: 1 }, // default: keep trying to jump — honoured only when neutral
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpAirThenJump,
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    for (const t of [7, 8, 9]) {
+      expect(result.events[t].a.degrade).toBe("locked"); // grounded but still recovering
+      expect(result.events[t].a.y).toBe(0); // on the ground
+    }
+
+    expect(result.events[10].a.degrade).toBe(null); // free again ⇒ the jump is honoured
+    expect(result.events[10].a.y).toBeGreaterThan(0); // a fresh arc launches
+  });
+
+  it("is punishable on landing: the recovering air-striker cannot guard, so a grounded strike connects", () => {
+    // A jumps (tick 0) and air-strikes (tick 1), landing at tick 6 into a 3-tick grounded recovery
+    // (ticks 7-9). A tries to BLOCK mid from tick 6 on, but while committed the guard is refused; B's
+    // gyaku-zuki (startup 4, active 2, committed tick 4 ⇒ active ticks 8-9) lands on the guard-less A.
+    const jumpAirThenBlock = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        {
+          when: atTick(1),
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+        {
+          when: {
+            op: "gte",
+            args: [
+              { op: "field", path: "clock.tick" },
+              { op: "const", value: 6 },
+            ],
+          },
+          do: { type: "block", band: "mid" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const bStrikes = bot(
+      [
+        {
+          when: atTick(4),
+          do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpAirThenBlock,
+        botB: bStrikes,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(result.events[7].b.points).toBe(0); // B still in startup
+    expect(result.events[8].b.points).toBe(1); // B connects on A's recovery (the block was refused)
+  });
+
+  it("whiffs entirely when the startup outlasts the airtime (the active window never opens before landing)", () => {
+    // startup 10 on a ~7-tick arc ⇒ the strike lands still in startup ⇒ never active ⇒ never scores.
+    const result = runFight(
+      getMockConfig({
+        rules: airRules({ startup: 10 }),
+        botA: jumpThenAir(1, "high"),
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    for (const e of result.events) expect(e.a.points).toBe(0);
+  });
+
+  it("scores at most once across its active window (no multi-hit)", () => {
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenAir(1, "high"),
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    // The active window spans elapsed 1,2 (ticks 2,3); the strike may score only on the first.
+    expect(result.events[2].a.points).toBe(3);
+    expect(result.events[3].a.points).toBe(3); // NOT 6 — `scored` latches after the first connect
+  });
+
+  it("leaves a non-air airborne attack inert: it degrades to `locked` and the arc is unchanged", () => {
+    const noAir = getMockRules({ jumpImpulse: 12000, gravity: 4000 }); // no air move configured
+
+    const jumpThenGround = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        {
+          when: atTick(1),
+          do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const jumpThenIdle = bot(
+      [{ when: atTick(0), do: { type: "jump", dir: 1 } }],
+      { type: "idle" },
+    );
+
+    const attempted = runFight(
+      getMockConfig({
+        rules: noAir,
+        botA: jumpThenGround,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    const plain = runFight(
+      getMockConfig({
+        rules: noAir,
+        botA: jumpThenIdle,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    expect(attempted.events[1].a.degrade).toBe("locked"); // airborne gyaku-zuki (no air flag) refused
+    // Physics identical to a plain jump — the refused attack has zero effect on x/y/points.
+    expect(attempted.events.map((e) => [e.a.x, e.a.y, e.a.points])).toEqual(
+      plain.events.map((e) => [e.a.x, e.a.y, e.a.points]),
+    );
+  });
+
+  it("refuses an air move from a grounded committed fighter: only an airborne fighter can air-strike", () => {
+    // A commits a GROUND gyaku-zuki (tick 0, 12 frames), then tries the air move each later tick. The
+    // air-route is airborne-only, so while grounded-committed the air attack is refused (`locked`) —
+    // the fighter never leaves the ground (it has no airborne velocities to launch an air strike).
+    const groundThenAir = bot(
+      [
+        {
+          when: atTick(0),
+          do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+        },
+        {
+          when: {
+            op: "gte",
+            args: [
+              { op: "field", path: "clock.tick" },
+              { op: "const", value: 1 },
+            ],
+          },
+          do: { type: "attack", move: "mawashi-geri", band: "high" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: groundThenAir,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    for (const e of result.events) expect(e.a.y).toBe(0); // never leaves the ground (no air launch)
+    expect(result.events[1].a.degrade).toBe("locked"); // air move refused while ground-committed
+  });
+
+  it("refuses an airborne attack naming an unconfigured move (no air strike, no crash)", () => {
+    // `mae-geri` is not in the fixture move table ⇒ the air-route reads `undefined` and refuses
+    // (falls through to `locked`) rather than dereferencing it. No air strike starts; nothing scores.
+    const jumpThenUnconfigured = bot(
+      [
+        { when: atTick(0), do: { type: "jump", dir: 1 } },
+        {
+          when: atTick(1),
+          do: { type: "attack", move: "mae-geri", band: "mid" },
+        },
+      ],
+      { type: "idle" },
+    );
+
+    const result = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: jumpThenUnconfigured,
+        botB: IDLE,
+        maxTicks: 8,
+      }),
+    );
+
+    expect(result.events[1].a.degrade).toBe("locked"); // unconfigured slot ⇒ refused
+    for (const e of result.events) expect(e.a.points).toBe(0); // never connects
+  });
+
+  it("carries the launch jumpXSpeed through the air strike (the strike keeps travelling in-flight)", () => {
+    // A forward jump with jumpXSpeed 5000, then an air strike at tick 1: the air-attacking state
+    // carries the launch vx, so x keeps climbing by 5000 each airborne tick — the same horizontal
+    // travel as the plain arc (committing the strike changes only the vertical/strike behaviour).
+    const rules = airRules({}, { jumpXSpeed: 5000 });
+
+    const striker = runFight(
+      getMockConfig({
+        rules,
+        botA: jumpThenAir(1, "high"),
+        botB: IDLE,
+        maxTicks: 7,
+      }),
+    );
+
+    const plainJump = bot(
+      [{ when: atTick(0), do: { type: "jump", dir: 1 } }],
+      { type: "idle" },
+    );
+
+    const plain = runFight(
+      getMockConfig({ rules, botA: plainJump, botB: IDLE, maxTicks: 7 }),
+    );
+
+    const startX = aStartX(rules);
+    expect(striker.events.map((e) => e.a.x)).toEqual([
+      startX + 5000,
+      startX + 10000,
+      startX + 15000,
+      startX + 20000,
+      startX + 25000,
+      startX + 30000,
+      startX + 35000,
+    ]);
+    // vx is carried seamlessly across the jump→air-strike transition (same horizontal arc).
+    expect(striker.events.map((e) => e.a.x)).toEqual(
+      plain.events.map((e) => e.a.x),
+    );
+  });
+
+  it("replays byte-identically and mirrors a swapped air strike", () => {
+    const cfg = getMockConfig({
+      rules: airRules(),
+      botA: jumpThenAir(1, "high"),
+      botB: IDLE,
+      maxTicks: 10,
+    });
+
+    expect(JSON.stringify(runFight(cfg).events)).toBe(
+      JSON.stringify(runFight(cfg).events),
+    );
+
+    const forward = runFight(cfg);
+
+    const mirrored = runFight(
+      getMockConfig({
+        rules: airRules(),
+        botA: IDLE,
+        botB: jumpThenAir(1, "high"),
+        maxTicks: 10,
+      }),
+    );
+
+    const width = airRules().ring.width;
+
+    for (let k = 0; k < 10; k++) {
+      expect(width - forward.events[k].a.x).toBe(mirrored.events[k].b.x);
+    }
+
+    expect(forward.events[2].a.points).toBe(mirrored.events[2].b.points); // same score from either slot
   });
 });
 
