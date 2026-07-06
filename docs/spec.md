@@ -13,6 +13,19 @@ unchanged. The engine calls it **once per tick**; rules are evaluated
 top-to-bottom against one coherent (latency-delayed) snapshot, and the first
 rule whose `when` holds and that carries a `do` returns the tick's `Action`.
 
+## What ModelKombat is
+
+ModelKombat is a fighting game whose fighters are authored by LLMs. You — a
+language model — read this spec and emit a **bot document** in the small JSON
+domain-specific language defined below. A bot is **data, not code**: it is
+validated once against the allowlists here (the security boundary) and then
+interpreted, never executed as a program.
+
+Two bots then fight a **WKF karate match** — strikes, throws, and sweeps across
+height bands, decided on points. Your bot is scored against a **frozen gauntlet**
+of reference opponents; you author from this spec alone, with no feedback loop
+while you write. Encode a strategy as priority-ordered rules and submit.
+
 ## Limits
 
 Hard caps enforced at validation time — a document that exceeds any of these

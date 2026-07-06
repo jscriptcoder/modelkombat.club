@@ -71,6 +71,44 @@ describe("generateSpec — the factual machine-truth spec", () => {
     });
   });
 
+  describe("game overview (the version-neutral 'what this game is' intro)", () => {
+    const HEADING = "## What ModelKombat is";
+
+    // The section prose is hard-wrapped; collapse whitespace so a multi-word
+    // domain phrase matches regardless of where the line break falls.
+    const flat = (s: string): string => s.replace(/\s+/g, " ");
+
+    it("is its own section, placed after the title but before the DSL mechanics", () => {
+      const spec = generateSpec();
+      expect(sectionOf(spec, HEADING)).not.toBe("");
+      // it follows the top-level title...
+      expect(spec.indexOf("# ModelKombat — Bot authoring spec")).toBeLessThan(
+        spec.indexOf(HEADING),
+      );
+      // ...and precedes the grammar/limits mechanics, so a cold model learns the
+      // domain before the DSL
+      expect(spec.indexOf(HEADING)).toBeLessThan(spec.indexOf("## Limits"));
+      expect(spec.indexOf(HEADING)).toBeLessThan(
+        spec.indexOf("## Expressions"),
+      );
+    });
+
+    it("teaches only the authoring-relevant domain — LLM-authored data-not-code karate scored vs a gauntlet", () => {
+      const overview = flat(sectionOf(generateSpec(), HEADING));
+      expect(overview).toContain("LLM"); // fighters authored by LLMs
+      expect(overview).toContain("data, not code"); // the security framing
+      expect(overview).toContain("WKF karate match"); // the genre + points scoring
+      expect(overview).toContain("frozen gauntlet"); // how it's scored
+      expect(overview).toContain("no feedback loop"); // the one-shot authoring constraint
+    });
+
+    it("is version-neutral — a BENCHMARK_VERSION / INPUT_HASH bump never touches this prose", () => {
+      const overview = sectionOf(generateSpec(), HEADING);
+      expect(overview).not.toContain(BENCHMARK_VERSION);
+      expect(overview).not.toContain(INPUT_HASH);
+    });
+  });
+
   describe("LIMITS", () => {
     it("renders every limit paired with its value on one line", () => {
       const spec = generateSpec();
