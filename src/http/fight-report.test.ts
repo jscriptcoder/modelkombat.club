@@ -12,6 +12,7 @@ const opponentScore = (
   wins: 10,
   draws: 0,
   fights: 20,
+  endReasons: { gap: 0, time: 0, senshu: 0, overtime: 0 },
   ...over,
 });
 
@@ -105,6 +106,20 @@ describe("buildFightReport — the compact gauntlet-gate report", () => {
     expect(report.version).toBe("v19");
     expect(report.gauntlet.seeds).toEqual([1, 2, 3]);
     expect(report).not.toHaveProperty("title"); // throne is S4
+  });
+
+  it("carries each opponent's endReasons through to its report entry", () => {
+    // The report surfaces HOW each matchup ended, verbatim from the OpponentScore.
+    const result = benchmarkResult([
+      opponentScore({
+        name: "zoner",
+        endReasons: { gap: 5, time: 12, senshu: 2, overtime: 1 },
+      }),
+    ]);
+
+    const [o] = buildFightReport(result, opts(["zoner"])).gauntlet.perOpponent;
+
+    expect(o.endReasons).toEqual({ gap: 5, time: 12, senshu: 2, overtime: 1 });
   });
 
   it("keys each member to ITS OWN result — a,b pass but c fails ⇒ not cleared", () => {

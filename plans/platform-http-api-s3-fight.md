@@ -1,7 +1,7 @@
 # Plan: S3 — `POST /fight` (stateless gauntlet gate)
 
-**Branch**: feat/platform-api-s3-fight
-**Status**: Active
+**Branch**: feat/platform-api-s3-fight (per-slice branches thereafter)
+**Status**: Active — Slice 1 ✅ merged (PR #178); Slice 2 next
 
 Story: `plans/platform-http-api-stories.md` (S3). Decisions: `plans/platform-http-api-decisions.md`
 (§API response contract, §Engineering requirements, decisions 2/4/5/6/7). Skipping `grill-me` —
@@ -62,12 +62,12 @@ submits a byte-clone, and the gate result is identical.
       decisions §API response contract: `version`, `cleared`, `gauntlet.seeds`,
       `gauntlet.perOpponent[]` (name, winRate, wins, losses, draws, net, passed, endReasons),
       `diagnostics.degrade`. **No `title` block** (throne is S4).
-- [ ] `cleared` is true iff the bot won > 50% vs each of the 6 members; a member it did not beat
-      (incl. a byte-clone) leaves `cleared` false.
-- [ ] Every error path matches the RFC 9457 contract, identical to `/validate`: `405`+`Allow`,
-      `413` oversize, `400` malformed, `422` invalid-bot (+`errors`). An invalid bot **never fights**.
-- [ ] The response never contains any opponent's bot document or engine internals (visibility
-      principle) — only spectator-visible figures.
+- [x] `cleared` is true iff the bot won > 50% vs each of the 6 members; a member it did not beat
+      (incl. a byte-clone) leaves `cleared` false. _(Slice 1, PR #178)_
+- [x] Every error path matches the RFC 9457 contract, identical to `/validate`: `405`+`Allow`,
+      `413` oversize, `400` malformed, `422` invalid-bot (+`errors`). An invalid bot **never fights**. _(Slice 1, PR #178)_
+- [x] The response never contains any opponent's bot document or engine internals (visibility
+      principle) — only spectator-visible figures. _(Slice 1, PR #178)_
 - [ ] `/spec` advertises `POST /fight` **only after** the rate-limit is in place (go-public gate).
 - [ ] TCB, `INPUT_HASH`, `BENCHMARK_VERSION`, and `docs/spec.md` are unchanged by the whole feature.
 
@@ -79,7 +79,7 @@ approval** before writing tests; **wait for commit approval** after.
 
 ---
 
-### Slice 1: Walking skeleton — the gate verdict + core compact report
+### Slice 1: Walking skeleton — the gate verdict + core compact report ✅ DONE (PR #178)
 
 **Value**: An LLM author (internal, unadvertised) POSTs a bot and gets back pass/fail vs the frozen
 gauntlet plus per-member W/L/net — the core learning loop. Proves the deploy path: a serverless fn
