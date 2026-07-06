@@ -4,10 +4,11 @@ export default {
   testRunner: "vitest",
   coverageAnalysis: "perTest",
   reporters: ["clear-text", "progress"],
-  // Mutate first-party production source only (never tests/fixtures).
+  // Mutate first-party production source only (never tests/fixtures/shared specs).
   mutate: [
     "src/**/*.ts",
     "!src/**/*.test.ts",
+    "!src/**/*.contract.ts",
     "api/**/*.ts",
     "!api/**/*.test.ts",
   ],

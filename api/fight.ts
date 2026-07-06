@@ -10,12 +10,13 @@
 // version-scoped KotH throne is contested. The gauntlet is loaded once per cold
 // start (same roster/files/version the CLI runner uses).
 //
-// The throne store is the in-memory fake for now (per-instance, non-durable); the
-// real Upstash-Redis adapter lands in slice 5 and swaps in behind the same port
-// via env config. Routing: `vercel.json` rewrites the public path -> `/api/fight`
-// with `includeFiles: "bots/*.json"` so the gauntlet docs are in the bundle.
+// The throne store is chosen from the environment: the durable Upstash-Redis adapter when
+// `UPSTASH_REDIS_REST_URL` / `_TOKEN` are set (production), else the in-memory fake
+// (per-instance, non-durable — local/dev/preview). Both sit behind the same `ThroneStore`
+// port. Routing: `vercel.json` rewrites the public path -> `/api/fight` with
+// `includeFiles: "bots/*.json"` so the gauntlet docs are in the bundle.
 import { handleFight } from "../src/http/handle-fight.js";
-import { inMemoryThroneStore } from "../src/http/throne-store.js";
+import { selectThroneStore } from "../src/http/throne-store-select.js";
 import { loadGauntlet } from "../src/http/gauntlet.js";
 import { CANONICAL_RULES } from "../src/engine/rules.js";
 import {
@@ -27,7 +28,7 @@ import {
 } from "../src/engine/benchmark-config.js";
 
 const gauntlet = loadGauntlet();
-const store = inMemoryThroneStore();
+const store = selectThroneStore(process.env);
 
 // The title fight's fresh seeds: 10 CSPRNG draws from Web Crypto. This is API-layer
 // entropy OUTSIDE the pure sim — each drawn seed still threads the engine's own
