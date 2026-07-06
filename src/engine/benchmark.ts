@@ -136,24 +136,30 @@ const outcomesAgainst = (
     playBothSides(bot, opp, seed, maxTicks, rules, match),
   );
 
+// Count outcomes per `endReason`, from an all-zero base — the one piece of
+// "how bouts are bucketed" knowledge, shared by the per-opponent breakdown
+// (`summarize`) and the global roll-up (`tallyOfficiating.endedBy`).
+const tallyEndReasons = (outcomes: Outcome[]): EndReasonTally =>
+  outcomes.reduce<EndReasonTally>(
+    (acc, o) => ({ ...acc, [o.endReason]: acc[o.endReason] + 1 }),
+    { gap: 0, time: 0, senshu: 0, overtime: 0 },
+  );
+
 const summarize = (name: string, outcomes: Outcome[]): OpponentScore => ({
   name,
   netPoints: outcomes.reduce((sum, o) => sum + o.net, 0),
   wins: outcomes.filter((o) => o.botWin).length,
   draws: outcomes.filter((o) => o.draw).length,
   fights: outcomes.length,
-  endReasons: outcomes.reduce<EndReasonTally>(
-    (acc, o) => ({ ...acc, [o.endReason]: acc[o.endReason] + 1 }),
-    { gap: 0, time: 0, senshu: 0, overtime: 0 },
-  ),
+  endReasons: tallyEndReasons(outcomes),
 });
 
 // Fold every fight's officiating read-out into one aggregate: how it ended (per
 // `endReason`) and the running bot-vs-opponent jogai + passivity foul splits.
-const tallyOfficiating = (outcomes: Outcome[]): OfficiatingTally =>
-  outcomes.reduce<OfficiatingTally>(
+const tallyOfficiating = (outcomes: Outcome[]): OfficiatingTally => ({
+  endedBy: tallyEndReasons(outcomes),
+  ...outcomes.reduce<Pick<OfficiatingTally, "jogai" | "passivity">>(
     (acc, o) => ({
-      endedBy: { ...acc.endedBy, [o.endReason]: acc.endedBy[o.endReason] + 1 },
       jogai: {
         bot: acc.jogai.bot + o.jogaiBot,
         opp: acc.jogai.opp + o.jogaiOpp,
@@ -164,11 +170,11 @@ const tallyOfficiating = (outcomes: Outcome[]): OfficiatingTally =>
       },
     }),
     {
-      endedBy: { gap: 0, time: 0, senshu: 0, overtime: 0 },
       jogai: { bot: 0, opp: 0 },
       passivity: { bot: 0, opp: 0 },
     },
-  );
+  ),
+});
 
 export const benchmark = (cfg: BenchmarkConfig): BenchmarkResult => {
   const { bot, gauntlet, seeds, maxTicks, rules, match } = cfg;
