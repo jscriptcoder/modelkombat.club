@@ -69,6 +69,7 @@ describe("GET /spec — the serve-time API envelope (where to act)", () => {
       "",
       "- `GET https://a.example/spec` — this self-describing spec.",
       "- `POST https://a.example/validate` — pre-check a bot document; returns ok or the validator's structured issues.",
+      "- `POST https://a.example/fight` — fight a bot against the frozen gauntlet; returns the gate verdict and a per-opponent report.",
     ].join("\n");
 
     const body = await bodyFor("https://a.example/spec");
@@ -112,14 +113,13 @@ describe("GET /spec — the serve-time API envelope (where to act)", () => {
     expect(envelope).not.toContain("https://modelkombat.club/spec");
   });
 
-  it("lists EXACTLY the live endpoints — GET /spec + POST /validate, and advertises no unbuilt endpoint", async () => {
+  it("lists EXACTLY the live endpoints — GET /spec + POST /validate + POST /fight", async () => {
     const envelope = envelopeOf(await bodyFor("https://a.example/spec"));
     const bullets = envelope.split("\n").filter((l) => l.startsWith("- "));
 
-    expect(bullets).toHaveLength(2); // GET /spec + POST /validate are live at S2
+    expect(bullets).toHaveLength(3); // GET /spec + POST /validate + POST /fight
     expect(envelope).toContain("POST https://a.example/validate");
-    // still no dead URL for the endpoint that doesn't exist yet
-    expect(envelope).not.toContain("/fight");
+    expect(envelope).toContain("POST https://a.example/fight"); // now live + advertised
   });
 
   it("is layered at serve time — NOT baked into the hashed, drift-tested core spec", () => {
