@@ -3,9 +3,9 @@
 // dependency seam). `api/fight.ts` becomes a thin wrapper supplying production
 // deps. Pure transport + orchestration over the deterministic engine (`benchmark`)
 // and the platform-layer throne store — no DSL op, TCB untouched (invariant #2).
-import { readValidatedBot } from "./envelope.js";
+import { problem, readValidatedBot } from "./envelope.js";
 import { buildFightReport } from "./fight-report.js";
-import type { ThroneStore } from "./throne-store.js";
+import type { ThroneRecord, ThroneStore } from "./throne-store.js";
 import { benchmark, type BenchmarkConfig } from "../engine/benchmark.js";
 import type { BotDoc } from "../engine/dsl.js";
 import type { Rules } from "../engine/types.js";
@@ -34,6 +34,29 @@ const json = (body: unknown): Response =>
     status: 200,
     headers: { "content-type": "application/json; charset=utf-8" },
   });
+
+// The RFC 9457 detail for a lost crowning race — the throne moved between a caller's read
+// and its atomic swap. The resolution is to resubmit against whichever King landed first;
+// there is no server-side auto-retry in v1.
+const THRONE_MOVED_DETAIL =
+  "The throne advanced to a new champion before your crown landed; resubmit to challenge the current King.";
+
+// Attempt an atomic crown. Returns the 409 problem to surface on a lost CAS race (the
+// throne moved since `read`), or `undefined` when the crown landed and the caller should
+// proceed. The "on moved → this 409" knowledge lives here once, shared by both crown
+// sites (the empty-throne bootstrap and the title-fight dethrone).
+const crown = async (
+  store: ThroneStore,
+  version: string,
+  expected: number | null,
+  next: ThroneRecord,
+): Promise<Response | undefined> => {
+  const result = await store.compareAndSwap(version, expected, next);
+
+  return result.ok
+    ? undefined
+    : problem(409, "/problems/throne-moved", THRONE_MOVED_DETAIL);
+};
 
 export const handleFight = async (
   req: Request,
@@ -65,12 +88,14 @@ export const handleFight = async (
 
   // Empty throne: crown the clearer as this version's first champion (the bootstrap).
   if (current === undefined) {
-    await deps.store.compareAndSwap(deps.version, null, {
+    const moved = await crown(deps.store, deps.version, null, {
       champion: parsed.doc,
       generation: 1,
     });
 
-    return json({ ...report, title: { outcome: "throne-empty-crowned" } });
+    return (
+      moved ?? json({ ...report, title: { outcome: "throne-empty-crowned" } })
+    );
   }
 
   // Occupied throne: contest a fresh-seeded title fight against the reigning champion.
@@ -89,13 +114,15 @@ export const handleFight = async (
   // which `benchmark` skips to winRate 0 — leaves the King on the throne.
   const dethroned = titleFight.winRate > 0.5;
 
-  // Crown appends the challenger to the lineage at the next generation. The CAS result
-  // is not consumed this slice; the "throne moved" → 409 race is slice 3.
+  // A win crowns the challenger at the next generation. A CAS race (the throne moved since
+  // our read) surfaces as 409 throne-moved; the loser resubmits against the new King.
   if (dethroned) {
-    await deps.store.compareAndSwap(deps.version, current.generation, {
+    const moved = await crown(deps.store, deps.version, current.generation, {
       champion: parsed.doc,
       generation: current.generation + 1,
     });
+
+    if (moved) return moved;
   }
 
   return json({

@@ -4,7 +4,11 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { handleFight, type FightDeps } from "./handle-fight.js";
-import { inMemoryThroneStore } from "./throne-store.js";
+import {
+  inMemoryThroneStore,
+  type InMemoryThroneStore,
+  type ThroneRecord,
+} from "./throne-store.js";
 import { loadBotDoc } from "../cli/load.js";
 import { CANONICAL_RULES } from "../engine/rules.js";
 import { MATCH } from "../engine/benchmark-config.js";
@@ -80,6 +84,18 @@ const enthrone = (
   champion: BotDoc,
 ): Promise<unknown> =>
   store.compareAndSwap(version, null, { champion, generation: 1 });
+
+// A store modelling a CAS race: `read` returns the throne as this request first SAW it
+// (`seenAtRead`), while `compareAndSwap` runs against `inner` — which a concurrent crown
+// has already moved on. So a crown attempt using the stale-read generation is rejected as
+// `moved`, exactly as a real race between two callers would resolve.
+const staleReadStore = (
+  inner: InMemoryThroneStore,
+  seenAtRead: ThroneRecord | undefined,
+): FightDeps["store"] => ({
+  read: () => Promise.resolve(seenAtRead),
+  compareAndSwap: inner.compareAndSwap,
+});
 
 const fightRequest = (body: string): Request =>
   new Request("https://mk.example/fight", { method: "POST", body });
@@ -275,5 +291,79 @@ describe("handleFight — S4 slice 2: occupied-throne title fight", () => {
 
     expect(body.title?.seeds).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(body.title?.bouts).toBe(20); // 10 seeds × both sides
+  });
+});
+
+describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-moved)", () => {
+  it("409s a winning title-fight crown when the throne advanced since the read", async () => {
+    const inner = inMemoryThroneStore();
+    const king = loadBot("aggressor");
+    const usurper = loadBot("berserker"); // the concurrent challenger who crowns first
+
+    await inner.compareAndSwap("vTEST", null, {
+      champion: king,
+      generation: 1,
+    });
+    await inner.compareAndSwap("vTEST", 1, {
+      champion: usurper,
+      generation: 2,
+    }); // a concurrent crown lands, moving the throne to generation 2
+
+    // our request read the throne at generation 1, before that concurrent crown landed
+    const store = staleReadStore(inner, { champion: king, generation: 1 });
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("pacer"))), // pacer beats aggressor 1.00 → wins
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(409);
+    expect(res.headers.get("content-type")).toContain(
+      "application/problem+json",
+    );
+
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/throne-moved");
+    // the detail is actionable: it tells the losing challenger to resubmit
+    expect(body.title).toContain("resubmit");
+
+    // the throne still holds the concurrent winner; the loser (pacer) was NOT appended
+    expect((await inner.read("vTEST"))?.champion).toEqual(usurper);
+    expect(inner.lineage("vTEST").map((e) => e.champion.name)).toEqual([
+      "aggressor",
+      "berserker",
+    ]);
+  });
+
+  it("409s a bootstrap crown when the empty throne was claimed since the read", async () => {
+    const inner = inMemoryThroneStore();
+    const usurper = loadBot("berserker");
+
+    // someone claimed the empty throne first, moving it to generation 1
+    await inner.compareAndSwap("vTEST", null, {
+      champion: usurper,
+      generation: 1,
+    });
+
+    // our request read the throne as EMPTY, before that claim landed
+    const store = staleReadStore(inner, undefined);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))), // clears → attempts a bootstrap crown
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(409);
+
+    const body = (await res.json()) as { type: string };
+
+    expect(body.type).toBe("/problems/throne-moved");
+
+    // the throne holds the first claimant; we were not appended
+    expect((await inner.read("vTEST"))?.champion).toEqual(usurper);
+    expect(inner.lineage("vTEST").map((e) => e.champion.name)).toEqual([
+      "berserker",
+    ]);
   });
 });
