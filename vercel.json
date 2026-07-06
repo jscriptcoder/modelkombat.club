@@ -3,7 +3,8 @@
   "outputDirectory": "public",
   "rewrites": [
     { "source": "/spec", "destination": "/api/spec" },
-    { "source": "/validate", "destination": "/api/validate" }
+    { "source": "/validate", "destination": "/api/validate" },
+    { "source": "/fight", "destination": "/api/fight" }
   ],
   "functions": {
     "api/spec.ts": {

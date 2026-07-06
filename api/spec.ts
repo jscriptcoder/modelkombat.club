@@ -32,6 +32,12 @@ const LIVE_ENDPOINTS: readonly {
     summary:
       "pre-check a bot document; returns ok or the validator's structured issues",
   },
+  {
+    method: "POST",
+    path: "/fight",
+    summary:
+      "fight a bot against the frozen gauntlet; returns the gate verdict and a per-opponent report",
+  },
 ];
 
 // The public origin to advertise. Behind Vercel's proxy the caller-facing host

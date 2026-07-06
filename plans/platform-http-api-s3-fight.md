@@ -1,7 +1,7 @@
 # Plan: S3 — `POST /fight` (stateless gauntlet gate)
 
 **Branch**: feat/platform-api-s3-fight (per-slice branches thereafter)
-**Status**: Active — Slice 1 ✅ (PR #178), Slice 2 ✅ (PR #179); Slice 3 next
+**Status**: Active — Slice 1 ✅ (PR #178), Slice 2 ✅ (PR #179), Slice 3 ✅ (PR #180); Slice 4 next (closes S3)
 
 Story: `plans/platform-http-api-stories.md` (S3). Decisions: `plans/platform-http-api-decisions.md`
 (§API response contract, §Engineering requirements, decisions 2/4/5/6/7). Skipping `grill-me` —
@@ -58,10 +58,11 @@ submits a byte-clone, and the gate result is identical.
 
 ## Acceptance Criteria (feature)
 
-- [ ] `POST /fight` with a valid bot returns `200 application/json` with the report shape from
+- [x] `POST /fight` with a valid bot returns `200 application/json` with the report shape from
       decisions §API response contract: `version`, `cleared`, `gauntlet.seeds`,
       `gauntlet.perOpponent[]` (name, winRate, wins, losses, draws, net, passed, endReasons),
-      `diagnostics.degrade`. **No `title` block** (throne is S4).
+      `diagnostics.degrade`. **No `title` block** (throne is S4). _(Slices 1–3; `endReasons` PR #179,
+      `diagnostics.degrade` PR #180)_
 - [x] `cleared` is true iff the bot won > 50% vs each of the 6 members; a member it did not beat
       (incl. a byte-clone) leaves `cleared` false. _(Slice 1, PR #178)_
 - [x] Every error path matches the RFC 9457 contract, identical to `/validate`: `405`+`Allow`,
@@ -171,7 +172,7 @@ init-value mutants.
 
 ---
 
-### Slice 3: `diagnostics.degrade` — aggregated S8 telemetry
+### Slice 3: `diagnostics.degrade` — aggregated S8 telemetry ✅ DONE (PR #180)
 
 **Value**: The single highest-signal coaching line — "your kicks were `locked` 40% of frames
 (gassed)" / "12 `unaffordable`". Decision 5's aggregated S8 degrade diagnostics.
@@ -213,9 +214,17 @@ is now truly one-URL. This is the public-release gate for the first public **com
 
 **Path**: (a) **Advertise** — add the `POST /fight` row to `LIVE_ENDPOINTS` in `api/spec.ts` (the
 envelope grows by a row, never by prose — no dead URLs) + the `/fight` public rewrite in `vercel.json`.
-(b) **Rate-limit** — per-IP limit on the `/fight` route via Vercel's platform WAF/firewall (decisions
-§abuse hygiene; the soft brake against title-variance-farming, accepted for v1). Payload cap is
-already enforced (413, from Slice 1's envelope).
+(b) **Rate-limit** — **20 req/min per IP** (confirmed 2026-07-06) on the `/fight` route via Vercel's
+platform WAF/firewall (decisions §abuse hygiene; the soft brake against title-variance-farming,
+accepted for v1). Generous for a human iterating (~a submit every 3s) but throttles scripted
+variance-farming. Payload cap is already enforced (413, from Slice 1's envelope). **This is a
+Vercel-account action (dashboard/API), not repo code — the user applies it; I provide the exact rule
+spec + smoke-check.** No unit test (the WAF returns a platform `429`, not our `problem+json`).
+
+**Go-public ordering (AC #5, confirmed 2026-07-06 — "WAF first, then merge"):** `/api/fight` is
+already reachable unadvertised (Slice 1). So the advertise code PR is greened now but its **merge is
+HELD** until the WAF rule is live + smoke-checked; only then does `/spec` list `/fight` — it never
+advertises an unprotected endpoint.
 
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 
@@ -242,9 +251,10 @@ summary; guard test still confirms the byte-hashed core has no absolute URL.
    appears before Slice 4; not needed for v1 internal testing.
 2. **Mirror cosmetic (Slice 1).** _Recommended:_ accept the 5-entry report for a self-clone (gate is
    correct); park the `skipMirror:false` honest-6-entry variant. No LLM submits a byte-clone.
-3. **Rate-limit mechanism (Slice 4).** _Recommended:_ Vercel platform WAF (decisions default; no
-   store, no code). An in-handler per-IP limiter would give a `problem+json` 429 but needs shared
-   state that stateless serverless lacks in v1 — defer with the identity model (decision 6).
+3. **Rate-limit mechanism (Slice 4). ✅ RESOLVED (2026-07-06):** Vercel platform WAF, **20 req/min per
+   IP** (no store, no code; a user dashboard/API action). An in-handler per-IP limiter would give a
+   `problem+json` 429 but needs shared state that stateless serverless lacks in v1 — defer with the
+   identity model (decision 6).
 4. **Gauntlet loading (Slice 1).** _Recommended:_ runtime `readFileSync` + `includeFiles` (the proven
    S1 pattern). Build-time JSON import (`resolveJsonModule` + import assertions) is an alternative that
    avoids fs but changes tsconfig mid-feature — not worth it.
