@@ -53,6 +53,10 @@ const mover = (): BotDoc => ({
   default: { type: "idle" },
 });
 
+// The 10 fresh CSPRNG seeds a real title fight draws, pinned for deterministic tests
+// (prod draws them from Web Crypto). 10 seeds × both sides ⇒ 20 title-fight bouts.
+const TITLE_SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+
 // The injected "arena": a 1-member idle gauntlet + a test version key + the real
 // engine config, so `handleFight` runs the real (fast, deterministic) benchmark.
 const arena = (version: string, store: FightDeps["store"]): FightDeps => ({
@@ -64,7 +68,18 @@ const arena = (version: string, store: FightDeps["store"]): FightDeps => ({
   match: MATCH,
   version,
   store,
+  freshSeeds: () => TITLE_SEEDS,
 });
+
+// Pre-seat a champion directly in the fake store (bypassing the clearing gate — this
+// King already reigns at generation 1). A challenger POSTed to `handleFight` must still
+// clear the injected idle-dummy gauntlet to earn the title shot against it.
+const enthrone = (
+  store: FightDeps["store"],
+  version: string,
+  champion: BotDoc,
+): Promise<unknown> =>
+  store.compareAndSwap(version, null, { champion, generation: 1 });
 
 const fightRequest = (body: string): Request =>
   new Request("https://mk.example/fight", { method: "POST", body });
@@ -139,29 +154,126 @@ describe("handleFight — S4 slice 1: empty-throne bootstrap crowning", () => {
     expect((await store.read("vOTHER"))?.champion).toEqual(other);
     expect(store.lineage("vOTHER")).toHaveLength(1);
   });
+});
 
-  it("does not contest an already-occupied throne yet (title fight is slice 2)", async () => {
+describe("handleFight — S4 slice 2: occupied-throne title fight", () => {
+  it("crowns a clearer who beats the reigning King > 0.5", async () => {
     const store = inMemoryThroneStore();
-    const king = loadBot("berserker");
+    const king = loadBot("aggressor");
 
-    await store.compareAndSwap("vTEST", null, {
-      champion: king,
-      generation: 1,
-    });
+    await enthrone(store, "vTEST", king);
 
-    const clearer = loadBot("aggressor");
+    const challenger = loadBot("berserker"); // beats aggressor 1.00 head-to-head
 
     const res = await handleFight(
-      fightRequest(JSON.stringify(clearer)),
+      fightRequest(JSON.stringify(challenger)),
       arena("vTEST", store),
     );
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const body = (await res.json()) as {
+      cleared: boolean;
+      title?: { outcome: string; winRate: number };
+    };
 
     expect(body.cleared).toBe(true);
-    expect(body).not.toHaveProperty("title");
-    // throne unchanged: still the original king, still exactly one lineage entry
+    expect(body.title?.outcome).toBe("crowned");
+    expect(body.title?.winRate).toBeGreaterThan(0.5);
+
+    // throne now holds the challenger at generation 2; lineage appended, King kept first
+    const rec = await store.read("vTEST");
+
+    expect(rec?.champion).toEqual(challenger);
+    expect(rec?.generation).toBe(2);
+    expect(store.lineage("vTEST").map((e) => e.champion.name)).toEqual([
+      "aggressor",
+      "berserker",
+    ]);
+  });
+
+  it("retains the King when the clearer scores <= 0.5 (a strict loss)", async () => {
+    const store = inMemoryThroneStore();
+    const king = loadBot("berserker");
+
+    await enthrone(store, "vTEST", king);
+
+    const challenger = loadBot("aggressor"); // loses to berserker 0.00
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(challenger)),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as { title?: { outcome: string } };
+
+    expect(body.title?.outcome).toBe("king-retained");
+    // throne unchanged: still berserker at generation 1, one lineage entry
     expect((await store.read("vTEST"))?.champion).toEqual(king);
+    expect((await store.read("vTEST"))?.generation).toBe(1);
     expect(store.lineage("vTEST")).toHaveLength(1);
+  });
+
+  it("retains the King on an EXACT 0.5 title fight (the strict > 0.5 boundary)", async () => {
+    const store = inMemoryThroneStore();
+    const king = loadBot("zoner");
+
+    await enthrone(store, "vTEST", king);
+
+    // a twin (King's rules, different name) is NOT a mirror (distinct doc) yet scores
+    // EXACTLY 0.5 by construction — it holds the winning side in exactly one of each
+    // seed's two bouts. A `>=` boundary mutant would (wrongly) crown it.
+    const twin: BotDoc = { ...king, name: "zoner-twin" };
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(twin)),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as {
+      title?: { outcome: string; winRate: number };
+    };
+
+    expect(body.title?.winRate).toBe(0.5);
+    expect(body.title?.outcome).toBe("king-retained");
+    expect(store.lineage("vTEST")).toHaveLength(1); // no crown at exactly 0.5
+  });
+
+  it("retains the King against a byte-identical clone (mirror can't dethrone)", async () => {
+    const store = inMemoryThroneStore();
+    const king = loadBot("berserker");
+
+    await enthrone(store, "vTEST", king);
+
+    const clone = loadBot("berserker"); // byte-identical ⇒ sameDoc skip ⇒ winRate 0
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(clone)),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as {
+      title?: { outcome: string; winRate: number };
+    };
+
+    expect(body.title?.outcome).toBe("king-retained");
+    expect(body.title?.winRate).toBe(0);
+    expect(store.lineage("vTEST")).toHaveLength(1); // cloning spawns no lineage entry
+  });
+
+  it("echoes the fresh title-fight seeds and reports the bout count", async () => {
+    const store = inMemoryThroneStore();
+
+    await enthrone(store, "vTEST", loadBot("aggressor"));
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as {
+      title?: { seeds: number[]; bouts: number };
+    };
+
+    expect(body.title?.seeds).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(body.title?.bouts).toBe(20); // 10 seeds × both sides
   });
 });

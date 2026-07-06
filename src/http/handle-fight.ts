@@ -23,6 +23,10 @@ export type FightDeps = {
   match?: BenchmarkConfig["match"];
   version: string;
   store: ThroneStore;
+  // The title fight's fresh seeds. Prod draws 10 from Web Crypto (CSPRNG — API-layer
+  // entropy OUTSIDE the pure sim, invariant #1 intact); tests inject a fixed list for
+  // determinism. Recorded in the `title` block so the title fight replays byte-identically.
+  freshSeeds: () => readonly number[];
 };
 
 const json = (body: unknown): Response =>
@@ -59,15 +63,48 @@ export const handleFight = async (
 
   const current = await deps.store.read(deps.version);
 
-  // Occupied throne: the title fight is slice 2. For now a clearer against an
-  // occupied throne gets the plain report (no title block yet).
-  if (current !== undefined) return json(report);
+  // Empty throne: crown the clearer as this version's first champion (the bootstrap).
+  if (current === undefined) {
+    await deps.store.compareAndSwap(deps.version, null, {
+      champion: parsed.doc,
+      generation: 1,
+    });
 
-  // Empty throne: crown the clearer as this version's first champion.
-  await deps.store.compareAndSwap(deps.version, null, {
-    champion: parsed.doc,
-    generation: 1,
+    return json({ ...report, title: { outcome: "throne-empty-crowned" } });
+  }
+
+  // Occupied throne: contest a fresh-seeded title fight against the reigning champion.
+  const seeds = deps.freshSeeds();
+
+  const titleFight = benchmark({
+    bot: parsed.doc,
+    gauntlet: [current.champion],
+    seeds,
+    maxTicks: deps.maxTicks,
+    rules: deps.rules,
+    match: deps.match,
   });
 
-  return json({ ...report, title: { outcome: "throne-empty-crowned" } });
+  // Dethrone strictly on > 0.5. A level (= 0.5) or losing fight — including a mirror,
+  // which `benchmark` skips to winRate 0 — leaves the King on the throne.
+  const dethroned = titleFight.winRate > 0.5;
+
+  // Crown appends the challenger to the lineage at the next generation. The CAS result
+  // is not consumed this slice; the "throne moved" → 409 race is slice 3.
+  if (dethroned) {
+    await deps.store.compareAndSwap(deps.version, current.generation, {
+      champion: parsed.doc,
+      generation: current.generation + 1,
+    });
+  }
+
+  return json({
+    ...report,
+    title: {
+      outcome: dethroned ? "crowned" : "king-retained",
+      winRate: titleFight.winRate,
+      seeds,
+      bouts: titleFight.totalFights,
+    },
+  });
 };

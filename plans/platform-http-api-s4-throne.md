@@ -66,9 +66,9 @@ gauntlet: [champion], seeds: fresh, maxTicks: MAX_TICKS, rules: CANONICAL_RULES,
 
 ## Acceptance Criteria
 
-- [ ] An empty (version-scoped) throne crowns the first gauntlet-clearer; `/fight` returns
+- [x] An empty (version-scoped) throne crowns the first gauntlet-clearer; `/fight` returns
       `title.outcome: "throne-empty-crowned"` and the champion is persisted (`generation 1` + one
-      lineage entry).
+      lineage entry). _(Slice 1 — PR #184)_
 - [ ] A clearer against an occupied throne runs a 20-bout fresh-seeded title fight and is
       `crowned` on `winRate > 0.5`, else the King is `king-retained`; the fresh seeds are returned.
 - [ ] A challenger byte-identical to the champion → `king-retained` (cloning can't dethrone), no
@@ -81,8 +81,8 @@ gauntlet: [champion], seeds: fresh, maxTicks: MAX_TICKS, rules: CANONICAL_RULES,
       incumbent's bot document (no `"rules"` leak — visibility principle).
 - [ ] A crowned bot's `X-Author-Handle` (≤ 64) and `model` are persisted and surfaced as the
       incumbent identity to the next challenger.
-- [ ] A non-clearing bot never receives a `title` block and never touches the throne (S3 behaviour
-      preserved).
+- [x] A non-clearing bot never receives a `title` block and never touches the throne (S3 behaviour
+      preserved). _(Slice 1 — PR #184)_
 - [ ] In production the throne persists across cold starts / instances on real Upstash Redis; a
       post-deploy smoke test crowns and reads back a throwaway champion.
 
@@ -95,6 +95,11 @@ Tests follow the eng-reqs strategy: handler logic is TDD'd as a **pure function*
 `Response`; no running server or live Redis.
 
 ### Slice 1: An empty throne crowns the first gauntlet-clearer (the stateful walking skeleton)
+
+**Status**: ✅ COMPLETE (PR #184, merged `main`@`52b0b5b`). Shipped the `ThroneStore` port + in-memory
+fake (`src/http/throne-store.ts`), the injectable `handleFight` seam (`src/http/handle-fight.ts`),
+`api/fight.ts` rewired to a thin prod wire, and the empty-throne bootstrap crown. 100% mutation on both
+new source files; all S3 `/fight` tests green; TCB / `INPUT_HASH` / `BENCHMARK_VERSION` untouched.
 
 **Value**: Challenger — the first bot to clear the gauntlet on an empty, version-scoped throne is
 crowned and recorded. Proves the whole stateful path (read → gate → CAS-crown → persist → response).
