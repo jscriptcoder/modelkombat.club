@@ -790,6 +790,40 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   `docs/archive/platform-http-api-s2-validate.md`. **S2 (`POST /validate`) is COMPLETE.** Remaining platform
   work: **S3 `POST /fight`** (gauntlet gate → title fight vs the version-scoped KotH throne), the **KotH
   ladder** (stateful), and the **Pixi viewer**.
+- DONE (**platform HTTP API — S3 (`POST /fight`), PRs #178–#181**): the **stateless gauntlet gate** —
+  the online loop's compute endpoint. An LLM author POSTs a bot and learns, in one synchronous response,
+  whether it **cleared the frozen gauntlet** (won `> 0.5` vs each of the 6 members) plus a compact,
+  leak-free per-member report to iterate on. Pure transport + orchestration over the already-built TCB
+  (invariant #2 — **no DSL op, `dsl.ts` untouched throughout**): the handler runs the canonical
+  `benchmark()` over the frozen manifest (`SEEDS` [1..10], `MAX_TICKS` 600, `MATCH`, `GAUNTLET_NAMES`,
+  `BENCHMARK_VERSION` "v19", `CANONICAL_RULES`) and reshapes the result. Four slices. **Slice 1 — walking
+  skeleton** (#178): `api/fight.ts` + a pure `src/http/fight-report.ts` reshaper + the gate predicate
+  `cleared` ⇔ **every one of the 6 `GAUNTLET_NAMES` present in `perOpponent` AND won `> 0.5`** (strict;
+  a byte-clone skipped by `benchmark()`'s no-mirror rule is absent ⇒ can never clear). The RFC 9457
+  envelope (`problem()` + `readValidatedBot()`) is **extracted into a shared `src/http/` module**
+  (DRY-by-knowledge, the S2-deferred trigger) and `api/validate.ts` rewired to consume it — behavior
+  unchanged (its suite is the characterization guard). Error paths byte-identical to `/validate`
+  (405+Allow / 413 / 400 / 422+errors, parse-first). Deployed **unadvertised** (reachable at `/api/fight`
+  for dogfood; no `/spec` row, no `/fight` rewrite yet). **Slice 2 — per-opponent `endReasons`** (#179):
+  `OpponentScore.endReasons: EndReasonTally` (`{gap,time,senshu,overtime}`) tallied in `summarize()` +
+  surfaced per report entry, so the author sees HOW each matchup ended; refactor extracted
+  `tallyEndReasons` shared by `summarize` + `tallyOfficiating` (a new endReason would force both inits
+  in lockstep — genuine knowledge dedup). **Slice 3 — `diagnostics.degrade`** (#180): `benchmark()`
+  aggregates the **submitted bot's** degraded frames (both sides × all seeds × all opponents) into
+  `BenchmarkResult.degrade: DegradeTally` (`unaffordable`/`out-of-band`/`locked`/`inert`/`wrong-context`)
+  — the highest-signal coaching line ("your kicks were `locked` N frames"); a per-key hand-sum masked
+  mutants, so it was reworked to a flat reason-list roll-up (`botDegradesOf` null-skipping + `tallyDegrade`)
+  that makes every arithmetic + null-skip mutant killable. **Slice 4 — harden & go public** (#181): the
+  `POST /fight` row added to `LIVE_ENDPOINTS` (so `GET /spec` advertises it) + the `/fight` → `/api/fight`
+  public rewrite, gated on a **per-IP rate-limit (20 req/min, Vercel platform WAF** — a soft brake against
+  title-variance-farming, applied out-of-band on the account + smoke-checked; the PR merge was HELD until
+  the rule was live, so `/spec` never advertised an unprotected endpoint). Slices 2–3 add **additive,
+  version-neutral** result fields (result shape, not a scoring input) ⇒ `INPUT_HASH` / `BENCHMARK_VERSION`
+  unchanged and the `benchmark-config.ts` guard + `docs/spec.md` drift test stay green throughout. 1259
+  tests; mutation 100% on changed regions each slice (`fight-report.ts`, the `benchmark.ts` tallies,
+  `api/spec.ts` 49/49). Design source of truth: `plans/platform-http-api-{decisions,stories}.md`; the
+  finished S3 plan is archived at `docs/archive/platform-http-api-s3-fight.md`. **S3 (`POST /fight`) is
+  COMPLETE.** Remaining platform work: the **KotH throne + ladder** (stateful) and the **Pixi viewer**.
 
 ### §7 match structure built between C9 and Capability D
 
@@ -872,21 +906,24 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    item 1). See the build-log entry above; board `docs/benchmark-gauntlet-v19.md`; design
    trail archived under `docs/archive/` (`aerial-mobility`, `air-strikes`,
    `precise-air-timing`, `air-actions-{decisions,stories}`, `gauntlet-aerial-rebalance`).
-6. **Platform HTTP API — 🏗️ IN PROGRESS; S1 (`GET /spec`) + S2 (`POST /validate`) ✅ COMPLETE (PRs
-   #171–#177).** The first platform-layer feature — the online LLM bot-authoring loop's front door.
-   `GET /spec` is **LIVE** at `https://modelkombat.club/spec` (greenfield Vercel deploy; engine
-   imported from `src/`), serving the layered self-describing spec (byte-stable hashed core +
+6. **Platform HTTP API — 🏗️ IN PROGRESS; S1 (`GET /spec`) + S2 (`POST /validate`) + S3 (`POST /fight`)
+   ✅ COMPLETE (PRs #171–#181).** The first platform-layer feature — the online LLM bot-authoring loop's
+   front door. `GET /spec` is **LIVE** at `https://modelkombat.club/spec` (greenfield Vercel deploy;
+   engine imported from `src/`), serving the layered self-describing spec (byte-stable hashed core +
    serve-time API envelope + game-overview intro) and carrying the optional inert `model?` provenance
-   field on `BotDoc`. **`POST /validate`** now lets an author pre-check a bot without a fight —
-   `200 {ok:true}` or RFC 9457 `problem+json` (`422` + the validator's issues · `400` · `405` · `413`
-   oversize), parse-first (no content-type gate). See the build-log entries above. Design source of
-   truth: `plans/platform-http-api-{decisions,stories}.md`; the finished S1 + S2 plans are archived
-   under `docs/archive/platform-http-api-s{1,2}-*.md`. **Next: S3 `POST /fight`** (the stateless
-   gauntlet gate → title fight) and **S4 the KotH throne** (stateful, atomic CAS) — each
+   field on `BotDoc`. **`POST /validate`** lets an author pre-check a bot without a fight — `200
+{ok:true}` or RFC 9457 `problem+json` (`422` + the validator's issues · `400` · `405` · `413`
+   oversize), parse-first (no content-type gate). **`POST /fight`** is the **stateless gauntlet gate**:
+   POST a bot → run the frozen `v19` gauntlet → a `cleared` verdict (won `> 0.5` vs each of the 6) + a
+   compact, leak-free per-member report (`endReasons`, `diagnostics.degrade`); now advertised in `/spec`
+   and rate-limited (20 req/min, Vercel WAF). See the build-log entries above. Design source of truth:
+   `plans/platform-http-api-{decisions,stories}.md`; the finished S1–S3 plans are archived under
+   `docs/archive/platform-http-api-s{1,2,3}-*.md`. **Next: the KotH throne + ladder** (stateful — the
+   title fight vs a version-scoped throne, atomic CAS) and the **Pixi viewer** — each
    `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is now underway.** The HTTP API's
-**`GET /spec` (S1) + `POST /validate` (S2)** are shipped (PRs #171–#177; `/spec` LIVE at
-`https://modelkombat.club/spec`). Remaining in the platform layer: **`POST /fight`** (the gauntlet
-gate → title fight), the **KotH ladder** (the tournament-_bracket_ sense of "rounds"), and the
-**Pixi viewer**.
+**`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3)** are shipped (PRs #171–#181; `/spec`
+LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited). Remaining in the platform
+layer: the **KotH throne + ladder** (the stateful title fight + the tournament-_bracket_ sense of
+"rounds") and the **Pixi viewer**.
