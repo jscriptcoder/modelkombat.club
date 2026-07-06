@@ -1,7 +1,7 @@
 # Plan: S3 — `POST /fight` (stateless gauntlet gate)
 
 **Branch**: feat/platform-api-s3-fight (per-slice branches thereafter)
-**Status**: Active — Slice 1 ✅ (PR #178), Slice 2 ✅ (PR #179); Slice 3 next
+**Status**: Active — Slice 1 ✅ (PR #178), Slice 2 ✅ (PR #179), Slice 3 ✅ (PR #180); Slice 4 next (closes S3)
 
 Story: `plans/platform-http-api-stories.md` (S3). Decisions: `plans/platform-http-api-decisions.md`
 (§API response contract, §Engineering requirements, decisions 2/4/5/6/7). Skipping `grill-me` —
@@ -58,10 +58,11 @@ submits a byte-clone, and the gate result is identical.
 
 ## Acceptance Criteria (feature)
 
-- [ ] `POST /fight` with a valid bot returns `200 application/json` with the report shape from
+- [x] `POST /fight` with a valid bot returns `200 application/json` with the report shape from
       decisions §API response contract: `version`, `cleared`, `gauntlet.seeds`,
       `gauntlet.perOpponent[]` (name, winRate, wins, losses, draws, net, passed, endReasons),
-      `diagnostics.degrade`. **No `title` block** (throne is S4).
+      `diagnostics.degrade`. **No `title` block** (throne is S4). _(Slices 1–3; `endReasons` PR #179,
+      `diagnostics.degrade` PR #180)_
 - [x] `cleared` is true iff the bot won > 50% vs each of the 6 members; a member it did not beat
       (incl. a byte-clone) leaves `cleared` false. _(Slice 1, PR #178)_
 - [x] Every error path matches the RFC 9457 contract, identical to `/validate`: `405`+`Allow`,
@@ -171,7 +172,7 @@ init-value mutants.
 
 ---
 
-### Slice 3: `diagnostics.degrade` — aggregated S8 telemetry
+### Slice 3: `diagnostics.degrade` — aggregated S8 telemetry ✅ DONE (PR #180)
 
 **Value**: The single highest-signal coaching line — "your kicks were `locked` 40% of frames
 (gassed)" / "12 `unaffordable`". Decision 5's aggregated S8 degrade diagnostics.
