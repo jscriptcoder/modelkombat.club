@@ -11,7 +11,7 @@ const specRequest = (method: string): Request =>
 
 describe("GET /spec — the self-describing spec endpoint", () => {
   it("serves the canonical spec as markdown on GET", async () => {
-    const res = handler(specRequest("GET"));
+    const res = handler.fetch(specRequest("GET"));
 
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe(
@@ -23,7 +23,7 @@ describe("GET /spec — the self-describing spec endpoint", () => {
   });
 
   it("rejects a non-GET method with an RFC 9457 405 problem+json", async () => {
-    const res = handler(specRequest("POST"));
+    const res = handler.fetch(specRequest("POST"));
 
     expect(res.status).toBe(405);
     expect(res.headers.get("content-type")).toBe(
