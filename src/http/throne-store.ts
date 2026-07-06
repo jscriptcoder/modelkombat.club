@@ -10,10 +10,16 @@
 // which any title fight is reconstructed via `runFight` (invariant #1).
 import type { BotDoc } from "../engine/dsl.js";
 
-// One crowning: the champion document + its monotonic generation (the CAS token).
-// Crowning metadata (title seeds, winRate, submitter identity) is added in later
-// slices; slice 1 needs only the pointer fields.
-export type ThroneRecord = { champion: BotDoc; generation: number };
+// One crowning: the champion document + its monotonic generation (the CAS token)
+// + the submitter's opaque author handle (S4), `null` when crowned without one.
+// The handle is identity metadata only — persisted so the next challenger can scout
+// the King, never read by the engine. Title seeds / winRate persistence is parked for
+// a future replay / champions-history story (no v1 read surface).
+export type ThroneRecord = {
+  champion: BotDoc;
+  generation: number;
+  handle?: string | null;
+};
 
 // The outcome of an atomic crown attempt: it either lands (`ok`) or the throne
 // moved under the caller since it read (`moved` — surfaced as 409 in slice 3).

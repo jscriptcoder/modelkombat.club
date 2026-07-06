@@ -97,8 +97,30 @@ const staleReadStore = (
   compareAndSwap: inner.compareAndSwap,
 });
 
-const fightRequest = (body: string): Request =>
-  new Request("https://mk.example/fight", { method: "POST", body });
+const fightRequest = (
+  body: string,
+  headers?: Record<string, string>,
+): Request =>
+  new Request("https://mk.example/fight", { method: "POST", body, headers });
+
+// An idle champion carrying a `model` field (provenance the interpreter never reads).
+// Pre-seated via `enthrone`, so it bypasses the clearing gate; a real challenger beats
+// this idle King, letting a test read the incumbent identity it was crowned against.
+const modelChamp = (model: string): BotDoc => ({
+  version: 1,
+  name: "modelking",
+  model,
+  rules: [],
+  default: { type: "idle" },
+});
+
+// The `title.incumbent` projection under test: identity fields only, never the doc.
+type IncumbentBody = {
+  title?: {
+    outcome: string;
+    incumbent?: { name: string; model: string | null; handle: string | null };
+  };
+};
 
 describe("handleFight — S4 slice 1: empty-throne bootstrap crowning", () => {
   it("crowns the first gauntlet-clearer on an empty version throne", async () => {
@@ -365,5 +387,208 @@ describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-mo
     expect(inner.lineage("vTEST").map((e) => e.champion.name)).toEqual([
       "berserker",
     ]);
+  });
+});
+
+describe("handleFight — S4 slice 4: incumbent identity + author handle", () => {
+  it("surfaces the incumbent's name/model/handle in the title block, never the doc", async () => {
+    const store = inMemoryThroneStore();
+    const king = loadBot("berserker"); // enthroned without a handle ⇒ handle null
+
+    await enthrone(store, "vTEST", king);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))), // loses ⇒ king-retained
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as IncumbentBody;
+
+    expect(body.title?.outcome).toBe("king-retained");
+    expect(body.title?.incumbent).toEqual({
+      name: "berserker",
+      model: null,
+      handle: null,
+    });
+    // the visibility invariant: the incumbent's bot DOCUMENT never leaks into the response
+    expect(JSON.stringify(body.title)).not.toContain('"rules"');
+    expect(JSON.stringify(body.title)).not.toContain('"default"');
+  });
+
+  it("persists a crowned bot's X-Author-Handle and surfaces it to the next challenger", async () => {
+    const store = inMemoryThroneStore();
+
+    // first challenger bootstrap-crowns the empty throne WITH a handle
+    await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Author-Handle": "koga",
+      }),
+      arena("vTEST", store),
+    );
+
+    // the next challenger (who beats aggressor) reads the reigning King's handle
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as IncumbentBody;
+
+    expect(body.title?.outcome).toBe("crowned");
+    expect(body.title?.incumbent?.handle).toBe("koga");
+  });
+
+  it("surfaces the incumbent's model when its document declares one", async () => {
+    const store = inMemoryThroneStore();
+
+    await enthrone(store, "vTEST", modelChamp("claude-opus-4-8"));
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))), // beats the idle King
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as IncumbentBody;
+
+    expect(body.title?.incumbent?.model).toBe("claude-opus-4-8");
+  });
+
+  it("reports the incumbent's model as null when its document omits one", async () => {
+    const store = inMemoryThroneStore();
+
+    await enthrone(store, "vTEST", loadBot("berserker")); // no model field
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as IncumbentBody;
+
+    expect(body.title?.incumbent?.model).toBeNull();
+  });
+
+  it("accepts a 64-character handle (the length boundary) and persists it", async () => {
+    const store = inMemoryThroneStore();
+    const handle = "a".repeat(64);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Author-Handle": handle,
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { title?: { outcome: string } };
+
+    expect(body.title?.outcome).toBe("throne-empty-crowned");
+    expect((await store.read("vTEST"))?.handle).toBe(handle);
+  });
+
+  it("rejects a 65-character handle with 400 and never touches the throne", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Author-Handle": "a".repeat(65),
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("content-type")).toContain(
+      "application/problem+json",
+    );
+
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/malformed-request");
+    // the message names the offending header so the caller knows what to fix
+    expect(body.title).toContain("X-Author-Handle");
+    // the clearer WOULD have crowned — the bad handle short-circuits before that
+    expect(await store.read("vTEST")).toBeUndefined();
+  });
+
+  // NUL/CR/LF are blocked by the Headers transport itself; the C0 controls below (US,
+  // 0x1F) and DEL (0x7F) pass through, so the handler's own code-point guard rejects them.
+  it.each([
+    { label: "a C0 control (US, 0x1F)", code: 0x1f },
+    { label: "DEL (0x7F)", code: 0x7f },
+  ])("rejects a handle containing $label with 400", async ({ code }) => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Author-Handle": "bad" + String.fromCharCode(code) + "handle",
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { type: string }).type).toBe(
+      "/problems/malformed-request",
+    );
+    expect(await store.read("vTEST")).toBeUndefined();
+  });
+
+  it("accepts a handle containing a space (0x20 is not a control character)", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Author-Handle": "ko ga",
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(200);
+    expect((await store.read("vTEST"))?.handle).toBe("ko ga");
+  });
+
+  it("validates the handle independently of the gauntlet gate (a non-clearer still 400s)", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(mover()), {
+        "X-Author-Handle": "a".repeat(65),
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(400);
+  });
+
+  it("treats an empty handle header as no handle (crown still succeeds)", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Author-Handle": "",
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as { title?: { outcome: string } };
+
+    expect(body.title?.outcome).toBe("throne-empty-crowned");
+    expect((await store.read("vTEST"))?.handle).toBeNull();
+  });
+
+  it("omits the incumbent from an empty-throne crown (you fought no one)", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as { title?: Record<string, unknown> };
+
+    expect(body.title?.outcome).toBe("throne-empty-crowned");
+    expect(body.title).not.toHaveProperty("incumbent");
   });
 });

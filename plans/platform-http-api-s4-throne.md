@@ -69,14 +69,16 @@ gauntlet: [champion], seeds: fresh, maxTicks: MAX_TICKS, rules: CANONICAL_RULES,
 - [x] An empty (version-scoped) throne crowns the first gauntlet-clearer; `/fight` returns
       `title.outcome: "throne-empty-crowned"` and the champion is persisted (`generation 1` + one
       lineage entry). _(Slice 1 — PR #184)_
-- [ ] A clearer against an occupied throne runs a 20-bout fresh-seeded title fight and is
+- [x] A clearer against an occupied throne runs a 20-bout fresh-seeded title fight and is
       `crowned` on `winRate > 0.5`, else the King is `king-retained`; the fresh seeds are returned.
-- [ ] A challenger byte-identical to the champion → `king-retained` (cloning can't dethrone), no
-      new lineage entry.
-- [ ] Two near-simultaneous crownings serialize: exactly one is `crowned`, the other gets
-      `409 /problems/throne-moved`; the throne ends holding the winner.
-- [ ] Every crowning appends an immutable lineage entry (champion doc + title seeds + metadata),
-      preserving the full per-version champion history.
+      _(Slice 2 — PR #185)_
+- [x] A challenger byte-identical to the champion → `king-retained` (cloning can't dethrone), no
+      new lineage entry. _(Slice 2 — PR #185)_
+- [x] Two near-simultaneous crownings serialize: exactly one is `crowned`, the other gets
+      `409 /problems/throne-moved`; the throne ends holding the winner. _(Slice 3 — PR #186)_
+- [ ] Every crowning appends an immutable lineage entry (champion doc + submitter metadata: the
+      author `handle`), preserving the full per-version champion history. _(Title-seed persistence
+      parked — no v1 read surface; folds into the future `/replay` / champions-history story.)_
 - [ ] The `title` block shows the incumbent's `name` / `model` / `handle` and **never** the
       incumbent's bot document (no `"rules"` leak — visibility principle).
 - [ ] A crowned bot's `X-Author-Handle` (≤ 64) and `model` are persisted and surfaced as the
@@ -131,6 +133,13 @@ not-cleared branch.
 
 ### Slice 2: A clearer fights the reigning King and dethrones on >50% (else the King retains)
 
+**Status**: ✅ COMPLETE (PR #185, merged `main`@`b4b3135`). Added the `freshSeeds` dep + the occupied-throne
+title-fight branch (`benchmark({ gauntlet: [current.champion], seeds })`, dethrone on top-level `winRate > 0.5`,
+crown at `generation + 1`), `title.outcome ∈ { crowned, king-retained }` carrying `winRate` / `seeds` / `bouts`.
+Boundary proven through the real handler with a zoner-twin fixture landing on exactly `0.5` (retained) and a
+mirror-clone → `winRate 0` (retained). Dethrone uses top-level `winRate` (the singleton `[champion]` gauntlet
+makes it the head-to-head rate — `OpponentScore` has no `winRate` field). 100% mutation on `handle-fight.ts`.
+
 **Value**: Challenger — clearing an **occupied** throne triggers a 20-bout fresh-seeded title fight;
 `> 0.5` dethrones and crowns, `≤ 0.5` retains the King.
 **Path**: `cleared?` → `store.read(version)` returns an incumbent → `freshSeeds()` (Web Crypto, 10) →
@@ -157,6 +166,13 @@ selection, `generation + 1` (not `+0`/`+2`), the seed count `10`, "crown writes 
 **Done when**: criteria met, mutation report reviewed, human approves commit.
 
 ### Slice 3: Concurrent dethrones serialize — one crowns, the other gets 409
+
+**Status**: ✅ COMPLETE (PR #186, merged `main`@`2fba314`). Unified both crown sites (empty-throne bootstrap
+`expected=null` + title-fight dethrone `expected=current.generation`) through one `crown()` helper that
+returns `409 /problems/throne-moved` (RFC 9457 via the shared `problem` envelope) on a lost CAS race, else
+`undefined` to proceed. Race driven by a stale-read store decorator (real CAS semantics, zero production-fake
+change); asserts 409 + `application/problem+json` + `type` + user-facing `title` (`toContain "resubmit"`) +
+the throne ends holding the usurper, loser absent. 100% mutation (42/42).
 
 **Value**: Challenger / operator — the throne can't be double-crowned; a crowning racing against a
 crowning that already landed is rejected with `409 /problems/throne-moved` (throne correctness).
@@ -191,9 +207,10 @@ handle }` sourced from the stored champion metadata (identity fields only, doc e
 `handle`, and `JSON.stringify(title)` contains **no** `"rules"` (no doc leak); (b) crowning with an
 `X-Author-Handle` header → the stored champion metadata carries the handle → the next challenger sees
 it as `incumbent.handle`; (c) a crowned bot's `model` (from its doc) appears as `incumbent.model`;
-(d) an over-length (> 64) or control-char handle → `400 /problems/malformed-request` (**confirm at the
-CONFIRM gate**: reject vs silently truncate — plan recommends _reject_, machine-readable, consistent
-with the structured-error ethos); (e) no handle header → `incumbent.handle` is `null`, crown still
+(d) an over-length (> 64) or control-char handle → `400 /problems/malformed-request` (**resolved at the
+CONFIRM gate: reject** — machine-readable, consistent with the structured-error ethos; NUL/CR/LF are
+already blocked by the Headers transport, so the handler's guard covers DEL + the other C0 controls that
+pass through); (e) no handle header → `incumbent.handle` is `null`, crown still
 succeeds.
 **RED**: assert identity present, doc absent, handle round-trips, model surfaced, length-cap behaviour.
 Mutator-aware gaps: the doc-exclusion (a mutant that includes `rules` must fail), the `64` length
@@ -242,6 +259,8 @@ mutation report reviewed, human approves commit.
 ## Follow-ups / parking lot (out of scope for S4)
 
 - Broader "fight archive" (retain non-champion submissions) — its own story _with_ a retention bound.
+- Persisting the title-fight seeds / winRate into each lineage entry (deferred at S4's CONFIRM gate —
+  no v1 read surface makes it observable; folds into the `/replay` / champions-history story below).
 - `/replay` + full visible tape; a champions-history read endpoint; the Pixi viewer.
 - Verified provenance / anti-impersonation + per-author accounts (deferred with decision 6).
 - Server-side title-only re-evaluation on `409` (v1 has the client resubmit).

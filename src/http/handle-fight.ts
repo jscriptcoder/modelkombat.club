@@ -58,6 +58,49 @@ const crown = async (
     : problem(409, "/problems/throne-moved", THRONE_MOVED_DETAIL);
 };
 
+// The author handle is an opaque, unverified label: at most 64 characters and free of
+// control characters (NUL/CR/LF never arrive — the Headers transport blocks them — but
+// DEL and the other C0 controls pass through, so the guard is the handler's own).
+const HANDLE_MAX = 64;
+
+const hasControlChar = (s: string): boolean =>
+  [...s].some((c) => {
+    const code = c.charCodeAt(0);
+
+    return code < 0x20 || code === 0x7f;
+  });
+
+// Read the optional `X-Author-Handle` header → a sanitized handle (absent / empty ⇒
+// `null`, "no handle"), or a `400` problem when it is over-length or carries control
+// characters. Runs before the gauntlet gate, so a malformed handle is rejected cheaply
+// and independently of whether the bot would clear.
+const readHandle = (req: Request): Response | { handle: string | null } => {
+  const raw = req.headers.get("x-author-handle");
+
+  if (raw == null || raw === "") return { handle: null };
+
+  if (raw.length > HANDLE_MAX || hasControlChar(raw)) {
+    return problem(
+      400,
+      "/problems/malformed-request",
+      "The X-Author-Handle header must be at most 64 characters and contain no control characters.",
+    );
+  }
+
+  return { handle: raw };
+};
+
+// The reigning champion's public identity — surfaced to a title challenger so they can
+// scout the King. Identity fields ONLY: the incumbent's bot document (its `rules`) is
+// never exposed. `model` (doc provenance) and `handle` (submitter) default to `null`.
+const incumbentOf = (
+  record: ThroneRecord,
+): { name: string; model: string | null; handle: string | null } => ({
+  name: record.champion.name,
+  model: record.champion.model ?? null,
+  handle: record.handle ?? null,
+});
+
 export const handleFight = async (
   req: Request,
   deps: FightDeps,
@@ -65,6 +108,14 @@ export const handleFight = async (
   const parsed = await readValidatedBot(req, "/fight");
 
   if (parsed instanceof Response) return parsed;
+
+  // Reject a malformed author handle up front — before the (costlier) benchmark and
+  // independently of whether the bot would clear the gate.
+  const handleResult = readHandle(req);
+
+  if (handleResult instanceof Response) return handleResult;
+
+  const { handle } = handleResult;
 
   const result = benchmark({
     bot: parsed.doc,
@@ -91,6 +142,7 @@ export const handleFight = async (
     const moved = await crown(deps.store, deps.version, null, {
       champion: parsed.doc,
       generation: 1,
+      handle,
     });
 
     return (
@@ -120,6 +172,7 @@ export const handleFight = async (
     const moved = await crown(deps.store, deps.version, current.generation, {
       champion: parsed.doc,
       generation: current.generation + 1,
+      handle,
     });
 
     if (moved) return moved;
@@ -132,6 +185,8 @@ export const handleFight = async (
       winRate: titleFight.winRate,
       seeds,
       bouts: titleFight.totalFights,
+      // Scout the King you fought (identity only, never the doc).
+      incumbent: incumbentOf(current),
     },
   });
 };
