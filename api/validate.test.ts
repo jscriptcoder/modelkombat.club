@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import handler from "./validate.js";
-import { validate, type BotDoc } from "../src/engine/dsl.js";
+import { LIMITS, validate, type BotDoc } from "../src/engine/dsl.js";
 
 // A complete, well-formed bot document (real `BotDoc` type — no redefined schema).
 // Callers JSON.stringify it into the request body; invalid cases spread an override
@@ -32,6 +32,16 @@ const validateRequest = (
   headers?: Record<string, string>,
 ): Request =>
   new Request("https://mk.example/validate", { method, body, headers });
+
+// A valid-bot JSON body padded with trailing whitespace (still valid JSON, so it
+// parses back to the same valid bot) to an EXACT character length — lets us probe
+// the `LIMITS.maxBytes` boundary precisely from both sides. `safeParse` and the
+// handler's size guard both measure `text.length`, so this is the honest boundary.
+const validBotBodyOfLength = (length: number): string => {
+  const base = JSON.stringify(validBot());
+
+  return base + " ".repeat(length - base.length);
+};
 
 describe("POST /validate — the validator gate", () => {
   it("accepts a well-formed bot with 200 {ok:true} as application/json", async () => {
@@ -114,5 +124,49 @@ describe("POST /validate — the validator gate", () => {
     expect(body.type).toBe("/problems/method-not-allowed");
     expect(body.status).toBe(405);
     expect(body.title).toBeTruthy();
+  });
+
+  it("rejects an oversize body with 413 payload-too-large", async () => {
+    // one byte over the cap — the transport is malformed, so the caller gets the
+    // precise 413 (shrink the doc) rather than a confusing 422 invalid-bot.
+    const res = await handler.fetch(
+      validateRequest("POST", validBotBodyOfLength(LIMITS.maxBytes + 1)),
+    );
+
+    expect(res.status).toBe(413);
+    expect(res.headers.get("content-type")).toBe(
+      "application/problem+json; charset=utf-8",
+    );
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.type).toBe("/problems/payload-too-large");
+    expect(body.status).toBe(413);
+    expect(body.title).toBeTruthy();
+  });
+
+  it("accepts a valid bot whose body is exactly at the size cap", async () => {
+    // boundary: `text.length === maxBytes` is NOT over the cap — the guard uses
+    // `>`, so an at-cap valid bot validates normally (kills a `>=` mutant).
+    const res = await handler.fetch(
+      validateRequest("POST", validBotBodyOfLength(LIMITS.maxBytes)),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("accepts a valid bot regardless of a non-JSON Content-Type (parse-first)", async () => {
+    // header-less `fetch` auto-labels a string body `text/plain`; `curl -d` sends
+    // form-urlencoded. `/validate` does not gate on content-type — a valid-JSON
+    // body is accepted on its merits (pins parse-first; catches a future gate).
+    const res = await handler.fetch(
+      validateRequest("POST", JSON.stringify(validBot()), {
+        "content-type": "text/plain",
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
   });
 });

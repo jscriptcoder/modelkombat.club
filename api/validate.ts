@@ -12,7 +12,12 @@
 //
 // Routing: `vercel.json` rewrites public `/validate` -> this function at
 // `/api/validate`.
-import { safeParse, validate, ValidationError } from "../src/engine/dsl.js";
+import {
+  LIMITS,
+  safeParse,
+  validate,
+  ValidationError,
+} from "../src/engine/dsl.js";
 
 // One RFC 9457 `application/problem+json` response. `extra` carries extension
 // members (e.g. the validator's `errors`); `headers` carries method-negotiation
@@ -49,6 +54,20 @@ export default {
     }
 
     const text = await req.text();
+
+    // Surface the engine's size bound (`safeParse` would otherwise throw it as a
+    // generic invalid-bot) as a precise 413, so an over-cap caller knows to shrink
+    // the document. Same predicate + constant the engine uses at `dsl.ts` — one
+    // boundary, not a second magic number. No content-type gate (parse-first):
+    // real clients label JSON bodies `text/plain` / form-urlencoded, so a valid
+    // body is accepted on its merits regardless of declared type.
+    if (text.length > LIMITS.maxBytes) {
+      return problem(
+        413,
+        "/problems/payload-too-large",
+        "The bot document exceeds the maximum size.",
+      );
+    }
 
     let doc: unknown;
 
