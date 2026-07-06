@@ -20,12 +20,17 @@ import { runFight, type FightConfig, type FightResult } from "./sim.js";
 import type { Rules } from "./types.js";
 import type { BotDoc } from "./dsl.js";
 
+// A count of bouts per `endReason` — the shape shared by the per-opponent
+// breakdown and the global `endedBy` roll-up.
+export type EndReasonTally = Record<FightResult["endReason"], number>;
+
 export type OpponentScore = {
   name: string;
   netPoints: number; // Σ (botScore − oppScore) over both sides × seeds
   wins: number; // fights the submitted bot won (a draw is not a win)
   draws: number;
   fights: number; // |seeds| × 2
+  endReasons: EndReasonTally; // how THIS matchup's bouts ended (sums to fights)
 };
 
 // A supplementary read-out of how the fights were officiated — never a ranking key.
@@ -33,7 +38,7 @@ export type OpponentScore = {
 // category-2 fouls into the submitted bot's own vs. its opponents' (bot-centric, like every
 // other figure — NOT the raw fighter-A/B split, which mixes the two once both sides are played).
 export type OfficiatingTally = {
-  endedBy: Record<FightResult["endReason"], number>;
+  endedBy: EndReasonTally;
   jogai: { bot: number; opp: number };
   passivity: { bot: number; opp: number };
 };
@@ -137,6 +142,10 @@ const summarize = (name: string, outcomes: Outcome[]): OpponentScore => ({
   wins: outcomes.filter((o) => o.botWin).length,
   draws: outcomes.filter((o) => o.draw).length,
   fights: outcomes.length,
+  endReasons: outcomes.reduce<EndReasonTally>(
+    (acc, o) => ({ ...acc, [o.endReason]: acc[o.endReason] + 1 }),
+    { gap: 0, time: 0, senshu: 0, overtime: 0 },
+  ),
 });
 
 // Fold every fight's officiating read-out into one aggregate: how it ended (per

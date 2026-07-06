@@ -99,9 +99,26 @@ describe("benchmark — aggregation over both sides × seeds", () => {
 
     // vs LOSER: bot scores 1, loser 0 ⇒ net +1 + a win, on all 2 seeds × 2 sides = 4 fights.
     // vs TRADER: both score 1 ⇒ net 0 + a draw, on all 4 fights.
+    // No match ⇒ every fight runs to the cap ⇒ all four bouts per opponent end by "time".
+    const allTime = { gap: 0, time: 4, senshu: 0, overtime: 0 };
+
     expect(result.perOpponent).toEqual([
-      { name: "loser", netPoints: 4, wins: 4, draws: 0, fights: 4 },
-      { name: "trader", netPoints: 0, wins: 0, draws: 4, fights: 4 },
+      {
+        name: "loser",
+        netPoints: 4,
+        wins: 4,
+        draws: 0,
+        fights: 4,
+        endReasons: allTime,
+      },
+      {
+        name: "trader",
+        netPoints: 0,
+        wins: 0,
+        draws: 4,
+        fights: 4,
+        endReasons: allTime,
+      },
     ]);
     expect(result.netPoints).toBe(4);
     expect(result.wins).toBe(4);
@@ -187,6 +204,7 @@ describe("benchmark — senshu first-blood tie-resolution (Capability D1)", () =
       wins: 2, // as A and as B
       draws: 0,
       fights: 2,
+      endReasons: { gap: 0, time: 0, senshu: 2, overtime: 0 }, // decided by first blood
     });
     expect(result.wins).toBe(2);
     expect(result.draws).toBe(0);
@@ -202,6 +220,7 @@ describe("benchmark — senshu first-blood tie-resolution (Capability D1)", () =
       wins: 0,
       draws: 2,
       fights: 2,
+      endReasons: { gap: 0, time: 2, senshu: 0, overtime: 0 }, // level bout runs to cap
     });
     expect(result.wins).toBe(0);
     expect(result.draws).toBe(2);
@@ -366,5 +385,66 @@ describe("benchmark — officiating tally (how bouts ended + jogai fouls)", () =
     );
 
     expect(result.officiating.passivity).toEqual({ bot: 0, opp: 18 });
+  });
+});
+
+describe("benchmark — per-opponent endReasons (how each matchup ended)", () => {
+  // A per-member breakdown of the global `officiating.endedBy`: the same bucketing,
+  // but keyed to each opponent so the author learns HOW a given matchup ended, not
+  // just the aggregate. A mixed gauntlet ends different matchups by different reasons.
+  const mixed = () =>
+    benchmark(
+      config({
+        gauntlet: [LOSER, TRADER],
+        seeds: [1],
+        maxTicks: 300,
+        match: { winGap: 8 },
+      }),
+    );
+
+  it("buckets each opponent's bouts by endReason — a mixed gauntlet gets its own per-opponent map", () => {
+    // vs the idle LOSER the bot reaches the +8 gap ⇒ both bouts end by "gap"; vs the
+    // symmetric TRADER the score stays level (no perception ⇒ swap-symmetric) ⇒ both
+    // run to the cap = "time". The maps differ per opponent — a shared global tally
+    // (or a fixed-bucket mutant) could not produce both.
+    const result = mixed();
+
+    expect(result.perOpponent[0].endReasons).toEqual({
+      gap: 2,
+      time: 0,
+      senshu: 0,
+      overtime: 0,
+    });
+    expect(result.perOpponent[1].endReasons).toEqual({
+      gap: 0,
+      time: 2,
+      senshu: 0,
+      overtime: 0,
+    });
+  });
+
+  it("keeps each opponent's endReasons summing to its fights, and Σ equal to the global endedBy", () => {
+    // The two invariants that pin the tally against init / increment / mis-bucket mutants:
+    // every member's reasons account for exactly its fights, and the per-member split
+    // re-aggregates to the independently-computed global `endedBy` (no double-count, no drop).
+    const result = mixed();
+
+    for (const o of result.perOpponent) {
+      const total = Object.values(o.endReasons).reduce((a, b) => a + b, 0);
+
+      expect(total).toBe(o.fights);
+    }
+
+    const summed = result.perOpponent.reduce(
+      (acc, o) => ({
+        gap: acc.gap + o.endReasons.gap,
+        time: acc.time + o.endReasons.time,
+        senshu: acc.senshu + o.endReasons.senshu,
+        overtime: acc.overtime + o.endReasons.overtime,
+      }),
+      { gap: 0, time: 0, senshu: 0, overtime: 0 },
+    );
+
+    expect(summed).toEqual(result.officiating.endedBy);
   });
 });

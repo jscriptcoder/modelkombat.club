@@ -52,6 +52,7 @@ type ReportOpponent = {
   draws: number;
   net: number;
   passed: boolean;
+  endReasons: { gap: number; time: number; senshu: number; overtime: number };
 };
 
 describe("POST /fight — the stateless gauntlet gate", () => {
@@ -84,6 +85,11 @@ describe("POST /fight — the stateless gauntlet gate", () => {
       expect(o.wins + o.losses + o.draws).toBe(fightsPerMember);
       expect(o.winRate).toBeCloseTo(o.wins / fightsPerMember);
       expect(o.passed).toBe(o.winRate > 0.5);
+
+      // every bout ended by exactly one reason ⇒ the reason counts sum to the fights
+      const { gap, time, senshu, overtime } = o.endReasons;
+
+      expect(gap + time + senshu + overtime).toBe(fightsPerMember);
     }
 
     // cleared = the strict >50%-vs-each gate over the derived per-member figures

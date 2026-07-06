@@ -2,7 +2,11 @@
 // `BenchmarkResult` into the `/fight` response contract (decisions §API response
 // contract). No I/O, no engine access; the gate predicate and per-member
 // derivations live here so they are unit-testable without running fights.
-import type { BenchmarkResult, OpponentScore } from "../engine/benchmark.js";
+import type {
+  BenchmarkResult,
+  EndReasonTally,
+  OpponentScore,
+} from "../engine/benchmark.js";
 
 export type FightReportOpponent = {
   name: string;
@@ -12,6 +16,7 @@ export type FightReportOpponent = {
   draws: number;
   net: number; // Σ (botScore − oppScore)
   passed: boolean; // won > 50% vs this member (strict)
+  endReasons: EndReasonTally; // how this matchup's bouts ended (sums to fights)
 };
 
 export type FightReport = {
@@ -36,6 +41,7 @@ const toReportOpponent = (o: OpponentScore): FightReportOpponent => ({
   draws: o.draws,
   net: o.netPoints,
   passed: passedBy(o),
+  endReasons: o.endReasons,
 });
 
 export const buildFightReport = (
