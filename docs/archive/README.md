@@ -116,3 +116,11 @@ ippon, all 6 ∈ `[25%, 75%]`). See the build-log entry in `docs/STATUS.md`; fin
 - **Story 2 — air strikes** (the `air-attacking` mechanic + air defense + canonical `tobi-geri`, 5 slices, PRs #159/#161/#162/#163 → benchmark v18/#164): [air-strikes.md](air-strikes.md)
 - **Story 3 — precise air timing** (`self.y` / `self.vy` air-perception reads, PR #165): [precise-air-timing.md](precise-air-timing.md)
 - **Story 4 — gauntlet exercises aerial combat** (passivity × jump characterization + rekka `tobi-geri` weaponization + the tobi-geri adoption lock, 3 slices, PRs #166/#167 → benchmark v19): [gauntlet-aerial-rebalance.md](gauntlet-aerial-rebalance.md)
+
+## Platform HTTP API — the LLM bot-authoring loop (first platform-layer feature)
+
+The online loop's front door. The **overall** design source of truth (spanning S1–S4) stays
+live in `plans/platform-http-api-{decisions,stories}.md` while S2–S4 are pending; only the
+completed **S1 plan** is archived here.
+
+- **S1 — `GET /spec`** (the deployment walking skeleton + self-describing layered spec + the inert `model?` `BotDoc` field; 4 slices, PRs #171–#174 → live at `https://modelkombat.club/spec`): [platform-http-api-s1-spec.md](platform-http-api-s1-spec.md)

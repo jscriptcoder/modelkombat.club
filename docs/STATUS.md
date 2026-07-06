@@ -740,6 +740,32 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   new host / network / fs / time / randomness op). **Air-actions is COMPLETE — the last combat
   capability; only the platform layer (KotH ladder / HTTP API / Pixi viewer) remains unbuilt.**
 
+- DONE (**platform HTTP API — S1 (`GET /spec`), PRs #171–#174**): the **first platform-layer
+  feature** (the combat tree is complete). A greenfield Vercel deployment serves the engine's
+  self-describing bot-authoring spec at **`https://modelkombat.club/spec`** — the front door of the
+  online LLM bot-authoring loop. Built `grill-me → story-splitting → find-gaps → planning → TDD`,
+  PR-per-slice, across four slices. **Slice 1 — `GET /spec` live** (#171): a Vercel serverless
+  function `api/spec.ts` (Web-standard `fetch` handler, **no `@vercel/node` runtime dep**) imports
+  `generateSpec()` from `src/` (NodeNext ESM) and returns it as `text/markdown`; non-GET → `405`
+  RFC 9457 `problem+json`; a dedicated `tsconfig.api.json` extends typecheck over `api/`. **Slice 2
+  — game overview** (#172): a version-neutral `## What ModelKombat is` intro in `generateSpec()` so
+  a cold model learns the domain (an LLM writes a data-not-code bot → WKF match on points → scored
+  vs a frozen gauntlet, no feedback loop) before the DSL mechanics — trimmed to the
+  authoring-relevant minimum (no render flavor / engine internals). **Slice 3 — serve-time API
+  envelope** (#173): the handler appends a `## API endpoints` block listing only LIVE endpoints
+  (S1: just `GET /spec`) as absolute URLs derived per-request (`x-forwarded-host` / `-proto` behind
+  Vercel's proxy, else the request origin) — composed at serve time so it stays OUT of the
+  byte-hashed, drift-tested core (no dead URLs advertised). **Slice 4 — `model` provenance field**
+  (#174): an optional inert `model?: string` on `BotDoc` (what authored the fighter, 1..64 chars
+  when present) — validated like `name`, **never read by the interpreter** (determinism-safe,
+  invariant #1) and adding **no DSL op** (TCB untouched, invariant #2). 1232 tests; mutation 100% on
+  changed regions; every spec change keeps `INPUT_HASH` / `BENCHMARK_VERSION` unchanged (the spec is
+  not a scoring input, and the 6 frozen `bots/*.json` stay without `model`). **S1 (`GET /spec`) is
+  COMPLETE.** Design source of truth: `plans/platform-http-api-{decisions,stories}.md`; the finished
+  S1 plan is archived at `docs/archive/platform-http-api-s1-spec.md`. Remaining platform work: **S2
+  `POST /validate`**, **S3 `POST /fight`** (gauntlet gate → title fight vs the version-scoped KotH
+  throne), the **KotH ladder** (stateful), and the **Pixi viewer**.
+
 ### §7 match structure built between C9 and Capability D
 
 Capabilities A (jogai), B (passivity), and C (tie resolution) — the WKF officiating
@@ -821,7 +847,18 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    item 1). See the build-log entry above; board `docs/benchmark-gauntlet-v19.md`; design
    trail archived under `docs/archive/` (`aerial-mobility`, `air-strikes`,
    `precise-air-timing`, `air-actions-{decisions,stories}`, `gauntlet-aerial-rebalance`).
+6. **Platform HTTP API — 🏗️ IN PROGRESS; S1 (`GET /spec`) ✅ COMPLETE (PRs #171–#174).** The first
+   platform-layer feature — the online LLM bot-authoring loop's front door. `GET /spec` is **LIVE**
+   at `https://modelkombat.club/spec` (greenfield Vercel deploy; engine imported from `src/`),
+   serving the layered self-describing spec (byte-stable hashed core + serve-time API envelope +
+   game-overview intro) and carrying the new optional inert `model?` provenance field on `BotDoc`.
+   See the build-log entry above. Design source of truth:
+   `plans/platform-http-api-{decisions,stories}.md`; the finished S1 plan is archived at
+   `docs/archive/platform-http-api-s1-spec.md`. **Next: S2 `POST /validate`** (the validator gate),
+   then **S3 `POST /fight`** (the stateless gauntlet gate → title fight) and **S4 the KotH throne**
+   (stateful, atomic CAS) — each `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
 
-**The deep-karate combat tree is now COMPLETE.** Everything remaining is the **platform
-layer** (a separate build phase): the **KotH ladder** (the tournament-_bracket_ sense of
-"rounds"), the **HTTP API** (`/spec` / `/validate` / `/fight`), and the **Pixi viewer**.
+**The deep-karate combat tree is COMPLETE, and the platform layer is now underway.** The HTTP API's
+**`GET /spec` (S1) is LIVE** at `https://modelkombat.club/spec` (PRs #171–#174). Everything else in
+the platform layer remains: **`POST /validate`** + **`POST /fight`** (the gauntlet gate → title
+fight), the **KotH ladder** (the tournament-_bracket_ sense of "rounds"), and the **Pixi viewer**.
