@@ -94,10 +94,21 @@ Parked (1):
 [Nice] Per-slice rollback — disposition set: Vercel instant redeploy; store changes additive.
 ```
 
+## Progress
+
+- **S1 (`GET /spec`) — ✅ COMPLETE.** All 4 slices shipped + live at
+  `https://modelkombat.club/spec` (PRs #171–#174, close-out #175). Plan archived to
+  `docs/archive/platform-http-api-s1-spec.md`.
+
 ## Next Step
 
-The split is hardened — all Blockers + Should-addresses closed. Load **`planning`** for
-**S1 (`GET /spec`)** — the walking skeleton that stands up the deployment — to turn it into
-PR-sized TDD slices. Every implementation slice must run the full
+**S2 (`POST /validate`).** Load **`planning`** to turn it into PR-sized TDD slices.
+Recommended shape: a **standalone small slice** — it stands up the shared POST envelope
+(JSON body parse → `Content-Type` check → validator gate → RFC 9457 `problem+json`) that
+S3 `POST /fight` then reuses wholesale, so building it in isolation de-risks S3 at minimal
+cost. Alternative the split left open: **fold `/validate` into S3's opening PR** if it
+proves too thin to stand alone. Either way it is the first PUBLIC endpoint accepting a
+request body ⇒ decide the payload-size cap here (per-IP rate-limit can still ride with S3's
+public-release gate). Every implementation slice must run the full
 RED-GREEN-MUTATE-KILL-MUTANTS-REFACTOR cycle: load `tdd`, `testing`, `mutation-testing`,
 `refactoring` before code.

@@ -24,7 +24,15 @@ const LIVE_ENDPOINTS: readonly {
   method: string;
   path: string;
   summary: string;
-}[] = [{ method: "GET", path: "/spec", summary: "this self-describing spec" }];
+}[] = [
+  { method: "GET", path: "/spec", summary: "this self-describing spec" },
+  {
+    method: "POST",
+    path: "/validate",
+    summary:
+      "pre-check a bot document; returns ok or the validator's structured issues",
+  },
+];
 
 // The public origin to advertise. Behind Vercel's proxy the caller-facing host
 // arrives in `x-forwarded-host` (the internal request URL is not public), so it
