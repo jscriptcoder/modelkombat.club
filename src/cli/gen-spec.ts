@@ -118,6 +118,7 @@ const documentShapeSection = (): string =>
     "{",
     '  "version": 1,',
     '  "name": "string (1..64 chars)",',
+    '  "model": "string (1..64 chars)",   // optional: what authored this bot (e.g. "Claude Opus 4.8", "human") — descriptive, never affects a fight',
     '  "memory": { "cellName": 0 },   // optional: declared int cells, persist across ticks within a fight',
     '  "rules": [ <Rule>, ... ],      // priority-ordered; first matching `do` wins',
     '  "default": <Action>            // taken when no rule fires',
@@ -312,6 +313,7 @@ export function botDocSchema(): Record<string, unknown> {
         properties: {
           version: { const: 1 },
           name: { type: "string", minLength: 1, maxLength: 64 },
+          model: { type: "string", maxLength: 64 },
           memory: {
             type: "object",
             maxProperties: LIMITS.maxCells,

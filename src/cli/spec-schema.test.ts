@@ -165,3 +165,27 @@ describe("schema enums are sourced from the live dsl.ts allowlists", () => {
     );
   });
 });
+
+describe("BotDoc schema — the optional model provenance property", () => {
+  // BotDoc-level view of the schema (the enum-navigation SchemaNode above omits
+  // object `properties`/`required`, which is what this property lives in).
+  const botDocDef = (): {
+    required: string[];
+    properties: Record<string, unknown>;
+  } =>
+    (
+      botDocSchema() as {
+        definitions: {
+          BotDoc: { required: string[]; properties: Record<string, unknown> };
+        };
+      }
+    ).definitions.BotDoc;
+
+  it("declares model as an optional capped string, not required", () => {
+    const def = botDocDef();
+    // an author MAY declare `model`; if they do it is a string capped at 64
+    expect(def.properties.model).toEqual({ type: "string", maxLength: 64 });
+    // but it is NOT required — a bot without `model` is still schema-valid
+    expect(def.required).not.toContain("model");
+  });
+});

@@ -67,6 +67,62 @@ describe("validate — bot intake gate", () => {
         expect.objectContaining({ path: "name" }),
       );
     });
+
+    // `model` — an OPTIONAL, purely descriptive record of what authored the
+    // fighter (e.g. "Claude Opus 4.8", "human"). Mirrors `name`'s 1..64 cap when
+    // present; the interpreter never reads it (see the determinism guard in the
+    // runFight suite). Invalid cases spread onto a plain object so validate's
+    // `unknown` parameter accepts the extra key without a type assertion.
+    describe("model provenance field (optional, descriptive)", () => {
+      it("accepts a bot declaring model (what authored the fighter)", () => {
+        const result = validate({
+          ...getMockBotDoc(),
+          model: "Claude Opus 4.8",
+        });
+
+        expect(result.ok).toBe(true);
+      });
+
+      it("accepts a bot with no model — the field is optional (the factory declares none)", () => {
+        expect(validate(getMockBotDoc()).ok).toBe(true);
+      });
+
+      it("accepts a single-character model", () => {
+        expect(validate({ ...getMockBotDoc(), model: "x" }).ok).toBe(true);
+      });
+
+      it("accepts a model of exactly 64 characters", () => {
+        expect(validate({ ...getMockBotDoc(), model: "a".repeat(64) }).ok).toBe(
+          true,
+        );
+      });
+
+      it("rejects an empty model", () => {
+        const result = validate({ ...getMockBotDoc(), model: "" });
+        expect(result.ok).toBe(false);
+        expect(result.issues).toContainEqual(
+          expect.objectContaining({ path: "model" }),
+        );
+      });
+
+      it("rejects a model of 65 characters", () => {
+        const result = validate({ ...getMockBotDoc(), model: "a".repeat(65) });
+        expect(result.ok).toBe(false);
+        expect(result.issues).toContainEqual(
+          expect.objectContaining({ path: "model" }),
+        );
+      });
+
+      it("rejects a non-string model with a descriptive reason", () => {
+        const result = validate({ ...getMockBotDoc(), model: 42 });
+        expect(result.ok).toBe(false);
+        // pin the full issue — the reason is the author-facing contract
+        expect(result.issues).toContainEqual({
+          path: "model",
+          reason: "must be a string of 1..64 characters",
+        });
+      });
+    });
   });
 
   describe("expression allowlists", () => {

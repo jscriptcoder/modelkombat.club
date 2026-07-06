@@ -84,6 +84,23 @@ describe("runFight — determinism and replay", () => {
       expect(Number.isInteger(e.b.x)).toBe(true);
     }
   });
+
+  it("ignores the descriptive `model` field — a fight is byte-identical with vs without it", () => {
+    // `model` (who/what authored the bot) is inert: the interpreter never reads
+    // it, so it cannot perturb a single outcome-path byte. Same seed, same bot,
+    // only `model` differs ⇒ identical event logs.
+    const cfg = getMockConfig({ maxTicks: 25 });
+    const without = runFight(cfg);
+
+    const withModel = runFight({
+      ...cfg,
+      botA: { ...AGGRESSOR, model: "Claude Opus 4.8" },
+    });
+
+    expect(JSON.stringify(withModel.events)).toBe(
+      JSON.stringify(without.events),
+    );
+  });
 });
 
 describe("runFight — movement", () => {

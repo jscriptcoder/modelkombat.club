@@ -109,6 +109,22 @@ describe("generateSpec — the factual machine-truth spec", () => {
     });
   });
 
+  describe("document shape", () => {
+    const HEADING = "## Document shape";
+
+    it("shows model as an optional sibling of name", () => {
+      const shape = sectionOf(generateSpec(), HEADING);
+      // both the required `name` and the optional provenance `model` appear...
+      expect(shape).toContain('"name"');
+      expect(shape).toContain('"model"');
+
+      // ...and `model` is documented as optional (so an author knows it may be omitted)
+      const modelLine = shape.split("\n").find((l) => l.includes('"model"'));
+
+      expect(modelLine).toContain("optional");
+    });
+  });
+
   describe("LIMITS", () => {
     it("renders every limit paired with its value on one line", () => {
       const spec = generateSpec();
