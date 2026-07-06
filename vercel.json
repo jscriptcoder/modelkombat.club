@@ -1,7 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "outputDirectory": "public",
-  "rewrites": [{ "source": "/spec", "destination": "/api/spec" }],
+  "rewrites": [
+    { "source": "/spec", "destination": "/api/spec" },
+    { "source": "/validate", "destination": "/api/validate" }
+  ],
   "functions": {
     "api/spec.ts": {
       "includeFiles": "bots/*.json"
