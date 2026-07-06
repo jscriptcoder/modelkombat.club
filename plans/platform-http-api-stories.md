@@ -99,16 +99,21 @@ Parked (1):
 - **S1 (`GET /spec`) — ✅ COMPLETE.** All 4 slices shipped + live at
   `https://modelkombat.club/spec` (PRs #171–#174, close-out #175). Plan archived to
   `docs/archive/platform-http-api-s1-spec.md`.
+- **S2 (`POST /validate`) — ✅ COMPLETE.** Both slices shipped (PRs #176–#177): slice 1 the
+  validator gate (`200 {ok:true}` / `422` + issues / `400` / `405`) + `/spec` advertises it;
+  slice 2 the `413` oversize guard + the **parse-first** resolution (415 dropped — real clients
+  label JSON bodies `text/plain` / form-urlencoded, so a content-type gate would reject the common
+  case). Payload cap = the engine's `LIMITS.maxBytes` surfaced as `413`; per-IP rate-limit deferred
+  to S3's public-release gate. Plan archived to `docs/archive/platform-http-api-s2-validate.md`.
 
 ## Next Step
 
-**S2 (`POST /validate`).** Load **`planning`** to turn it into PR-sized TDD slices.
-Recommended shape: a **standalone small slice** — it stands up the shared POST envelope
-(JSON body parse → `Content-Type` check → validator gate → RFC 9457 `problem+json`) that
-S3 `POST /fight` then reuses wholesale, so building it in isolation de-risks S3 at minimal
-cost. Alternative the split left open: **fold `/validate` into S3's opening PR** if it
-proves too thin to stand alone. Either way it is the first PUBLIC endpoint accepting a
-request body ⇒ decide the payload-size cap here (per-IP rate-limit can still ride with S3's
-public-release gate). Every implementation slice must run the full
-RED-GREEN-MUTATE-KILL-MUTANTS-REFACTOR cycle: load `tdd`, `testing`, `mutation-testing`,
-`refactoring` before code.
+**S3 (`POST /fight`)** — the stateless gauntlet gate → title fight. Load **`grill-me`/`find-gaps`**
+to resolve the open decisions, then **`planning`** to turn it into PR-sized TDD slices. It reuses S2's
+POST envelope (`await req.text()` → `413` payload cap → `safeParse` + `validate` → RFC 9457
+`problem+json`) wholesale, adding: run the frozen gauntlet at fixed disclosed seeds → the `>50%`-vs-each
+gate predicate → the compact egocentric report shape (decisions §API response contract). It is the first
+public **compute** endpoint ⇒ carry the per-IP rate-limit here (Vercel WAF/firewall) and keep the initial
+release **internal-only** until it's added. Every implementation slice must run the full
+RED-GREEN-MUTATE-KILL-MUTANTS-REFACTOR cycle: load `tdd`, `testing`, `mutation-testing`, `refactoring`
+before code.

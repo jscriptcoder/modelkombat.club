@@ -765,6 +765,31 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   S1 plan is archived at `docs/archive/platform-http-api-s1-spec.md`. Remaining platform work: **S2
   `POST /validate`**, **S3 `POST /fight`** (gauntlet gate → title fight vs the version-scoped KotH
   throne), the **KotH ladder** (stateful), and the **Pixi viewer**.
+- DONE (**platform HTTP API — S2 (`POST /validate`), PRs #176–#177**): the validator gate — the online
+  loop's second endpoint, letting an LLM author pre-check a bot document **without spending a fight**.
+  Pure transport over the engine's TCB: the handler composes `safeParse` (prototype-pollution-safe
+  intake) + `validate` (the allowlist validator) **directly** — not `parseBotDoc`, which flattens every
+  failure into one issue list and so can't drive per-failure HTTP status — so there is **no DSL op and
+  the TCB is untouched** (invariant #2). Errors are RFC 9457 `application/problem+json`. Two slices.
+  **Slice 1 — the walking skeleton** (#176): `api/validate.ts` (Web-standard `fetch` handler, **no
+  `@vercel/node` dep**) + a `vercel.json` rewrite → `200 {ok:true}` (valid) · `422 /problems/invalid-bot`
+  carrying an `errors` member = the validator's `{path,reason}` issues **verbatim** (structurally invalid,
+  incl. a forbidden-key prototype-pollution reject) · `400 /problems/malformed-request` (unparseable JSON)
+  · `405 /problems/method-not-allowed` + `Allow: POST` (non-POST); `GET /spec` advertises `POST …/validate`
+  via a new `LIVE_ENDPOINTS` row (still no `/fight`). **Slice 2 — transport hardening** (#177): an over-cap
+  body → `413 /problems/payload-too-large` via a single pre-`safeParse` guard reusing the engine's exact
+  `text.length > LIMITS.maxBytes` predicate + constant (one boundary, no second magic number). **Decision 2
+  revised to parse-first — 415 dropped**: empirically a header-less `fetch` auto-sends `text/plain` and
+  `curl -d` sends form-urlencoded, so a content-type gate would `415` the two most common JSON-posting
+  clients and contradict the curl smoke test; `/validate` therefore does not gate on content-type (a valid
+  JSON body is accepted on its merits regardless of declared type). 1240 tests; mutation **100%** on
+  `api/validate.ts` (44/44) + the `api/spec.ts` envelope diff; typecheck (base + `tsconfig.api.json`) / lint
+  / format clean. Every change keeps `INPUT_HASH` / `BENCHMARK_VERSION` unchanged (the endpoint is not a
+  scoring input; the `docs/spec.md` drift test stays green). Design source of truth:
+  `plans/platform-http-api-{decisions,stories}.md`; the finished S2 plan is archived at
+  `docs/archive/platform-http-api-s2-validate.md`. **S2 (`POST /validate`) is COMPLETE.** Remaining platform
+  work: **S3 `POST /fight`** (gauntlet gate → title fight vs the version-scoped KotH throne), the **KotH
+  ladder** (stateful), and the **Pixi viewer**.
 
 ### §7 match structure built between C9 and Capability D
 
@@ -847,18 +872,21 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    item 1). See the build-log entry above; board `docs/benchmark-gauntlet-v19.md`; design
    trail archived under `docs/archive/` (`aerial-mobility`, `air-strikes`,
    `precise-air-timing`, `air-actions-{decisions,stories}`, `gauntlet-aerial-rebalance`).
-6. **Platform HTTP API — 🏗️ IN PROGRESS; S1 (`GET /spec`) ✅ COMPLETE (PRs #171–#174).** The first
-   platform-layer feature — the online LLM bot-authoring loop's front door. `GET /spec` is **LIVE**
-   at `https://modelkombat.club/spec` (greenfield Vercel deploy; engine imported from `src/`),
-   serving the layered self-describing spec (byte-stable hashed core + serve-time API envelope +
-   game-overview intro) and carrying the new optional inert `model?` provenance field on `BotDoc`.
-   See the build-log entry above. Design source of truth:
-   `plans/platform-http-api-{decisions,stories}.md`; the finished S1 plan is archived at
-   `docs/archive/platform-http-api-s1-spec.md`. **Next: S2 `POST /validate`** (the validator gate),
-   then **S3 `POST /fight`** (the stateless gauntlet gate → title fight) and **S4 the KotH throne**
-   (stateful, atomic CAS) — each `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
+6. **Platform HTTP API — 🏗️ IN PROGRESS; S1 (`GET /spec`) + S2 (`POST /validate`) ✅ COMPLETE (PRs
+   #171–#177).** The first platform-layer feature — the online LLM bot-authoring loop's front door.
+   `GET /spec` is **LIVE** at `https://modelkombat.club/spec` (greenfield Vercel deploy; engine
+   imported from `src/`), serving the layered self-describing spec (byte-stable hashed core +
+   serve-time API envelope + game-overview intro) and carrying the optional inert `model?` provenance
+   field on `BotDoc`. **`POST /validate`** now lets an author pre-check a bot without a fight —
+   `200 {ok:true}` or RFC 9457 `problem+json` (`422` + the validator's issues · `400` · `405` · `413`
+   oversize), parse-first (no content-type gate). See the build-log entries above. Design source of
+   truth: `plans/platform-http-api-{decisions,stories}.md`; the finished S1 + S2 plans are archived
+   under `docs/archive/platform-http-api-s{1,2}-*.md`. **Next: S3 `POST /fight`** (the stateless
+   gauntlet gate → title fight) and **S4 the KotH throne** (stateful, atomic CAS) — each
+   `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is now underway.** The HTTP API's
-**`GET /spec` (S1) is LIVE** at `https://modelkombat.club/spec` (PRs #171–#174). Everything else in
-the platform layer remains: **`POST /validate`** + **`POST /fight`** (the gauntlet gate → title
-fight), the **KotH ladder** (the tournament-_bracket_ sense of "rounds"), and the **Pixi viewer**.
+**`GET /spec` (S1) + `POST /validate` (S2)** are shipped (PRs #171–#177; `/spec` LIVE at
+`https://modelkombat.club/spec`). Remaining in the platform layer: **`POST /fight`** (the gauntlet
+gate → title fight), the **KotH ladder** (the tournament-_bracket_ sense of "rounds"), and the
+**Pixi viewer**.

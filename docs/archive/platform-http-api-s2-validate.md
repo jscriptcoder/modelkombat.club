@@ -1,7 +1,7 @@
 # Plan: Platform HTTP API — S2 (`POST /validate`)
 
-**Branch**: feat/platform-api-s2-validate
-**Status**: Active
+**Branch**: feat/platform-api-s2-validate (slice 1, PR #176) · feat/platform-api-s2-hardening (slice 2 + close-out, PR #177)
+**Status**: ✅ COMPLETE — both slices shipped (PRs #176–#177); archived under `docs/archive/`.
 **Story**: S2 in `plans/platform-http-api-stories.md`. Decisions: `plans/platform-http-api-decisions.md` (decision 10 + § API response contract). Prior slice: S1 (`GET /spec`), archived at `docs/archive/platform-http-api-s1-spec.md`.
 
 ## Goal
@@ -22,10 +22,10 @@ An LLM author can POST a bot document to `/validate` and learn — **without spe
 - [x] `POST /validate` with a structurally-invalid bot → `422 application/problem+json` `type: "/problems/invalid-bot"` with an **`errors`** member = the validator's `{path,reason}` issues (verbatim). _(slice 1, PR #176)_
 - [x] Unparseable JSON body → `400 /problems/malformed-request`. _(slice 1, PR #176)_
 - [x] Non-POST method → `405 /problems/method-not-allowed`, `Allow: POST`. _(slice 1, PR #176)_
-- [ ] Oversize body (> `LIMITS.maxBytes`) → `413 /problems/payload-too-large`. _(slice 2)_
-- [ ] (decision 2 — **REVISED to parse-first**) `Content-Type` is not gated: any body that parses to a valid bot is accepted regardless of declared type (`text/plain`, `application/x-www-form-urlencoded`, absent, …); no `415` in v1. _(slice 2)_
+- [x] Oversize body (> `LIMITS.maxBytes`) → `413 /problems/payload-too-large`. _(slice 2, PR #177)_
+- [x] (decision 2 — **REVISED to parse-first**) `Content-Type` is not gated: any body that parses to a valid bot is accepted regardless of declared type (`text/plain`, `application/x-www-form-urlencoded`, absent, …); no `415` in v1. _(slice 2, PR #177)_
 - [x] `GET /spec` now advertises `POST …/validate` in its serve-time envelope (and still not `/fight`). _(slice 1, PR #176)_
-- [x] No fights, no opponent docs, no state. `INPUT_HASH` / `BENCHMARK_VERSION` unchanged (no engine / bot-file / spec-INPUT edits); the `docs/spec.md` drift test stays green. _(slice 1, PR #176; re-verify slice 2)_
+- [x] No fights, no opponent docs, no state. `INPUT_HASH` / `BENCHMARK_VERSION` unchanged (no engine / bot-file / spec-INPUT edits); the `docs/spec.md` drift test stays green. _(both slices; re-verified slice 2)_
 
 ## Slices
 
@@ -55,7 +55,7 @@ The walking skeleton — the complete **core value** (confirm well-formed / get 
   **REFACTOR**: keep `problem()` **local** to `api/validate.ts` (S1's single 405 + S2 ≠ enough shared knowledge to extract yet; the rule-of-three trigger is S3's 3rd handler — and a shared module must live OUTSIDE `api/`, since Vercel routes every `api/*.ts`). Do NOT retrofit S1's 405 to a shared helper in this slice.
   **Done when**: all ACs met, mutation report reviewed, human approves commit.
 
-### Slice 2: `/validate` rejects oversize requests with `413` (and stays content-type-agnostic)
+### Slice 2: `/validate` rejects oversize requests with `413` (and stays content-type-agnostic) ✅ MERGED (PR #177)
 
 Harden the public request envelope — surface the existing `LIMITS.maxBytes` bound as a precise `413` instead of a generic `422`. **415 dropped** (decision 2 revised to parse-first): real clients label JSON bodies as `text/plain` (header-less `fetch`) or `application/x-www-form-urlencoded` (`curl -d`), so gating on content-type would reject the common cases and contradict the curl smoke test. Instead we pin that any valid-JSON body is accepted regardless of declared type. This is the shared HTTP-envelope hardening S3's public gate reuses.
 
