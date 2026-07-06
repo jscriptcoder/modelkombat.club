@@ -5,5 +5,10 @@ export default {
   coverageAnalysis: "perTest",
   reporters: ["clear-text", "progress"],
   // Mutate first-party production source only (never tests/fixtures).
-  mutate: ["src/**/*.ts", "!src/**/*.test.ts"],
+  mutate: [
+    "src/**/*.ts",
+    "!src/**/*.test.ts",
+    "api/**/*.ts",
+    "!api/**/*.test.ts",
+  ],
 };
