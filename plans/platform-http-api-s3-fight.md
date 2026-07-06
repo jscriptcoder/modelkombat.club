@@ -1,7 +1,7 @@
 # Plan: S3 — `POST /fight` (stateless gauntlet gate)
 
 **Branch**: feat/platform-api-s3-fight (per-slice branches thereafter)
-**Status**: Active — Slice 1 ✅ merged (PR #178); Slice 2 next
+**Status**: Active — Slice 1 ✅ (PR #178), Slice 2 ✅ (PR #179); Slice 3 next
 
 Story: `plans/platform-http-api-stories.md` (S3). Decisions: `plans/platform-http-api-decisions.md`
 (§API response contract, §Engineering requirements, decisions 2/4/5/6/7). Skipping `grill-me` —
@@ -140,7 +140,7 @@ clean, human approves commit.
 
 ---
 
-### Slice 2: Per-opponent `endReasons` in the report
+### Slice 2: Per-opponent `endReasons` in the report ✅ DONE (PR #179)
 
 **Value**: The author sees _how_ each matchup ended (gap / time / senshu / overtime) — e.g. "all my
 zoner losses were `time` decisions" is different learning from "I got gapped out." Decision 5's

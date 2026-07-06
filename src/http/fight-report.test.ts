@@ -19,7 +19,10 @@ const opponentScore = (
 // A BenchmarkResult carrying the given per-opponent breakdown. The global
 // roll-ups + officiating are required by the type but unused by the slice-1
 // reshaper, so they are inert zeros here.
-const benchmarkResult = (perOpponent: OpponentScore[]): BenchmarkResult => ({
+const benchmarkResult = (
+  perOpponent: OpponentScore[],
+  over: Partial<BenchmarkResult> = {},
+): BenchmarkResult => ({
   netPoints: 0,
   winRate: 0,
   wins: 0,
@@ -31,6 +34,14 @@ const benchmarkResult = (perOpponent: OpponentScore[]): BenchmarkResult => ({
     jogai: { bot: 0, opp: 0 },
     passivity: { bot: 0, opp: 0 },
   },
+  degrade: {
+    unaffordable: 0,
+    "out-of-band": 0,
+    locked: 0,
+    inert: 0,
+    "wrong-context": 0,
+  },
+  ...over,
 });
 
 const opts = (gauntletNames: string[]) => ({
@@ -120,6 +131,23 @@ describe("buildFightReport — the compact gauntlet-gate report", () => {
     const [o] = buildFightReport(result, opts(["zoner"])).gauntlet.perOpponent;
 
     expect(o.endReasons).toEqual({ gap: 5, time: 12, senshu: 2, overtime: 1 });
+  });
+
+  it("surfaces the aggregated degrade tally as diagnostics.degrade", () => {
+    // The report exposes WHY the submitted bot's actions failed, verbatim from the result.
+    const degrade = {
+      unaffordable: 3,
+      "out-of-band": 0,
+      locked: 27,
+      inert: 0,
+      "wrong-context": 1,
+    };
+
+    const result = benchmarkResult([opponentScore({ name: "a" })], { degrade });
+
+    const report = buildFightReport(result, opts(["a"]));
+
+    expect(report.diagnostics.degrade).toEqual(degrade);
   });
 
   it("keys each member to ITS OWN result — a,b pass but c fails ⇒ not cleared", () => {

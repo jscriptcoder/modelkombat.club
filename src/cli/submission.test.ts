@@ -24,6 +24,13 @@ const scored = (netPoints: number, wins = 0, totalFights = 0): Submission => ({
       jogai: { bot: 0, opp: 0 },
       passivity: { bot: 0, opp: 0 },
     },
+    degrade: {
+      unaffordable: 0,
+      "out-of-band": 0,
+      locked: 0,
+      inert: 0,
+      "wrong-context": 0,
+    },
   },
 });
 

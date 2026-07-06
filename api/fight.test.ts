@@ -70,6 +70,12 @@ describe("POST /fight — the stateless gauntlet gate", () => {
       version: string;
       cleared: boolean;
       gauntlet: { seeds: number[]; perOpponent: ReportOpponent[] };
+      diagnostics: {
+        degrade: Record<
+          "unaffordable" | "out-of-band" | "locked" | "inert" | "wrong-context",
+          number
+        >;
+      };
     };
 
     expect(body.version).toBe(BENCHMARK_VERSION);
@@ -98,6 +104,21 @@ describe("POST /fight — the stateless gauntlet gate", () => {
       body.gauntlet.perOpponent.every((o) => o.passed);
 
     expect(body.cleared).toBe(gate);
+
+    // degrade diagnostics: all five reason buckets present and non-negative
+    const { degrade } = body.diagnostics;
+
+    expect(Object.keys(degrade).sort()).toEqual([
+      "inert",
+      "locked",
+      "out-of-band",
+      "unaffordable",
+      "wrong-context",
+    ]);
+
+    for (const count of Object.values(degrade)) {
+      expect(count).toBeGreaterThanOrEqual(0);
+    }
 
     // no throne yet (S4), and no opponent playbook leaked (visibility principle)
     expect(body).not.toHaveProperty("title");
