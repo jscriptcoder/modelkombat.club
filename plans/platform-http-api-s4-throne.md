@@ -76,13 +76,14 @@ gauntlet: [champion], seeds: fresh, maxTicks: MAX_TICKS, rules: CANONICAL_RULES,
       new lineage entry. _(Slice 2 — PR #185)_
 - [x] Two near-simultaneous crownings serialize: exactly one is `crowned`, the other gets
       `409 /problems/throne-moved`; the throne ends holding the winner. _(Slice 3 — PR #186)_
-- [ ] Every crowning appends an immutable lineage entry (champion doc + submitter metadata: the
-      author `handle`), preserving the full per-version champion history. _(Title-seed persistence
+- [x] Every crowning appends an immutable lineage entry (champion doc + submitter metadata: the
+      author `handle`), preserving the full per-version champion history. _(Lineage append — Slices
+      1–2; author `handle` recorded into the crown record — Slice 4, PR #187. Title-seed persistence
       parked — no v1 read surface; folds into the future `/replay` / champions-history story.)_
-- [ ] The `title` block shows the incumbent's `name` / `model` / `handle` and **never** the
-      incumbent's bot document (no `"rules"` leak — visibility principle).
-- [ ] A crowned bot's `X-Author-Handle` (≤ 64) and `model` are persisted and surfaced as the
-      incumbent identity to the next challenger.
+- [x] The `title` block shows the incumbent's `name` / `model` / `handle` and **never** the
+      incumbent's bot document (no `"rules"` leak — visibility principle). _(Slice 4 — PR #187)_
+- [x] A crowned bot's `X-Author-Handle` (≤ 64) and `model` are persisted and surfaced as the
+      incumbent identity to the next challenger. _(Slice 4 — PR #187)_
 - [x] A non-clearing bot never receives a `title` block and never touches the throne (S3 behaviour
       preserved). _(Slice 1 — PR #184)_
 - [ ] In production the throne persists across cold starts / instances on real Upstash Redis; a
@@ -196,6 +197,14 @@ holder. Mutator-aware gaps: the `generation` equality compare in CAS, the `409` 
 
 ### Slice 4: The title block shows who the King is, and records the submitter's handle
 
+**Status**: ✅ COMPLETE (PR #187, merged `main`@`29efce9`). Added the optional `X-Author-Handle` header read
+(`readHandle` — absent/empty ⇒ `null`; over-length/control-char ⇒ `400 /problems/malformed-request`, guarded
+via a code-point predicate since undici Headers only block NUL/CR/LF), the `handle` field on `ThroneRecord`
+(carried into both crown sites), and the identity-only `incumbentOf` projection (`name` / `model` / `handle`,
+doc excluded) surfaced in the occupied-throne `title` block. `model` sourced from `champion.model ?? null`
+(optional doc provenance). 100% mutation (`handle-fight.ts` 81/81, `throne-store.ts` 24/24); `api/fight.ts` /
+TCB / `INPUT_HASH` / `BENCHMARK_VERSION` untouched.
+
 **Value**: Challenger — a title-fighter (win or lose) sees the incumbent's identity (`name` / `model` /
 `handle`, **never** the doc); a crowned bot's `X-Author-Handle` + `model` are persisted and surfaced
 to the next challenger.
@@ -231,16 +240,26 @@ env-config (`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`); `api/fight.t
 store when env is present, the in-memory fake otherwise. Provision the Upstash integration on Vercel
 (Marketplace — a dashboard action, like the S3 WAF rule, not repo code).
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
-**Acceptance criteria**: (a) a **shared `ThroneStore` contract test** (empty→read, CAS-crown,
-CAS-generation-loss, lineage-append ordering) runs against the **in-memory fake** in CI and defines the
-port's semantics; (b) the adapter's **request-building** is a pure, unit-tested function — given
-`(version, expected, next)` it produces the correct Upstash `EVAL` payload (Lua script + `KEYS`/`ARGV`)
-and correctly interprets the `crowned` / `moved` reply; (c) a **post-deploy smoke test** crowns a
-throwaway bot on the deployed endpoint, reads it back (persistence), and confirms a stale-generation
-resubmit yields `409` — an integration check, not a unit test (consistent with S1's smoke test);
-(d) `/fight` remains under the existing S3 rate-limit (endpoint surface unchanged — no new advertise
-step). _Note:_ live Redis is not exercised in CI (no live instance); the fake carries CI, the smoke
-test carries prod — call this out in the PR.
+**Acceptance criteria** (CONFIRM gate resolved, this session): (a) a **shared `ThroneStore` contract
+suite** — `runThroneStoreContract(makeStore)` pinning empty→`read` undefined, CAS-crown,
+CAS-generation-loss, lineage-append ordering — refactored out of the existing `throne-store.test.ts`
+and run against the **in-memory fake** in the vitest suite (no GH-Actions CI here — the suite _is_ the
+gate); (b) the adapter's **request-building** is a pure, unit-tested function — given `(version,
+expected, next)` it produces the correct Upstash `EVAL` payload (Lua script + `KEYS`/`ARGV`, with
+`expected=null` encoded as the expect-empty sentinel) and correctly maps the reply → `{ ok }` /
+`{ moved }`; (c) **store selection at the composition root** — `api/fight.ts` builds
+`upstashThroneStore({ url, token })` iff **both** `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`
+are set, else the in-memory fake (partial config → fake); the adapter takes **injected config**, never
+reads `process.env` (unit-testable); (d) a **post-deploy smoke test** — a vitest spec **gated on the
+live env vars** (skipped without creds) that runs the contract suite against a **live-Upstash-backed
+store scoped to a throwaway version key** (crown → read-back → stale-generation loss), then `DEL`s the
+key — exercises the real adapter + real Redis **without** the deployed `/fight` HTTP path (avoids
+polluting the live `v19` lineage and sidesteps the open gauntlet-clearability question — decision D1);
+(e) `/fight` remains under the existing S3 rate-limit (endpoint surface unchanged — no new advertise
+step). _Note:_ live Redis is not exercised in the ordinary suite (no live instance); the fake carries
+the suite, the smoke test carries prod — call this out in the PR. _Store-unavailable resilience (map an
+adapter rejection → `503 /problems/throne-unavailable`) is **deferred** to a focused follow-up slice
+(decision D2); until then a store outage surfaces as a generic 500._
 **RED**: the `ThroneStore` contract suite (fake) + the adapter request-builder unit tests.
 **GREEN**: the Upstash REST adapter + env-based store selection.
 **MUTATE / KILL MUTANTS**: the request-builder payload shape + reply interpretation; the env-select
@@ -264,6 +283,10 @@ mutation report reviewed, human approves commit.
 - `/replay` + full visible tape; a champions-history read endpoint; the Pixi viewer.
 - Verified provenance / anti-impersonation + per-author accounts (deferred with decision 6).
 - Server-side title-only re-evaluation on `409` (v1 has the client resubmit).
+- **Store-unavailable graceful degradation** — map an Upstash adapter rejection (network error / 5xx)
+  → `503 /problems/throne-unavailable` (RFC 9457). Deferred at S5's CONFIRM gate (decision D2): a
+  distinct observable behavior from durable persistence, so its own small slice. Until then a store
+  outage surfaces as a generic 500 (the handler awaits `store.read` / `compareAndSwap` with no guard).
 
 ---
 
