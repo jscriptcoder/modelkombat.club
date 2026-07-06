@@ -8,6 +8,9 @@
   "functions": {
     "api/spec.ts": {
       "includeFiles": "bots/*.json"
+    },
+    "api/fight.ts": {
+      "includeFiles": "bots/*.json"
     }
   }
 }
