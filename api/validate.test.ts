@@ -123,7 +123,7 @@ describe("POST /validate — the validator gate", () => {
 
     expect(body.type).toBe("/problems/method-not-allowed");
     expect(body.status).toBe(405);
-    expect(body.title).toBeTruthy();
+    expect(body.title).toContain("/validate"); // the message names the rejected route
   });
 
   it("rejects an oversize body with 413 payload-too-large", async () => {
