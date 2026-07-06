@@ -29,6 +29,13 @@ import {
 const gauntlet = loadGauntlet();
 const store = inMemoryThroneStore();
 
+// The title fight's fresh seeds: 10 CSPRNG draws from Web Crypto. This is API-layer
+// entropy OUTSIDE the pure sim — each drawn seed still threads the engine's own
+// `mulberry32` PRNG, and the chosen seeds are echoed in the `title` block so the fight
+// replays byte-identically (invariant #1 intact).
+const freshSeeds = (): number[] =>
+  Array.from(crypto.getRandomValues(new Uint32Array(10)));
+
 export default {
   fetch(req: Request): Promise<Response> {
     return handleFight(req, {
@@ -40,6 +47,7 @@ export default {
       match: MATCH,
       version: BENCHMARK_VERSION,
       store,
+      freshSeeds,
     });
   },
 };
