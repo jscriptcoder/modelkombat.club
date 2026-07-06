@@ -120,8 +120,9 @@ ippon, all 6 ∈ `[25%, 75%]`). See the build-log entry in `docs/STATUS.md`; fin
 ## Platform HTTP API — the LLM bot-authoring loop (first platform-layer feature)
 
 The online loop's front door. The **overall** design source of truth (spanning S1–S4) stays
-live in `plans/platform-http-api-{decisions,stories}.md` while S3–S4 are pending; the completed
-**S1 + S2 plans** are archived here.
+live in `plans/platform-http-api-{decisions,stories}.md` while S4 (the KotH throne) is pending;
+the completed **S1–S3 plans** are archived here.
 
 - **S1 — `GET /spec`** (the deployment walking skeleton + self-describing layered spec + the inert `model?` `BotDoc` field; 4 slices, PRs #171–#174 → live at `https://modelkombat.club/spec`): [platform-http-api-s1-spec.md](platform-http-api-s1-spec.md)
 - **S2 — `POST /validate`** (the validator gate — `200 {ok:true}` or RFC 9457 `problem+json` issues; 2 slices, PRs #176–#177; parse-first, `413` oversize, no content-type gate): [platform-http-api-s2-validate.md](platform-http-api-s2-validate.md)
+- **S3 — `POST /fight`** (the stateless gauntlet gate — `cleared` verdict vs the frozen `v19` gauntlet + a compact leak-free per-member report with `endReasons` + `diagnostics.degrade`; 4 slices, PRs #178–#181; shared `src/http/` RFC 9457 envelope, advertised + rate-limited at 20 req/min via Vercel WAF): [platform-http-api-s3-fight.md](platform-http-api-s3-fight.md)

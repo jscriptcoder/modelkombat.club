@@ -1,7 +1,9 @@
 # Plan: S3 — `POST /fight` (stateless gauntlet gate)
 
 **Branch**: feat/platform-api-s3-fight (per-slice branches thereafter)
-**Status**: Active — Slice 1 ✅ (PR #178), Slice 2 ✅ (PR #179), Slice 3 ✅ (PR #180); Slice 4 next (closes S3)
+**Status**: ✅ COMPLETE — Slice 1 (PR #178), Slice 2 (PR #179), Slice 3 (PR #180), Slice 4 (PR #181).
+S3 (`POST /fight`) is done: advertised at `/spec` + rate-limited (20 req/min, Vercel WAF). Archived
+per repo convention; next platform work is the KotH throne (S4).
 
 Story: `plans/platform-http-api-stories.md` (S3). Decisions: `plans/platform-http-api-decisions.md`
 (§API response contract, §Engineering requirements, decisions 2/4/5/6/7). Skipping `grill-me` —
