@@ -105,15 +105,26 @@ Parked (1):
   label JSON bodies `text/plain` / form-urlencoded, so a content-type gate would reject the common
   case). Payload cap = the engine's `LIMITS.maxBytes` surfaced as `413`; per-IP rate-limit deferred
   to S3's public-release gate. Plan archived to `docs/archive/platform-http-api-s2-validate.md`.
+- **S3 (`POST /fight`, stateless gauntlet gate) — ✅ COMPLETE + LIVE.** All 4 slices shipped
+  (PRs #178–#181, close-out #182): slice 1 the skeleton — validate → run the frozen **v19**
+  gauntlet at fixed disclosed seeds → the `>50%`-vs-each gate predicate → compact egocentric
+  report (`cleared` verdict + `gauntlet.perOpponent[]` with `passed` + visible W/L/scores);
+  slice 2 per-member `endReasons`; slice 3 aggregated `diagnostics.degrade`; slice 4 **go-public** —
+  `/spec` advertises `POST /fight` (data-driven, core spec + `INPUT_HASH` untouched) + a Vercel WAF
+  per-IP rate-limit (20 req/min — a dashboard action, not repo code). Reused S2's POST envelope
+  wholesale; shared `src/http/` RFC 9457 envelope extracted at the 3rd handler. TCB untouched
+  (pure transport over `validate`/`runFight`/`benchmark`). Live at `https://modelkombat.club/fight`;
+  dogfooded end-to-end. Plan archived to `docs/archive/platform-http-api-s3-fight.md`.
 
 ## Next Step
 
-**S3 (`POST /fight`)** — the stateless gauntlet gate → title fight. Load **`grill-me`/`find-gaps`**
-to resolve the open decisions, then **`planning`** to turn it into PR-sized TDD slices. It reuses S2's
-POST envelope (`await req.text()` → `413` payload cap → `safeParse` + `validate` → RFC 9457
-`problem+json`) wholesale, adding: run the frozen gauntlet at fixed disclosed seeds → the `>50%`-vs-each
-gate predicate → the compact egocentric report shape (decisions §API response contract). It is the first
-public **compute** endpoint ⇒ carry the per-IP rate-limit here (Vercel WAF/firewall) and keep the initial
-release **internal-only** until it's added. Every implementation slice must run the full
-RED-GREEN-MUTATE-KILL-MUTANTS-REFACTOR cycle: load `tdd`, `testing`, `mutation-testing`, `refactoring`
-before code.
+**S4 (title fight + version-scoped KotH throne)** — the **stateful** apex: clearing the gauntlet
+earns a title shot; winning `>50%` vs the incumbent crowns you the King others must beat. This is
+the **first stateful platform piece** (version-keyed throne store, empty-throne bootstrap, **atomic
+CAS** crown with a `409 /problems/throne-moved` on concurrent dethrones, hall-of-fame retention,
+optional unverified author handle). It has genuinely new design surface — the storage tech choice
+(Vercel KV / Blob / Edge Config / Postgres) and concurrency/versioning correctness — so resolve it
+via **`grill-me`/`find-gaps`** first, then **`planning`** to turn it into PR-sized TDD slices (see
+the S4 row in Split Candidates for the resolved schema + acceptance examples). Every implementation
+slice must run the full RED-GREEN-MUTATE-KILL-MUTANTS-REFACTOR cycle: load `tdd`, `testing`,
+`mutation-testing`, `refactoring` before code.

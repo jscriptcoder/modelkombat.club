@@ -1,9 +1,11 @@
 # Platform HTTP API — resolved design decisions
 
-Resolved via `grill-me` (2026-07-05). This is the pre-planning source of truth for
-the LLM bot-authoring HTTP API — the first piece of the **platform layer** (the
-deep-karate combat tree is complete; see `docs/STATUS.md`). Feeds `story-splitting`
-→ `planning` → TDD.
+Resolved via `grill-me` (2026-07-05; S4 persistence branches resolved 2026-07-06). This
+is the pre-planning source of truth for the LLM bot-authoring HTTP API — the first piece
+of the **platform layer** (the deep-karate combat tree is complete; see `docs/STATUS.md`).
+Feeds `story-splitting` → `planning` → TDD. S1–S3 are LIVE; **S4 (the throne)** is planned
+in `plans/platform-http-api-s4-throne.md` — the "deferred to planning" items below are now
+**resolved** (marked _resolved S4_).
 
 ## The loop (what we're building)
 
@@ -23,18 +25,18 @@ POST bot ─► validate ─► gauntlet gate ─┬─ fail ─► visible per-
 
 ## Resolved decisions
 
-| #   | Decision               | Choice                                                                                                                                                                                                                                                                                                                            | Rationale                                                                                                                                                                                                                                                                                             |
-| --- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Opponent model**     | Frozen gauntlet as a **gate**, KotH as the **apex**. Clear the gauntlet → title shot; empty throne → clearing crowns you.                                                                                                                                                                                                         | Unifies generalize-vs-adapt: you must _generalize_ (beat a diverse field) to earn the right to _adapt_ (challenge one king). Natural difficulty curve for the LLM.                                                                                                                                    |
-| 2   | **Gate threshold**     | Win-rate **> 50% vs each** of the 6 gauntlet members (head-to-head over its ~20 fights = seeds × both sides).                                                                                                                                                                                                                     | Honors "beats all of them" — no member it can't handle — without demanding a flawless 120-0. Strict `>` also resolves the exact-tie edge. Computable directly from `perOpponent[]`.                                                                                                                   |
-| 3   | **Title-fight format** | Mirror the gauntlet protocol (~20 bouts); challenger must win **> 50%** to dethrone.                                                                                                                                                                                                                                              | Robust (not decided by one PRNG draw); consistent bar with the gate; **king retains on a tie** falls out for free (10-10 → incumbent keeps it).                                                                                                                                                       |
-| 4   | **Seed policy**        | **Fixed, disclosed** seeds for the gauntlet; **fresh, hidden** seeds for the title fight (returned post-hoc for replay).                                                                                                                                                                                                          | Practice is reproducible & A/B-testable (clean learning signal); the throne can't be pre-tuned. Anti-overfit sits exactly where it matters. Fresh seeds do **not** break determinism — seed selection is API-layer entropy _outside_ the pure sim; given the seed the fight replays byte-identically. |
-| 5   | **Feedback richness**  | **Compact egocentric report**: gate/title verdict + per-member pass/fail + per-matchup visible outcomes (scores, `endReason`, foul counts) + aggregated S8 degrade diagnostics ("your kicks were locked 40% — gassed").                                                                                                           | High signal, leak-free, reuses `BenchmarkResult` + `FighterFrame.degrade`. Full per-tick tape deferred to a later opt-in `/replay`.                                                                                                                                                                   |
-| 6   | **State model**        | **Stateless authoring** (each POST is a complete fresh bot) + **one global throne** (champion document held server-side, undisclosed). No accounts/sessions in v1.                                                                                                                                                                | Simplest; matches the offline benchmark; the LLM's "learning" lives in its own context. The throne is the only persistent state.                                                                                                                                                                      |
-| 7   | **Sync vs async**      | **Synchronous.**                                                                                                                                                                                                                                                                                                                  | Measured: ~82ms for the 120-fight gauntlet warm (~0.68ms/fight); a full submission (gate 120 + title ~20 = ~140 fights) ≈ **96ms** — far under any serverless budget. Async job/poll is unjustifiable at this scale.                                                                                  |
-| 8   | **Throne versioning**  | **Version-scoped throne**, keyed by the benchmark/ruleset version. A version bump (new move, rebalance, `INPUT_HASH` flip) starts a **fresh empty throne**.                                                                                                                                                                       | Honest (no title under defunct physics); reuses existing versioning; storage keys by version from day one → no migration debt.                                                                                                                                                                        |
-| 9   | **Spec composition**   | **Layered envelope.** `GET /spec` = canonical `generateSpec()` output + a short **version-neutral** "what this game is" narrative in the _core_ spec (helps offline authors too, like D2's senshu prose) + an **API envelope layered at serve time** (submit URL + POST request/response contract) kept _out_ of the hashed spec. | Self-describing _and_ byte-stable — the deployment URL never enters the drift-tested / `INPUT_HASH`-folded artifact.                                                                                                                                                                                  |
-| 10  | **Endpoint surface**   | `GET /spec` · `POST /validate` · `POST /fight`.                                                                                                                                                                                                                                                                                   | Matches the original roadmap. `/validate` (validator gate → ok / structured `ValidationError[]`, no fight) lets the LLM iterate on structural validity cheaply; validation is a clean distinct concern and reuses the built validator.                                                                |
+| #   | Decision               | Choice                                                                                                                                                                                                                                                                                                                            | Rationale                                                                                                                                                                                                                                                                                                  |
+| --- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Opponent model**     | Frozen gauntlet as a **gate**, KotH as the **apex**. Clear the gauntlet → title shot; empty throne → clearing crowns you.                                                                                                                                                                                                         | Unifies generalize-vs-adapt: you must _generalize_ (beat a diverse field) to earn the right to _adapt_ (challenge one king). Natural difficulty curve for the LLM.                                                                                                                                         |
+| 2   | **Gate threshold**     | Win-rate **> 50% vs each** of the 6 gauntlet members (head-to-head over its ~20 fights = seeds × both sides).                                                                                                                                                                                                                     | Honors "beats all of them" — no member it can't handle — without demanding a flawless 120-0. Strict `>` also resolves the exact-tie edge. Computable directly from `perOpponent[]`.                                                                                                                        |
+| 3   | **Title-fight format** | Mirror the gauntlet protocol (~20 bouts); challenger must win **> 50%** to dethrone.                                                                                                                                                                                                                                              | Robust (not decided by one PRNG draw); consistent bar with the gate; **king retains on a tie** falls out for free (10-10 → incumbent keeps it).                                                                                                                                                            |
+| 4   | **Seed policy**        | **Fixed, disclosed** seeds for the gauntlet; **fresh, hidden** seeds for the title fight (returned post-hoc for replay).                                                                                                                                                                                                          | Practice is reproducible & A/B-testable (clean learning signal); the throne can't be pre-tuned. Anti-overfit sits exactly where it matters. Fresh seeds do **not** break determinism — seed selection is API-layer entropy _outside_ the pure sim; given the seed the fight replays byte-identically.      |
+| 5   | **Feedback richness**  | **Compact egocentric report**: gate/title verdict + per-member pass/fail + per-matchup visible outcomes (scores, `endReason`, foul counts) + aggregated S8 degrade diagnostics ("your kicks were locked 40% — gassed").                                                                                                           | High signal, leak-free, reuses `BenchmarkResult` + `FighterFrame.degrade`. Full per-tick tape deferred to a later opt-in `/replay`.                                                                                                                                                                        |
+| 6   | **State model**        | **Stateless authoring** (each POST is a complete fresh bot) + **one global throne** (champion document held server-side, undisclosed). No accounts/sessions in v1.                                                                                                                                                                | Simplest; matches the offline benchmark; the LLM's "learning" lives in its own context. The version-scoped throne **and its append-only champion lineage** (_resolved S4_) are the only persistent state.                                                                                                  |
+| 7   | **Sync vs async**      | **Synchronous.**                                                                                                                                                                                                                                                                                                                  | Measured: ~82ms for the 120-fight gauntlet warm (~0.68ms/fight); a full submission (gate 120 + title ~20 = ~140 fights) ≈ **96ms** — far under any serverless budget. Async job/poll is unjustifiable at this scale.                                                                                       |
+| 8   | **Throne versioning**  | **Version-scoped throne**, keyed by the benchmark/ruleset version. A version bump (new move, rebalance, `INPUT_HASH` flip) starts a **fresh empty throne**.                                                                                                                                                                       | Honest (no title under defunct physics); reuses existing versioning; storage keys by version from day one → no migration debt. Each version key holds the **full append-only lineage** of every bot that has held that version's throne (_resolved S4_ — see below), the last entry being the active king. |
+| 9   | **Spec composition**   | **Layered envelope.** `GET /spec` = canonical `generateSpec()` output + a short **version-neutral** "what this game is" narrative in the _core_ spec (helps offline authors too, like D2's senshu prose) + an **API envelope layered at serve time** (submit URL + POST request/response contract) kept _out_ of the hashed spec. | Self-describing _and_ byte-stable — the deployment URL never enters the drift-tested / `INPUT_HASH`-folded artifact.                                                                                                                                                                                       |
+| 10  | **Endpoint surface**   | `GET /spec` · `POST /validate` · `POST /fight`.                                                                                                                                                                                                                                                                                   | Matches the original roadmap. `/validate` (validator gate → ok / structured `ValidationError[]`, no fight) lets the LLM iterate on structural validity cheaply; validation is a clean distinct concern and reuses the built validator.                                                                     |
 
 ## Visibility principle (the "nothing internal" rule, made precise)
 
@@ -57,10 +59,19 @@ Scouting is legitimate; handing over the enemy's source is not.
   read current king → evaluate title fight against it → CAS crown _iff the throne is
   still that king_; if it moved under us, reject with "throne changed, resubmit" (or
   re-evaluate). Serializes simultaneous dethronements. Low-traffic-simple, correct.
-- **Throne record schema (decided):** key = ruleset/benchmark version; value =
-  champion bot document + crowning metadata (title-fight seeds used, result, and the
-  optional **unverified author handle**). Storage _tech_ (Vercel KV / Blob / Edge Config
-  / Postgres) deferred to planning.
+  **(_resolved S4_)** The CAS token is an **opaque monotonic `generation`** counter
+  carried on the throne record; a crown reads `generation`, then swaps only if the stored
+  `generation` still matches → losing writer gets `409 /problems/throne-moved`.
+- **Throne record schema (decided):** key = ruleset/benchmark version; value = the
+  **append-only lineage** of champions — each entry = `{ bot document, generation,
+crowning metadata (title-fight seeds used, winRate/result), incumbent identity
+(name, model, optional unverified handle) }`. The active king is the last entry.
+  **Storage tech (_resolved S4_): Upstash Redis** (Vercel Marketplace; the 2026
+  successor to Vercel KV) driven over its **REST API via `fetch`** — no SDK runtime
+  dep, honoring "no runtime deps." Sits behind a `ThroneStore` **port** (`read` +
+  `compareAndSwap`) with an **in-memory fake** for tests; the Upstash binding is the
+  thin production adapter. The atomic compare-gen-then-swap-and-append is one Redis
+  `EVAL` (Lua) call. Edge Config was rejected (read-optimized, poor for CAS writes).
 - **Bot `model` field (author provenance, in the document).** Optional `model?: string`
   on `BotDoc`, a **sibling of `name`**: _what authored the fighter_ (e.g. `"Claude Opus
 4.8"`, `"ChatGPT 5.5"`, `"human"` by convention). Free-form, length-capped,
@@ -77,13 +88,23 @@ Scouting is legitimate; handing over the enemy's source is not.
 - **Author handle (optional, unverified).** A submission may carry an optional author
   handle, shown alongside the crown + the bot's `name`; **unverified** (no auth) and
   labeled as such. It is envelope metadata, NOT part of the validated bot document
-  (keeps the DSL doc pure) — exact transport (header vs request envelope) deferred to
-  planning. Impersonation remains possible in v1 (low-stakes); real anti-impersonation
-  is deferred with accounts (decision 6). Old-version thrones (below) keep their handle.
-- **Retention — hall of fame (keep all).** Every version's final champion persists as a
-  historical record ("King of v15, v16, …"); the active throne is always the current
-  version's. Records are tiny ⇒ no cleanup/expiry logic and no clock dependency. A future
-  read surface could expose the champions history; not required for v1.
+  (keeps the DSL doc pure). **Transport (_resolved S4_): an `X-Author-Handle` request
+  header** — never the JSON body, so the validated bot document stays pure; length-capped
+  (≤64), control chars / over-length rejected `400`; absent ⇒ `null`. Impersonation
+  remains possible in v1 (low-stakes); real anti-impersonation is deferred with accounts
+  (decision 6). Old-version thrones (below) keep their handle. The `/fight` `title` block
+  surfaces the incumbent's **identity** (`name` / `model` / `handle`) — **never** the
+  incumbent's bot document (visibility principle).
+- **Retention — hall of fame (full lineage, keep all) (_resolved S4_).** Not just each
+  version's _final_ champion — the **entire append-only lineage** of every bot that ever
+  held a throne persists ("Kings of v19: challenger-A → challenger-B → …"). The active
+  throne is always the last entry under the current version key. Records are tiny ⇒ no
+  cleanup/expiry logic and no clock dependency. Because fights are **reconstructed**
+  (`runFight(a, b, seed, version)`), storing champion docs + the crowning seeds makes
+  every past title fight replayable later (the viewer) with no fight-tape storage. A
+  broader **archive of _all_ uploaded bots** (to replay any fight, incl. vs gauntlet
+  members) was discussed and **deferred as its own bounded story** — it needs a retention
+  bound so anonymous POSTs can't grow an unbounded sink; the champion lineage does not.
 - **Abuse hygiene:** per-IP rate limit + HTTP body-size cap (Vercel WAF/firewall
   available). The bot document's _internal_ worst-case cost is already bounded by
   `LIMITS` at validation (invariant #3).
@@ -100,9 +121,19 @@ Scouting is legitimate; handing over the enemy's source is not.
 - **Mirror rule at the gate.** To clear, a bot must win **>50% vs each of the 6**; a
   member it did _not_ beat — including one it is byte-identical to (`benchmark()`'s
   `sameDoc` no-mirror skip) — counts as **not-passed**. So copying a gauntlet fighter
-  can never clear the gate. Implementation choice deferred to planning: either disable
-  the skip for the API (the self-clone fights to ~50% and naturally fails) or treat a
-  skipped member as not-passed — identical gate result.
+  can never clear the gate. **Implementation (_resolved — already in code_): treat a
+  skipped member as not-passed.** `src/http/fight-report.ts` computes `cleared` /
+  `passed` as "found in `perOpponent` **and** `winRate > 0.5`"; a `sameDoc`-skipped
+  member is simply absent ⇒ not-passed. The same rule extends to the S4 title fight:
+  cloning the reigning king produces an empty title fight (0 bouts ⇒ `winRate 0`) ⇒
+  cannot dethrone.
+- **Title fight mechanics (_resolved S4_).** Reuses `benchmark({ bot: challenger,
+gauntlet: [reigningKingDoc], seeds: freshSeeds, maxTicks, rules, match })` → read
+  `perOpponent[0].winRate`; dethrone iff **> 0.5** (decision 3's bar; king retains ties
+  and the clone's empty 0-bout fight). Fresh seeds are **10 uint32s from Web Crypto**
+  (`crypto.getRandomValues(new Uint32Array(10))` — any uint32 is a valid `mulberry32`
+  seed), both-sides ⇒ 20 bouts. The seed source is a small injected dependency (fixed in
+  tests) so the fight is fully replayable and the store never needs the sim's PRNG.
 - **The gauntlet IS the frozen benchmark.** The API's gauntlet run reuses the frozen
   `benchmark-config.ts` manifest at the current `BENCHMARK_VERSION` — same roster
   (jabber/rekka/zoner/grappler/sweeper/vulture), same seeds (1..10), `maxTicks 600`, and
@@ -207,12 +238,17 @@ Never includes any opponent's bot document or internal state (visibility princip
    seam; reuses `BenchmarkResult` + S8 aggregation. **No throne yet.**
 4. **The throne (stateful)** — version-keyed throne store + title fight (fresh hidden
    seeds, returned for replay) + dethrone-on->50% + empty-throne bootstrap + atomic CAS.
+   **Planned in `plans/platform-http-api-s4-throne.md`** (5 TDD slices: empty-throne
+   bootstrap → title fight → CAS/409 → identity/handle → real Upstash Redis + deploy).
 5. **(Later) `/replay` + full visible tape** — deferred opt-in.
 6. **(Cross-cutting)** rate-limit + payload cap config.
 
 ## Deferred / out of scope for v1
 
-- Per-author sessions, accounts, leaderboards, throne lineage (decision 6).
+- Per-author sessions, accounts, leaderboards (decision 6). _(Champion lineage IS kept
+  — resolved S4; a per-`model`/`handle` leaderboard on top of it is still deferred.)_
+- Archive of all uploaded bots / arbitrary-fight replay (deferred as its own bounded
+  story — needs a retention bound; the champion lineage does not).
 - Full per-tick replay tape in `/fight` (decision 5 → later `/replay`).
 - Trainer _strategy_ prompting — that's the caller's prompt wrapped around the neutral
   spec, not an API feature. No strategy presets in v1.
