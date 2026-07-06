@@ -18,20 +18,20 @@ An LLM author can POST a bot document to `/validate` and learn — **without spe
 
 ## Acceptance Criteria (feature-level)
 
-- [ ] `POST /validate` with a valid bot → `200 application/json` `{ "ok": true }`.
-- [ ] `POST /validate` with a structurally-invalid bot → `422 application/problem+json` `type: "/problems/invalid-bot"` with an **`errors`** member = the validator's `{path,reason}` issues (verbatim).
-- [ ] Unparseable JSON body → `400 /problems/malformed-request`.
-- [ ] Non-POST method → `405 /problems/method-not-allowed`, `Allow: POST`.
-- [ ] Oversize body (> `LIMITS.maxBytes`) → `413 /problems/payload-too-large`.
-- [ ] (decision 2) A present, non-JSON `Content-Type` → `415 /problems/unsupported-media-type`; an ABSENT content-type stays lenient (parse-first).
-- [ ] `GET /spec` now advertises `POST …/validate` in its serve-time envelope (and still not `/fight`).
-- [ ] No fights, no opponent docs, no state. `INPUT_HASH` / `BENCHMARK_VERSION` unchanged (no engine / bot-file / spec-INPUT edits); the `docs/spec.md` drift test stays green.
+- [x] `POST /validate` with a valid bot → `200 application/json` `{ "ok": true }`. _(slice 1, PR #176)_
+- [x] `POST /validate` with a structurally-invalid bot → `422 application/problem+json` `type: "/problems/invalid-bot"` with an **`errors`** member = the validator's `{path,reason}` issues (verbatim). _(slice 1, PR #176)_
+- [x] Unparseable JSON body → `400 /problems/malformed-request`. _(slice 1, PR #176)_
+- [x] Non-POST method → `405 /problems/method-not-allowed`, `Allow: POST`. _(slice 1, PR #176)_
+- [ ] Oversize body (> `LIMITS.maxBytes`) → `413 /problems/payload-too-large`. _(slice 2)_
+- [ ] (decision 2 — **REVISED to parse-first**) `Content-Type` is not gated: any body that parses to a valid bot is accepted regardless of declared type (`text/plain`, `application/x-www-form-urlencoded`, absent, …); no `415` in v1. _(slice 2)_
+- [x] `GET /spec` now advertises `POST …/validate` in its serve-time envelope (and still not `/fight`). _(slice 1, PR #176)_
+- [x] No fights, no opponent docs, no state. `INPUT_HASH` / `BENCHMARK_VERSION` unchanged (no engine / bot-file / spec-INPUT edits); the `docs/spec.md` drift test stays green. _(slice 1, PR #176; re-verify slice 2)_
 
 ## Slices
 
 Every slice follows RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR. No production code without a failing test. Handler logic is TDD'd as a **pure function** — construct a `Request`, assert the `Response` (per decisions § Testing strategy), exactly like `api/spec.test.ts`.
 
-### Slice 1: `POST /validate` returns `{ok:true}` or the structured validator issues
+### Slice 1: `POST /validate` returns `{ok:true}` or the structured validator issues ✅ MERGED (PR #176)
 
 The walking skeleton — the complete **core value** (confirm well-formed / get structured errors) end-to-end through the real deploy path, and `/spec` advertises it.
 
@@ -55,32 +55,30 @@ The walking skeleton — the complete **core value** (confirm well-formed / get 
   **REFACTOR**: keep `problem()` **local** to `api/validate.ts` (S1's single 405 + S2 ≠ enough shared knowledge to extract yet; the rule-of-three trigger is S3's 3rd handler — and a shared module must live OUTSIDE `api/`, since Vercel routes every `api/*.ts`). Do NOT retrofit S1's 405 to a shared helper in this slice.
   **Done when**: all ACs met, mutation report reviewed, human approves commit.
 
-### Slice 2: `/validate` rejects oversize and wrong-media-type requests with the correct status
+### Slice 2: `/validate` rejects oversize requests with `413` (and stays content-type-agnostic)
 
-Harden the public request envelope — surface the existing `LIMITS.maxBytes` bound as `413`, and (decision 2) reject a declared non-JSON media type as `415`. This is the shared HTTP-envelope hardening S3's public gate reuses.
+Harden the public request envelope — surface the existing `LIMITS.maxBytes` bound as a precise `413` instead of a generic `422`. **415 dropped** (decision 2 revised to parse-first): real clients label JSON bodies as `text/plain` (header-less `fetch`) or `application/x-www-form-urlencoded` (`curl -d`), so gating on content-type would reject the common cases and contradict the curl smoke test. Instead we pin that any valid-JSON body is accepted regardless of declared type. This is the shared HTTP-envelope hardening S3's public gate reuses.
 
-**Value**: operator + honest LLM author — malformed **transport** (too big / wrong type) gets the precise RFC 9457 status instead of a generic 422 or an ugly 500, so a caller can react correctly.
-**Trigger**: `POST /validate` with an oversize body, or a present non-JSON `Content-Type`.
-**Observable outcome**: body > `LIMITS.maxBytes` → `413 /problems/payload-too-large`; `Content-Type: text/plain` → `415 /problems/unsupported-media-type`.
-**Path**: in `api/validate.ts`, BEFORE `safeParse`: (a) if a `Content-Type` is present and is not `application/json` (ignoring `; charset=…`) → 415; (b) `text.length > LIMITS.maxBytes` → 413 (import the engine constant — **one** size boundary, mapped to the right status, no second magic number). Absent content-type ⇒ parse-first (lenient).
-**Intentionally skipped**: 429 rate-limit — needs Vercel WAF/firewall config (not handler code), has no positive user outcome, and per the parking lot attaches to S3's public-release gate.
+**Value**: operator + honest LLM author — an over-cap body gets the precise RFC 9457 `413` (so a caller knows to shrink the doc) instead of a confusing `422 invalid-bot`; and a caller that mislabels its content-type is not punished for it.
+**Trigger**: `POST /validate` with an oversize body, or a valid body under a non-JSON `Content-Type`.
+**Observable outcome**: body > `LIMITS.maxBytes` → `413 /problems/payload-too-large`; a valid bot under `Content-Type: text/plain` → `200 {ok:true}` (not rejected on type).
+**Path**: in `api/validate.ts`, BEFORE `safeParse`: `text.length > LIMITS.maxBytes` → 413 (import the engine constant — **one** size boundary, the exact predicate `safeParse` uses internally at `dsl.ts:393`, mapped to the right status; no second magic number). No content-type branch at all (parse-first).
+**Intentionally skipped**: 415 content-type gate — dropped for v1 (parse-first; see above), reconsider at S3 only if a real need appears. 429 rate-limit — needs Vercel WAF/firewall config (not handler code), attaches to S3's public-release gate.
 **Required implementation skills**: load `tdd`, `testing`, `mutation-testing`, `refactoring` before code.
 **Acceptance criteria** (present at CONFIRM gate):
 
-- a body one byte over `LIMITS.maxBytes` → `413`, `body.type === "/problems/payload-too-large"`.
-- a body **at** the cap that is otherwise valid → NOT 413 (boundary; validates normally).
-- `Content-Type: text/plain` with a valid-JSON body → `415`, `body.type === "/problems/unsupported-media-type"` (decision 2).
-- `application/json; charset=utf-8` → accepted (param-tolerant).
-- **absent** `Content-Type` + valid JSON → `200` (leniency pinned — LLM callers that omit the header aren't punished).
-  **RED**: oversize-body test → 413; at-cap boundary test → not 413; `text/plain` → 415; `application/json; charset=utf-8` → 200; no content-type + valid JSON → 200. Mutator focus: the `>` vs `>=` on the cap (both boundary tests present), and the content-type equality/`startsWith` check (a mutated comparison must flip a case).
-  **GREEN**: add the two pre-`safeParse` guards to `api/validate.ts`.
+- a body one byte over `LIMITS.maxBytes` → `413`, `content-type: application/problem+json; charset=utf-8`, `body.type === "/problems/payload-too-large"`, `body.status === 413`, `body.title` truthy.
+- a body **at** the cap (`text.length === LIMITS.maxBytes`) that is otherwise a valid bot → `200 {ok:true}` (boundary — NOT 413; validates normally).
+- a valid bot sent with `Content-Type: text/plain` → `200 {ok:true}` (parse-first leniency pinned — a mislabeled but valid body is accepted, and any future accidental content-type gate is caught).
+  **RED**: oversize-body test → 413 (+ envelope/type/status/title assertions); at-cap boundary test → 200; `text/plain` + valid bot → 200. Mutator focus: the `>` vs `>=` / `<` on the cap comparison (both boundary tests present so a flipped operator fails one), the `413` status literal, the `"/problems/payload-too-large"` type string, and the `title` (truthy assertion).
+  **GREEN**: add the single pre-`safeParse` size guard to `api/validate.ts` (import `LIMITS`).
   **MUTATE / KILL / REFACTOR**: standard; reassess whether `problem()` now wants extracting (still likely local until S3).
   **Done when**: all ACs met, mutation report reviewed, human approves commit.
 
 ## Open decisions — lock at the relevant CONFIRM gate
 
 1. **Success body shape** (slice 1) — `{ok:true}` (minimal) vs `{ok:true,nodeCount}` (a free diagnostic: doc size vs `LIMITS.maxNodes`). **Recommend `{ok:true}`** — the story AC says only "ok"; `nodeCount` adds an unrequested field and is trivially addable later.
-2. **415 content-type strictness** (slice 2) — reject a PRESENT non-JSON type (415) while staying lenient on an ABSENT one, vs drop 415 for v1 (parse everything; 400 on failure). **Recommend the middle** (reject present-non-JSON, lenient on absent) — honors the decisions § contract table without punishing LLM callers that forget the header.
+2. **415 content-type strictness** (slice 2) — ~~reject a PRESENT non-JSON type while staying lenient on an ABSENT one~~ → **RESOLVED: parse-first, 415 dropped for v1.** Empirically, a string-body `fetch` with no header auto-sends `text/plain;charset=UTF-8` and `curl -d` sends `application/x-www-form-urlencoded`, so "reject present non-JSON" would 415 the two most common JSON-posting clients, contradict this plan's own curl smoke test, and invert the "don't punish callers who forget the header" rationale (forgetting → `text/plain`, not absent). So `/validate` does not gate on content-type; any valid-JSON body is accepted. A real 415 can return at S3 if a need appears.
 3. **Slice count** — 2 slices (cleaner review) vs fold slice 2 into slice 1 (one `/validate` PR). **Recommend 2.**
 4. **`problem()` helper location** — local to `api/validate.ts` now; extract to a shared module (OUTSIDE `api/`, e.g. `src/api/problem.ts`) at S3. **Recommend local now** (rule of three; avoids Vercel routing a helper file).
 
