@@ -44,6 +44,14 @@ const RETREATER = named("retreater", { type: "move", dir: -1 });
 // Byte-for-byte identical to SUBMITTED ⇒ the no-mirror skip must drop it.
 const SUBMITTED_CLONE = named("sub", ATTACK_MID);
 
+// Attacks a valid MoveId that MOCK_RULES does NOT configure ⇒ the action never starts;
+// it degrades to `inert` EVERY tick (stays neutral, so no `locked` follow-on).
+const INERT_BOT = named("inert-bot", {
+  type: "attack",
+  move: "kizami-zuki",
+  band: "mid",
+});
+
 // ─── senshu fixtures ─────────────────────────────────────────────────────────
 // A level-at-cap matchup with a SOLO first blood, for the senshu tie-break (D1).
 const selfHasScored: BoolExpr = {
@@ -446,5 +454,54 @@ describe("benchmark — per-opponent endReasons (how each matchup ended)", () =>
     );
 
     expect(summed).toEqual(result.officiating.endedBy);
+  });
+});
+
+describe("benchmark — degrade diagnostics (why the submitted bot's actions failed)", () => {
+  // A single aggregate over both sides × seeds × opponents: how many of the SUBMITTED
+  // bot's frames degraded, split by reason. The opponent's degradation is never counted
+  // (visibility principle) — the author only sees its OWN failures.
+  const noDegrade = {
+    unaffordable: 0,
+    "out-of-band": 0,
+    locked: 0,
+    inert: 0,
+    "wrong-context": 0,
+  };
+
+  it("counts the submitted bot's degraded frames across BOTH sides", () => {
+    // INERT_BOT attacks an unconfigured move ⇒ every one of its frames degrades to `inert`,
+    // whether it fights as A or as B. The idle LOSER never degrades, so only `inert` accrues.
+    const result = benchmark(
+      config({ bot: INERT_BOT, gauntlet: [LOSER], seeds: [1] }),
+    );
+
+    expect(result.degrade.inert).toBeGreaterThan(0);
+    expect(result.degrade).toEqual({
+      ...noDegrade,
+      inert: result.degrade.inert,
+    });
+  });
+
+  it("never counts the OPPONENT's degraded frames (the mirror — only the bot's own)", () => {
+    // Now the bot IDLES (LOSER ⇒ null every frame) and the OPPONENT is the inert one.
+    // A tally that read the opponent's side (or aggregated both fighters) would show
+    // inert > 0; the correct bot-only tally is all zeros.
+    const result = benchmark(
+      config({ bot: LOSER, gauntlet: [INERT_BOT], seeds: [1] }),
+    );
+
+    expect(result.degrade).toEqual(noDegrade);
+  });
+
+  it("attributes the actual degrade reason, not a fixed bucket", () => {
+    // SUBMITTED attacks a CONFIGURED move ⇒ it commits, then its re-attacks during the
+    // commit frames degrade to `locked` (not inert). Pins the reason key to the real cause.
+    const result = benchmark(
+      config({ bot: SUBMITTED, gauntlet: [LOSER], seeds: [1] }),
+    );
+
+    expect(result.degrade.locked).toBeGreaterThan(0);
+    expect(result.degrade.inert).toBe(0);
   });
 });

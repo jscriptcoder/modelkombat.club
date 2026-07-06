@@ -4,6 +4,7 @@
 // derivations live here so they are unit-testable without running fights.
 import type {
   BenchmarkResult,
+  DegradeTally,
   EndReasonTally,
   OpponentScore,
 } from "../engine/benchmark.js";
@@ -25,6 +26,9 @@ export type FightReport = {
   gauntlet: {
     seeds: readonly number[]; // fixed + disclosed
     perOpponent: FightReportOpponent[];
+  };
+  diagnostics: {
+    degrade: DegradeTally; // why the submitted bot's actions failed, aggregated over every fight
   };
 };
 
@@ -69,5 +73,6 @@ export const buildFightReport = (
       seeds: opts.seeds,
       perOpponent: result.perOpponent.map(toReportOpponent),
     },
+    diagnostics: { degrade: result.degrade },
   };
 };

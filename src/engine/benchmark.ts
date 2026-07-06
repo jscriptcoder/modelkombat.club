@@ -16,13 +16,22 @@
 // skipped (a bot vs its own clone is just side-asymmetry noise). For a real LLM
 // submission this never triggers; it only matters when self-testing a roster bot.
 // ============================================================================
-import { runFight, type FightConfig, type FightResult } from "./sim.js";
+import {
+  runFight,
+  type DegradeReason,
+  type FightConfig,
+  type FightResult,
+} from "./sim.js";
 import type { Rules } from "./types.js";
 import type { BotDoc } from "./dsl.js";
 
 // A count of bouts per `endReason` — the shape shared by the per-opponent
 // breakdown and the global `endedBy` roll-up.
 export type EndReasonTally = Record<FightResult["endReason"], number>;
+
+// A count of the SUBMITTED bot's degraded frames per `DegradeReason` (S8 telemetry)
+// — how many times its intended action did not take effect, and why.
+export type DegradeTally = Record<DegradeReason, number>;
 
 export type OpponentScore = {
   name: string;
@@ -51,6 +60,7 @@ export type BenchmarkResult = {
   totalFights: number;
   perOpponent: OpponentScore[];
   officiating: OfficiatingTally; // inert to ranking; a read-out for the CLI report
+  degrade: DegradeTally; // the submitted bot's degraded frames, aggregated over every fight
 };
 
 export type BenchmarkConfig = {
@@ -76,7 +86,36 @@ type Outcome = {
   jogaiOpp: number; // the opponent's ring-outs this fight
   passivityBot: number; // the submitted bot's own passivity fouls this fight
   passivityOpp: number; // the opponent's passivity fouls this fight
+  botDegrades: DegradeReason[]; // the submitted bot's degrade reasons this fight (honoured frames omitted)
 };
+
+// The five DegradeReasons, from an all-zero base — the shared start for the degrade tally.
+const emptyDegrade = (): DegradeTally => ({
+  unaffordable: 0,
+  "out-of-band": 0,
+  locked: 0,
+  inert: 0,
+  "wrong-context": 0,
+});
+
+// The submitted bot's degrade reasons across a fight. `side` selects the bot's own frames
+// (fighter A or B); a `null` frame (the action was honoured) contributes nothing.
+const botDegradesOf = (
+  events: FightResult["events"],
+  side: "a" | "b",
+): DegradeReason[] =>
+  events.flatMap((ev) => {
+    const reason = ev[side].degrade;
+
+    return reason === null ? [] : [reason];
+  });
+
+// Count a flat list of degrade reasons into the all-reason tally (the cross-fight roll-up).
+const tallyDegrade = (reasons: DegradeReason[]): DegradeTally =>
+  reasons.reduce<DegradeTally>(
+    (acc, reason) => ({ ...acc, [reason]: acc[reason] + 1 }),
+    emptyDegrade(),
+  );
 
 // Deep document identity for the no-mirror rule. Both documents are validated
 // JSON (plain data, no functions/undefined), so a serialization compare is a
@@ -110,6 +149,7 @@ const playBothSides = (
       jogaiOpp: asA.fouls.b.jogai,
       passivityBot: asA.fouls.a.passivity,
       passivityOpp: asA.fouls.b.passivity,
+      botDegrades: botDegradesOf(asA.events, "a"), // bot's frames are the A side here
     },
     {
       net: asB.scores.b - asB.scores.a,
@@ -120,6 +160,7 @@ const playBothSides = (
       jogaiOpp: asB.fouls.a.jogai,
       passivityBot: asB.fouls.b.passivity,
       passivityOpp: asB.fouls.a.passivity,
+      botDegrades: botDegradesOf(asB.events, "b"), // bot's frames are the B side here
     },
   ];
 };
@@ -205,5 +246,6 @@ export const benchmark = (cfg: BenchmarkConfig): BenchmarkResult => {
     totalFights,
     perOpponent,
     officiating: tallyOfficiating(allOutcomes),
+    degrade: tallyDegrade(allOutcomes.flatMap((o) => o.botDegrades)),
   };
 };
