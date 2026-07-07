@@ -64,4 +64,73 @@ describe("selectThroneStore — durable store when configured, else the in-memor
       vi.unstubAllGlobals();
     }
   });
+
+  it("selects the durable adapter via the Vercel Marketplace prefixed names", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ result: null }), { status: 200 }),
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      // The names the Upstash Marketplace integration actually injects (chosen prefix
+      // `UPSTASH_REDIS_REST` + the classic KV suffixes) — no canonical names present.
+      const store = selectThroneStore({
+        UPSTASH_REDIS_REST_KV_REST_API_URL: "https://prefixed.upstash.io",
+        UPSTASH_REDIS_REST_KV_REST_API_TOKEN: "t",
+      });
+
+      expect(isFake(store)).toBe(false);
+
+      await store.read("v19");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://prefixed.upstash.io",
+        expect.anything(),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("selects the durable adapter via the default Vercel-KV names", () => {
+    // What a default-prefix re-provision would inject.
+    expect(
+      isFake(
+        selectThroneStore({
+          KV_REST_API_URL: "https://kv.upstash.io",
+          KV_REST_API_TOKEN: "t",
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it("prefers an explicit canonical URL over a lower-priority injected name", async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ result: null }), { status: 200 }),
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      // Both a canonical URL and the prefixed injected URL are present — the explicit
+      // canonical one must win, so a local override always beats the auto-injected value.
+      const store = selectThroneStore({
+        UPSTASH_REDIS_REST_URL: "https://canonical.upstash.io",
+        UPSTASH_REDIS_REST_KV_REST_API_URL: "https://prefixed.upstash.io",
+        UPSTASH_REDIS_REST_TOKEN: "t",
+      });
+
+      await store.read("v19");
+      expect(fetchMock).toHaveBeenCalledWith(
+        "https://canonical.upstash.io",
+        expect.anything(),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
