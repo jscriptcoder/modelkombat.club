@@ -31,12 +31,12 @@ replacing the `🥷` generic-head placeholders in the King and Hall-of-Kings sec
    identity only — never a logo; the mapping happens in the browser) with no engine/`api`
    consumer. Per the **durable web rule** (Stryker's Vitest runner can't drive browser mode;
    `stryker.config.mjs` mutates only `src/**`+`api/**`), it lives under **`web/src/`** and is
-   covered by a **strong exact-assertion fixture table** — *not* Stryker. The fixture table's
+   covered by a **strong exact-assertion fixture table** — _not_ Stryker. The fixture table's
    exhaustiveness over the mutation space (every alias, the precedence order, the lowercasing,
    and empty/null/undefined) **is** the mutation-kill mechanism. `npm run mutation` is run only
    to confirm the Node/Stryker scope is unaffected and still 100%.
 2. **`modelToLogo` earns its own module via DRY, not testability.** It classifies a model for
-   **both** the champion cards (4a) and the hero is a *fixed* set (4b uses the brand marks
+   **both** the champion cards (4a) and the hero is a _fixed_ set (4b uses the brand marks
    directly, not the classifier) — the classifier's consumers are the King card + the podium
    step (same knowledge, two places). That DRY justifies the module; it is tested **through
    its consumer's observable output** (`<ModelLogo model={…}>` renders the right labeled mark),
@@ -55,25 +55,25 @@ replacing the `🥷` generic-head placeholders in the King and Hall-of-Kings sec
 ## Acceptance Criteria (from the hardened AC set)
 
 - [ ] **AC-L1 (roster):** exactly four inline SVG marks — Claude, OpenAI/ChatGPT, Gemini, and a
-  neutral generic "mystery challenger". No other brand marks.
+      neutral generic "mystery challenger". No other brand marks.
 - [ ] **AC-L2 (matching rule):** `modelToLogo(model)` lowercases and tests substrings in fixed
-  priority `claude` → (`gpt`|`openai`|`chatgpt`) → (`gemini`|`google`|`bard`), first-match-wins;
-  no match / empty / absent → generic. Pinned by the fixture table below.
+      priority `claude` → (`gpt`|`openai`|`chatgpt`) → (`gemini`|`google`|`bard`), first-match-wins;
+      no match / empty / absent → generic. Pinned by the fixture table below.
 - [ ] **AC-L3 (a11y):** each **card** mark has an accessible label naming the brand
-  (`role="img"` + `aria-label`); the model text label accompanies it (the mark is never the only
-  signal). Hero marks are decorative (the hero's `<h1>` is its accessible heading).
+      (`role="img"` + `aria-label`); the model text label accompanies it (the mark is never the only
+      signal). Hero marks are decorative (the hero's `<h1>` is its accessible heading).
 - [ ] **AC-C4 (absent optionals):** `model` absent (`null`) → generic mark **and** no model text
-  label (never the string "null"/"undefined").
+      label (never the string "null"/"undefined").
 - [ ] **AC-C1 (escaping) regression:** a `<script>`-laden model still renders as inert text and
-  never changes which mark is chosen (classifier operates on the raw string; Solid escapes text).
+      never changes which mark is chosen (classifier operates on the raw string; Solid escapes text).
 - [ ] **Hero:** visiting `/` renders three logo-headed stickmen (Claude, OpenAI, Gemini) in
-  karate stances facing center; the `<h1>` heading + tagline remain.
+      karate stances facing center; the `<h1>` heading + tagline remain.
 - [ ] **AC-R1 (mobile):** at ≤360px the hero scales/stacks with **no horizontal scroll**; the
-  page stays single-column.
+      page stays single-column.
 - [ ] **AC-A4 (motion):** the hero is static; any future entrance animation must gate on
-  `prefers-reduced-motion` (documented; nothing animated in this slice).
+      `prefers-reduced-motion` (documented; nothing animated in this slice).
 - [ ] **AC-A1/A2:** interactive elements keep a visible focus ring; dark-theme text/marks meet
-  WCAG AA contrast.
+      WCAG AA contrast.
 
 ## Slices
 
@@ -98,16 +98,16 @@ before code.**
 (model `null` → generic mark + no `.king-model` text). Fixture table (each row = a `<ModelLogo
 model={m}>` render):
 
-| `model` | expected mark | proves |
-| --- | --- | --- |
-| `"claude-opus-4-8"` / `"claude-3-5-sonnet"` | Claude | claude alias |
-| `"gpt-4o"` / `"openai/o1"` / `"chatgpt-4o-latest"` | OpenAI | all three OpenAI aliases |
-| `"gemini-2.5-pro"` / `"google/gemini-flash"` / `"bard"` | Gemini | all three Gemini aliases |
-| `"GPT-4O"` | OpenAI | lowercasing (kills the `.toLowerCase()` removal mutant) |
-| `"gpt-via-gemini"` | OpenAI | precedence: gpt before gemini |
-| `"claude-vs-gpt"` | Claude | precedence: claude first |
-| `"weirdmodel"` / `""` / `null` / `undefined` | generic | no-match / empty / absent |
-| `'<script>alert(1)</script>'` | generic + inert text | AC-C1 regression |
+| `model`                                                 | expected mark        | proves                                                  |
+| ------------------------------------------------------- | -------------------- | ------------------------------------------------------- |
+| `"claude-opus-4-8"` / `"claude-3-5-sonnet"`             | Claude               | claude alias                                            |
+| `"gpt-4o"` / `"openai/o1"` / `"chatgpt-4o-latest"`      | OpenAI               | all three OpenAI aliases                                |
+| `"gemini-2.5-pro"` / `"google/gemini-flash"` / `"bard"` | Gemini               | all three Gemini aliases                                |
+| `"GPT-4O"`                                              | OpenAI               | lowercasing (kills the `.toLowerCase()` removal mutant) |
+| `"gpt-via-gemini"`                                      | OpenAI               | precedence: gpt before gemini                           |
+| `"claude-vs-gpt"`                                       | Claude               | precedence: claude first                                |
+| `"weirdmodel"` / `""` / `null` / `undefined`            | generic              | no-match / empty / absent                               |
+| `'<script>alert(1)</script>'`                           | generic + inert text | AC-C1 regression                                        |
 
 Every alias, both precedence orders, the case-fold, and all three empties are covered — the
 exact-assertion equivalent of a Stryker pass on the classifier (per resolved decision 1).
@@ -181,6 +181,7 @@ approves commit.
 - Merge PRs with `gh pr merge <N> --merge --delete-branch` (repo convention = merge commits).
 
 ---
-*Archive this file to `docs/archive/` at the Slice-4 close-out (per `archive-plans-not-delete`);
+
+_Archive this file to `docs/archive/` at the Slice-4 close-out (per `archive-plans-not-delete`);
 the spanning `public-page-{decisions,stories}.md` stay live in `plans/` until the whole feature
-ships.*
+ships._

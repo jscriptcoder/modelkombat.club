@@ -1,5 +1,7 @@
 import { createResource, Match, Show, Switch, type Component } from "solid-js";
 
+import ModelLogo from "./ModelLogo";
+
 // The identity-only view of the reigning King, mirroring the `GET /king` contract
 // (`{ current }`; `recent` lineage arrives in Slice 3). Never the champion's DSL.
 export type Champion = {
@@ -51,8 +53,8 @@ const King: Component<{ fetchKing?: () => Promise<KingView> }> = (props) => {
           >
             {(champion) => (
               <div class="king-card">
-                <div class="king-head" aria-hidden="true">
-                  🥷
+                <div class="king-head">
+                  <ModelLogo model={champion().model} />
                 </div>
                 <p class="king-name">{champion().name}</p>
                 <Show when={champion().model}>

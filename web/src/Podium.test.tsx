@@ -61,6 +61,25 @@ describe("Hall of Kings podium", () => {
     expect(stepOf(container, "bronze")?.textContent).toContain("Bronze");
   });
 
+  it("brands each podium champion with its model's logo", async () => {
+    const recent = [
+      champ({ name: "gold-king", model: "gpt-4o" }),
+      champ({ name: "silver-king", model: "gemini-2.5-pro" }),
+    ];
+
+    const { findByRole } = render(() => (
+      <Podium fetchRecent={resolves(recent)} />
+    ));
+
+    // Each filled step wears its champion's brand mark (AC-L3).
+    expect(
+      await findByRole("img", { name: "authored by OpenAI" }),
+    ).toBeTruthy();
+    expect(
+      await findByRole("img", { name: "authored by Gemini" }),
+    ).toBeTruthy();
+  });
+
   it("dims the bronze step when only two champions exist, fabricating no third", async () => {
     const recent = [
       champ({ name: "gold-king", generation: 2 }),
