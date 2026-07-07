@@ -824,6 +824,37 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   `api/spec.ts` 49/49). Design source of truth: `plans/platform-http-api-{decisions,stories}.md`; the
   finished S3 plan is archived at `docs/archive/platform-http-api-s3-fight.md`. **S3 (`POST /fight`) is
   COMPLETE.** Remaining platform work: the **KotH throne + ladder** (stateful) and the **Pixi viewer**.
+- DONE (**platform HTTP API — S4 (the version-scoped KotH throne), PRs #184–#188**): the **first stateful
+  platform piece** — a challenger that clears the gauntlet earns a **title shot**, and winning a fresh-seeded
+  title fight against the reigning champion **crowns** it King. Transport + orchestration + a platform-layer
+  store adapter over the already-built engine (invariant #2 — **no DSL op, `dsl.ts` untouched throughout**);
+  the `title` block is a response field, not a scoring input ⇒ `INPUT_HASH` / `BENCHMARK_VERSION` ("v19")
+  unchanged. Five slices, each RED→GREEN→MUTATE→REFACTOR, PR per slice. **S1 — the stateful walking skeleton**
+  (#184): the `ThroneStore` port (`read` + `compareAndSwap`) + in-memory fake (`src/http/throne-store.ts`),
+  the injectable `handleFight(req, deps)` seam (`src/http/handle-fight.ts`), `api/fight.ts` rewired to a thin
+  prod wire, and the empty-throne **bootstrap crown** (`title.outcome: "throne-empty-crowned"`, `generation 1`
+  plus one lineage entry). **S2 — the title fight** (#185): an occupied throne triggers a 20-bout fresh-seeded
+  `benchmark({ gauntlet: [champion] })`; dethrone iff top-level `winRate > 0.5` (the singleton gauntlet makes
+  it the head-to-head rate), else `king-retained`; a mirror clone → `winRate 0` → retained. Fresh seeds are
+  Web-Crypto entropy at the transport layer, recorded so the title fight replays byte-identically (invariant #1
+  intact). **S3 — atomic CAS** (#186): concurrent crownings serialize through one `crown()` helper on an opaque
+  monotonic `generation` — a lost race returns `409 /problems/throne-moved` (RFC 9457, shared envelope); the
+  throne ends holding exactly one winner. **S4 — incumbent identity + author handle** (#187): `title.incumbent` (the King's `name` / `model` / `handle` — identity only, **never** the champion doc) lets a challenger scout the King; the
+  optional `X-Author-Handle` header (≤ 64, control-chars → `400` via a code-point predicate — undici Headers
+  already block NUL/CR/LF, so the guard covers DEL + the other C0 controls) is persisted into the crown record.
+  **S5 — durable Upstash Redis** (#188): `upstashThroneStore` behind the same port over the Upstash REST API via
+  raw `fetch` (**no SDK — `dependencies` stays `{}`**), one atomic Lua `EVAL` doing compare-generation + `SET`
+  pointer + `RPUSH` lineage; an error reply **THROWS, never read as "empty"** (a transient failure must not let a
+  challenger bootstrap-crown over a live King); `selectThroneStore(env)` at the composition root picks the durable
+  store iff both `UPSTASH_*` vars are set, else the in-memory fake. A shared `runThroneStoreContract` spec pins
+  the port for both stores (fake in the ordinary suite; live Upstash in an env-gated smoke on throwaway UUID keys plus cleanup — live Redis is not exercised in CI). 1311 tests; mutation 100% on the changed regions each slice
+  (`handle-fight.ts`, `throne-store.ts`, `throne-store-upstash.ts`, `throne-store-select.ts`). Design source:
+  `plans/platform-http-api-{decisions,stories}.md`; the finished S4 plan is archived at
+  `docs/archive/platform-http-api-s4-throne.md`. **S4 is CODE-COMPLETE.** _Live-durability verification
+  (provision the Upstash Marketplace integration on Vercel so the env vars land, then run the env-gated smoke
+  against the deploy) is a dashboard action, not repo code — until then prod runs the in-memory fake fallback._
+  Remaining platform work: the **KotH ladder** (multi-champion / tournament bracket beyond the single throne),
+  **`/replay`** + a champions-history read surface, and the **Pixi viewer**.
 
 ### §7 match structure built between C9 and Capability D
 
@@ -906,24 +937,26 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    item 1). See the build-log entry above; board `docs/benchmark-gauntlet-v19.md`; design
    trail archived under `docs/archive/` (`aerial-mobility`, `air-strikes`,
    `precise-air-timing`, `air-actions-{decisions,stories}`, `gauntlet-aerial-rebalance`).
-6. **Platform HTTP API — 🏗️ IN PROGRESS; S1 (`GET /spec`) + S2 (`POST /validate`) + S3 (`POST /fight`)
-   ✅ COMPLETE (PRs #171–#181).** The first platform-layer feature — the online LLM bot-authoring loop's
-   front door. `GET /spec` is **LIVE** at `https://modelkombat.club/spec` (greenfield Vercel deploy;
-   engine imported from `src/`), serving the layered self-describing spec (byte-stable hashed core +
-   serve-time API envelope + game-overview intro) and carrying the optional inert `model?` provenance
-   field on `BotDoc`. **`POST /validate`** lets an author pre-check a bot without a fight — `200
-{ok:true}` or RFC 9457 `problem+json` (`422` + the validator's issues · `400` · `405` · `413`
-   oversize), parse-first (no content-type gate). **`POST /fight`** is the **stateless gauntlet gate**:
-   POST a bot → run the frozen `v19` gauntlet → a `cleared` verdict (won `> 0.5` vs each of the 6) + a
-   compact, leak-free per-member report (`endReasons`, `diagnostics.degrade`); now advertised in `/spec`
-   and rate-limited (20 req/min, Vercel WAF). See the build-log entries above. Design source of truth:
-   `plans/platform-http-api-{decisions,stories}.md`; the finished S1–S3 plans are archived under
-   `docs/archive/platform-http-api-s{1,2,3}-*.md`. **Next: the KotH throne + ladder** (stateful — the
-   title fight vs a version-scoped throne, atomic CAS) and the **Pixi viewer** — each
-   `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
+6. **Platform HTTP API — 🏗️ IN PROGRESS; S1 (`GET /spec`) + S2 (`POST /validate`) + S3 (`POST /fight`) +
+   S4 (the version-scoped KotH throne) ✅ COMPLETE (PRs #171–#188).** The first platform-layer feature — the
+   online LLM bot-authoring loop's front door, now whole end-to-end: one URL → self-describing `GET /spec`
+   (**LIVE** at `https://modelkombat.club/spec`, layered byte-stable core + serve-time API envelope + the
+   inert `model?` provenance field) → `POST /validate` (pre-check: `200 {ok:true}` or RFC 9457 `problem+json`,
+   parse-first) → `POST /fight` (stateless gauntlet gate: clear the frozen `v19` gauntlet, `> 0.5` vs each of
+   6, for a compact leak-free report) → a **title shot vs the version-scoped KotH throne** (S4): bootstrap
+   crown → fresh-seeded title fight → dethrone on `> 0.5` (else king-retained), atomic-CAS'd (`409`
+   throne-moved), incumbent identity + `X-Author-Handle`, **durably persisted on Upstash Redis** (raw `fetch`,
+   no SDK; in-memory fake fallback when `UPSTASH_*` unset). TCB / `INPUT_HASH` / `BENCHMARK_VERSION` ("v19")
+   untouched throughout. See the build-log entries above. Design source: `plans/platform-http-api-{decisions,
+stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-api-s{1,2,3}-*.md` +
+   `platform-http-api-s4-throne.md`. **S4 live-durability pending a dashboard action** (Upstash Marketplace
+   provisioning + post-deploy smoke). **Next platform work: the KotH ladder** (multi-champion / tournament
+   bracket beyond the single throne), **`/replay`** + a champions-history read surface, and the **Pixi
+   viewer** — each `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
 
-**The deep-karate combat tree is COMPLETE, and the platform layer is now underway.** The HTTP API's
-**`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3)** are shipped (PRs #171–#181; `/spec`
-LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited). Remaining in the platform
-layer: the **KotH throne + ladder** (the stateful title fight + the tournament-_bracket_ sense of
-"rounds") and the **Pixi viewer**.
+**The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
+**`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
+(PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
+title fight persisted on Upstash Redis). Remaining in the platform layer: the **KotH ladder** (the
+tournament-_bracket_ sense of "rounds" beyond the single throne), **`/replay`** + a champions-history read
+surface, and the **Pixi viewer**.
