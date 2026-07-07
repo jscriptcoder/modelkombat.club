@@ -21,8 +21,8 @@ Grounding facts discovered up front (they drove the choices below):
   there is **no HTTP read endpoint**. Only `POST /fight` touches the throne (write).
 - **Past champions**: the throne keeps an append-only **lineage** (`RPUSH` list), but
   the `ThroneStore` port has **no lineage read method** (only the in-memory fake
-  exposes `lineage()`). "Podium 1/2/3" has no ranking data — lineage is *chronological
-  succession*; there are **no timestamps, no defense counts, no per-fight records**.
+  exposes `lineage()`). "Podium 1/2/3" has no ranking data — lineage is _chronological
+  succession_; there are **no timestamps, no defense counts, no per-fight records**.
 - **Previous fights**: **not persisted at all** (invariant #1 — any fight
   reconstructs from seeds+bots; nothing is stored as a tape). Title-fight seeds/winRate
   are returned in the `/fight` response but thrown away.
@@ -31,7 +31,7 @@ Grounding facts discovered up front (they drove the choices below):
   `src/` (so the "single `src/`" rule governs the engine TCB, not the whole repo).
 - **Likely launch state**: the throne may be **empty** (clearing the 6-bot gauntlet is
   hard — blind attempts topped 4/6; durable persistence only went live today). The
-  empty/sparse state is the *dominant* early reality, not an edge case.
+  empty/sparse state is the _dominant_ early reality, not an edge case.
 
 ## Resolved decisions
 
@@ -50,8 +50,8 @@ Grounding facts discovered up front (they drove the choices below):
    `find-gaps` established it has no v1 consumer (the hero is SVG, replay is deferred), so
    scaffolding it now would be an unused dep. Slice 1 installs **Vite + Solid** only. Tests
    via **Vitest browser mode** (+ `@solidjs/testing-library`), TDD per CLAUDE.md.
-   *(Amended 2026-07-07 during planning — supersedes the original "Vite + Pixi + Solid
-   now".)*
+   _(Amended 2026-07-07 during planning — supersedes the original "Vite + Pixi + Solid
+   now".)_
 
 4. **App layout — sibling top-level `web/` dir.** `web/` (its own `vite.config`,
    `tsconfig` with **DOM + JSX**, `index.html`, `*.test.tsx`), sibling to `src/` and
@@ -65,7 +65,7 @@ Grounding facts discovered up front (they drove the choices below):
    **never** the champion's `rules`/DSL. Consistent with `/fight`'s `incumbent` block;
    preserves the reigning bot's competitive edge. `model` is the visual hook (drives the
    logo). **Backend work:** add a `lineage`/recent read to the `ThroneStore` port +
-   **Upstash adapter** (durable store currently only reads the *reigning* record) + the
+   **Upstash adapter** (durable store currently only reads the _reigning_ record) + the
    in-memory fake, under the existing shared port contract spec; add a new
    version-scoped read endpoint (working name **`GET /king`**) returning
    `{ current, recent: [...] }`; advertise it in `/spec`'s `LIVE_ENDPOINTS`.
@@ -85,13 +85,13 @@ Grounding facts discovered up front (they drove the choices below):
    with a **disabled play button + tooltip**. **No rows, no fabricated data.**
    Persisting real title fights (challenger/incumbent identity, outcome, winRate,
    **seeds**, a transport-layer timestamp) is the **immediate next slice** — it makes
-   the list real *and* captures the seeds that unlock replay.
+   the list real _and_ captures the seeds that unlock replay.
 
 9. **Participation / CTA — explainer + link-out.** A concise **"How it works"** (LLM
    reads the spec → emits a JSON bot → clears the 6-bot gauntlet → challenges the King)
-   + a prominent CTA to **`GET /spec`** and a short **`POST /fight`** snippet. **No
-   in-page submission UI** in v1 (a live "paste JSON → fight → see the report" panel is
-   a strong future slice).
+   - a prominent CTA to **`GET /spec`** and a short **`POST /fight`** snippet. **No
+     in-page submission UI** in v1 (a live "paste JSON → fight → see the report" panel is
+     a strong future slice).
 
 10. **Logos — curated marks + normalize + fallback.** Case-insensitively substring-match
     the free-text `model` (`claude`→Claude, `gpt`/`openai`/`chatgpt`→OpenAI,
@@ -123,7 +123,7 @@ AC blocks in `plans/public-page-stories.md`:
 
 - ✅ **Read-endpoint contract:** `GET /king` → `200 { current, recent }` (identity only);
   empty throne → `200 { current: null, recent: [] }`; store unavailable → `503
-  problem+json`; non-GET → `405`. `recent` capped at **3** (podium need). (AC-K1–K5, P1.)
+problem+json`; non-GET → `405`. `recent` capped at **3** (podium need). (AC-K1–K5, P1.)
 - ✅ **Logo roster:** **big-3 + generic fallback** (4 SVGs); case-insensitive substring
   match, fixed priority, first-match-wins. (AC-L1–L3.)
 - ✅ **Testing strategy:** browser-mode TDD for Solid components, node-vitest TDD for the
@@ -138,6 +138,7 @@ AC blocks in `plans/public-page-stories.md`:
 ## Recommended next step
 
 `story-splitting` to carve this into PR-sized vertical slices — candidate spine:
+
 1. **`web/` scaffold + deploy skeleton** (Vite+Pixi+Solid app builds, deploys, serves a
    trivial page at `/`; `/spec` etc. still work; Vitest browser mode green).
 2. **`GET /king` read endpoint + `ThroneStore` lineage read** (port + Upstash + fake,
