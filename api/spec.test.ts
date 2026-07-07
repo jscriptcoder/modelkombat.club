@@ -70,6 +70,7 @@ describe("GET /spec — the serve-time API envelope (where to act)", () => {
       "- `GET https://a.example/spec` — this self-describing spec.",
       "- `POST https://a.example/validate` — pre-check a bot document; returns ok or the validator's structured issues.",
       "- `POST https://a.example/fight` — fight a bot against the frozen gauntlet; returns the gate verdict and a per-opponent report.",
+      "- `GET https://a.example/king` — the reigning King of the Hill for the live version; identity only, never the DSL.",
     ].join("\n");
 
     const body = await bodyFor("https://a.example/spec");
@@ -113,13 +114,14 @@ describe("GET /spec — the serve-time API envelope (where to act)", () => {
     expect(envelope).not.toContain("https://modelkombat.club/spec");
   });
 
-  it("lists EXACTLY the live endpoints — GET /spec + POST /validate + POST /fight", async () => {
+  it("lists EXACTLY the live endpoints — GET /spec + POST /validate + POST /fight + GET /king", async () => {
     const envelope = envelopeOf(await bodyFor("https://a.example/spec"));
     const bullets = envelope.split("\n").filter((l) => l.startsWith("- "));
 
-    expect(bullets).toHaveLength(3); // GET /spec + POST /validate + POST /fight
+    expect(bullets).toHaveLength(4); // + GET /king
     expect(envelope).toContain("POST https://a.example/validate");
-    expect(envelope).toContain("POST https://a.example/fight"); // now live + advertised
+    expect(envelope).toContain("POST https://a.example/fight");
+    expect(envelope).toContain("GET https://a.example/king"); // now live + advertised
   });
 
   it("is layered at serve time — NOT baked into the hashed, drift-tested core spec", () => {

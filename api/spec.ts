@@ -38,6 +38,12 @@ const LIVE_ENDPOINTS: readonly {
     summary:
       "fight a bot against the frozen gauntlet; returns the gate verdict and a per-opponent report",
   },
+  {
+    method: "GET",
+    path: "/king",
+    summary:
+      "the reigning King of the Hill for the live version; identity only, never the DSL",
+  },
 ];
 
 // The public origin to advertise. Behind Vercel's proxy the caller-facing host

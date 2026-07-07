@@ -3,6 +3,7 @@
 // dependency seam). `api/fight.ts` becomes a thin wrapper supplying production
 // deps. Pure transport + orchestration over the deterministic engine (`benchmark`)
 // and the platform-layer throne store — no DSL op, TCB untouched (invariant #2).
+import { championIdentity } from "./champion-identity.js";
 import { problem, readValidatedBot } from "./envelope.js";
 import { buildFightReport } from "./fight-report.js";
 import type { ThroneRecord, ThroneStore } from "./throne-store.js";
@@ -91,15 +92,16 @@ const readHandle = (req: Request): Response | { handle: string | null } => {
 };
 
 // The reigning champion's public identity — surfaced to a title challenger so they can
-// scout the King. Identity fields ONLY: the incumbent's bot document (its `rules`) is
-// never exposed. `model` (doc provenance) and `handle` (submitter) default to `null`.
+// scout the King. Reuses the shared `championIdentity` shaper (identity only, never the
+// doc; `model`/`handle` default to `null`) and drops the `generation`: the title block
+// scouts the King, and the challenger has no use for the throne's CAS token.
 const incumbentOf = (
   record: ThroneRecord,
-): { name: string; model: string | null; handle: string | null } => ({
-  name: record.champion.name,
-  model: record.champion.model ?? null,
-  handle: record.handle ?? null,
-});
+): { name: string; model: string | null; handle: string | null } => {
+  const { generation, ...identity } = championIdentity(record);
+
+  return identity;
+};
 
 export const handleFight = async (
   req: Request,
