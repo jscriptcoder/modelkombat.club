@@ -1,7 +1,8 @@
 # Plan: Public page — Slice 1 (walking skeleton)
 
 **Branch**: `feat/public-page-skeleton`
-**Status**: Active
+**Status**: ✅ COMPLETE — all three slices merged (1a #195, 1b #196, 1c #197, 2026-07-07);
+every feature-level AC met + preview-smoked. Archived under `docs/archive/`.
 
 ## Goal
 
@@ -32,12 +33,15 @@ hero + logos (Slice 4), and the fights teaser (Slice 5) are separate plans.
       plus a `POST /fight` snippet. _(Slice 1b)_ — **1b: verified on preview `…exk2hio7q…`
       2026-07-07 (a11y tree: `region "How it works"` + 4 ordered step headings + `link "Read
 the spec"` + the curl snippet).**
-- [ ] A slim sticky nav (anchors to the sections that exist in Slice 1: How it works ·
+- [x] A slim sticky nav (anchors to the sections that exist in Slice 1: How it works ·
       Spec ↗) + a footer; smooth-scroll honors `prefers-reduced-motion`. _(AC-R2, AC-A4 —
-      Slice 1c)_
-- [ ] Usable at ≤360px with no horizontal scroll; keyboard-navigable with a visible focus
-      ring; WCAG AA contrast on the dark theme. _(AC-R1, AC-A1–A2 — dark theme in 1a; full
-      nav/keyboard flows in 1b/1c)_
+      Slice 1c)_ — **1c: `navigation "Primary"` + `contentinfo` landmarks; CSS-native
+      reduced-motion gate.**
+- [x] Usable at ≤360px with no horizontal scroll; keyboard-navigable with a visible focus
+      ring; WCAG AA contrast on the dark theme. _(AC-R1, AC-A1–A2)_ — **dark theme + `pre`
+      in-container scroll in 1a; single-column steps in 1b; nav flex-wrap + `:focus-visible`
+      ring in 1c; high-contrast palette (`--fg` #e6e8ee / `--muted` #aab2c0 on `--bg`
+      #0b0e14).**
 - [x] Unknown non-API routes fall back to the SPA index; the 3 API rewrites keep
       precedence. _(AC-R4, smoke-verified)_ — **1a: `/nope`→200 SPA index; `/validate`+`/fight`
       → 405 from the functions (rewrites win over the `/(.*)` catch-all).**
@@ -159,7 +163,15 @@ copy-to-clipboard on the snippet (parked nice-to-have).
   **REFACTOR**: assess (e.g., a shared `<Section>` wrapper) only if it adds value.
   **Done when**: criteria met, mutation report reviewed, human approves commit.
 
-### Slice 1c: Visitor navigates the page via a sticky nav + footer
+### Slice 1c: Visitor navigates the page via a sticky nav + footer — ✅ DONE
+
+**Status**: ✅ Merged in **PR #197** (`1997eba`, 2026-07-07). Preview smoke green (a11y tree
+on `…6vsm3085g…`: `navigation "Primary"` with brand + How it works + Spec links, `region`
+sections, `contentinfo` footer; loaded at `/#how-it-works`). **Design deviation:** smooth
+scroll is **CSS-native** (`@media (prefers-reduced-motion: no-preference) { html {
+scroll-behavior: smooth } }`) rather than the sketched JS `smoothScrollEnabled` helper —
+simpler, native, more robust; chosen at the 1c CONFIRM gate. So 1c added **no** node-side
+logic (browser-only, like 1b); the gate is verified by a CSSOM assertion.
 
 **Value**: The single page feels navigable (the "very easy to navigate" goal); ties the
 sections together and finalizes the cross-cutting nav/routing/motion a11y.
@@ -216,7 +228,9 @@ collapses to a compact form on narrow viewports; smooth-scroll gates on
 
 ---
 
-_When Slice 1 is complete, **archive — do NOT delete** — this plan **and** its sibling
-`public-page-decisions.md` + `public-page-stories.md` under `docs/archive/` (with a
-`docs/archive/README.md` entry), per the standing "archive plans, don't delete" rule. Slices
-2–5 get their own plans._
+_Slice 1 complete → this plan is **archived (not deleted)** under `docs/archive/` with a
+`docs/archive/README.md` entry, per the standing "archive plans, don't delete" rule. Its
+siblings `public-page-decisions.md` + `public-page-stories.md` stay **live in `plans/`** as
+the design/roadmap source for the still-pending Slices 2–5 (mirroring the platform-http-api
+precedent); they get archived when the whole public-page feature ships. Slices 2–5 get their
+own plans._
