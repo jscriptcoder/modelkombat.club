@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 
 import { type Champion } from "./King";
+import ModelLogo from "./ModelLogo";
 
 // The recent line of succession, mirroring the `GET /king` `recent` contract — the
 // bounded, identity-only tail of the throne's lineage (never the champions' DSL).
@@ -80,8 +81,8 @@ const Podium: Component<{ fetchRecent?: () => Promise<Champion[]> }> = (
                       >
                         {(present) => (
                           <div class="podium-champion">
-                            <div class="podium-head" aria-hidden="true">
-                              🥷
+                            <div class="podium-head">
+                              <ModelLogo model={present().model} />
                             </div>
                             <p class="podium-name" title={present().name}>
                               {present().name}

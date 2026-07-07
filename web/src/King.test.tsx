@@ -45,6 +45,17 @@ describe("King section", () => {
     expect(await findByText(/Gen\s*3/)).toBeTruthy();
   });
 
+  it("brands the reigning champion with its model's logo", async () => {
+    const { findByRole } = render(() => (
+      <King fetchKing={resolves(kingView({ model: "gpt-4o" }))} />
+    ));
+
+    // The card head is the model's brand mark, not a generic placeholder (AC-L3).
+    expect(
+      await findByRole("img", { name: "authored by OpenAI" }),
+    ).toBeTruthy();
+  });
+
   it("renders a hostile champion name as inert text, never as markup", async () => {
     const hostile = "<script>alert(1)</script>";
 
@@ -59,12 +70,16 @@ describe("King section", () => {
   });
 
   it("omits the model label and handle byline when they are absent", async () => {
-    const { findByText, queryByText } = render(() => (
+    const { findByText, findByRole, queryByText } = render(() => (
       <King fetchKing={resolves(kingView({ model: null, handle: null }))} />
     ));
 
     // The name still anchors the card...
     expect(await findByText("reigning-king")).toBeTruthy();
+    // ...an absent model falls back to the generic mystery-challenger mark (AC-C4)...
+    expect(
+      await findByRole("img", { name: /mystery challenger/i }),
+    ).toBeTruthy();
     // ...but no "null"/"undefined" leaks, and the handle byline is gone.
     expect(queryByText(/null|undefined/)).toBeNull();
     expect(queryByText(/grandmaster/)).toBeNull();

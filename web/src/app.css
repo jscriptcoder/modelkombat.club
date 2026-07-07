@@ -143,6 +143,22 @@ main,
   line-height: 1;
 }
 
+/* Brand mark: sized by its head slot; larger on the King hero, smaller on podium steps. */
+.model-logo {
+  display: block;
+  margin: 0 auto;
+}
+
+.king-head .model-logo {
+  width: 3rem;
+  height: 3rem;
+}
+
+.podium-head .model-logo {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
 .king-name {
   margin: 0.5rem 0 0.25rem;
   font-size: 1.5rem;
