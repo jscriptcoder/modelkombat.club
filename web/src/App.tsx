@@ -1,5 +1,6 @@
 import "./app.css";
 import Cta from "./Cta";
+import Fights from "./Fights";
 import Footer from "./Footer";
 import Hero from "./Hero";
 import HowItWorks from "./HowItWorks";
@@ -35,6 +36,7 @@ export default function App() {
         <Cta />
         <King />
         <Podium />
+        <Fights />
       </main>
       <Footer />
     </>

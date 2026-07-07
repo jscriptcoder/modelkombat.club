@@ -117,6 +117,7 @@ describe("App (landing page)", () => {
       "#how-it-works",
       "#king",
       "#champions",
+      "#fights",
       "/spec",
     ]);
   });
@@ -129,6 +130,14 @@ describe("App (landing page)", () => {
     const region = getByRole("region", { name: "Hall of Kings" });
 
     expect(region.id).toBe("champions");
+  });
+
+  it("renders the fights teaser as a labelled section for the #fights anchor", () => {
+    const { getByRole } = render(() => <App />);
+
+    const region = getByRole("region", { name: /fight replays/i });
+
+    expect(region.id).toBe("fights");
   });
 
   it("renders a footer landmark naming the site", () => {
