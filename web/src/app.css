@@ -143,20 +143,68 @@ main,
   line-height: 1;
 }
 
-/* Brand mark: sized by its head slot; larger on the King hero, smaller on podium steps. */
-.model-logo {
+/* Brand mark: sized by its head slot; larger on the King card, smaller on podium steps. */
+.brand-mark {
   display: block;
   margin: 0 auto;
 }
 
-.king-head .model-logo {
+.king-head .brand-mark {
   width: 3rem;
   height: 3rem;
 }
 
-.podium-head .model-logo {
+.podium-head .brand-mark {
   width: 2.25rem;
   height: 2.25rem;
+}
+
+/* Static face-off hero: three logo-headed stickmen squaring off toward the centre.
+   Everything scales with the viewport (clamp) and the row shrinks on narrow screens,
+   so the page never scrolls sideways at 360px (AC-R1). */
+.hero {
+  text-align: center;
+  padding: 1.5rem 0 0.5rem;
+}
+
+.hero-stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: clamp(0.5rem, 5vw, 2.5rem);
+  margin-bottom: 1.5rem;
+}
+
+.hero-fighter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--muted);
+}
+
+/* Mirror the right-hand fighter so the outer two face inward toward the centre. */
+.hero-fighter-left {
+  transform: scaleX(-1);
+}
+
+.hero-fighter .brand-mark {
+  width: clamp(2rem, 9vw, 3rem);
+  height: clamp(2rem, 9vw, 3rem);
+}
+
+.hero-body {
+  width: clamp(2.25rem, 11vw, 3.5rem);
+  height: auto;
+}
+
+.hero-title {
+  margin: 0 0 0.5rem;
+}
+
+.hero-tagline {
+  margin: 0;
+  color: var(--muted);
 }
 
 .king-name {
