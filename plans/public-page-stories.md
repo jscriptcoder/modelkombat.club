@@ -219,12 +219,12 @@ Parked (owner: this feature's follow-ups):
 
 ## Next Step
 
-**Slices 1 (walking skeleton) + 2 (who rules the ring) ✅ COMPLETE + live** (PRs
-#195–#201; the Slice-2 plan is archived at `docs/archive/public-page-s2-king.md`).
-**Slice 3** (the Hall-of-Kings podium — the bounded `ThroneStore` lineage/recent read →
-`/king` gains `recent[]` → gold/silver/bronze podium with sparse 0/1/2/3 states + a
-`#champions` nav anchor) is next and gets its own PR-sized plan in `plans/`. Slices 4–5
-(SVG logo-headed hero + logo normalization → fights "coming soon" teaser) follow in turn.
+**Slices 1 (walking skeleton) + 2 (who rules the ring) + 3 (the Hall of Kings podium) ✅
+COMPLETE + live** (PRs #195–#205; the Slice-3 plan is archived at
+`docs/archive/public-page-s3-podium.md`). **Slice 4** (the SVG logo-headed hero +
+`modelToLogo` normalization — retrofitting the King/podium generic-head placeholders with
+real per-model marks) is next and gets its own PR-sized plan in `plans/`. Slice 5 (the
+fights "coming soon" teaser) follows.
 
 Every planning stage runs the full cycle — load `tdd`, `testing`, `mutation-testing`,
 `refactoring`; RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR — before the next stage

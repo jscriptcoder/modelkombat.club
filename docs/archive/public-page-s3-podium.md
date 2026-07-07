@@ -1,7 +1,7 @@
 # Plan: Public page — Slice 3 (Hall of Kings — the podium)
 
-**Branch**: feat/public-page-podium (implementation) · plan authored on `docs/public-page-s3-plan`
-**Status**: Active (awaiting approval)
+**Branch**: feat/public-page-recent-lineage (3a) + feat/public-page-podium (3b) · plan authored on `docs/public-page-s3-plan`
+**Status**: ✅ COMPLETE — shipped + live (2026-07-07). Slice 3a `GET /king` recent lineage (PR #204), Slice 3b Hall of Kings podium (PR #205); this close-out archives the plan.
 
 > Sequences **Slice 3** of the 5-slice public-page feature from
 > `plans/public-page-stories.md` ("Fan sees the recent lineage of Kings on a podium" —
@@ -321,5 +321,6 @@ commit.
 
 ---
 
-_Archive to `docs/archive/` when the whole public-page feature ships (per
-[[archive-plans-not-delete]] — decisions/stories stay live meanwhile). Do not delete._
+_✅ Archived 2026-07-07 (Slice 3 shipped: 3a `GET /king` recent lineage #204 + 3b Hall of
+Kings podium #205). The spanning `plans/public-page-{decisions,stories}.md` stay live until
+the whole public-page feature ships (per [[archive-plans-not-delete]]). Do not delete._
