@@ -25,16 +25,16 @@ hero + logos (Slice 4), and the fights teaser (Slice 5) are separate plans.
 
 - [ ] Visiting `/` on a Vercel preview serves the built Solid SPA (not the old
       `public/index.html` placeholder); `GET /spec` still returns markdown; `/validate` +
-      `/fight` still respond. *(smoke-verified, non-TDD — Testing strategy)*
+      `/fight` still respond. _(smoke-verified, non-TDD — Testing strategy)_
 - [ ] The page renders a "How it works" explainer (the 4 steps) and a CTA to `GET /spec`
       plus a `POST /fight` snippet.
 - [ ] A slim sticky nav (anchors to the sections that exist in Slice 1: How it works ·
-      Spec ↗) + a footer; smooth-scroll honors `prefers-reduced-motion`. *(AC-R2, AC-A4)*
+      Spec ↗) + a footer; smooth-scroll honors `prefers-reduced-motion`. _(AC-R2, AC-A4)_
 - [ ] Usable at ≤360px with no horizontal scroll; keyboard-navigable with a visible focus
-      ring; WCAG AA contrast on the dark theme. *(AC-R1, AC-A1–A2)*
+      ring; WCAG AA contrast on the dark theme. _(AC-R1, AC-A1–A2)_
 - [ ] Unknown non-API routes fall back to the SPA index; the 3 API rewrites keep
-      precedence. *(AC-R4, smoke-verified)*
-- [ ] `<title>` + `<meta name="description">` are set and descriptive. *(AC-M1)*
+      precedence. _(AC-R4, smoke-verified)_
+- [ ] `<title>` + `<meta name="description">` are set and descriptive. _(AC-M1)_
 
 ## Resolved decision — Pixi deferred (2026-07-07)
 
@@ -44,15 +44,30 @@ is deferred). 1a's `web/` deps: `solid-js`, `vite`, the browser-mode vitest + Pl
 provider, `@solidjs/testing-library` — **no `pixi.js`**. (Reverses the earlier "scaffold
 the full stack" choice; recorded in `plans/public-page-decisions.md` §3.)
 
-## Risk to retire early (in Slice 1a)
+## Risk retired (Slice 1a — RESOLVED 2026-07-07)
 
-**Mutation testing on browser-mode components.** The repo's MUTATE step uses
-`@stryker-mutator/vitest-runner`. Stryker against a **browser-mode** vitest project is
-known friction. In 1a, prove the MUTATE step runs on one real `web/` component (dedicated
-Stryker config pointing at the `web/` vitest project) **before** building more components.
-If it can't run cleanly, fall back: keep **pure logic in node-vitest units** (fully
-mutation-tested) and rely on browser-mode tests for DOM/interaction behavior — and record
-that split in the plan. Slice 1 has little pure logic, so this is cheap to settle now.
+**Mutation testing on browser-mode components does NOT work — fallback adopted.**
+Empirically confirmed in 1a: a dedicated Stryker config pointing its Vitest runner at the
+`web/` browser-mode project (`vitest: { configFile: "web/vitest.config.ts" }`, both with
+and without `related: false`) fails the dry run — _"Vitest failed to find test files
+related to mutated files" → "No tests were executed."_ Stryker's `@stryker-mutator/vitest-runner`
+cannot drive a Vitest 4 browser-mode project.
+
+**Adopted split (durable rule for all web slices):**
+
+- **Pure logic** (helpers, reducers, `modelToLogo`, `smoothScrollEnabled`, …) lives in
+  **node-testable `.ts`** modules under `src/` (or a node-covered path) and IS
+  mutation-tested by the normal `npm run mutation` (globs `src/**` + `api/**`).
+- **Browser-mode components** (`web/**/*.tsx`) are NOT Stryker-mutated. They are guarded by
+  **strong, mutation-aware browser assertions** written in the RED phase: assert exact
+  values (exact heading name, `href` `=== "/spec"`, opaque-dark-bg, title/meta regexes),
+  never `toBeTruthy`.
+- Stryker's own config is pinned to the Node project
+  (`vitest: { configFile: "vitest.node.config.ts" }`) so `npm run mutation` stays green and
+  fast (verified: `src/engine/prng.ts` scoped run = 100%, 4/4 killed).
+
+`App.tsx` (1a) has no branching pure logic to extract; its five browser tests assert exact
+values, so the fallback fully covers it.
 
 ## Slices
 
@@ -73,32 +88,33 @@ here: the explainer, CTA, nav, footer (later slices); the SVG hero (Slice 4).
 **Required implementation skills**: load `tdd`, `testing`, `mutation-testing`,
 `refactoring` before code.
 **Acceptance criteria** (confirm before coding):
+
 - Mounting `<App/>` renders the site name "ModelKombat" as the page heading and a link
   whose `href` is exactly `/spec` and whose accessible name references the spec.
 - The app sets `document.title` to a descriptive string containing "ModelKombat" and a
-  `<meta name="description">`. *(AC-M1)*
-- Dark theme applied; no horizontal scroll at 360px. *(AC-R1, AC-A2)*
-- *(smoke, non-TDD)* On a Vercel preview: `GET /` → the SPA HTML; `GET /spec` → markdown;
-  `/validate` + `/fight` respond; an unknown route (`/nope`) → the SPA index. *(AC-R4)*
-- *(harness)* One browser-mode test runs green; the MUTATE step runs on it (see Risk).
-**RED**: a `@solidjs/testing-library` browser-mode test — `render(() => <App/>)` then assert
-the "ModelKombat" heading and `getByRole('link', { name: /spec/i })` has `href="/spec"`;
-a second test asserts `document.title` matches `/ModelKombat/`. Anticipated mutants: the
-title/heading **StringLiteral** and the `/spec` href literal (assert exact values, not
-`toBeTruthy`); a `BooleanLiteral`/removed-attribute on the link.
-**GREEN**: `web/{index.html, vite.config.ts, tsconfig.json (DOM+JSX), src/main.tsx,
+  `<meta name="description">`. _(AC-M1)_
+- Dark theme applied; no horizontal scroll at 360px. _(AC-R1, AC-A2)_
+- _(smoke, non-TDD)_ On a Vercel preview: `GET /` → the SPA HTML; `GET /spec` → markdown;
+  `/validate` + `/fight` respond; an unknown route (`/nope`) → the SPA index. _(AC-R4)_
+- _(harness)_ One browser-mode test runs green; the MUTATE step runs on it (see Risk).
+  **RED**: a `@solidjs/testing-library` browser-mode test — `render(() => <App/>)` then assert
+  the "ModelKombat" heading and `getByRole('link', { name: /spec/i })` has `href="/spec"`;
+  a second test asserts `document.title` matches `/ModelKombat/`. Anticipated mutants: the
+  title/heading **StringLiteral** and the `/spec` href literal (assert exact values, not
+  `toBeTruthy`); a `BooleanLiteral`/removed-attribute on the link.
+  **GREEN**: `web/{index.html, vite.config.ts, tsconfig.json (DOM+JSX), src/main.tsx,
 src/App.tsx}`; the `web/` vitest browser-mode project (Playwright provider); minimal
-`App` (heading, tagline, `/spec` link, head title/meta). Update `vercel.json`:
-`buildCommand: "vite build"` (or the web build script) + `outputDirectory: "web/dist"`;
-keep the 3 rewrites + `functions.includeFiles`. Remove/replace `public/index.html`.
-Decide Pixi per the Open decision above.
-**MUTATE**: run `mutation-testing` on `web/src/App.tsx` (prove Stryker↔browser-mode works).
-**KILL MUTANTS**: strengthen the title/href/heading assertions until the string + attribute
-mutants die. Ask the human if a survivor's value is ambiguous.
-**REFACTOR**: assess only if it adds value (e.g., extract a `<SiteHead>` if head-setting is
-noisy). Keep it minimal.
-**Done when**: all 1a criteria met, preview smoke green, mutation report reviewed, human
-approves commit.
+  `App` (heading, tagline, `/spec` link, head title/meta). Update `vercel.json`:
+  `buildCommand: "vite build"` (or the web build script) + `outputDirectory: "web/dist"`;
+  keep the 3 rewrites + `functions.includeFiles`. Remove/replace `public/index.html`.
+  Decide Pixi per the Open decision above.
+  **MUTATE**: run `mutation-testing` on `web/src/App.tsx` (prove Stryker↔browser-mode works).
+  **KILL MUTANTS**: strengthen the title/href/heading assertions until the string + attribute
+  mutants die. Ask the human if a survivor's value is ambiguous.
+  **REFACTOR**: assess only if it adds value (e.g., extract a `<SiteHead>` if head-setting is
+  noisy). Keep it minimal.
+  **Done when**: all 1a criteria met, preview smoke green, mutation report reviewed, human
+  approves commit.
 
 ### Slice 1b: Newcomer reads how it works and gets the links to enter
 
@@ -110,23 +126,24 @@ accessible, responsive section with an anchor id. Intentionally skipped: nav + f
 copy-to-clipboard on the snippet (parked nice-to-have).
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (confirm before coding):
+
 - `<HowItWorks/>` renders **exactly 4** steps, in order, with the expected step text
   (source `/spec` → write a JSON bot → clear the 6-bot gauntlet → challenge the King), from
   a `steps` data array. Section has a heading + `id="how-it-works"`.
 - `<Cta/>` renders a link with accessible name "Read the spec" and `href="/spec"`, plus a
   `<pre><code>` snippet whose text contains `POST` and `/fight`.
 - Both sections readable at ≤360px (single-column, no h-scroll) and keyboard-focusable with
-  a visible focus ring. *(AC-R1, AC-A1)*
-**RED**: browser-mode tests — assert `getAllByRole('listitem')` (or step nodes) has length
-4 and the ordered text; assert the spec link `href` + name; assert the snippet substring.
-Anticipated mutants: **ArrayDeclaration/length** (killed by count + all-4-labels), step
-**string literals** and **order** (assert full ordered text), the href literal, the snippet
-substring literal.
-**GREEN**: `HowItWorks` + `Cta` components + the `steps` data; wire into `App`.
-**MUTATE**: run on the new components + any pure data mapping.
-**KILL MUTANTS**: strengthen until step-count, ordering, and literal mutants die.
-**REFACTOR**: assess (e.g., a shared `<Section>` wrapper) only if it adds value.
-**Done when**: criteria met, mutation report reviewed, human approves commit.
+  a visible focus ring. _(AC-R1, AC-A1)_
+  **RED**: browser-mode tests — assert `getAllByRole('listitem')` (or step nodes) has length
+  4 and the ordered text; assert the spec link `href` + name; assert the snippet substring.
+  Anticipated mutants: **ArrayDeclaration/length** (killed by count + all-4-labels), step
+  **string literals** and **order** (assert full ordered text), the href literal, the snippet
+  substring literal.
+  **GREEN**: `HowItWorks` + `Cta` components + the `steps` data; wire into `App`.
+  **MUTATE**: run on the new components + any pure data mapping.
+  **KILL MUTANTS**: strengthen until step-count, ordering, and literal mutants die.
+  **REFACTOR**: assess (e.g., a shared `<Section>` wrapper) only if it adds value.
+  **Done when**: criteria met, mutation report reviewed, human approves commit.
 
 ### Slice 1c: Visitor navigates the page via a sticky nav + footer
 
@@ -139,30 +156,31 @@ collapses to a compact form on narrow viewports; smooth-scroll gates on
 2–3 add those sections.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (confirm before coding):
+
 - `<Nav/>` is a `<nav>` landmark rendering an in-page anchor to `#how-it-works` and an
   external "Spec ↗" link to `/spec`; links are keyboard-reachable in order with a visible
-  focus ring. *(AC-A1)*
+  focus ring. _(AC-A1)_
 - Smooth-scroll is applied only when `prefers-reduced-motion` is **not** set; with reduced
-  motion, navigation jumps instantly (no smooth behavior). *(AC-A4)*
-- A `<footer>` landmark renders. Nav is compact/usable at ≤360px (no h-scroll). *(AC-R1,
-  AC-R2)*
-- *(smoke, non-TDD)* Re-confirm on preview: deep link `/#how-it-works` scrolls to the
-  section; unknown route still falls back to the SPA. *(AC-R4)*
-**RED**: browser-mode tests — `getByRole('navigation')` contains a link with `href` ending
-`#how-it-works` and the external `/spec` link; a test that the reduced-motion branch is
-taken (e.g., a `smoothScrollEnabled(matchMedia)` pure helper returns `false` when
-`prefers-reduced-motion: reduce` — mutation-test this helper in node-vitest per the pure-
-logic split). Anticipated mutants: the anchor **string literal**, the reduced-motion
-**ConditionalExpression** (both arms — assert enabled AND disabled cases), the
-`<nav>`/`<footer>` roles.
-**GREEN**: `Nav` + `Footer` components; a pure `smoothScrollEnabled(mql)` helper (node-unit
-tested); sticky + collapse CSS; reduced-motion gate. Verify the SPA-fallback config.
-**MUTATE**: run on the components + the `smoothScrollEnabled` helper.
-**KILL MUTANTS**: kill both arms of the reduced-motion conditional + the anchor/role
-mutants.
-**REFACTOR**: assess only if valuable.
-**Done when**: criteria met, preview smoke green, mutation report reviewed, human approves
-commit.
+  motion, navigation jumps instantly (no smooth behavior). _(AC-A4)_
+- A `<footer>` landmark renders. Nav is compact/usable at ≤360px (no h-scroll). _(AC-R1,
+  AC-R2)_
+- _(smoke, non-TDD)_ Re-confirm on preview: deep link `/#how-it-works` scrolls to the
+  section; unknown route still falls back to the SPA. _(AC-R4)_
+  **RED**: browser-mode tests — `getByRole('navigation')` contains a link with `href` ending
+  `#how-it-works` and the external `/spec` link; a test that the reduced-motion branch is
+  taken (e.g., a `smoothScrollEnabled(matchMedia)` pure helper returns `false` when
+  `prefers-reduced-motion: reduce` — mutation-test this helper in node-vitest per the pure-
+  logic split). Anticipated mutants: the anchor **string literal**, the reduced-motion
+  **ConditionalExpression** (both arms — assert enabled AND disabled cases), the
+  `<nav>`/`<footer>` roles.
+  **GREEN**: `Nav` + `Footer` components; a pure `smoothScrollEnabled(mql)` helper (node-unit
+  tested); sticky + collapse CSS; reduced-motion gate. Verify the SPA-fallback config.
+  **MUTATE**: run on the components + the `smoothScrollEnabled` helper.
+  **KILL MUTANTS**: kill both arms of the reduced-motion conditional + the anchor/role
+  mutants.
+  **REFACTOR**: assess only if valuable.
+  **Done when**: criteria met, preview smoke green, mutation report reviewed, human approves
+  commit.
 
 ## Pre-PR Quality Gate (each slice)
 
@@ -183,4 +201,5 @@ commit.
   doc Parking Lot).
 
 ---
-*Delete this file when Slice 1 is complete. Slices 2–5 get their own plans.*
+
+_Delete this file when Slice 1 is complete. Slices 2–5 get their own plans._
