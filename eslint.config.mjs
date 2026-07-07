@@ -10,7 +10,7 @@ import prettier from "eslint-config-prettier";
 export default tseslint.config(
   {
     ignores: [
-      "dist/",
+      "**/dist/",
       "coverage/",
       "reports/",
       ".stryker-tmp/",

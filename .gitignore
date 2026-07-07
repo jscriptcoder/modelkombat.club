@@ -10,3 +10,5 @@ coverage/
 /replays/
 .vitest/
 .vercel
+__screenshots__/
+.vitest-attachments/

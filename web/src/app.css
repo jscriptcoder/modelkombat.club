@@ -1,0 +1,24 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0e14;
+  --fg: #e6e8ee;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
