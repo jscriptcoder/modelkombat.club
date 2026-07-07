@@ -88,8 +88,8 @@ air-actions was the last combat capability. **The platform layer is now underway
 HTTP API is built:** `GET /spec` (LIVE at `https://modelkombat.club/spec`), `POST
 /validate`, `POST /fight` (stateless gauntlet gate), and **S4 the version-scoped KotH
 throne** (title shot → fresh-seeded title fight → atomic-CAS crown, durably persisted on
-Upstash Redis; PRs #171–#188 — S4 code-complete, live-durability pending the Upstash
-Marketplace provisioning). **Not yet built:** the **KotH ladder** (tournament bracket
+Upstash Redis; PRs #171–#190 — S4 COMPLETE, durable persistence LIVE on Upstash via the
+Vercel Marketplace). **Not yet built:** the **KotH ladder** (tournament bracket
 beyond the single throne), **`/replay`** + a champions-history read surface, and the
 **Pixi viewer**. See `docs/STATUS.md` for detail and the next slice.
 
