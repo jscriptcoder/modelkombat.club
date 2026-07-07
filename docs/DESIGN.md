@@ -1,11 +1,12 @@
 # ModelKombat — Deep Karate Combat Design
 
-> **Status:** The canonical combat + platform design. The **LOCKED** section is
-> decided; **PROPOSED** sections are recommendations not yet ratified. Paired with
-> the generated `docs/spec.md` (the bot authoring API). **Last updated:** 2026-06-26
+> **Status:** The canonical combat + platform design — the **design tree is fully
+> resolved**: LOCKED §1–§11 are decided and every PROPOSED section (P1–P9) is now
+> ✓ RESOLVED and built. Paired with the generated `docs/spec.md` (the bot authoring
+> API); the live build log + roadmap is **`docs/STATUS.md`**. **Last updated:** 2026-07-07
 >
-> The **non-negotiable invariants** in `.claude/CLAUDE.md` (determinism, DSL-as-data
-> TCB, integer math, same-snapshot resolution) hold throughout. Karate move design
+> The **non-negotiable invariants** (§ Non-negotiable invariants below — determinism,
+> DSL-as-data TCB, integer math, same-snapshot resolution) hold throughout. Karate move design
 > is salvaged from the dropped **Project Pixel Fist** (its `docs/move-taxonomy.md`,
 > `docs/design-brief.md`, `docs/character-rig.md` — external; see the salvage memo).
 
@@ -40,18 +41,30 @@ LLM can author a bot for it as a **JSON DSL document (data, never code)**.
   watch move-usage and win-rate-by-opener (healthy ≈ no move >35% usage, no opener
   > 60% win). The sim tells the truth; the frame table is just a starting point.
 
-## Non-negotiables preserved (from `.claude/CLAUDE.md`)
+## Non-negotiable invariants
 
-1. **Determinism.** Fixed timestep; one decision per fighter per tick from a
-   single seeded PRNG. **Integer / fixed-point math only** in the outcome path.
-2. **Security / TCB.** Bots are **data, not code**. The validator + interpreter
-   (`packages/engine/src/dsl.ts`) is the trusted computing base; its allowlists
-   are the security boundary. No DSL op may touch host/net/fs/time/randomness.
-3. **Bounded DSL.** Loop-free, recursion-free; worst-case cost bounded by document
-   size, enforced at validation.
-4. **Same pre-tick snapshot.** Both fighters decide against one immutable snapshot
-   of tick T; actions resolve together afterward. Opponent perception is served
-   from a per-fighter history ring buffer as one coherent delayed snapshot.
+These protect determinism, replay, and security — the **canonical statement** of
+the four (`.claude/CLAUDE.md` keeps a brief + pointer here). Do not violate them
+when generating code; flag any change that would.
+
+1. **Determinism.** Fixed timestep; one `runTick` per fighter per tick. A single
+   **seeded PRNG** threads the whole sim — no `Math.random`, no `Date.now`, no
+   wall-clock. **Integer / fixed-point math only** in anything that affects
+   outcomes (position, velocity, stamina, score). Floats in the outcome path break
+   cross-platform replay. Trig/FK and ragdoll are **render-layer only** (the
+   non-authoritative side of the seam).
+2. **Security / TCB.** Untrusted bots are **data, never code.** Never run
+   LLM-authored JS. The trusted computing base is `src/engine/dsl.ts`
+   (validator + interpreter). Never add a DSL op that can touch the host,
+   network, filesystem, time, or randomness. The allowlists in that file ARE the
+   security boundary. Validate before run; reject with structured errors.
+3. **Bot DSL is bounded.** Loop-free and recursion-free ⇒ worst-case cost is
+   bounded by document size, enforced by `LIMITS` at validation time. No
+   instruction metering needed. Keep it that way.
+4. **Same pre-tick snapshot.** Both fighters' `runTick` read one immutable
+   snapshot of tick T; resolve both actions together afterward. Perception
+   latency is served from a per-fighter history ring buffer as a single coherent
+   delayed snapshot (never mix fresh + stale fields).
 
 ### The render/authority seam (the key architectural unlock)
 
@@ -626,11 +639,10 @@ shipped first; `staminaCost` on `MoveSpec`/`ThrowSpec` was forward-compatible, a
 
 ### P8. Platform / meta loop — ✓ RESOLVED
 
-- **Backend stack:** **all-TypeScript.** The API imports `@modelkombat/engine`
-  directly — shared `validate`/`runFight` + contract types end-to-end, one
-  monorepo/toolchain, deploys on Vercel with the Solid+Pixi viewer. No
-  cross-language contract drift. (Supersedes the planned Python/FastAPI
-  `services/api` — update that stub + the `CLAUDE.md` mention.)
+- **Backend stack:** **all-TypeScript.** The API (Vercel serverless functions under
+  `api/`) imports the engine directly from `src/` — shared `validate`/`runFight` +
+  contract types end-to-end, one package/toolchain, deploys on Vercel with the
+  Solid+Pixi viewer. No cross-language contract drift.
 - **Ladder:** **king-of-the-hill + lineage.** A new bot challenges the reigning
   champion; win → become champion; track streaks/lineage (replayable "title
   defenses"). ELO ladder = later growth.
@@ -639,8 +651,10 @@ shipped first; `staminaCost` on `MoveSpec`/`ThrowSpec` was forward-compatible, a
   blocked/parried/whiffed/hit-confirm rates, stamina + lead curves, key moments)
   - full deterministic replay. Counter-design fuel _and_ balance instrumentation.
     Auto NL coaching summary = trivial later add (generated _from_ this telemetry).
-- **Pipeline:** `POST /fighter` (validate + store), `POST /fight` (vs champion),
-  `GET /replay/:id`, `GET /spec`.
+- **Pipeline (as built):** `GET /spec` (self-describing bot API) · `POST /validate`
+  (validator gate) · `POST /fight` (stateless gauntlet gate → title shot vs the
+  version-scoped KotH throne). Planned: `GET /replay/:id` + a champions-history read
+  surface. The endpoint design of record + live status is `docs/STATUS.md`.
 
 ### P9. First-build scope (planning, not design)
 
@@ -659,10 +673,13 @@ core footwork) rendered as the stick figure in Pixi. Resolved later via the
 - ✓ P8 Platform/meta — **resolved** (all-TS · KotH+lineage · rich telemetry)
 - ✓ P7 Move schema — **resolved → C9 arsenal** (flat moveIds · per-move `bands[]` · band-dependent WKF score · 4-strike core)
 - ✓ P1 concretized → **C10 stamina** (on-commit costs · contact guard-chip · stepped gas · `L_act` opponent tell)
-- **NEXT build:** C10 stamina (first), then C9 arsenal — via `story-splitting` → `planning` → TDD
+- ✓ **Built since:** C10 stamina + C9 arsenal shipped, then the §7 match structure, the LLM
+  benchmark, and the platform HTTP API — the **live build log + roadmap is `docs/STATUS.md`**
 - → P9 Scope — first vertical slice: hand off to `story-splitting` then `planning`
 - ✓ Combat design gap #1 (ordered resolution procedure) — **resolved** → **§11**
 
-**Design tree resolved.** Next: docs-alignment pass (CLAUDE.md / DESIGN.md /
-spec.md / services-api / README reflect deep-karate + all-TS), then
-`story-splitting` → `planning` → TDD build.
+**Design tree resolved** — the deep-karate combat tree is **complete** and the
+**platform layer is underway** (HTTP API `GET /spec` · `POST /validate` ·
+`POST /fight` · the version-scoped KotH throne all shipped). The authoritative,
+capability-by-capability **build log + roadmap lives in `docs/STATUS.md`**; this
+document is the design rationale of record.
