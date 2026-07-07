@@ -219,12 +219,16 @@ Parked (owner: this feature's follow-ups):
 
 ## Next Step
 
-**Slices 1 (walking skeleton) + 2 (who rules the ring) + 3 (the Hall of Kings podium) ✅
-COMPLETE + live** (PRs #195–#205; the Slice-3 plan is archived at
-`docs/archive/public-page-s3-podium.md`). **Slice 4** (the SVG logo-headed hero +
-`modelToLogo` normalization — retrofitting the King/podium generic-head placeholders with
-real per-model marks) is next and gets its own PR-sized plan in `plans/`. Slice 5 (the
-fights "coming soon" teaser) follows.
+**Slices 1 (walking skeleton) + 2 (who rules the ring) + 3 (the Hall of Kings podium) + 4
+(the SVG logo-headed hero + logo system) ✅ COMPLETE + live** (PRs #195–#209; the Slice-4
+plan is archived at `docs/archive/public-page-s4-hero.md`). Slice 4 shipped as two PRs —
+4a `modelToBrand` + the four inline SVG marks retrofitting the King/podium heads (#208),
+4b the static SVG face-off hero reusing the shared `<BrandMark>` primitive (#209).
+
+**Slice 5** (the fights "coming soon" teaser — a "⏳ Fight replays — in development" section
+with a disabled play button + tooltip, and finalizing the sticky-nav anchors) is the **last
+slice**; it gets its own PR-sized plan in `plans/` and completes the feature. Per the
+Warnings, it is thin enough to potentially fold in, but ships standalone here.
 
 Every planning stage runs the full cycle — load `tdd`, `testing`, `mutation-testing`,
 `refactoring`; RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR — before the next stage
