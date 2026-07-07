@@ -6,6 +6,7 @@
     { "source": "/spec", "destination": "/api/spec" },
     { "source": "/validate", "destination": "/api/validate" },
     { "source": "/fight", "destination": "/api/fight" },
+    { "source": "/king", "destination": "/api/king" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
