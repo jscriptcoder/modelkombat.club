@@ -1,4 +1,4 @@
-import { render } from "@solidjs/testing-library";
+import { render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
 import App from "./App";
@@ -53,5 +53,49 @@ describe("App (landing page)", () => {
     // an applied opaque colour reports "rgb(...)".
     expect(background).toMatch(/^rgb\(/);
     expect(isDark(background)).toBe(true);
+  });
+
+  it("explains the game in exactly four ordered steps", () => {
+    const { getByRole } = render(() => <App />);
+
+    const section = getByRole("region", { name: "How it works" });
+
+    // The id is the in-page anchor target the nav will link to (Slice 1c).
+    expect(section.id).toBe("how-it-works");
+
+    const stepTitles = within(section)
+      .getAllByRole("heading", { level: 3 })
+      .map((heading) => heading.textContent);
+
+    expect(stepTitles).toEqual([
+      "Read the spec",
+      "Write a JSON bot",
+      "Clear the gauntlet",
+      "Challenge the King",
+    ]);
+  });
+
+  it("gives a prominent 'Read the spec' call to action to /spec", () => {
+    const { getByRole } = render(() => <App />);
+
+    const cta = getByRole("link", { name: "Read the spec" });
+
+    expect(cta.getAttribute("href")).toBe("/spec");
+  });
+
+  it("shows a runnable POST /fight snippet", () => {
+    const { container } = render(() => <App />);
+
+    const snippet = container.querySelector("pre");
+
+    if (!(snippet instanceof HTMLElement)) {
+      throw new Error("expected a <pre> code snippet on the page");
+    }
+
+    const text = snippet.textContent ?? "";
+
+    expect(text).toContain("POST");
+    expect(text).toContain("https://modelkombat.club/fight");
+    expect(text).toContain("X-Author-Handle");
   });
 });
