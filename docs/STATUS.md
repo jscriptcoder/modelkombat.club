@@ -857,6 +857,28 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   `KV_REST_API_*`), so production reads the injected vars instead of falling back to the in-memory fake.
   Remaining platform work: the **KotH ladder** (multi-champion / tournament bracket beyond the single throne),
   **`/replay`** + a champions-history read surface, and the **Pixi viewer**.
+- DONE (**public page — the newcomer front door (first web-UI feature) + `GET /king` reads, PRs #195–#213**):
+  the public single-page site — a top-level **`web/`** Vite + SolidJS app that Vercel builds and serves at **`/`**
+  (**LIVE** at `https://modelkombat.club/`), replacing the static placeholder while `/spec` · `/validate` ·
+  `/fight` keep resolving. **Five vertical slices, PR per slice:** **S1** the deploy walking skeleton (how-it-works
+  explainer + spec/fight CTA + sticky nav/footer + CSS-native reduced-motion scroll, #195–#197); **S2** the Current
+  King section on a new **`GET /king`** endpoint (#200–#201) — a version-scoped, **identity-only** reigning-King
+  read reusing `ThroneStore.read` via a `handleKing` seam + a thin `api/king.ts`; **S3** the Hall of Kings podium
+  on a bounded **`GET /king` recent-lineage** read (#204–#205) — the one slice that touched the `ThroneStore`
+  **port**, adding a `recent(version, limit)` method (fake `slice(-limit)` + Upstash `LRANGE`, pinned by the shared
+  `runThroneStoreContract`; lineage was already `RPUSH`'d on every crown ⇒ a pure READ, no migration); **S4** the
+  SVG logo-headed face-off hero + a `modelToBrand` logo system / shared `<BrandMark>` (#208–#209); **S5** the honest
+  "⏳ Fight replays — in development" teaser + nav finalize (#212). **The `/king` endpoints are the only new API
+  surface** — identity-only (never the champion doc, no DSL leak), advertised in the serve-time `/spec` envelope,
+  `503 /problems/throne-unavailable` on a store reject; **`championIdentity` gained a control-char sanitize**
+  protecting `/king` **and** `/fight` retroactively. **Invariant #1 held** — the fights teaser fabricates NO fight
+  rows (fights are never persisted; real replay is the parked next feature, gated on `/replay` + the Pixi viewer).
+  **No `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB change throughout** (the `/king` reads + web UI are
+  serve-time / presentation; the `/spec` envelope refresh is byte-pinned outside the hashed core). Web-presentation
+  logic is outside the Node/Stryker scope (Stryker can't drive Vitest-4 browser mode) ⇒ covered by **strong
+  exact-assertion browser-mode tests + a mandatory manual mutator scan**; each slice preview-smoked on Vercel before
+  merge. Design source `plans/public-page-{decisions,stories}.md` (archived at feature close-out); slice plans +
+  spanning docs under `docs/archive/public-page-*` (see the archive [`README.md`](archive/README.md)).
 
 ### §7 match structure built between C9 and Capability D
 
@@ -956,10 +978,18 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    work: the KotH ladder** (multi-champion / tournament
    bracket beyond the single throne), **`/replay`** + a champions-history read surface, and the **Pixi
    viewer** — each `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
+7. **Public page — the newcomer front door — ✅ COMPLETE (first web-UI feature, PRs #195–#213).** A
+   top-level `web/` Vite + SolidJS site **LIVE at `https://modelkombat.club/`**: a face-off hero, the Current
+   King + Hall of Kings (on the new identity-only **`GET /king`** + recent-lineage reads), a `modelToBrand`
+   logo system, and an honest "coming soon" fights teaser (no fabricated fights — invariant #1). Five slices,
+   PR per slice; **no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change** (serve-time reads + presentation). See
+   the build-log entry above; design trail + slice plans archived under `docs/archive/public-page-*`.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
-title fight persisted on Upstash Redis). Remaining in the platform layer: the **KotH ladder** (the
-tournament-_bracket_ sense of "rounds" beyond the single throne), **`/replay`** + a champions-history read
-surface, and the **Pixi viewer**.
+title fight persisted on Upstash Redis), and the **public page — the newcomer front door** is LIVE at
+`https://modelkombat.club/` (PRs #195–#213; a face-off hero + Current King + Hall of Kings on the new
+identity-only **`GET /king`** reads + an honest fights "coming soon" teaser). Remaining in the platform
+layer: the **KotH ladder** (the tournament-_bracket_ sense of "rounds" beyond the single throne),
+**`/replay`** + a champions-history read surface, and the **Pixi viewer**.

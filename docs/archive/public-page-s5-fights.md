@@ -1,10 +1,12 @@
 # Plan: Public webpage — Slice 5 (fights "coming soon" teaser + nav finalize)
 
 **Branch (this plan PR)**: docs/public-page-s5-plan
-**Status**: Active
-**Source of truth**: `plans/public-page-decisions.md` (decision 8 — honest "coming soon"
-teaser; decision 11 — page skeleton + nav) + `plans/public-page-stories.md` (Slice 5 row +
-AC-R2/R3, AC-A1/A3).
+**Status**: ✅ COMPLETE — shipped + live (2026-07-07, PR #212). Single-PR slice; this
+close-out archives this plan **and** the spanning `public-page-{decisions,stories}.md`
+(the whole public-page feature ships here).
+**Source of truth**: `docs/archive/public-page-decisions.md` (decision 8 — honest "coming
+soon" teaser; decision 11 — page skeleton + nav) + `docs/archive/public-page-stories.md`
+(Slice 5 row + AC-R2/R3, AC-A1/A3).
 
 ## Goal
 
