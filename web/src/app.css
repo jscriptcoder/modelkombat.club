@@ -349,3 +349,21 @@ main,
     grid-template-columns: 1fr;
   }
 }
+
+.fights p {
+  color: var(--muted);
+}
+
+/* The replay control is disabled-in-look but stays keyboard-reachable
+   (aria-disabled, not the `disabled` attribute), so the focus ring and the
+   title tooltip both still work. */
+.replay-play {
+  margin-top: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  cursor: not-allowed;
+}

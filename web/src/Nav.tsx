@@ -8,6 +8,7 @@ export default function Nav() {
         <a href="#how-it-works">How it works</a>
         <a href="#king">King</a>
         <a href="#champions">Champions</a>
+        <a href="#fights">Fights</a>
         <a href="/spec">
           Spec <span aria-hidden="true">↗</span>
         </a>
