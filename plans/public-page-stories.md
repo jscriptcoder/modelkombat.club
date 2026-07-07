@@ -219,9 +219,12 @@ Parked (owner: this feature's follow-ups):
 
 ## Next Step
 
-Load **`planning`** for **Slice 1** (the walking skeleton) to sequence it into PR-sized
-TDD stages. Every planning stage must run the full cycle — load `tdd`, `testing`,
-`mutation-testing`, `refactoring`; RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR —
-before the next stage (endpoint stages tested like the existing `api/*.test.ts`; Solid
-components via **Vitest browser mode**). Optionally run **`find-gaps`** on this split
-first to harden the acceptance examples.
+**Slice 1 (walking skeleton) ✅ COMPLETE + live** (PRs #195–#198). **Slice 2** is
+planned in `plans/public-page-s2-king.md` (the `GET /king` endpoint + King section,
+split into 2a backend / 2b UI). Remaining slices 3–5 (Hall-of-Kings podium → SVG hero +
+logos → fights teaser) get their own plans in turn.
+
+Every planning stage runs the full cycle — load `tdd`, `testing`, `mutation-testing`,
+`refactoring`; RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR — before the next stage
+(endpoint stages tested like the existing `api/*.test.ts`; Solid components via **Vitest
+browser mode**).
