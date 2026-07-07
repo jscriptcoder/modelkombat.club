@@ -1,7 +1,8 @@
 # Plan: Public webpage — Slice 4 (SVG logo-headed hero + logo system)
 
 **Branch (this plan PR)**: docs/public-page-s4-plan
-**Status**: Active
+**Status**: ✅ COMPLETE — shipped + live (2026-07-07). Slice 4a (logo system + card
+retrofit) = PR #208; Slice 4b (SVG face-off hero) = PR #209; plan PR #207.
 **Source of truth**: `plans/public-page-decisions.md` (decisions 6, 10, 11) +
 `plans/public-page-stories.md` (Slice 4 row + AC-L1–L3, AC-C1–C4, AC-R1, AC-A1–A4).
 
@@ -182,6 +183,6 @@ approves commit.
 
 ---
 
-_Archive this file to `docs/archive/` at the Slice-4 close-out (per `archive-plans-not-delete`);
-the spanning `public-page-{decisions,stories}.md` stay live in `plans/` until the whole feature
-ships._
+_✅ Archived 2026-07-07 at the Slice-4 close-out (per `archive-plans-not-delete`); the
+spanning `public-page-{decisions,stories}.md` stay live in `plans/` until the whole feature
+ships (only Slice 5 — the fights "coming soon" teaser — remains)._
