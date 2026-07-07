@@ -128,3 +128,55 @@ main,
   color: var(--muted);
   font-size: 0.9rem;
 }
+
+.king-card,
+.king-empty,
+.king-error {
+  padding: 1.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.king-head {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.king-name {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.king-model {
+  margin: 0.25rem 0;
+  color: var(--accent);
+}
+
+.king-gen,
+.king-handle {
+  margin: 0.25rem 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.king-status,
+.king-empty-line,
+.king-error-line {
+  margin: 0 0 1rem;
+}
+
+.retry {
+  padding: 0.5rem 1.25rem;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: var(--code-bg);
+}

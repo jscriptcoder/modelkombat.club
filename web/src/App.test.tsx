@@ -112,7 +112,7 @@ describe("App (landing page)", () => {
       .getAllByRole("link")
       .map((link) => link.getAttribute("href"));
 
-    expect(hrefs).toEqual(["#top", "#how-it-works", "/spec"]);
+    expect(hrefs).toEqual(["#top", "#how-it-works", "#king", "/spec"]);
   });
 
   it("renders a footer landmark naming the site", () => {
