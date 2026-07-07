@@ -22,27 +22,22 @@ what's next in **`docs/STATUS.md`**).
 
 ## Non-negotiable invariants
 
-These protect determinism, replay, and security. Do not violate them when
-generating code; flag any change that would.
+These protect determinism, replay, and security. **Do not violate them when
+generating code; flag any change that would.** The full canonical statement lives
+in **`docs/DESIGN.md` § Non-negotiable invariants** — read it before touching the
+engine. In brief:
 
-1. **Determinism.** Fixed timestep; one `runTick` per fighter per tick. A single
-   **seeded PRNG** threads the whole sim — no `Math.random`, no `Date.now`, no
-   wall-clock. **Integer / fixed-point math only** in anything that affects
-   outcomes (position, velocity, stamina, score). Floats in the outcome path break
-   cross-platform replay. Trig/FK and ragdoll are **render-layer only** (the
-   non-authoritative side of the seam).
-2. **Security / TCB.** Untrusted bots are **data, never code.** Never run
-   LLM-authored JS. The trusted computing base is `src/engine/dsl.ts`
-   (validator + interpreter). Never add a DSL op that can touch the host,
-   network, filesystem, time, or randomness. The allowlists in that file ARE the
-   security boundary. Validate before run; reject with structured errors.
-3. **Bot DSL is bounded.** Loop-free and recursion-free ⇒ worst-case cost is
-   bounded by document size, enforced by `LIMITS` at validation time. No
-   instruction metering needed. Keep it that way.
-4. **Same pre-tick snapshot.** Both fighters' `runTick` read one immutable
-   snapshot of tick T; resolve both actions together afterward. Perception
-   latency is served from a per-fighter history ring buffer as a single coherent
-   delayed snapshot (never mix fresh + stale fields).
+1. **Determinism** — fixed timestep, one `runTick`/fighter/tick, single seeded
+   PRNG, **integer / fixed-point math only** in the outcome path (no
+   `Math.random` / `Date.now` / wall-clock; trig/FK/ragdoll are render-layer only).
+2. **Security / TCB** — bots are **data, never code**; the TCB is
+   `src/engine/dsl.ts` (validator + interpreter) and its allowlists ARE the
+   security boundary. No DSL op may touch host / net / fs / time / randomness.
+3. **Bounded DSL** — loop-free, recursion-free; worst-case cost bounded by
+   document size, enforced by `LIMITS` at validation.
+4. **Same pre-tick snapshot** — both fighters' `runTick` read one immutable
+   snapshot of tick T; resolve together afterward; perception served from a
+   per-fighter history ring buffer as one coherent delayed snapshot.
 
 ## Stack & conventions
 
