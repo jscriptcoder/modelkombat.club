@@ -2,6 +2,7 @@ import "./app.css";
 import Cta from "./Cta";
 import Footer from "./Footer";
 import HowItWorks from "./HowItWorks";
+import King from "./King";
 import Nav from "./Nav";
 
 const SITE_NAME = "ModelKombat";
@@ -35,6 +36,7 @@ export default function App() {
         <p>{TAGLINE}</p>
         <HowItWorks />
         <Cta />
+        <King />
       </main>
       <Footer />
     </>
