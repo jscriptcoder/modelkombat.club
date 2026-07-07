@@ -1,7 +1,9 @@
 # Plan: Public page — Slice 2 (who rules the ring)
 
 **Branch**: feat/public-page-king (implementation) · plan authored on `docs/public-page-s2-plan`
-**Status**: Active (awaiting approval)
+**Status**: ✅ COMPLETE — shipped + live (2026-07-07). Slice 2a `GET /king` endpoint (PR
+#200), Slice 2b King section (PR #201), both preview-smoked before merge. Archived on
+close-out branch `docs/public-page-s2-closeout`.
 
 > Sequences **Slice 2** of the 5-slice public-page feature from
 > `plans/public-page-stories.md` ("Returning fan sees who currently rules the ring —
@@ -248,5 +250,7 @@ null }`; human approves commit.
 
 ---
 
-_Archive to `docs/archive/` when the whole public-page feature ships (per
-[[archive-plans-not-delete]] — decisions/stories stay live meanwhile). Do not delete._
+_✅ Archived 2026-07-07 (Slice 2 shipped: 2a `GET /king` #200 + 2b King section #201).
+Per [[archive-plans-not-delete]], the completed slice plan is archived here (never
+deleted); the overall design/roadmap (`plans/public-page-{decisions,stories}.md`) stays
+LIVE for the still-pending Slices 3–5._
