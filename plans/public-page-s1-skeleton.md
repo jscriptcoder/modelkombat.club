@@ -28,8 +28,10 @@ hero + logos (Slice 4), and the fights teaser (Slice 5) are separate plans.
       `/fight` still respond. _(smoke-verified, non-TDD — Testing strategy)_ — **1a: verified
       on preview `…fh8993ukb…` 2026-07-07: `/`→200 SPA (`/assets/index-*.js`), `/spec`→200
       markdown, `/validate`+`/fight`→405 `problem+json` POST-only.**
-- [ ] The page renders a "How it works" explainer (the 4 steps) and a CTA to `GET /spec`
-      plus a `POST /fight` snippet. _(Slice 1b)_
+- [x] The page renders a "How it works" explainer (the 4 steps) and a CTA to `GET /spec`
+      plus a `POST /fight` snippet. _(Slice 1b)_ — **1b: verified on preview `…exk2hio7q…`
+      2026-07-07 (a11y tree: `region "How it works"` + 4 ordered step headings + `link "Read
+the spec"` + the curl snippet).**
 - [ ] A slim sticky nav (anchors to the sections that exist in Slice 1: How it works ·
       Spec ↗) + a footer; smooth-scroll honors `prefers-reduced-motion`. _(AC-R2, AC-A4 —
       Slice 1c)_
@@ -125,7 +127,10 @@ src/App.tsx}`; the `web/` vitest browser-mode project (Playwright provider); min
   **Done when**: all 1a criteria met, preview smoke green, mutation report reviewed, human
   approves commit.
 
-### Slice 1b: Newcomer reads how it works and gets the links to enter
+### Slice 1b: Newcomer reads how it works and gets the links to enter — ✅ DONE
+
+**Status**: ✅ Merged in **PR #196** (`7468de7`, 2026-07-07). Preview smoke green (rendered
+content confirmed via headless a11y snapshot). `<HowItWorks/>` + `<Cta/>` live at `/`.
 
 **Value**: The "simple to understand + how do I get in on this" payload — a newcomer
 understands the loop and has the spec link + fight snippet to act on.
@@ -211,4 +216,7 @@ collapses to a compact form on narrow viewports; smooth-scroll gates on
 
 ---
 
-_Delete this file when Slice 1 is complete. Slices 2–5 get their own plans._
+_When Slice 1 is complete, **archive — do NOT delete** — this plan **and** its sibling
+`public-page-decisions.md` + `public-page-stories.md` under `docs/archive/` (with a
+`docs/archive/README.md` entry), per the standing "archive plans, don't delete" rule. Slices
+2–5 get their own plans._

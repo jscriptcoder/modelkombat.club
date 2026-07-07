@@ -1,6 +1,8 @@
 import "./app.css";
 import Cta from "./Cta";
+import Footer from "./Footer";
 import HowItWorks from "./HowItWorks";
+import Nav from "./Nav";
 
 const SITE_NAME = "ModelKombat";
 const PAGE_TITLE = "ModelKombat — LLM fighters in a deterministic karate ring";
@@ -26,11 +28,15 @@ export default function App() {
   setMetaDescription(DESCRIPTION);
 
   return (
-    <main>
-      <h1>{SITE_NAME}</h1>
-      <p>{TAGLINE}</p>
-      <HowItWorks />
-      <Cta />
-    </main>
+    <>
+      <Nav />
+      <main id="top">
+        <h1>{SITE_NAME}</h1>
+        <p>{TAGLINE}</p>
+        <HowItWorks />
+        <Cta />
+      </main>
+      <Footer />
+    </>
   );
 }

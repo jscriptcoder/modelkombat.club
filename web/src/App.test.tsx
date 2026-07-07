@@ -21,11 +21,15 @@ describe("App (landing page)", () => {
   });
 
   it("links to the bot spec at exactly /spec", () => {
-    const { getByRole } = render(() => <App />);
+    // The page has more than one /spec link (nav + CTA), so match by href
+    // rather than a loose accessible-name regex.
+    const { getAllByRole } = render(() => <App />);
 
-    const specLink = getByRole("link", { name: /spec/i });
+    const specHrefs = getAllByRole("link")
+      .map((link) => link.getAttribute("href"))
+      .filter((href) => href === "/spec");
 
-    expect(specLink.getAttribute("href")).toBe("/spec");
+    expect(specHrefs.length).toBeGreaterThan(0);
   });
 
   it("sets a descriptive document title naming ModelKombat", () => {
@@ -97,5 +101,51 @@ describe("App (landing page)", () => {
     expect(text).toContain("POST");
     expect(text).toContain("https://modelkombat.club/fight");
     expect(text).toContain("X-Author-Handle");
+  });
+
+  it("provides a sticky nav linking to the top, the sections, and the spec", () => {
+    const { getByRole } = render(() => <App />);
+
+    const nav = getByRole("navigation");
+
+    const hrefs = within(nav)
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+
+    expect(hrefs).toEqual(["#top", "#how-it-works", "/spec"]);
+  });
+
+  it("renders a footer landmark naming the site", () => {
+    const { getByRole } = render(() => <App />);
+
+    const footer = getByRole("contentinfo");
+
+    expect(footer.textContent).toContain("ModelKombat");
+  });
+
+  it("gates smooth scrolling behind prefers-reduced-motion: no-preference", () => {
+    render(() => <App />);
+
+    const allRules = [...document.styleSheets].flatMap((sheet) => {
+      try {
+        return [...sheet.cssRules];
+      } catch {
+        return [];
+      }
+    });
+
+    const reducedMotionGate = allRules
+      .filter((rule): rule is CSSMediaRule => rule instanceof CSSMediaRule)
+      .find((rule) =>
+        rule.conditionText.includes("prefers-reduced-motion: no-preference"),
+      );
+
+    if (!reducedMotionGate) {
+      throw new Error(
+        "expected a @media (prefers-reduced-motion: no-preference) gate",
+      );
+    }
+
+    expect(reducedMotionGate.cssText).toMatch(/scroll-behavior:\s*smooth/);
   });
 });
