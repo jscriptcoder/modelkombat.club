@@ -159,12 +159,15 @@ main,
   height: 2.25rem;
 }
 
-/* Static face-off hero: three logo-headed stickmen squaring off toward the centre.
-   Everything scales with the viewport (clamp) and the row shrinks on narrow screens,
-   so the page never scrolls sideways at 360px (AC-R1). */
+/* Animated face-off hero: three logo-headed, articulated stickmen squaring off toward the
+   centre. On load the two flanking challengers rush in from the wings and the champion
+   rises in the middle a beat later (see the motion block below). Everything scales with the
+   viewport (clamp) and the row shrinks on narrow screens; the slide-in is clipped rather
+   than pushed off-page, so the page never scrolls sideways at 360px (AC-R1). */
 .hero {
   text-align: center;
   padding: 1.5rem 0 0.5rem;
+  overflow-x: clip;
 }
 
 .hero-stage {
@@ -181,11 +184,12 @@ main,
   align-items: center;
   gap: 0.25rem;
   color: var(--muted);
+  transform-origin: bottom center;
 }
 
-/* Mirror the right-hand fighter so the outer two face inward toward the centre. */
-.hero-fighter-left {
-  transform: scaleX(-1);
+/* The champion holds the centre — a touch larger and brighter than the two challengers. */
+.hero-fighter-claude {
+  color: var(--fg);
 }
 
 .hero-fighter .brand-mark {
@@ -193,9 +197,93 @@ main,
   height: clamp(2rem, 9vw, 3rem);
 }
 
+.hero-fighter-claude .brand-mark {
+  width: clamp(2.4rem, 11vw, 3.6rem);
+  height: clamp(2.4rem, 11vw, 3.6rem);
+}
+
 .hero-body {
-  width: clamp(2.25rem, 11vw, 3.5rem);
+  width: clamp(2.5rem, 12vw, 4rem);
   height: auto;
+}
+
+.hero-fighter-claude .hero-body {
+  width: clamp(3rem, 14vw, 4.75rem);
+}
+
+/* Entrance, in two tiers. Everyone — including visitors who ask the OS to reduce motion —
+   gets a gentle staged fade-in: the challengers first, the champion a beat later. It is
+   opacity-only, so there is no movement to trigger vestibular discomfort. */
+.hero-fighter-openai,
+.hero-fighter-gemini {
+  animation: hero-fade 0.6s ease 0.1s both;
+}
+
+.hero-fighter-claude {
+  animation: hero-fade 0.6s ease 0.55s both;
+}
+
+/* Motion-OK visitors get the full choreography on top: the challengers rush in from the
+   wings and the champion rises to meet them (these override the fade above by source
+   order). */
+@media (prefers-reduced-motion: no-preference) {
+  .hero-fighter-openai {
+    animation: hero-enter-left 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) 0.15s both;
+  }
+
+  .hero-fighter-gemini {
+    animation: hero-enter-right 0.7s cubic-bezier(0.2, 0.8, 0.3, 1) 0.15s both;
+  }
+
+  .hero-fighter-claude {
+    animation: hero-enter-mid 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) 0.9s both;
+  }
+}
+
+@keyframes hero-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes hero-enter-left {
+  from {
+    opacity: 0;
+    transform: translateX(-160%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes hero-enter-right {
+  from {
+    opacity: 0;
+    transform: translateX(160%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes hero-enter-mid {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.8);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .hero-title {
