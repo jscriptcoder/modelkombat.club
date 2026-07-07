@@ -70,31 +70,8 @@ this file lean; update `docs/STATUS.md` when a slice lands. Every completed
 vertical-slice **plan** + its design records (resolved decisions + acceptance criteria)
 is archived under **`docs/archive/`** (indexed by its `README.md`).
 
-**Where things stand:** the deterministic headless core is **built and canonical** —
-validate → fight → byte-identical replay over the **complete** deep-karate combat tree
-(perception latency, height bands, vertical axis + occupancy, parry/counter windows,
-on-contact cancel combos, throws, sweeps + okizeme, and **air-actions** — horizontal
-jump displacement + air strikes + the canonical `tobi-geri` jump-in), the **C9**
-multi-move "real karate" arsenal, the **C10** stamina economy, **WKF match structure**
-(yame + win condition + jogai / passivity officiating + senshu / overtime tie-resolution),
-the offline **LLM bot-authoring benchmark v1**, the **gauntlet modernization** (all 6
-frozen bots re-authored into the `[25%, 75%]` band, CI-locked), the **officiating
-benchmark adoption** (jogai `v15` + passivity `v16` + overtime `v17` — item 3 CLOSED),
-and the **air-actions gauntlet exercise** (rekka's `tobi-geri` jump-in weaponized so the
-frozen board actually exercises aerial combat — `v19`, 12/12 arsenal coverage, all 6 ∈
-`[25%, 75%]`). **§7 is complete** ("rounds" resolved by reframe → tie resolution,
-Capability C, adopted `v4`/`v17`). **The deep-karate combat tree is COMPLETE** —
-air-actions was the last combat capability. **The platform layer is now underway — the
-HTTP API is built:** `GET /spec` (LIVE at `https://modelkombat.club/spec`), `POST
-/validate`, `POST /fight` (stateless gauntlet gate), and **S4 the version-scoped KotH
-throne** (title shot → fresh-seeded title fight → atomic-CAS crown, durably persisted on
-Upstash Redis; PRs #171–#190 — S4 COMPLETE, durable persistence LIVE on Upstash via the
-Vercel Marketplace). **Not yet built:** the **KotH ladder** (tournament bracket
-beyond the single throne), **`/replay`** + a champions-history read surface, and the
-**Pixi viewer**. See `docs/STATUS.md` for detail and the next slice.
-
-Flow for the next build — **the rest of the platform layer** (KotH ladder / `/replay` /
-Pixi viewer): `grill-me` → `story-splitting` → `planning` → TDD, **PR per slice**. The §11
+Flow for the next build — **the rest of the platform layer**: `grill-me` →
+`story-splitting` → `planning` → TDD, **PR per slice**. The §11
 combat-resolution spine (two-phase compute-then-apply, `strike > throw > guard`) is
 pinned in `docs/DESIGN.md` for any future combat work.
 
