@@ -15,8 +15,10 @@ the generated **`docs/spec.md`** (the bot API). All engine code is built **from 
 resolved design via TDD** under a single top-level **`src/`** (no `packages/` nesting). The
 **walking skeleton is done** (headless validate → fight → byte-identical replay,
 with 1D approach + one *mid* strike that can score / block / trade); the deep-karate
-**combat tree is now complete**, and the next build phase is the **platform layer**.
-See **Status & roadmap** below (full build log + what's next in **`docs/STATUS.md`**).
+**combat tree is now complete**, and the **platform layer** is underway (the HTTP API —
+`/spec` · `/validate` · `/fight` · the S4 KotH throne — is built; the KotH ladder,
+`/replay`, and the Pixi viewer remain). See **Status & roadmap** below (full build log +
+what's next in **`docs/STATUS.md`**).
 
 ## Non-negotiable invariants
 
@@ -81,13 +83,18 @@ benchmark adoption** (jogai `v15` + passivity `v16` + overtime `v17` — item 3 
 and the **air-actions gauntlet exercise** (rekka's `tobi-geri` jump-in weaponized so the
 frozen board actually exercises aerial combat — `v19`, 12/12 arsenal coverage, all 6 ∈
 `[25%, 75%]`). **§7 is complete** ("rounds" resolved by reframe → tie resolution,
-Capability C, adopted `v4`/`v17`). **The deep-karate combat tree is now COMPLETE** —
-air-actions was the last combat capability. **Not yet built — the platform layer only:**
-the KotH ladder, the HTTP API (`/spec` / `/validate` / `/fight`), and the Pixi viewer.
-See `docs/STATUS.md` for detail and the next slice.
+Capability C, adopted `v4`/`v17`). **The deep-karate combat tree is COMPLETE** —
+air-actions was the last combat capability. **The platform layer is now underway — the
+HTTP API is built:** `GET /spec` (LIVE at `https://modelkombat.club/spec`), `POST
+/validate`, `POST /fight` (stateless gauntlet gate), and **S4 the version-scoped KotH
+throne** (title shot → fresh-seeded title fight → atomic-CAS crown, durably persisted on
+Upstash Redis; PRs #171–#188 — S4 code-complete, live-durability pending the Upstash
+Marketplace provisioning). **Not yet built:** the **KotH ladder** (tournament bracket
+beyond the single throne), **`/replay`** + a champions-history read surface, and the
+**Pixi viewer**. See `docs/STATUS.md` for detail and the next slice.
 
-Flow for the next build — **the platform layer** (KotH ladder / HTTP API / Pixi viewer):
-`grill-me` → `story-splitting` → `planning` → TDD, **PR per slice**. The §11
+Flow for the next build — **the rest of the platform layer** (KotH ladder / `/replay` /
+Pixi viewer): `grill-me` → `story-splitting` → `planning` → TDD, **PR per slice**. The §11
 combat-resolution spine (two-phase compute-then-apply, `strike > throw > guard`) is
 pinned in `docs/DESIGN.md` for any future combat work.
 

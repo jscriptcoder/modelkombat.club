@@ -1,7 +1,8 @@
 # Plan: Platform HTTP API — S4, the version-scoped KotH throne
 
 **Branch**: `feat/platform-api-s4-*` (one branch/PR per slice)
-**Status**: Active
+**Status**: ✅ COMPLETE (all 5 slices merged, PRs #184–#188). Live-durability verification (Upstash
+Marketplace provisioning + post-deploy smoke run) is a dashboard action tracked in `docs/STATUS.md`.
 
 ## Goal
 
@@ -86,8 +87,11 @@ gauntlet: [champion], seeds: fresh, maxTicks: MAX_TICKS, rules: CANONICAL_RULES,
       incumbent identity to the next challenger. _(Slice 4 — PR #187)_
 - [x] A non-clearing bot never receives a `title` block and never touches the throne (S3 behaviour
       preserved). _(Slice 1 — PR #184)_
-- [ ] In production the throne persists across cold starts / instances on real Upstash Redis; a
-      post-deploy smoke test crowns and reads back a throwaway champion.
+- [x] In production the throne persists across cold starts / instances on real Upstash Redis; a
+      post-deploy smoke test crowns and reads back a throwaway champion. _(Code: Slice 5 — PR #188:
+      `upstashThroneStore` + the shared contract suite + the env-gated live smoke test. **Live-durability
+      verification is pending** the Upstash Marketplace provisioning + running the smoke against the deploy
+      — a dashboard action, not repo code; until then prod runs the in-memory fake fallback.)_
 
 ## Slices
 
@@ -230,6 +234,18 @@ boundary, `handle ?? null` default.
 **Done when**: criteria met, mutation report reviewed, human approves commit.
 
 ### Slice 5: The throne runs on real Upstash Redis in production
+
+**Status**: ✅ COMPLETE (PR #188, merged `main`@`2dbd3c7`). Shipped `upstashThroneStore` (Upstash REST via
+raw `fetch`, no SDK — `dependencies` stays `{}`) behind the existing port: pure `buildCrownRequest` /
+`buildReadRequest` + `interpretReadReply` / `interpretCrownReply` (an error reply THROWS, never read as
+"empty" — no wrongful bootstrap crown), one atomic Lua `EVAL` (compare-generation + `SET` pointer + `RPUSH`
+lineage), the shared `runThroneStoreContract` spec (drives the fake in-suite + live Upstash in the env-gated
+smoke, throwaway UUID version keys + `afterAll` cleanup), and `selectThroneStore(env)` at the composition
+root (durable iff BOTH `UPSTASH_*` set, else the fake). Refactor extracted the shared `restRequest` envelope;
+`stryker.config.mjs` excludes `*.contract.ts`. 100% mutation on both new units (70/70); `api/fight.ts` rewired
+to `selectThroneStore(process.env)`; TCB / `INPUT_HASH` / `BENCHMARK_VERSION` untouched. _Live-durability
+verification (Upstash Marketplace provisioning + post-deploy smoke run) is a dashboard action — see the
+STATUS follow-ups; the code path is complete + merged._
 
 **Value**: Operator / everyone — the throne persists across cold starts and function instances on
 real storage; the KotH ladder becomes durable. (Justified horizontal/integration slice: retires the
