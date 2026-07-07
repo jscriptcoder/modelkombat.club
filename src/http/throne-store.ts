@@ -30,6 +30,10 @@ export type CasResult =
 export type ThroneStore = {
   // The reigning champion for a version, or `undefined` when the throne is empty.
   read(version: string): Promise<ThroneRecord | undefined>;
+  // The `limit` most-recent crownings for a version, oldest-first (the lineage tail), or
+  // `[]` when the throne is empty. A bounded read — the store never returns the whole
+  // history — so `GET /king` can surface a capped succession (the Hall of Kings) cheaply.
+  recent(version: string, limit: number): Promise<ThroneRecord[]>;
   // Crown `next` iff the stored generation still equals `expected` (`null` = "expected
   // empty"). Appends to the version's lineage as one atomic step.
   compareAndSwap(
@@ -60,6 +64,9 @@ export const inMemoryThroneStore = (): InMemoryThroneStore => {
 
   return {
     read: (version) => Promise.resolve(reigning(version)),
+
+    // The bounded lineage tail: the last `limit` entries, oldest-first (`slice(-limit)`).
+    recent: (version, limit) => Promise.resolve(entries(version).slice(-limit)),
 
     compareAndSwap: (version, expected, next) => {
       if (currentGeneration(version) !== expected) {

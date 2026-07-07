@@ -42,7 +42,7 @@ const LIVE_ENDPOINTS: readonly {
     method: "GET",
     path: "/king",
     summary:
-      "the reigning King of the Hill for the live version; identity only, never the DSL",
+      "the reigning King of the Hill and the recent line of succession for the live version; identity only, never the DSL",
   },
 ];
 
