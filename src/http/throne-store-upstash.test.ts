@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildCrownRequest,
   buildReadRequest,
+  buildRecentRequest,
   CROWN_SCRIPT,
   interpretCrownReply,
   interpretReadReply,
+  interpretRecentReply,
   upstashThroneStore,
 } from "./throne-store-upstash.js";
 import type { ThroneRecord } from "./throne-store.js";
@@ -117,6 +119,53 @@ describe("buildReadRequest — fetch the reigning record", () => {
       "GET",
       "throne:v20",
     ]);
+  });
+});
+
+describe("buildRecentRequest — fetch the recent lineage tail", () => {
+  it("POSTs an LRANGE of the version's lineage key for the last `limit` entries", () => {
+    const { url, init } = buildRecentRequest(config, "v19", 3);
+
+    expect(url).toBe(config.url);
+    expect(init.method).toBe("POST");
+    expect(init.headers).toMatchObject({
+      Authorization: `Bearer ${config.token}`,
+      "Content-Type": "application/json",
+    });
+    // `LRANGE key -limit -1` = the last `limit` entries, oldest-first within the tail.
+    expect(command(init)).toEqual(["LRANGE", "champions:v19", "-3", "-1"]);
+  });
+
+  it("scopes the read to the requested version and limit", () => {
+    expect(command(buildRecentRequest(config, "v20", 5).init)).toEqual([
+      "LRANGE",
+      "champions:v20",
+      "-5",
+      "-1",
+    ]);
+  });
+});
+
+describe("interpretRecentReply — the recent lineage, oldest-first", () => {
+  it("parses each stored record JSON into a ThroneRecord, preserving order", () => {
+    const a = record({ generation: 1 });
+    const b = record({ generation: 2, handle: "sensei" });
+
+    expect(
+      interpretRecentReply({ result: [JSON.stringify(a), JSON.stringify(b)] }),
+    ).toEqual([a, b]);
+  });
+
+  it("returns an empty array for an empty lineage (result [])", () => {
+    expect(interpretRecentReply({ result: [] })).toEqual([]);
+  });
+
+  it("throws on an Upstash error rather than reporting an empty lineage", () => {
+    // Critical: a transient store error must NOT read as "no champions yet" — that would
+    // misreport an outage as an empty Hall of Kings. Surface it; never return [].
+    expect(() => interpretRecentReply({ error: "WRONGTYPE" })).toThrow(
+      /recent read failed/i,
+    );
   });
 });
 
@@ -246,6 +295,29 @@ describe("upstashThroneStore — the adapter over Upstash REST", () => {
 
     await expect(
       upstashThroneStore(config, fetchImpl).read("v19"),
+    ).rejects.toThrow();
+  });
+
+  it("reads the recent lineage by LRANGE-ing the last `limit` of the version's list", async () => {
+    const a = record({ generation: 1 });
+    const b = record({ generation: 2 });
+    const c = record({ generation: 3 });
+
+    const { fetchImpl, calls } = stubFetch({
+      result: [JSON.stringify(a), JSON.stringify(b), JSON.stringify(c)],
+    });
+
+    const got = await upstashThroneStore(config, fetchImpl).recent("v19", 3);
+
+    expect(got).toEqual([a, b, c]); // oldest-first, as stored
+    expect(calls[0].command).toEqual(["LRANGE", "champions:v19", "-3", "-1"]);
+  });
+
+  it("rejects a recent read when the store errors (not an empty lineage)", async () => {
+    const { fetchImpl } = stubFetch({ error: "ECONN" });
+
+    await expect(
+      upstashThroneStore(config, fetchImpl).recent("v19", 3),
     ).rejects.toThrow();
   });
 });

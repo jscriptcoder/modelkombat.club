@@ -21,6 +21,10 @@ export type KingDeps = {
 // 200 reads only; failure/method responses are never cached.
 const CACHE_CONTROL = "public, max-age=30";
 
+// The recent succession surfaced as the Hall of Kings — the podium is gold/silver/bronze,
+// so three is all the UI needs. The bound lives at the store (a cheap tail read).
+const RECENT_LIMIT = 3;
+
 const json = (body: unknown): Response =>
   new Response(JSON.stringify(body), {
     status: 200,
@@ -45,12 +49,22 @@ export const handleKing = async (
   }
 
   try {
-    const record = await deps.store.read(deps.version);
+    // Both reads under one try: the reigning pointer AND the bounded lineage tail. If
+    // either fails the whole read fails (the 503 below) — never a partial success.
+    const [record, lineage] = await Promise.all([
+      deps.store.read(deps.version),
+      deps.store.recent(deps.version, RECENT_LIMIT),
+    ]);
 
-    // Empty throne is a first-class SUCCESS (`current: null`), distinct from the 503
-    // below — the caller renders "the throne awaits", not an error.
+    // The store returns the tail oldest-first; the succession reads newest-first (the
+    // reigning King heads the podium), so reverse after shaping each entry identity-only.
+    const recent = lineage.map(championIdentity).reverse();
+
+    // Empty throne is a first-class SUCCESS (`current: null`, `recent: []`), distinct from
+    // the 503 below — the caller renders "the throne awaits", not an error.
     return json({
       current: record === undefined ? null : championIdentity(record),
+      recent,
     });
   } catch {
     // The store threw (Upstash unreachable / error reply) — surface a 503, never a

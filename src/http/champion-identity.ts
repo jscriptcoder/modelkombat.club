@@ -12,9 +12,28 @@ export type ChampionIdentity = {
   generation: number;
 };
 
+// The C0 control range (codes 0–31) and DEL (127). These never carry display meaning but
+// can corrupt a terminal / log line or smuggle intent, so any code point in that set is a
+// control character to strip.
+const CONTROL_MAX = 0x1f;
+const DEL = 0x7f;
+
+// Drop control characters from an identity string before it leaves over HTTP. Printable
+// characters (incl. spaces and markup like `<script>`) are kept verbatim — the client
+// renders those inertly (Solid escapes them). Code-point comparison (not a control-literal
+// regex) keeps the boundaries explicit and the source free of embedded control bytes.
+const sanitize = (value: string): string =>
+  [...value]
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+
+      return code > CONTROL_MAX && code !== DEL;
+    })
+    .join("");
+
 export const championIdentity = (record: ThroneRecord): ChampionIdentity => ({
-  name: record.champion.name,
-  model: record.champion.model ?? null,
-  handle: record.handle ?? null,
+  name: sanitize(record.champion.name),
+  model: record.champion.model == null ? null : sanitize(record.champion.model),
+  handle: record.handle == null ? null : sanitize(record.handle),
   generation: record.generation,
 });

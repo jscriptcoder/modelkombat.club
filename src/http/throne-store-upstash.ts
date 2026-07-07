@@ -77,6 +77,16 @@ export const buildReadRequest = (
 ): { url: string; init: RequestInit } =>
   restRequest(config, ["GET", throneKey(version)]);
 
+// Pure: build the Upstash REST request for the recent lineage tail. `LRANGE key -limit -1`
+// returns the last `limit` entries of the append-only list, oldest-first within the tail
+// (Redis clamps when fewer exist), so the read is always bounded by `limit`.
+export const buildRecentRequest = (
+  config: UpstashConfig,
+  version: string,
+  limit: number,
+): { url: string; init: RequestInit } =>
+  restRequest(config, ["LRANGE", lineageKey(version), String(-limit), "-1"]);
+
 // The Upstash REST reply: exactly one of `result` (success) or `error` (failure).
 export type UpstashReply = { result: unknown } | { error: unknown };
 
@@ -96,6 +106,20 @@ export const interpretReadReply = (
   const parsed: unknown = JSON.parse(String(reply.result));
 
   return parsed as ThroneRecord;
+};
+
+// Interpret an `LRANGE` reply: a list of JSON record strings ⇒ the lineage tail, oldest-first
+// (each parsed back into a `ThroneRecord`); an empty list ⇒ `[]`. An error is thrown, NEVER
+// read as an empty lineage — a transient failure must not misreport an outage as "no champions".
+export const interpretRecentReply = (reply: UpstashReply): ThroneRecord[] => {
+  if ("error" in reply) {
+    throw new Error(`Upstash recent read failed: ${String(reply.error)}`);
+  }
+
+  // Trust-boundary parse of records this adapter itself wrote (round-trip of our own JSON).
+  const entries = reply.result as unknown[];
+
+  return entries.map((entry) => JSON.parse(String(entry)) as ThroneRecord);
 };
 
 // Interpret a crown `EVAL` reply: 'ok' ⇒ the crown landed (carrying the crowned record),
@@ -138,6 +162,12 @@ export const upstashThroneStore = (
     const { url, init } = buildReadRequest(config, version);
 
     return interpretReadReply(await post(fetchImpl, url, init));
+  },
+
+  recent: async (version, limit) => {
+    const { url, init } = buildRecentRequest(config, version, limit);
+
+    return interpretRecentReply(await post(fetchImpl, url, init));
   },
 
   compareAndSwap: async (version, expected, next) => {

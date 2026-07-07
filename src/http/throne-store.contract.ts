@@ -100,4 +100,50 @@ export const runThroneStoreContract = (make: ThroneStoreHarness): void => {
     expect(await store.read(versionB)).toBeUndefined();
     expect(await readLineage(versionB)).toHaveLength(0);
   });
+
+  it("reads an empty recent lineage for an untouched version", async () => {
+    const { store, versionA } = make();
+
+    expect(await store.recent(versionA, 3)).toEqual([]);
+  });
+
+  it("returns the most-recent crownings, oldest-first, bounded by the limit", async () => {
+    const { store, versionA } = make();
+
+    // Four successive crownings a→b→c→d (each CAS matches the prior generation).
+    await store.compareAndSwap(versionA, null, {
+      champion: champ("a"),
+      generation: 1,
+    });
+    await store.compareAndSwap(versionA, 1, {
+      champion: champ("b"),
+      generation: 2,
+    });
+    await store.compareAndSwap(versionA, 2, {
+      champion: champ("c"),
+      generation: 3,
+    });
+    await store.compareAndSwap(versionA, 3, {
+      champion: champ("d"),
+      generation: 4,
+    });
+
+    const recent = await store.recent(versionA, 3);
+
+    // The three most-recent, oldest-first (the /king handler reverses to newest-first);
+    // the fourth-oldest ("a") has dropped off the bounded tail.
+    expect(recent.map((e) => e.champion.name)).toEqual(["b", "c", "d"]);
+    expect(recent.map((e) => e.generation)).toEqual([2, 3, 4]);
+  });
+
+  it("keeps the recent lineage version-isolated", async () => {
+    const { store, versionA, versionB } = make();
+
+    await store.compareAndSwap(versionA, null, {
+      champion: champ("a"),
+      generation: 1,
+    });
+
+    expect(await store.recent(versionB, 3)).toEqual([]);
+  });
 };

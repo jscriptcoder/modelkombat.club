@@ -94,6 +94,7 @@ const staleReadStore = (
   seenAtRead: ThroneRecord | undefined,
 ): FightDeps["store"] => ({
   read: () => Promise.resolve(seenAtRead),
+  recent: inner.recent,
   compareAndSwap: inner.compareAndSwap,
 });
 
