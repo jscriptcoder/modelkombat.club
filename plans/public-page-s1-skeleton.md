@@ -23,18 +23,23 @@ hero + logos (Slice 4), and the fights teaser (Slice 5) are separate plans.
 
 ## Acceptance Criteria (feature-level, Slice 1)
 
-- [ ] Visiting `/` on a Vercel preview serves the built Solid SPA (not the old
+- [x] Visiting `/` on a Vercel preview serves the built Solid SPA (not the old
       `public/index.html` placeholder); `GET /spec` still returns markdown; `/validate` +
-      `/fight` still respond. _(smoke-verified, non-TDD — Testing strategy)_
+      `/fight` still respond. _(smoke-verified, non-TDD — Testing strategy)_ — **1a: verified
+      on preview `…fh8993ukb…` 2026-07-07: `/`→200 SPA (`/assets/index-*.js`), `/spec`→200
+      markdown, `/validate`+`/fight`→405 `problem+json` POST-only.**
 - [ ] The page renders a "How it works" explainer (the 4 steps) and a CTA to `GET /spec`
-      plus a `POST /fight` snippet.
+      plus a `POST /fight` snippet. _(Slice 1b)_
 - [ ] A slim sticky nav (anchors to the sections that exist in Slice 1: How it works ·
-      Spec ↗) + a footer; smooth-scroll honors `prefers-reduced-motion`. _(AC-R2, AC-A4)_
+      Spec ↗) + a footer; smooth-scroll honors `prefers-reduced-motion`. _(AC-R2, AC-A4 —
+      Slice 1c)_
 - [ ] Usable at ≤360px with no horizontal scroll; keyboard-navigable with a visible focus
-      ring; WCAG AA contrast on the dark theme. _(AC-R1, AC-A1–A2)_
-- [ ] Unknown non-API routes fall back to the SPA index; the 3 API rewrites keep
-      precedence. _(AC-R4, smoke-verified)_
-- [ ] `<title>` + `<meta name="description">` are set and descriptive. _(AC-M1)_
+      ring; WCAG AA contrast on the dark theme. _(AC-R1, AC-A1–A2 — dark theme in 1a; full
+      nav/keyboard flows in 1b/1c)_
+- [x] Unknown non-API routes fall back to the SPA index; the 3 API rewrites keep
+      precedence. _(AC-R4, smoke-verified)_ — **1a: `/nope`→200 SPA index; `/validate`+`/fight`
+      → 405 from the functions (rewrites win over the `/(.*)` catch-all).**
+- [x] `<title>` + `<meta name="description">` are set and descriptive. _(AC-M1)_ — **1a.**
 
 ## Resolved decision — Pixi deferred (2026-07-07)
 
@@ -77,7 +82,11 @@ failing test.** Before code changes in each slice, load `tdd`, `testing`,
 to Solid). Present each slice's acceptance criteria to the human and get approval before
 writing any code. Wait for explicit commit approval at the end of each slice.
 
-### Slice 1a: The `web/` app deploys at `/` and shows a minimal real page
+### Slice 1a: The `web/` app deploys at `/` and shows a minimal real page — ✅ DONE
+
+**Status**: ✅ Merged in **PR #195** (`6d79661`, 2026-07-07). Preview smoke green (see
+feature-level ACs above). The Vercel-integration risk is burned; later slices ride the
+proven `web/` build path.
 
 **Value**: Newcomer sees a real (if minimal) ModelKombat page at the root; **the whole
 Vercel-integration risk is burned** so every later slice rides a proven path.

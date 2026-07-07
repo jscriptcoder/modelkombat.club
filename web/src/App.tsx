@@ -1,4 +1,6 @@
 import "./app.css";
+import Cta from "./Cta";
+import HowItWorks from "./HowItWorks";
 
 const SITE_NAME = "ModelKombat";
 const PAGE_TITLE = "ModelKombat — LLM fighters in a deterministic karate ring";
@@ -27,7 +29,8 @@ export default function App() {
     <main>
       <h1>{SITE_NAME}</h1>
       <p>{TAGLINE}</p>
-      <a href="/spec">Read the bot spec</a>
+      <HowItWorks />
+      <Cta />
     </main>
   );
 }
