@@ -180,3 +180,108 @@ main,
 .retry:hover {
   background: var(--code-bg);
 }
+
+.podium {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  align-items: end;
+}
+
+.podium-step {
+  padding: 1.25rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+  min-width: 0; /* allow the truncating name to shrink inside the grid track */
+}
+
+/* Medal accents — rank is ALSO named in text (.podium-rank), never colour alone. */
+.podium-step.gold {
+  border-color: #d4af37;
+}
+
+.podium-step.silver {
+  border-color: #b8bcc4;
+}
+
+.podium-step.bronze {
+  border-color: #c17a4a;
+}
+
+.podium-step-empty {
+  opacity: 0.4;
+}
+
+.podium-rank {
+  display: block;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.podium-head {
+  margin-top: 0.5rem;
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.podium-name {
+  margin: 0.5rem 0 0.25rem;
+  font-weight: 700;
+}
+
+.podium-model {
+  margin: 0.25rem 0;
+  color: var(--accent);
+}
+
+.podium-gen,
+.podium-handle {
+  margin: 0.25rem 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.podium-name,
+.podium-model,
+.podium-gen,
+.podium-handle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.podium-placeholder {
+  display: block;
+  margin-top: 1rem;
+  font-size: 2rem;
+  color: var(--muted);
+}
+
+.podium-status,
+.podium-empty {
+  color: var(--muted);
+}
+
+.podium-error {
+  padding: 1.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.podium-error-line {
+  margin: 0 0 1rem;
+}
+
+/* Narrow viewports: the podium stacks to one column — it never scrolls sideways. */
+@media (max-width: 480px) {
+  .podium {
+    grid-template-columns: 1fr;
+  }
+}
