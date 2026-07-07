@@ -127,3 +127,13 @@ archived here.
 - **S2 — `POST /validate`** (the validator gate — `200 {ok:true}` or RFC 9457 `problem+json` issues; 2 slices, PRs #176–#177; parse-first, `413` oversize, no content-type gate): [platform-http-api-s2-validate.md](platform-http-api-s2-validate.md)
 - **S3 — `POST /fight`** (the stateless gauntlet gate — `cleared` verdict vs the frozen `v19` gauntlet + a compact leak-free per-member report with `endReasons` + `diagnostics.degrade`; 4 slices, PRs #178–#181; shared `src/http/` RFC 9457 envelope, advertised + rate-limited at 20 req/min via Vercel WAF): [platform-http-api-s3-fight.md](platform-http-api-s3-fight.md)
 - **S4 — the version-scoped KotH throne** (the **first stateful** platform piece — a gauntlet-clearer earns a title shot; bootstrap crown → fresh-seeded title fight → dethrone on `> 0.5` else king-retained, atomic-CAS `409 /problems/throne-moved`, incumbent identity + `X-Author-Handle`, durably persisted on Upstash Redis behind a `ThroneStore` port with an in-memory fake; 5 slices, PRs #184–#188; code-complete, live-durability pending the Upstash Marketplace provisioning): [platform-http-api-s4-throne.md](platform-http-api-s4-throne.md)
+
+## Public page — the newcomer front door (first web-UI feature)
+
+The public single-page site: a Vite + SolidJS app that Vercel builds and serves at `/`,
+replacing the static placeholder, while `/spec` · `/validate` · `/fight` keep resolving. The
+feature spans 5 slices (1 skeleton → 2 King data → 3 podium → 4 SVG hero → 5 fights teaser);
+the **overall** design/roadmap stays live in `plans/public-page-{decisions,stories}.md` and
+only completed slice plans are archived here.
+
+- **Slice 1 — the walking skeleton** (1a `web/` deploy skeleton, PR #195; 1b how-it-works explainer + spec/fight CTA, PR #196; 1c sticky nav + footer + CSS-native reduced-motion scroll, PR #197 → live at `https://modelkombat.club/`): [public-page-s1-skeleton.md](public-page-s1-skeleton.md)
