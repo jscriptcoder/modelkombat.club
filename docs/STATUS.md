@@ -850,9 +850,11 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   the port for both stores (fake in the ordinary suite; live Upstash in an env-gated smoke on throwaway UUID keys plus cleanup — live Redis is not exercised in CI). 1311 tests; mutation 100% on the changed regions each slice
   (`handle-fight.ts`, `throne-store.ts`, `throne-store-upstash.ts`, `throne-store-select.ts`). Design source:
   `plans/platform-http-api-{decisions,stories}.md`; the finished S4 plan is archived at
-  `docs/archive/platform-http-api-s4-throne.md`. **S4 is CODE-COMPLETE.** _Live-durability verification
-  (provision the Upstash Marketplace integration on Vercel so the env vars land, then run the env-gated smoke
-  against the deploy) is a dashboard action, not repo code — until then prod runs the in-memory fake fallback._
+  `docs/archive/platform-http-api-s4-throne.md`. **S4 is COMPLETE — durable persistence is LIVE** (2026-07-07):
+  Upstash was provisioned via the Vercel Marketplace + connected to the project, the env-gated smoke passed
+  against live Redis, and **PR #190** widened `selectThroneStore` to resolve the REST URL/token across the
+  Marketplace's naming schemes (canonical → prefixed `UPSTASH_REDIS_REST_KV_REST_API_*` → default
+  `KV_REST_API_*`), so production reads the injected vars instead of falling back to the in-memory fake.
   Remaining platform work: the **KotH ladder** (multi-champion / tournament bracket beyond the single throne),
   **`/replay`** + a champions-history read surface, and the **Pixi viewer**.
 
@@ -949,8 +951,9 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    no SDK; in-memory fake fallback when `UPSTASH_*` unset). TCB / `INPUT_HASH` / `BENCHMARK_VERSION` ("v19")
    untouched throughout. See the build-log entries above. Design source: `plans/platform-http-api-{decisions,
 stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-api-s{1,2,3}-*.md` +
-   `platform-http-api-s4-throne.md`. **S4 live-durability pending a dashboard action** (Upstash Marketplace
-   provisioning + post-deploy smoke). **Next platform work: the KotH ladder** (multi-champion / tournament
+   `platform-http-api-s4-throne.md`. **S4 durable persistence is LIVE** (Upstash provisioned on the Vercel
+   Marketplace; `selectThroneStore` resolves the injected prefixed env-var names — PR #190). **Next platform
+   work: the KotH ladder** (multi-champion / tournament
    bracket beyond the single throne), **`/replay`** + a champions-history read surface, and the **Pixi
    viewer** — each `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
 
