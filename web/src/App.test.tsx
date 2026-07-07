@@ -112,7 +112,23 @@ describe("App (landing page)", () => {
       .getAllByRole("link")
       .map((link) => link.getAttribute("href"));
 
-    expect(hrefs).toEqual(["#top", "#how-it-works", "#king", "/spec"]);
+    expect(hrefs).toEqual([
+      "#top",
+      "#how-it-works",
+      "#king",
+      "#champions",
+      "/spec",
+    ]);
+  });
+
+  it("renders the Hall of Kings as a labelled section for the #champions anchor", () => {
+    const { getByRole } = render(() => <App />);
+
+    // The heading renders regardless of fetch state (it sits outside the resource
+    // Switch), so this is stable without stubbing the network.
+    const region = getByRole("region", { name: "Hall of Kings" });
+
+    expect(region.id).toBe("champions");
   });
 
   it("renders a footer landmark naming the site", () => {

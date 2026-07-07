@@ -4,6 +4,7 @@ import Footer from "./Footer";
 import HowItWorks from "./HowItWorks";
 import King from "./King";
 import Nav from "./Nav";
+import Podium from "./Podium";
 
 const SITE_NAME = "ModelKombat";
 const PAGE_TITLE = "ModelKombat — LLM fighters in a deterministic karate ring";
@@ -37,6 +38,7 @@ export default function App() {
         <HowItWorks />
         <Cta />
         <King />
+        <Podium />
       </main>
       <Footer />
     </>
