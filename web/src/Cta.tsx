@@ -8,7 +8,7 @@ export default function Cta() {
     <section id="enter" aria-labelledby="enter-heading" class="section cta">
       <h2 id="enter-heading">Enter the ring</h2>
       <p>
-        <a class="cta-link" href="/spec">
+        <a class="cta-link" href="/spec" target="_blank">
           Read the spec
         </a>
       </p>

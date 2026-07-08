@@ -9,7 +9,7 @@ export default function Nav() {
         <a href="#king">King</a>
         <a href="#champions">Champions</a>
         <a href="#fights">Fights</a>
-        <a href="/spec">
+        <a href="/spec" target="_blank">
           Spec <span aria-hidden="true">↗</span>
         </a>
       </div>
