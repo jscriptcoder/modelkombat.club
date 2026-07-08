@@ -26,6 +26,7 @@ type Move = {
   readonly id: string;
   readonly gloss: string;
   readonly badge: Badge;
+  readonly descriptor: string;
 };
 
 type Family = {
@@ -43,42 +44,122 @@ const FAMILIES: readonly Family[] = [
     name: "Strikes",
     slug: "strikes",
     moves: [
-      { id: "kizami-zuki", gloss: "jab", badge: YUKO },
-      { id: "gyaku-zuki", gloss: "reverse punch", badge: YUKO },
-      { id: "uraken", gloss: "backfist", badge: YUKO },
-      { id: "shuto", gloss: "knife-hand", badge: YUKO },
+      {
+        id: "kizami-zuki",
+        gloss: "jab",
+        badge: YUKO,
+        descriptor:
+          "Fast lead-hand poke — the tempo-setter that opens the cancel chain.",
+      },
+      {
+        id: "gyaku-zuki",
+        gloss: "reverse punch",
+        badge: YUKO,
+        descriptor:
+          "The power hand and cancel hub — every combo routes through it.",
+      },
+      {
+        id: "uraken",
+        gloss: "backfist",
+        badge: YUKO,
+        descriptor:
+          "Cheapest, shortest hand — a gas-proof jodan snap and combo starter.",
+      },
+      {
+        id: "shuto",
+        gloss: "knife-hand",
+        badge: YUKO,
+        descriptor:
+          "The longest-reaching hand, out-ranging even the reverse punch.",
+      },
     ],
   },
   {
     name: "Kicks",
     slug: "kicks",
     moves: [
-      { id: "mae-geri", gloss: "front kick", badge: WAZA_ARI },
-      { id: "mawashi-geri", gloss: "roundhouse kick", badge: HEAD_BONUS },
-      { id: "yoko-geri", gloss: "side kick", badge: WAZA_ARI },
-      { id: "ushiro-geri", gloss: "back kick", badge: HEAD_BONUS },
+      {
+        id: "mae-geri",
+        gloss: "front kick",
+        badge: WAZA_ARI,
+        descriptor:
+          "The straight-line body kick — a reliable waza-ari from mid range.",
+      },
+      {
+        id: "mawashi-geri",
+        gloss: "roundhouse kick",
+        badge: HEAD_BONUS,
+        descriptor:
+          "Arcs to the body for two, or over the guard to the head for the ippon.",
+      },
+      {
+        id: "yoko-geri",
+        gloss: "side kick",
+        badge: WAZA_ARI,
+        descriptor:
+          "A beyond-neutral thrust that out-reaches even the roundhouse.",
+      },
+      {
+        id: "ushiro-geri",
+        gloss: "back kick",
+        badge: HEAD_BONUS,
+        descriptor:
+          "The longest, most committed strike — a turn-away thrust you'll see coming.",
+      },
     ],
   },
   {
     name: "Close-range",
     slug: "close-range",
     moves: [
-      { id: "empi", gloss: "elbow strike", badge: WAZA_ARI },
-      { id: "hiza-geri", gloss: "knee strike", badge: KNOCKDOWN },
+      {
+        id: "empi",
+        gloss: "elbow strike",
+        badge: WAZA_ARI,
+        descriptor:
+          "Shortest reach in the game — a point-blank two-point payoff.",
+      },
+      {
+        id: "hiza-geri",
+        gloss: "knee strike",
+        badge: KNOCKDOWN,
+        descriptor:
+          "The only standing mid-band knockdown — it sets up a three-point finish.",
+      },
     ],
   },
   {
     name: "Takedowns",
     slug: "takedowns",
     moves: [
-      { id: "throw", gloss: "throw", badge: IPPON },
-      { id: "sweep", gloss: "foot sweep", badge: KNOCKDOWN },
+      {
+        id: "throw",
+        gloss: "throw",
+        badge: IPPON,
+        descriptor:
+          "Clean takedown for the instant ippon — the anti-turtle answer.",
+      },
+      {
+        id: "sweep",
+        gloss: "foot sweep",
+        badge: KNOCKDOWN,
+        descriptor:
+          "Chops the base out; scores nothing, but the okizeme finish pays three.",
+      },
     ],
   },
   {
     name: "Aerial",
     slug: "aerial",
-    moves: [{ id: "tobi-geri", gloss: "jumping kick", badge: HEAD_BONUS }],
+    moves: [
+      {
+        id: "tobi-geri",
+        gloss: "jumping kick",
+        badge: HEAD_BONUS,
+        descriptor:
+          "Leap in from range for a head-height ippon — the only airborne strike.",
+      },
+    ],
   },
 ];
 
@@ -101,15 +182,18 @@ export default function Arsenal() {
               <For each={family.moves}>
                 {(move) => (
                   <li class="move">
-                    <code class="move-id">{move.id}</code>
-                    <span class="move-gloss">{move.gloss}</span>
-                    <span
-                      class="move-badge"
-                      role="img"
-                      aria-label={move.badge.label}
-                    >
-                      {move.badge.text}
-                    </span>
+                    <div class="move-header">
+                      <code class="move-id">{move.id}</code>
+                      <span class="move-gloss">{move.gloss}</span>
+                      <span
+                        class="move-badge"
+                        role="img"
+                        aria-label={move.badge.label}
+                      >
+                        {move.badge.text}
+                      </span>
+                    </div>
+                    <p class="move-descriptor">{move.descriptor}</p>
                   </li>
                 )}
               </For>

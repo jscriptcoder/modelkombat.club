@@ -12,6 +12,7 @@ type ExpectedMove = {
   readonly id: string;
   readonly gloss: string;
   readonly badge: ExpectedBadge;
+  readonly descriptor: string;
 };
 type ExpectedFamily = {
   readonly name: string;
@@ -39,38 +40,118 @@ const EXPECTED_FAMILIES: readonly ExpectedFamily[] = [
   {
     name: "Strikes",
     moves: [
-      { id: "kizami-zuki", gloss: "jab", badge: B1 },
-      { id: "gyaku-zuki", gloss: "reverse punch", badge: B1 },
-      { id: "uraken", gloss: "backfist", badge: B1 },
-      { id: "shuto", gloss: "knife-hand", badge: B1 },
+      {
+        id: "kizami-zuki",
+        gloss: "jab",
+        badge: B1,
+        descriptor:
+          "Fast lead-hand poke — the tempo-setter that opens the cancel chain.",
+      },
+      {
+        id: "gyaku-zuki",
+        gloss: "reverse punch",
+        badge: B1,
+        descriptor:
+          "The power hand and cancel hub — every combo routes through it.",
+      },
+      {
+        id: "uraken",
+        gloss: "backfist",
+        badge: B1,
+        descriptor:
+          "Cheapest, shortest hand — a gas-proof jodan snap and combo starter.",
+      },
+      {
+        id: "shuto",
+        gloss: "knife-hand",
+        badge: B1,
+        descriptor:
+          "The longest-reaching hand, out-ranging even the reverse punch.",
+      },
     ],
   },
   {
     name: "Kicks",
     moves: [
-      { id: "mae-geri", gloss: "front kick", badge: B2 },
-      { id: "mawashi-geri", gloss: "roundhouse kick", badge: B23 },
-      { id: "yoko-geri", gloss: "side kick", badge: B2 },
-      { id: "ushiro-geri", gloss: "back kick", badge: B23 },
+      {
+        id: "mae-geri",
+        gloss: "front kick",
+        badge: B2,
+        descriptor:
+          "The straight-line body kick — a reliable waza-ari from mid range.",
+      },
+      {
+        id: "mawashi-geri",
+        gloss: "roundhouse kick",
+        badge: B23,
+        descriptor:
+          "Arcs to the body for two, or over the guard to the head for the ippon.",
+      },
+      {
+        id: "yoko-geri",
+        gloss: "side kick",
+        badge: B2,
+        descriptor:
+          "A beyond-neutral thrust that out-reaches even the roundhouse.",
+      },
+      {
+        id: "ushiro-geri",
+        gloss: "back kick",
+        badge: B23,
+        descriptor:
+          "The longest, most committed strike — a turn-away thrust you'll see coming.",
+      },
     ],
   },
   {
     name: "Close-range",
     moves: [
-      { id: "empi", gloss: "elbow strike", badge: B2 },
-      { id: "hiza-geri", gloss: "knee strike", badge: B03 },
+      {
+        id: "empi",
+        gloss: "elbow strike",
+        badge: B2,
+        descriptor:
+          "Shortest reach in the game — a point-blank two-point payoff.",
+      },
+      {
+        id: "hiza-geri",
+        gloss: "knee strike",
+        badge: B03,
+        descriptor:
+          "The only standing mid-band knockdown — it sets up a three-point finish.",
+      },
     ],
   },
   {
     name: "Takedowns",
     moves: [
-      { id: "throw", gloss: "throw", badge: B3 },
-      { id: "sweep", gloss: "foot sweep", badge: B03 },
+      {
+        id: "throw",
+        gloss: "throw",
+        badge: B3,
+        descriptor:
+          "Clean takedown for the instant ippon — the anti-turtle answer.",
+      },
+      {
+        id: "sweep",
+        gloss: "foot sweep",
+        badge: B03,
+        descriptor:
+          "Chops the base out; scores nothing, but the okizeme finish pays three.",
+      },
     ],
   },
   {
     name: "Aerial",
-    moves: [{ id: "tobi-geri", gloss: "jumping kick", badge: B23 }],
+    moves: [
+      {
+        id: "tobi-geri",
+        gloss: "jumping kick",
+        badge: B23,
+        descriptor:
+          "Leap in from range for a head-height ippon — the only airborne strike.",
+      },
+    ],
   },
 ];
 
@@ -82,6 +163,9 @@ const idOf = (item: HTMLElement): string | null =>
 
 const glossOf = (item: HTMLElement): string | null =>
   item.querySelector(".move-gloss")?.textContent ?? null;
+
+const descriptorOf = (item: HTMLElement): string | null =>
+  item.querySelector(".move-descriptor")?.textContent ?? null;
 
 describe("Arsenal section", () => {
   it("is a labelled region anchored at #arsenal with an orienting lede", () => {
@@ -126,6 +210,20 @@ describe("Arsenal section", () => {
       expect(items.map(idOf)).toEqual(family.moves.map((move) => move.id));
       expect(items.map(glossOf)).toEqual(
         family.moves.map((move) => move.gloss),
+      );
+    }
+  });
+
+  it("gives each technique its own one-line descriptor, in order under each family", () => {
+    const { getByRole } = render(() => <Arsenal />);
+
+    for (const family of EXPECTED_FAMILIES) {
+      const familyRegion = getByRole("region", { name: family.name });
+
+      const items = within(familyRegion).getAllByRole("listitem");
+
+      expect(items.map(descriptorOf)).toEqual(
+        family.moves.map((move) => move.descriptor),
       );
     }
   });
