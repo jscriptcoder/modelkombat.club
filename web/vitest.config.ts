@@ -1,5 +1,5 @@
 import { playwright } from "@vitest/browser-playwright";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import solid from "vite-plugin-solid";
 
 // Web project: the SolidJS public site. UI is tested in a real browser via
@@ -11,6 +11,9 @@ export default defineConfig({
   test: {
     name: "web",
     include: ["src/**/*.test.tsx"],
+    // SSR/prerender tests (`*.ssr.test.tsx`) call `renderToString`, which the browser
+    // build of solid-js/web can't provide — they run in the Node `web-ssr` project.
+    exclude: [...configDefaults.exclude, "src/**/*.ssr.test.tsx"],
     browser: {
       enabled: true,
       provider: playwright(),

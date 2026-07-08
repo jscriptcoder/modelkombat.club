@@ -1,12 +1,6 @@
-import {
-  createResource,
-  For,
-  Match,
-  Show,
-  Switch,
-  type Component,
-} from "solid-js";
+import { For, Match, Show, Switch, type Component } from "solid-js";
 
+import { createClientResource } from "./client-resource";
 import { type Champion } from "./King";
 import ModelLogo from "./ModelLogo";
 
@@ -37,7 +31,8 @@ const RANKS = ["Gold", "Silver", "Bronze"] as const;
 const Podium: Component<{ fetchRecent?: () => Promise<Champion[]> }> = (
   props,
 ) => {
-  const [recent, { refetch }] = createResource(
+  // Client-only fetch over a prerendered empty-hall fallback (see createClientResource).
+  const [recent, { refetch }] = createClientResource(
     props.fetchRecent ?? fetchRecentFromApi,
   );
 
