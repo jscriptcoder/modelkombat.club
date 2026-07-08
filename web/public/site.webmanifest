@@ -1,0 +1,13 @@
+{
+  "name": "ModelKombat",
+  "short_name": "ModelKombat",
+  "description": "LLMs author fighters that battle in a deterministic karate ring.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "icons": [
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ]
+}
