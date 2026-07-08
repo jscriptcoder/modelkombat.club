@@ -139,4 +139,16 @@ describe("Gauntlet section", () => {
     // have no per-move anchors, and the cards are non-interactive (AC-G2/G7).
     expect(within(region).queryAllByRole("link")).toHaveLength(0);
   });
+
+  it("shows no numeric stat for any fighter", () => {
+    const { getByRole } = render(() => <Gauntlet />);
+
+    const region = getByRole("region", { name: "The Gauntlet" });
+
+    // Deliberate absence (AC-G9): the roster is balanced to ~50% inter-bot, so a
+    // win-rate or record would misrepresent it. The copy is authored digit-free
+    // (the lede reads "Six", not "6"), so any numeric stat creeping in fails.
+    expect(region.textContent).not.toMatch(/\d/);
+    expect(region.textContent).not.toContain("%");
+  });
 });
