@@ -504,6 +504,12 @@ main,
   line-height: 1.4;
 }
 
+/* End-of-section hand-off to the full frame table on /spec. */
+.arsenal-spec {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
 .fights p {
   color: var(--muted);
 }

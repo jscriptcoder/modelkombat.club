@@ -248,4 +248,27 @@ describe("Arsenal section", () => {
       });
     }
   });
+
+  it("ends with a single /spec hand-off link framed around the frame table", () => {
+    const { getByRole } = render(() => <Arsenal />);
+
+    const region = getByRole("region", { name: "The Arsenal" });
+
+    // Exactly one /spec link in the whole section — no per-card links.
+    const specLinks = within(region)
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("href") === "/spec");
+
+    expect(specLinks).toHaveLength(1);
+
+    // Framed around the full frame table; the decorative ↗ affordance must not
+    // leak into the accessible name (exact-name match asserts it is aria-hidden).
+    const specLink = within(region).getByRole("link", {
+      name: "Reach, frames, stamina, cancels — see the full frame table",
+    });
+
+    expect(specLink.getAttribute("href")).toBe("/spec");
+    // Opens the spec in a new tab, matching the nav + CTA spec links.
+    expect(specLink.getAttribute("target")).toBe("_blank");
+  });
 });
