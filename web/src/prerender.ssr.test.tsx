@@ -1,8 +1,8 @@
 import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
-import { renderApp } from "./entry-server";
-import { injectBody } from "./inject-body";
+import { renderApp, renderHomePage } from "./entry-server";
+import { injectBody, injectHead } from "./inject-body";
 import King from "./King";
 import Podium from "./Podium";
 
@@ -82,5 +82,41 @@ describe("injectBody", () => {
     expect(() =>
       injectBody(`<html><body><div id="app"></div></body></html>`, "<p>x</p>"),
     ).toThrow(/root/i);
+  });
+});
+
+describe("injectHead", () => {
+  it("inserts markup immediately before </head>", () => {
+    const result = injectHead(
+      `<html><head><title>t</title></head><body></body></html>`,
+      "<script>X</script>",
+    );
+
+    expect(result).toContain("<title>t</title><script>X</script></head>");
+  });
+
+  it("throws (fail-fast) when the shell has no </head>", () => {
+    expect(() =>
+      injectHead(`<html><body></body></html>`, "<script>X</script>"),
+    ).toThrow(/head/i);
+  });
+});
+
+// The full prerendered home page: body in #root PLUS Solid's hydration script in the
+// <head>. The script is not optional — without `window._$HY` the browser's `hydrate()`
+// can't establish its context, `onMount` never fires, and the client King/Podium fetches
+// never run (the page looks right but is inert). This is the regression guard for that.
+describe("renderHomePage", () => {
+  const shell = `<html><head><title>t</title></head><body><div id="root"></div><script src="/x.js"></script></body></html>`;
+
+  it("injects the server-rendered body into #root", () => {
+    const html = renderHomePage(shell);
+
+    expect(html).toContain("The Arsenal");
+    expect(html).not.toContain(`<div id="root"></div>`);
+  });
+
+  it("includes Solid's hydration script so the browser can hydrate and run effects", () => {
+    expect(renderHomePage(shell)).toContain("_$HY");
   });
 });

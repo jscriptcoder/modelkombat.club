@@ -1,6 +1,7 @@
 # Build output & generated artifacts
 node_modules/
 dist/
+web/.ssr/
 coverage/
 reports/
 .stryker-tmp/

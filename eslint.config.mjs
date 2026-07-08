@@ -11,6 +11,8 @@ export default tseslint.config(
   {
     ignores: [
       "**/dist/",
+      // Generated SSR bundle for the prerender step — not project source.
+      "web/.ssr/",
       "coverage/",
       "reports/",
       ".stryker-tmp/",

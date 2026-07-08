@@ -8,6 +8,7 @@
     { "source": "/validate", "destination": "/api/validate" },
     { "source": "/fight", "destination": "/api/fight" },
     { "source": "/king", "destination": "/api/king" },
+    { "source": "/spec-guide", "destination": "/spec-guide.html" },
     {
       "source": "/((?!api/|src/|@|node_modules/|.*\\.).*)",
       "destination": "/index.html"

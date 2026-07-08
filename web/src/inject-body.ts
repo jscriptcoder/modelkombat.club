@@ -14,3 +14,14 @@ export const injectBody = (template: string, body: string): string => {
 
   return template.replace(EMPTY_ROOT, `<div id="root">${body}</div>`);
 };
+
+// Insert markup (e.g. Solid's hydration script) immediately before `</head>`. Fail-fast
+// for the same reason as injectBody: a shell missing `</head>` means the build is broken,
+// not something to paper over.
+export const injectHead = (template: string, html: string): string => {
+  if (!template.includes("</head>")) {
+    throw new Error("prerender: no </head> found in the HTML shell");
+  }
+
+  return template.replace("</head>", `${html}</head>`);
+};
