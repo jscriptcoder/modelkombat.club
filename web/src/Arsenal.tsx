@@ -202,7 +202,7 @@ export default function Arsenal() {
         )}
       </For>
       <p class="arsenal-spec">
-        <a href="/spec" target="_blank">
+        <a href="/spec-guide#frame-table" target="_blank">
           Reach, frames, stamina, cancels — see the full frame table{" "}
           <span aria-hidden="true">↗</span>
         </a>

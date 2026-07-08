@@ -1,5 +1,5 @@
 import { fireEvent, render } from "@solidjs/testing-library";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import SpecPage from "./SpecPage";
 
@@ -156,5 +156,98 @@ describe("SpecPage", () => {
     render(() => <SpecPage fetchSpec={pending} />);
 
     expect(document.title).toBe("ModelKombat — Bot authoring spec");
+  });
+
+  it("gives every section heading its own slug id, so any section is deep-linkable", async () => {
+    const sections =
+      "## Frame table\n\nnumbers\n\n## What ModelKombat is\n\nprose\n\n## Limits (hard caps)\n\nx";
+
+    const { findByRole, container } = render(() => (
+      <SpecPage fetchSpec={resolves(sections)} />
+    ));
+
+    await findByRole("heading", { name: /hard caps/i });
+
+    // Generic slugging — NOT a frame-table special case: distinct headings each
+    // get their own derived id, so `#frame-table`, `#what-modelkombat-is`, etc. all work.
+    expect(container.querySelector("h2#frame-table")).toBeTruthy();
+    expect(container.querySelector("h2#what-modelkombat-is")).toBeTruthy();
+    // Punctuation is stripped and spaces collapse to hyphens.
+    expect(container.querySelector("h2#limits-hard-caps")).toBeTruthy();
+  });
+
+  it("disambiguates repeated headings so ids stay unique", async () => {
+    const dupes = "## Frame table\n\nfirst\n\n## Frame table\n\nsecond";
+
+    const { findAllByRole, container } = render(() => (
+      <SpecPage fetchSpec={resolves(dupes)} />
+    ));
+
+    const headings = await findAllByRole("heading", { name: "Frame table" });
+
+    expect(headings).toHaveLength(2);
+    // The first keeps the clean slug; the second is suffixed — both ids exist.
+    expect(container.querySelector("#frame-table")).toBeTruthy();
+    expect(container.querySelector("#frame-table-1")).toBeTruthy();
+  });
+
+  it("scrolls the hash-named section into view once the content has rendered", async () => {
+    const spy = vi
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+
+    const original = window.location.hash;
+
+    window.history.replaceState(null, "", "#frame-table");
+
+    try {
+      const { findByRole } = render(() => (
+        <SpecPage fetchSpec={resolves("## Frame table\n\nnumbers")} />
+      ));
+
+      await findByRole("heading", { name: /frame table/i });
+
+      // The fetched content arrives async, so the browser's native hash-scroll
+      // can't work — the page scrolls the target itself, once it exists.
+      expect(spy).toHaveBeenCalled();
+
+      const scrolledTo = spy.mock.contexts as unknown as readonly Element[];
+
+      expect(scrolledTo.some((el) => el?.id === "frame-table")).toBe(true);
+    } finally {
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + original,
+      );
+      spy.mockRestore();
+    }
+  });
+
+  it("does not scroll when the URL names no section", async () => {
+    const spy = vi
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => {});
+
+    const original = window.location.hash;
+
+    window.history.replaceState(null, "", window.location.pathname);
+
+    try {
+      const { findByRole } = render(() => (
+        <SpecPage fetchSpec={resolves("## Frame table\n\nnumbers")} />
+      ));
+
+      await findByRole("heading", { name: /frame table/i });
+
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + original,
+      );
+      spy.mockRestore();
+    }
   });
 });
