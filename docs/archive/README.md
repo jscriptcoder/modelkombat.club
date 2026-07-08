@@ -169,3 +169,28 @@ until S2 landed, then all three archived together here.
 - **Spanning design trail** (both sections): the story split
   [arsenal-gauntlet-stories.md](arsenal-gauntlet-stories.md) (AC-G1…AC-G9 for S2) and the S1
   grill-me record [arsenal-section-decisions.md](arsenal-section-decisions.md).
+
+## Public-page rendered spec page — /spec-guide (web) ✅ COMPLETE
+
+The raw `/spec` markdown (built for LLMs) gets a **human-readable rendered page** at `/spec-guide`,
+plus a generic per-section deep-link mechanism — **both shipped**.
+
+- **Rendered spec page** (PR #223 — the Nav "Spec" link opens `/spec-guide`, a Solid page that
+  fetches the live `/spec` markdown and renders it to HTML with `marked` (the only web markdown dep,
+  injected via `innerHTML` — a trusted same-origin source, so no sanitiser), with loading /
+  error+Retry / success states mirroring the King card; a **no-router** second page via a shared
+  `SPEC_PATH` constant feeding both the Nav `href` and a `main.tsx` `window.location.pathname` switch
+  (Vercel's SPA catch-all already serves it — no `vercel.json` change); a slim brand header + tab
+  title + `.spec-doc` styling with the main page's 2px section separators and self-scrolling tables;
+  `/spec` stays raw for LLMs and the `Cta`/`King` links are untouched; **web-only plus the `marked`
+  dep, no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change**; 2 ordered TDD increments, browser-mode
+  exact-assertion + a manual mutator scan since web logic is outside the Node/Stryker scope):
+  [web-spec-page.md](web-spec-page.md)
+- **Arsenal frame-table deep link** (PR #224 — the Arsenal "…see the full frame table" hand-off now
+  targets `/spec-guide#frame-table`, built **generically**: every rendered heading gets a deduped
+  URL-safe slug id via a dep-free custom `marked` renderer, and a `createEffect` scrolls the URL's
+  `#hash` section into view after the async content renders, so **any** section is `/spec-guide#slug`;
+  headings carry `scroll-margin-top` to clear the sticky header. Gotcha fixed under TDD: reading a
+  Solid `createResource` accessor inside an effect **re-throws** in the error state → gate on
+  `spec.state === "ready"`. **web-only, no new dependency**):
+  [web-arsenal-frametable-deeplink.md](web-arsenal-frametable-deeplink.md)

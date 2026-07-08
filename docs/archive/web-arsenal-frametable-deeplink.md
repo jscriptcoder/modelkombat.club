@@ -1,7 +1,7 @@
 # Plan: Arsenal → rendered-spec frame-table deep link
 
 **Branch**: `feat/web-arsenal-frametable-deeplink`
-**Status**: Complete — all ACs met, gate green; ready for PR.
+**Status**: ✅ SHIPPED — PR #224 (merged 2026-07-08). Archived.
 
 ## Goal
 

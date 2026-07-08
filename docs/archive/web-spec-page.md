@@ -1,7 +1,7 @@
 # Plan: Human-readable spec page
 
 **Branch**: `feat/web-spec-page`
-**Status**: Slice 1 shipped (commit `22e14d3`) + Slice 2 complete — ready for PR.
+**Status**: ✅ SHIPPED — PR #223 (merged 2026-07-08). Archived.
 
 ## Goal
 
