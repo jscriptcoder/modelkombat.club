@@ -21,8 +21,8 @@ describe("App (landing page)", () => {
   });
 
   it("links to the bot spec at exactly /spec", () => {
-    // The page has more than one /spec link (nav + CTA), so match by href
-    // rather than a loose accessible-name regex.
+    // The "How it works" spec link points at the raw /spec markdown endpoint;
+    // match by href rather than a loose accessible-name regex.
     const { getAllByRole } = render(() => <App />);
 
     const specHrefs = getAllByRole("link")
@@ -79,12 +79,16 @@ describe("App (landing page)", () => {
     ]);
   });
 
-  it("gives a prominent 'Read the spec' call to action to /spec", () => {
+  it("surfaces the spec URL as a copyable link to /spec", () => {
     const { getByRole } = render(() => <App />);
 
-    const cta = getByRole("link", { name: "Read the spec" });
+    // The "Read the spec" step shows the origin-based spec URL as a link to the
+    // raw /spec endpoint (with a copy affordance beside it, covered in HowItWorks).
+    const specLink = getByRole("link", {
+      name: `${window.location.origin}/spec`,
+    });
 
-    expect(cta.getAttribute("href")).toBe("/spec");
+    expect(specLink.getAttribute("href")).toBe("/spec");
   });
 
   it("shows a runnable POST /fight snippet", () => {
@@ -99,7 +103,7 @@ describe("App (landing page)", () => {
     const text = snippet.textContent ?? "";
 
     expect(text).toContain("POST");
-    expect(text).toContain("https://modelkombat.club/fight");
+    expect(text).toContain(`${window.location.origin}/fight`);
     expect(text).toContain("X-Author-Handle");
   });
 
@@ -132,21 +136,22 @@ describe("App (landing page)", () => {
     expect(region.id).toBe("arsenal");
   });
 
-  it("places the Arsenal between How it works and the CTA", () => {
+  it("places the Arsenal between How it works and the Gauntlet", () => {
     const { getByRole } = render(() => <App />);
 
     const howItWorks = getByRole("region", { name: "How it works" });
     const arsenal = getByRole("region", { name: "The Arsenal" });
-    const cta = getByRole("region", { name: "Enter the ring" });
+    const gauntlet = getByRole("region", { name: "The Gauntlet" });
 
     // Arsenal follows How it works in document order...
     expect(
       howItWorks.compareDocumentPosition(arsenal) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // ...and precedes the CTA.
+    // ...and precedes the Gauntlet.
     expect(
-      cta.compareDocumentPosition(arsenal) & Node.DOCUMENT_POSITION_PRECEDING,
+      gauntlet.compareDocumentPosition(arsenal) &
+        Node.DOCUMENT_POSITION_PRECEDING,
     ).toBeTruthy();
   });
 
@@ -158,16 +163,17 @@ describe("App (landing page)", () => {
     expect(region.id).toBe("gauntlet");
   });
 
-  it("places the Gauntlet between the CTA and the King", () => {
+  it("places the Gauntlet between the Arsenal and the King", () => {
     const { getByRole } = render(() => <App />);
 
-    const cta = getByRole("region", { name: "Enter the ring" });
+    const arsenal = getByRole("region", { name: "The Arsenal" });
     const gauntlet = getByRole("region", { name: "The Gauntlet" });
     const king = getByRole("region", { name: "Current King" });
 
-    // Gauntlet follows the CTA in document order...
+    // Gauntlet follows the Arsenal in document order...
     expect(
-      cta.compareDocumentPosition(gauntlet) & Node.DOCUMENT_POSITION_FOLLOWING,
+      arsenal.compareDocumentPosition(gauntlet) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     // ...and precedes the King.
     expect(
