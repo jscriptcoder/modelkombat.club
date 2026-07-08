@@ -28,9 +28,11 @@ sections client-side — **not** a SolidStart/SSR-server migration.
    `entry-server.tsx` exporting `renderApp(pathname)`; `vite-plugin-solid({ hydratable: true })`
    on the client build; inject the rendered string into `#root` of the built `index.html`;
    `main.tsx` switches `render()` → `hydrate()` **for the home route**.
-2. **Dynamic sections** — `isServer`-gated fetchers (no network on the server) + **sync**
-   `renderToString` (does not await resources); prerender the **empty-throne / "no champions
-   yet" fallback**. *Spike first* to confirm the server branch and the first client paint
+2. **Dynamic sections** — `createResource` gated by a `createSignal(false)` source that `onMount`
+   flips to `true` (no network on the server; the fetch defers to client-post-hydration — simpler
+   than `isServer`, confirmed by Spike 1) + **sync** `renderToString` (does not await resources);
+   prerender the **empty-throne / "no champions yet" fallback**. *Spike first* to confirm the
+   server branch and the first client paint
    agree (no hydration mismatch).
 3. **Render-time browser APIs** — guard head side-effects (`document.title`/meta in `App`,
    title in `SpecPage`) to client-only via `onMount`; a shared **canonical-origin constant**
@@ -159,30 +161,39 @@ home tree with **sync `renderToString`**, injects into built `index.html`'s `#ro
 emits a plain `spec-guide.html` **shell** (empty root, keeps CSR `SpecPage`) → `main.tsx`
 `hydrate(App)` on the home route, `render(SpecPage)` on the spec route → `vercel.json` gains the
 explicit `/spec-guide → /spec-guide.html` rewrite before the catch-all. `King`/`Podium` fetchers
-become **`isServer`-gated** so no network runs on the server; the prerendered HTML shows their
-fallback branch. `App`'s `document.title`/meta side-effects (and `SpecPage`'s title) are wrapped
+become **source-signal-gated** (a `createSignal(false)` `shouldFetch` flipped in `onMount`) so no
+network runs on the server and the prerendered HTML shows their fallback branch; the fetch fires
+only after the client hydrates. `App`'s `document.title`/meta side-effects (and `SpecPage`'s title) are wrapped
 in **`onMount`** (client-only) — moved here from Slice 1 because the SSR render is the first thing
 that makes an unguarded `document.` access throw, i.e. the failing test that demands the guard.
 **Required implementation skills**: `tdd`, `testing`, `front-end-testing`, `mutation-testing`, `refactoring`.
 
-**Spike 1 (throwaway, before RED) — hydration branch agreement**: With an `isServer`-gated
-resource, confirm what branch `king.loading` / `recent.loading` renders under sync `renderToString`
-(server) vs. the first client paint after `hydrate()`. Design the gate so **both render the same
-branch** (target: the empty-throne / "no champions yet" fallback). If they disagree, adjust the
-gate (e.g. seed the resource's initial value, or render the loading branch on both) until Chromium
-logs **no hydration-mismatch warning**. Record the resolution in the plan before writing tests.
+**Spike 1 — hydration branch agreement — ✅ RESOLVED (2026-07-08).** Confirmed via a throwaway
+`renderToString` spike. **The gate is a source signal, not `isServer`**: `createResource` takes a
+`createSignal(false)` "shouldFetch" source that `onMount` flips to `true`. `onMount` never runs on
+the server *and* runs only **after** the client's first hydrate paint, so the signal is `false` on
+both sides at initial render → both render the **empty-throne / "no champions yet" fallback** →
+they agree. Spike output: `renderToString(<GatedKing/>)` → `<p data-hk="0110">THRONE-AWAITS</p>`
+(the fallback branch — not loading, not the champion). This is **simpler than the planned
+`isServer`-gated fetcher** (no `isServer` import; the fetch naturally defers to client-post-mount).
+The final hydrate-console check stays in manual smoke (per the verification decision above).
 
-**Spike 2 (throwaway, before RED) — SSR-in-vitest feasibility**: Determine whether a node vitest
-project can compile `entry-server.tsx` via `vite-plugin-solid` in SSR mode and call `renderApp`.
-If cheap → unit-test the render function directly (fast, clean TDD). If finicky → fall back to a
-**build-and-assert integration test** (run `build:web`, read `dist/index.html`). Pick one and
-record it.
+**Spike 2 — SSR-in-vitest feasibility — ✅ RESOLVED (2026-07-08): FEASIBLE.** A node-environment
+vitest with `solid({ ssr: true, hydratable: true })` renders Solid components to **hydratable** SSR
+HTML: spike output `renderToString(<Hello/>)` → `<p data-hk="00">The Arsenal</p>` — the `data-hk`
+keys confirm the client `hydrate()` will have the markers it needs. **Decision:** unit-test the
+render logic in a node vitest project (fast, clean TDD). To also cover the injection wiring the
+find-gaps decision flagged (without a slow in-test build), keep the prerender script's core a
+**pure `injectBody(htmlTemplate, body)` function** and unit-test that too; the real build artifact
+rests on the mandatory manual smoke + fail-fast build. (The slower build-and-assert-on-`dist`
+variant remains available if belt-and-suspenders coverage is wanted.)
 
 **Acceptance criteria** *(present to human before coding)*:
-- `renderApp("/")` (or the built `dist/index.html`, per Spike 2) contains "The Arsenal", the
-  Gauntlet fighter names, the four HowItWorks step titles, and King's empty-throne copy.
-- The prerendered `#root` is **non-empty**; the prerendered King/Podium show the **fallback**
-  branch (no fabricated champion), and contain **no** `/king` fetch result.
+- `renderApp("/")` (node-unit test, resolved Spike 2) contains "The Arsenal", the Gauntlet fighter
+  names, the four HowItWorks step titles, and King's empty-throne copy.
+- `injectBody(template, body)` (node-unit) places `body` inside the template's `#root`, so the
+  prerendered `#root` is **non-empty**; the prerendered King/Podium show the **fallback** branch
+  (no fabricated champion), and contain **no** `/king` fetch result.
 - In Chromium (browser mode / manual smoke), `/` hydrates with **no** hydration-mismatch console
   warning; after mount, `King`/`Podium` fetch `/king` and render loading→resolved.
 - `/spec-guide` still serves an empty-root shell that CSR-renders `SpecPage` (no regression, no
@@ -190,14 +201,16 @@ record it.
 - `build:web` runs client build → SSR build → prerender script as one pipeline; `web/dist`
   remains the deploy output; the SSR build emits to a **non-deployed** dir **outside `web/dist`**
   (e.g. `web/.ssr/`, gitignored) so the server bundle is never shipped to the CDN.
-**RED**: Per Spike 2 — either a node test `expect(renderApp("/")).toContain("The Arsenal")` (+ the
-other markers, + a "does not contain a champion name / fetch marker" negative), or the integration
-test asserting the same on built `dist/index.html`. Mutator gaps to cover: exact content markers
+**RED**: Node-unit tests (resolved Spike 2): `expect(renderApp("/")).toContain("The Arsenal")` (+
+the other markers, + a "does not contain a champion name / fetch marker" negative), and
+`injectBody` placing a body inside `#root`. Mutator gaps to cover: exact content markers
 (kills an emptied/placeholder root), the negative-fetch assertion (kills a fetcher that runs on the
 server), and a `#root`-non-empty assertion (kills a no-op injection).
-**GREEN**: Add the plugin option, `entry-server.tsx`, the SSR build step, `scripts/prerender.ts`
-(inject home; copy shell → `spec-guide.html`), the `isServer` fetcher gates, the `main.tsx`
-hydrate/render split, and the `vercel.json` rewrite — minimum to pass.
+**GREEN**: Add the client `hydratable` plugin option + a node SSR-vitest project, `entry-server.tsx`,
+the SSR build step, `scripts/prerender.ts` (pure `injectBody` + home inject; copy shell →
+`spec-guide.html`), the `createSignal(false)`/`onMount` fetch gates on King/Podium, the `onMount`
+head-side-effect guards on `App`/`SpecPage`, the `main.tsx` hydrate/render split, and the
+`vercel.json` rewrite — minimum to pass.
 **MUTATE**: Node render/integration test under Stryker where applicable; browser hydration behavior
 via **manual mutator scan** (exact markers; confirm a server-side fetch or empty root would fail).
 **KILL MUTANTS**: Strengthen the fallback-branch and no-server-fetch assertions as needed.
