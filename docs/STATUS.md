@@ -879,6 +879,24 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   exact-assertion browser-mode tests + a mandatory manual mutator scan**; each slice preview-smoked on Vercel before
   merge. Design source `plans/public-page-{decisions,stories}.md` (archived at feature close-out); slice plans +
   spanning docs under `docs/archive/public-page-*` (see the archive [`README.md`](archive/README.md)).
+- DONE (**Arsenal section — the technique showcase (public-page content feature, S1 of 2), PR #218**):
+  the first slice of a two-part public-page **content** feature (S2 — the Gauntlet fighter bios — is the
+  parked next slice). A new static **"The Arsenal"** section in `web/`, woven into the page arc **between
+  How it works and the CTA**, showing all **13 karate techniques** grouped into 5 families (Strikes ·
+  Kicks · Close-range · Takedowns · Aerial); each card carries its romaji move-id, English gloss, a
+  one-line descriptor, and a **score badge** — the numeric WKF encoding (`1`/`2`/`3`/`2·3`/`0→3`) with a
+  `role="img"` accessible label so `2·3` is announced as "scores 2 points, 3 to the head" rather than
+  voiced literally. Plus an **"Arsenal"** nav anchor after "How it works" and a **single** end-of-section
+  **`/spec`** frame-table hand-off (decorative `↗` aria-hidden; no per-card links). **Presentation-only** —
+  the move roster is a hand-curated `readonly` array (kept in sync by hand with `docs/move-roster.md` +
+  `CANONICAL_RULES`, **no `src/engine` import** — the web layer stays decoupled from the TCB); **no
+  `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB change**. Built in **5 ordered TDD increments**
+  (skeleton+wiring → score badges → descriptors → responsive card styling → `/spec` link), one commit
+  each; web-presentation logic is outside the Node/Stryker scope ⇒ covered by **exhaustive exact-assertion
+  browser-mode tests + a manual mutator scan**, preview-smoked via `agent-browser` (card layout, the
+  Arsenal→CTA order, aria-hidden `↗`, no horizontal overflow at 360px). Design trail:
+  `plans/arsenal-gauntlet-stories.md` + `plans/arsenal-section-decisions.md` stay **live in `plans/`** (they
+  span the unbuilt S2 Gauntlet); the S1 plan is archived at `docs/archive/arsenal-section.md`.
 
 ### §7 match structure built between C9 and Capability D
 
@@ -984,6 +1002,16 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    logo system, and an honest "coming soon" fights teaser (no fabricated fights — invariant #1). Five slices,
    PR per slice; **no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change** (serve-time reads + presentation). See
    the build-log entry above; design trail + slice plans archived under `docs/archive/public-page-*`.
+8. **Public-page content sections — Arsenal + Gauntlet — 🏗️ IN PROGRESS; S1 (The Arsenal) ✅ COMPLETE
+   (PR #218).** Two static orientation sections woven into the public page. **S1 — The Arsenal** (shipped):
+   all 13 karate techniques in 5 families with id + gloss + descriptor + score badge, an "Arsenal" nav
+   anchor, and a `/spec` frame-table hand-off (see the build-log entry above). **S2 — The Gauntlet** (the
+   NEXT slice, already fully specified): style bios of the 6 frozen gauntlet fighters
+   (`jabber/rekka/zoner/grappler/sweeper/vulture`) — a monogram-tiled card per fighter in canonical order
+   with a bio + a signature-move token + a gate-framing lede, **no stats**. The S2 spec is written
+   (AC-G1…AC-G9 in `plans/arsenal-gauntlet-stories.md`), ready to `planning` → TDD. Presentation-only, like
+   S1 (no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change expected). Archive all Arsenal + Gauntlet artifacts
+   at feature close-out (after S2).
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
