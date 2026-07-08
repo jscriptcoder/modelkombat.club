@@ -1,12 +1,13 @@
 import { For, Show } from "solid-js";
 
+import { CANONICAL_ORIGIN } from "./config";
 import CopyButton from "./CopyButton";
 
-// Build the endpoints from wherever the page is served, so they follow the site
-// across production, preview deployments, and localhost — never a baked-in host.
-const specUrl = (): string => `${window.location.origin}/spec`;
+// The endpoints use the canonical absolute host (not the serving origin) so they are
+// pasteable into an LLM from anywhere and stay stable when the page is prerendered.
+const specUrl = (): string => `${CANONICAL_ORIGIN}/spec`;
 
-const fightUrl = (): string => `${window.location.origin}/fight`;
+const fightUrl = (): string => `${CANONICAL_ORIGIN}/fight`;
 
 // A ready-to-paste prompt: the whole loop in one message so a human can drop it
 // into any capable model and let it drive. Shown verbatim so they see what they

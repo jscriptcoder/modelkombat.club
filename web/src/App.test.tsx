@@ -2,6 +2,7 @@ import { render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
 import App from "./App";
+import { CANONICAL_ORIGIN } from "./config";
 
 const isDark = (color: string): boolean => {
   const channels = color.match(/\d+/g)?.map(Number) ?? [];
@@ -82,10 +83,10 @@ describe("App (landing page)", () => {
   it("surfaces the spec URL as a copyable link to /spec", () => {
     const { getByRole } = render(() => <App />);
 
-    // The "Read the spec" step shows the origin-based spec URL as a link to the
+    // The "Read the spec" step shows the canonical absolute spec URL as a link to the
     // raw /spec endpoint (with a copy affordance beside it, covered in HowItWorks).
     const specLink = getByRole("link", {
-      name: `${window.location.origin}/spec`,
+      name: `${CANONICAL_ORIGIN}/spec`,
     });
 
     expect(specLink.getAttribute("href")).toBe("/spec");
@@ -103,7 +104,7 @@ describe("App (landing page)", () => {
     const text = snippet.textContent ?? "";
 
     expect(text).toContain("POST");
-    expect(text).toContain(`${window.location.origin}/fight`);
+    expect(text).toContain(`${CANONICAL_ORIGIN}/fight`);
     expect(text).toContain("X-Author-Handle");
   });
 

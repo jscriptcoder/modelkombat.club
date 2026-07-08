@@ -1,13 +1,14 @@
 import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
+import { CANONICAL_ORIGIN } from "./config";
 import HowItWorks from "./HowItWorks";
 
-// The URLs are built from wherever the page is served, so they follow the site
-// across production, previews, and localhost — never a baked-in host. In the
-// browser test runner the origin is localhost, so these must NOT be the prod host.
-const SPEC_URL = `${window.location.origin}/spec`;
-const FIGHT_URL = `${window.location.origin}/fight`;
+// The spec/fight URLs are the canonical absolute host so they are pasteable into an
+// LLM from anywhere and stay stable when the page is prerendered (SSG has no runtime
+// origin). They no longer follow the serving origin (localhost in this test runner).
+const SPEC_URL = `${CANONICAL_ORIGIN}/spec`;
+const FIGHT_URL = `${CANONICAL_ORIGIN}/fight`;
 
 // The <pre> whose text matches the predicate — the section holds more than one.
 const codeBlockMatching = (
@@ -62,14 +63,17 @@ describe("HowItWorks", () => {
     expect(link.getAttribute("href")).toBe("/spec");
   });
 
-  it("builds the shown spec URL from the current origin, not a baked-in host", () => {
+  it("shows the canonical spec host, not the serving origin", () => {
     const { getByRole } = render(() => <HowItWorks />);
 
     const link = getByRole("link", { name: SPEC_URL });
 
-    // Follows the current site (localhost here) — a re-hardcoded prod host regresses this.
-    expect(link.textContent).toContain(window.location.origin);
-    expect(link.textContent).not.toContain("modelkombat.club");
+    // The absolute canonical host is shown everywhere — an LLM must be able to POST to it,
+    // and SSG has no runtime origin — so the serving origin (localhost here) must NOT leak in.
+    // The literal host here is intentional: it is the one place that pins CANONICAL_ORIGIN's
+    // value, so a wrong/empty constant is caught even though the other tests import it.
+    expect(link.textContent).toContain("modelkombat.club");
+    expect(link.textContent).not.toContain(window.location.origin);
   });
 
   it("copies the absolute spec URL to the clipboard from the Read the spec step", () => {
