@@ -1,3 +1,5 @@
+import { onMount } from "solid-js";
+
 import "./app.css";
 import Arsenal from "./Arsenal";
 import Fights from "./Fights";
@@ -25,8 +27,14 @@ const setMetaDescription = (content: string): void => {
 };
 
 export default function App() {
-  document.title = PAGE_TITLE;
-  setMetaDescription(DESCRIPTION);
+  // The static `<head>` in index.html already carries the title/description for
+  // crawlers, so these client-side updates only need to run in the browser. Guarding
+  // them in `onMount` (which never runs during SSR) keeps the prerender from touching
+  // `document`, which does not exist on the server.
+  onMount(() => {
+    document.title = PAGE_TITLE;
+    setMetaDescription(DESCRIPTION);
+  });
 
   return (
     <>

@@ -1,6 +1,8 @@
 import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
+import { renderApp } from "./entry-server";
+import { injectBody } from "./inject-body";
 import King from "./King";
 import Podium from "./Podium";
 
@@ -25,5 +27,60 @@ describe("server-rendered dynamic sections", () => {
 
     expect(html).toContain("No champions have been crowned yet");
     expect(html).not.toContain("Gathering");
+  });
+});
+
+// renderApp is the build-time prerender entry: it turns the home route into the body
+// string the prerender script injects into the built HTML shell's #root, so a no-JS
+// fetch (LLMs, crawlers) sees the real marketing content. It must carry every *static*
+// section plus the dynamic sections' *empty* fallback (they fetch client-side only).
+describe("renderApp (prerender entry)", () => {
+  it("renders the home page's static section content", () => {
+    const html = renderApp();
+
+    expect(html).toContain("The Arsenal");
+    // A Gauntlet fighter name — the roster is the marketing centrepiece...
+    expect(html).toContain("jabber");
+    // ...and the four How-it-works step titles.
+    expect(html).toContain("Read the spec");
+    expect(html).toContain("Write a JSON bot");
+    expect(html).toContain("Clear the gauntlet");
+    expect(html).toContain("Challenge the King");
+  });
+
+  it("prerenders the dynamic sections as their empty fallback, not fetched data", () => {
+    const html = renderApp();
+
+    // King + Hall of Kings show their empty state — they fetch only after hydration.
+    expect(html).toContain("The throne awaits");
+    expect(html).toContain("No champions have been crowned yet");
+  });
+});
+
+// The prerender script's core is a pure string transform, unit-tested here so the
+// injection is covered without a slow in-test build (the real artifact rests on the
+// build's fail-fast + the manual smoke).
+describe("injectBody", () => {
+  const shell = (root: string): string =>
+    `<html><head><title>Keep me</title></head><body>${root}<script src="/x.js"></script></body></html>`;
+
+  it("places the rendered body inside the shell's empty #root", () => {
+    const result = injectBody(
+      shell(`<div id="root"></div>`),
+      "<main>PRE</main>",
+    );
+
+    expect(result).toContain(`<div id="root"><main>PRE</main></div>`);
+    // The rest of the shell (head, scripts) is left intact.
+    expect(result).toContain("<title>Keep me</title>");
+    expect(result).toContain(`<script src="/x.js"></script>`);
+    // #root is no longer empty — a no-op injection would fail here.
+    expect(result).not.toContain(`<div id="root"></div>`);
+  });
+
+  it("throws (fail-fast) when the shell has no empty #root to inject into", () => {
+    expect(() =>
+      injectBody(`<html><body><div id="app"></div></body></html>`, "<p>x</p>"),
+    ).toThrow(/root/i);
   });
 });
