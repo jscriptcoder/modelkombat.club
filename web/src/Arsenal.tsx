@@ -1,8 +1,31 @@
 import { For } from "solid-js";
 
+// A score badge: the numeric glyph the eye reads, plus the label a screen
+// reader announces (so "2·3" isn't voiced as "two middot three"). WKF scoring
+// is 1 yuko / 2 waza-ari / 3 ippon.
+type Badge = {
+  readonly text: string;
+  readonly label: string;
+};
+
+const YUKO: Badge = { text: "1", label: "scores 1 point" };
+const WAZA_ARI: Badge = { text: "2", label: "scores 2 points" };
+const IPPON: Badge = { text: "3", label: "scores 3 points" };
+
+const HEAD_BONUS: Badge = {
+  text: "2·3",
+  label: "scores 2 points, 3 to the head",
+};
+
+const KNOCKDOWN: Badge = {
+  text: "0→3",
+  label: "scores no points on the hit, but knocks down for a 3-point finish",
+};
+
 type Move = {
   readonly id: string;
   readonly gloss: string;
+  readonly badge: Badge;
 };
 
 type Family = {
@@ -20,42 +43,42 @@ const FAMILIES: readonly Family[] = [
     name: "Strikes",
     slug: "strikes",
     moves: [
-      { id: "kizami-zuki", gloss: "jab" },
-      { id: "gyaku-zuki", gloss: "reverse punch" },
-      { id: "uraken", gloss: "backfist" },
-      { id: "shuto", gloss: "knife-hand" },
+      { id: "kizami-zuki", gloss: "jab", badge: YUKO },
+      { id: "gyaku-zuki", gloss: "reverse punch", badge: YUKO },
+      { id: "uraken", gloss: "backfist", badge: YUKO },
+      { id: "shuto", gloss: "knife-hand", badge: YUKO },
     ],
   },
   {
     name: "Kicks",
     slug: "kicks",
     moves: [
-      { id: "mae-geri", gloss: "front kick" },
-      { id: "mawashi-geri", gloss: "roundhouse kick" },
-      { id: "yoko-geri", gloss: "side kick" },
-      { id: "ushiro-geri", gloss: "back kick" },
+      { id: "mae-geri", gloss: "front kick", badge: WAZA_ARI },
+      { id: "mawashi-geri", gloss: "roundhouse kick", badge: HEAD_BONUS },
+      { id: "yoko-geri", gloss: "side kick", badge: WAZA_ARI },
+      { id: "ushiro-geri", gloss: "back kick", badge: HEAD_BONUS },
     ],
   },
   {
     name: "Close-range",
     slug: "close-range",
     moves: [
-      { id: "empi", gloss: "elbow strike" },
-      { id: "hiza-geri", gloss: "knee strike" },
+      { id: "empi", gloss: "elbow strike", badge: WAZA_ARI },
+      { id: "hiza-geri", gloss: "knee strike", badge: KNOCKDOWN },
     ],
   },
   {
     name: "Takedowns",
     slug: "takedowns",
     moves: [
-      { id: "throw", gloss: "throw" },
-      { id: "sweep", gloss: "foot sweep" },
+      { id: "throw", gloss: "throw", badge: IPPON },
+      { id: "sweep", gloss: "foot sweep", badge: KNOCKDOWN },
     ],
   },
   {
     name: "Aerial",
     slug: "aerial",
-    moves: [{ id: "tobi-geri", gloss: "jumping kick" }],
+    moves: [{ id: "tobi-geri", gloss: "jumping kick", badge: HEAD_BONUS }],
   },
 ];
 
@@ -80,6 +103,13 @@ export default function Arsenal() {
                   <li class="move">
                     <code class="move-id">{move.id}</code>
                     <span class="move-gloss">{move.gloss}</span>
+                    <span
+                      class="move-badge"
+                      role="img"
+                      aria-label={move.badge.label}
+                    >
+                      {move.badge.text}
+                    </span>
                   </li>
                 )}
               </For>

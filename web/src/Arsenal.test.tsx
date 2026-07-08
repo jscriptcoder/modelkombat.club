@@ -7,48 +7,70 @@ import Arsenal from "./Arsenal";
 // component — so a renamed, dropped, or reordered move-id/gloss in production
 // fails this test. The web project can't run Stryker, so exact assertions plus
 // this independent duplication are the mutation guard.
-type ExpectedMove = { readonly id: string; readonly gloss: string };
+type ExpectedBadge = { readonly text: string; readonly label: string };
+type ExpectedMove = {
+  readonly id: string;
+  readonly gloss: string;
+  readonly badge: ExpectedBadge;
+};
 type ExpectedFamily = {
   readonly name: string;
   readonly moves: readonly ExpectedMove[];
+};
+
+// The five score encodings, defined independently of the component: numeric
+// glyph (what the eye reads) + accessible label (what a screen reader announces,
+// so "2·3" isn't voiced as "two middot three").
+const B1: ExpectedBadge = { text: "1", label: "scores 1 point" };
+const B2: ExpectedBadge = { text: "2", label: "scores 2 points" };
+const B3: ExpectedBadge = { text: "3", label: "scores 3 points" };
+
+const B23: ExpectedBadge = {
+  text: "2·3",
+  label: "scores 2 points, 3 to the head",
+};
+
+const B03: ExpectedBadge = {
+  text: "0→3",
+  label: "scores no points on the hit, but knocks down for a 3-point finish",
 };
 
 const EXPECTED_FAMILIES: readonly ExpectedFamily[] = [
   {
     name: "Strikes",
     moves: [
-      { id: "kizami-zuki", gloss: "jab" },
-      { id: "gyaku-zuki", gloss: "reverse punch" },
-      { id: "uraken", gloss: "backfist" },
-      { id: "shuto", gloss: "knife-hand" },
+      { id: "kizami-zuki", gloss: "jab", badge: B1 },
+      { id: "gyaku-zuki", gloss: "reverse punch", badge: B1 },
+      { id: "uraken", gloss: "backfist", badge: B1 },
+      { id: "shuto", gloss: "knife-hand", badge: B1 },
     ],
   },
   {
     name: "Kicks",
     moves: [
-      { id: "mae-geri", gloss: "front kick" },
-      { id: "mawashi-geri", gloss: "roundhouse kick" },
-      { id: "yoko-geri", gloss: "side kick" },
-      { id: "ushiro-geri", gloss: "back kick" },
+      { id: "mae-geri", gloss: "front kick", badge: B2 },
+      { id: "mawashi-geri", gloss: "roundhouse kick", badge: B23 },
+      { id: "yoko-geri", gloss: "side kick", badge: B2 },
+      { id: "ushiro-geri", gloss: "back kick", badge: B23 },
     ],
   },
   {
     name: "Close-range",
     moves: [
-      { id: "empi", gloss: "elbow strike" },
-      { id: "hiza-geri", gloss: "knee strike" },
+      { id: "empi", gloss: "elbow strike", badge: B2 },
+      { id: "hiza-geri", gloss: "knee strike", badge: B03 },
     ],
   },
   {
     name: "Takedowns",
     moves: [
-      { id: "throw", gloss: "throw" },
-      { id: "sweep", gloss: "foot sweep" },
+      { id: "throw", gloss: "throw", badge: B3 },
+      { id: "sweep", gloss: "foot sweep", badge: B03 },
     ],
   },
   {
     name: "Aerial",
-    moves: [{ id: "tobi-geri", gloss: "jumping kick" }],
+    moves: [{ id: "tobi-geri", gloss: "jumping kick", badge: B23 }],
   },
 ];
 
@@ -105,6 +127,27 @@ describe("Arsenal section", () => {
       expect(items.map(glossOf)).toEqual(
         family.moves.map((move) => move.gloss),
       );
+    }
+  });
+
+  it("marks each technique with its score badge — numeric glyph plus accessible label", () => {
+    const { getByRole } = render(() => <Arsenal />);
+
+    for (const family of EXPECTED_FAMILIES) {
+      const familyRegion = getByRole("region", { name: family.name });
+
+      const items = within(familyRegion).getAllByRole("listitem");
+
+      items.forEach((item, index) => {
+        const move = family.moves[index];
+
+        // One icon-role badge per card: the visible glyph is the numeric
+        // encoding, the accessible name is the spoken label.
+        const badge = within(item).getByRole("img");
+
+        expect(badge.textContent).toBe(move.badge.text);
+        expect(badge.getAttribute("aria-label")).toBe(move.badge.label);
+      });
     }
   });
 });
