@@ -438,6 +438,72 @@ main,
   }
 }
 
+/* The Arsenal: each technique is a card, grouped under its family. Cards flow in
+   a responsive grid — two-up on desktop, collapsing to one column on narrow
+   viewports (min(100%, …) caps the track so it never scrolls sideways at 360px). */
+.arsenal-family {
+  margin-top: 1.75rem;
+}
+
+.arsenal-family h3 {
+  margin: 0 0 0.75rem;
+}
+
+.arsenal-moves {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: 0.75rem;
+}
+
+.move {
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Identity row: romaji token, gloss, and the score badge pinned to the trailing edge. */
+.move-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.move-id {
+  padding: 0.1rem 0.4rem;
+  color: var(--accent);
+  background: var(--code-bg);
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+
+.move-gloss {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.move-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  min-width: 2.5rem;
+  padding: 0.15rem 0.55rem;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.move-descriptor {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .fights p {
   color: var(--muted);
 }
