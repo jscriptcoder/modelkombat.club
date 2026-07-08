@@ -24,6 +24,16 @@ const modelToBrand = (model: string | null | undefined): Brand => {
     return "gemini";
   }
 
+  // xAI's Grok. Current model ids all carry "grok", but the provider is stylized "xAI"
+  // and its slug is "x-ai/…", so match those too — note "x-ai" does NOT contain "xai".
+  if (
+    needle.includes("grok") ||
+    needle.includes("xai") ||
+    needle.includes("x-ai")
+  ) {
+    return "grok";
+  }
+
   return "generic";
 };
 
@@ -33,6 +43,7 @@ const LABELS: Record<Brand, string> = {
   claude: "authored by Claude",
   openai: "authored by OpenAI",
   gemini: "authored by Gemini",
+  grok: "authored by Grok",
   generic: "Mystery challenger",
 };
 
