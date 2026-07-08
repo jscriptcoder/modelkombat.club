@@ -8,7 +8,10 @@
     { "source": "/validate", "destination": "/api/validate" },
     { "source": "/fight", "destination": "/api/fight" },
     { "source": "/king", "destination": "/api/king" },
-    { "source": "/((?!api/|src/|@|node_modules/|.*\\.).*)", "destination": "/index.html" }
+    {
+      "source": "/((?!api/|src/|@|node_modules/|.*\\.).*)",
+      "destination": "/index.html"
+    }
   ],
   "functions": {
     "api/spec.ts": {
