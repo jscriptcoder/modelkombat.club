@@ -27,4 +27,14 @@ describe("Nav", () => {
 
     expect(logo.getAttribute("aria-hidden")).toBe("true");
   });
+
+  it("links Spec to the rendered spec page, opening it in a new tab", () => {
+    const { getByRole } = render(() => <Nav />);
+
+    const spec = getByRole("link", { name: /spec/i });
+
+    // The human-readable rendered page, not the raw /spec markdown endpoint.
+    expect(spec.getAttribute("href")).toBe("/spec-guide");
+    expect(spec.getAttribute("target")).toBe("_blank");
+  });
 });

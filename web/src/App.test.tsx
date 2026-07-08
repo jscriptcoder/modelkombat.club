@@ -120,7 +120,7 @@ describe("App (landing page)", () => {
       "#king",
       "#champions",
       "#fights",
-      "/spec",
+      "/spec-guide",
     ]);
   });
 

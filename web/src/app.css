@@ -668,3 +668,107 @@ main,
   font: inherit;
   cursor: not-allowed;
 }
+
+/* The rendered spec page. The fetched markdown is injected as HTML into
+   .spec-doc, so it needs document typography — headings, tables, code,
+   blockquotes, and lists — all built from the same tokens as the rest of the
+   site. The loading/error states reuse the King card's idiom. */
+.spec-status,
+.spec-error {
+  color: var(--muted);
+}
+
+.spec-error {
+  padding: 1.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.spec-error-line {
+  margin: 0 0 1rem;
+}
+
+.spec-doc {
+  line-height: 1.6;
+}
+
+.spec-doc h1 {
+  margin: 0 0 1rem;
+  font-size: 1.9rem;
+}
+
+/* Section separators match the main page's `.section` rule (a 2px hairline in
+   the shared border colour) so the two pages read as one site. */
+.spec-doc h2 {
+  margin: 2.5rem 0 1rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid var(--border);
+  font-size: 1.45rem;
+}
+
+.spec-doc h3 {
+  margin: 1.75rem 0 0.5rem;
+  font-size: 1.15rem;
+}
+
+.spec-doc p,
+.spec-doc li {
+  color: var(--muted);
+}
+
+/* Inline code gets the accent-token treatment; fenced blocks keep the plain
+   look from the global `pre` rule, so the inline styling is reset there. */
+.spec-doc code {
+  padding: 0.1rem 0.35rem;
+  color: var(--accent);
+  background: var(--code-bg);
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.spec-doc pre {
+  margin: 1rem 0;
+}
+
+.spec-doc pre code {
+  padding: 0;
+  color: var(--fg);
+  background: none;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.spec-doc blockquote {
+  margin: 1rem 0;
+  padding: 0.25rem 0 0.25rem 1rem;
+  border-left: 3px solid var(--border);
+  color: var(--muted);
+}
+
+/* Each table is its own horizontal scroll container (display:block + overflow),
+   so a wide frame table never pushes the whole page sideways at 360px. */
+.spec-doc table {
+  display: block;
+  overflow-x: auto;
+  margin: 1rem 0;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.spec-doc th,
+.spec-doc td {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.spec-doc th {
+  background: var(--code-bg);
+}
+
+.spec-doc ul,
+.spec-doc ol {
+  padding-left: 1.5rem;
+}
