@@ -31,7 +31,7 @@ sections client-side — **not** a SolidStart/SSR-server migration.
 2. **Dynamic sections** — `createResource` gated by a `createSignal(false)` source that `onMount`
    flips to `true` (no network on the server; the fetch defers to client-post-hydration — simpler
    than `isServer`, confirmed by Spike 1) + **sync** `renderToString` (does not await resources);
-   prerender the **empty-throne / "no champions yet" fallback**. *Spike first* to confirm the
+   prerender the **empty-throne / "no champions yet" fallback**. _Spike first_ to confirm the
    server branch and the first client paint
    agree (no hydration mismatch).
 3. **Render-time browser APIs** — guard head side-effects (`document.title`/meta in `App`,
@@ -77,7 +77,7 @@ then upgrades that shell from "empty + CSR `SpecPage`" to "fully static, no JS".
   browser-mode test that hydrates the prerendered string and asserts a clean console. Instead,
   "no hydration mismatch" is verified by the reviewer during PR review: build `web`, open `/` in
   Chromium, confirm **no hydration-mismatch warning/error** in the console (a mandatory item in
-  the Pre-PR Quality Gate below). Accepted risk: a hydration regression introduced by a *later*
+  the Pre-PR Quality Gate below). Accepted risk: a hydration regression introduced by a _later_
   edit is not caught in CI — only at the next manual smoke.
 - **No separate post-build CI content check.** The **Slice 2 render/integration test is the sole
   automated guard** that the page carries content. **Consequence (keep consistent):** this makes
@@ -119,16 +119,17 @@ environment — an absolute URL an LLM can actually POST to — instead of the s
 This also makes `HowItWorks` prerenderable (SSG has no runtime origin at build time).
 **Design reversal (approved 2026-07-08)**: this intentionally **reverses** the prior
 "follow the serving origin, never a baked-in host" design (`HowItWorks.tsx:5-6` comment;
-`HowItWorks.test.tsx:65-73` asserted the URL is *not* `modelkombat.club`). Reasons: SSG can't
+`HowItWorks.test.tsx:65-73` asserted the URL is _not_ `modelkombat.club`). Reasons: SSG can't
 follow a runtime origin, and the starter-prompt feature needs an absolute URL (relative would
 degrade it). The two origin-following tests are inverted to assert the canonical host.
 **Path**: a single exported `CANONICAL_ORIGIN` constant → `HowItWorks`' `specUrl`/`fightUrl`
 compose from it → shown link text, Copy-link clipboard value, starter prompt, and curl snippet
 all read the canonical host; `href`s stay the relative `/spec`. Still `render()` (CSR);
-otherwise identical. *(The `onMount` head guards and the `isServer` fetcher gate are **not**
-here — without SSR no failing test demands them; they land in Slice 2 where the SSR render forces them.)*
+otherwise identical. _(The `onMount` head guards and the `isServer` fetcher gate are **not**
+here — without SSR no failing test demands them; they land in Slice 2 where the SSR render forces them.)_
 **Required implementation skills**: `tdd`, `testing`, `front-end-testing`, `mutation-testing`, `refactoring`.
-**Acceptance criteria** *(present to human before coding)*:
+**Acceptance criteria** _(present to human before coding)_:
+
 - A single exported `CANONICAL_ORIGIN` (`https://modelkombat.club`) is the source of the
   spec/fight URLs shown **and** copied in `HowItWorks`; the `href`s stay the relative `/spec`.
 - The shown/copied URLs read `https://modelkombat.club/spec` and `…/fight` in **all**
@@ -137,17 +138,17 @@ here — without SSR no failing test demands them; they land in Slice 2 where th
   now asserts the shown URL **contains** `modelkombat.club`; `SPEC_URL`/`FIGHT_URL` (HowItWorks
   test) and `App.test.tsx:88,106` assert the canonical host.
 - No other behavior change (head guards / fetcher gate deferred to Slice 2).
-**RED**: Invert/rewrite the origin assertions to expect `` `${CANONICAL_ORIGIN}/spec` `` /
-`…/fight` (exact full-URL strings) — fails while the code still reads `window.location.origin`.
-Mutator gaps: exact full-URL assertion on the visible link, the Copy-link clipboard value, the
-starter prompt, and the curl snippet (kills a mutated host/path or a missed call-site); assert
-`CANONICAL_ORIGIN` has no trailing slash so `` `${CANONICAL_ORIGIN}/spec` `` can't gain `//`.
-**GREEN**: Add `CANONICAL_ORIGIN` (`web/src/config.ts`); point `HowItWorks`' `specUrl`/`fightUrl` at it.
-**MUTATE**: Browser project isn't under Stryker — **manual mutator scan** (exact-URL assertions at
-every call site; confirm an emptied/typo'd constant fails a test).
-**KILL MUTANTS**: Add assertions for any surviving call site (Copy-link, prompt, curl).
-**REFACTOR**: Only if the constant wants a shared home (align with `SPEC_PATH` in `routes.ts`).
-**Done when**: All criteria met, manual mutator scan clean, typecheck/lint pass, human approves.
+  **RED**: Invert/rewrite the origin assertions to expect `` `${CANONICAL_ORIGIN}/spec` `` /
+  `…/fight` (exact full-URL strings) — fails while the code still reads `window.location.origin`.
+  Mutator gaps: exact full-URL assertion on the visible link, the Copy-link clipboard value, the
+  starter prompt, and the curl snippet (kills a mutated host/path or a missed call-site); assert
+  `CANONICAL_ORIGIN` has no trailing slash so `` `${CANONICAL_ORIGIN}/spec` `` can't gain `//`.
+  **GREEN**: Add `CANONICAL_ORIGIN` (`web/src/config.ts`); point `HowItWorks`' `specUrl`/`fightUrl` at it.
+  **MUTATE**: Browser project isn't under Stryker — **manual mutator scan** (exact-URL assertions at
+  every call site; confirm an emptied/typo'd constant fails a test).
+  **KILL MUTANTS**: Add assertions for any surviving call site (Copy-link, prompt, curl).
+  **REFACTOR**: Only if the constant wants a shared home (align with `SPEC_PATH` in `routes.ts`).
+  **Done when**: All criteria met, manual mutator scan clean, typecheck/lint pass, human approves.
 
 ---
 
@@ -171,7 +172,7 @@ that makes an unguarded `document.` access throw, i.e. the failing test that dem
 **Spike 1 — hydration branch agreement — ✅ RESOLVED (2026-07-08).** Confirmed via a throwaway
 `renderToString` spike. **The gate is a source signal, not `isServer`**: `createResource` takes a
 `createSignal(false)` "shouldFetch" source that `onMount` flips to `true`. `onMount` never runs on
-the server *and* runs only **after** the client's first hydrate paint, so the signal is `false` on
+the server _and_ runs only **after** the client's first hydrate paint, so the signal is `false` on
 both sides at initial render → both render the **empty-throne / "no champions yet" fallback** →
 they agree. Spike output: `renderToString(<GatedKing/>)` → `<p data-hk="0110">THRONE-AWAITS</p>`
 (the fallback branch — not loading, not the champion). This is **simpler than the planned
@@ -188,7 +189,8 @@ find-gaps decision flagged (without a slow in-test build), keep the prerender sc
 rests on the mandatory manual smoke + fail-fast build. (The slower build-and-assert-on-`dist`
 variant remains available if belt-and-suspenders coverage is wanted.)
 
-**Acceptance criteria** *(present to human before coding)*:
+**Acceptance criteria** _(present to human before coding)_:
+
 - `renderApp("/")` (node-unit test, resolved Spike 2) contains "The Arsenal", the Gauntlet fighter
   names, the four HowItWorks step titles, and King's empty-throne copy.
 - `injectBody(template, body)` (node-unit) places `body` inside the template's `#root`, so the
@@ -201,21 +203,21 @@ variant remains available if belt-and-suspenders coverage is wanted.)
 - `build:web` runs client build → SSR build → prerender script as one pipeline; `web/dist`
   remains the deploy output; the SSR build emits to a **non-deployed** dir **outside `web/dist`**
   (e.g. `web/.ssr/`, gitignored) so the server bundle is never shipped to the CDN.
-**RED**: Node-unit tests (resolved Spike 2): `expect(renderApp("/")).toContain("The Arsenal")` (+
-the other markers, + a "does not contain a champion name / fetch marker" negative), and
-`injectBody` placing a body inside `#root`. Mutator gaps to cover: exact content markers
-(kills an emptied/placeholder root), the negative-fetch assertion (kills a fetcher that runs on the
-server), and a `#root`-non-empty assertion (kills a no-op injection).
-**GREEN**: Add the client `hydratable` plugin option + a node SSR-vitest project, `entry-server.tsx`,
-the SSR build step, `scripts/prerender.ts` (pure `injectBody` + home inject; copy shell →
-`spec-guide.html`), the `createSignal(false)`/`onMount` fetch gates on King/Podium, the `onMount`
-head-side-effect guards on `App`/`SpecPage`, the `main.tsx` hydrate/render split, and the
-`vercel.json` rewrite — minimum to pass.
-**MUTATE**: Node render/integration test under Stryker where applicable; browser hydration behavior
-via **manual mutator scan** (exact markers; confirm a server-side fetch or empty root would fail).
-**KILL MUTANTS**: Strengthen the fallback-branch and no-server-fetch assertions as needed.
-**REFACTOR**: Factor `renderApp`/`prerender.ts` for reuse by Slice 3; only if it adds value.
-**Done when**: All criteria met, both spikes resolved & recorded, no hydration warning, human approves.
+  **RED**: Node-unit tests (resolved Spike 2): `expect(renderApp("/")).toContain("The Arsenal")` (+
+  the other markers, + a "does not contain a champion name / fetch marker" negative), and
+  `injectBody` placing a body inside `#root`. Mutator gaps to cover: exact content markers
+  (kills an emptied/placeholder root), the negative-fetch assertion (kills a fetcher that runs on the
+  server), and a `#root`-non-empty assertion (kills a no-op injection).
+  **GREEN**: Add the client `hydratable` plugin option + a node SSR-vitest project, `entry-server.tsx`,
+  the SSR build step, `scripts/prerender.ts` (pure `injectBody` + home inject; copy shell →
+  `spec-guide.html`), the `createSignal(false)`/`onMount` fetch gates on King/Podium, the `onMount`
+  head-side-effect guards on `App`/`SpecPage`, the `main.tsx` hydrate/render split, and the
+  `vercel.json` rewrite — minimum to pass.
+  **MUTATE**: Node render/integration test under Stryker where applicable; browser hydration behavior
+  via **manual mutator scan** (exact markers; confirm a server-side fetch or empty root would fail).
+  **KILL MUTANTS**: Strengthen the fallback-branch and no-server-fetch assertions as needed.
+  **REFACTOR**: Factor `renderApp`/`prerender.ts` for reuse by Slice 3; only if it adds value.
+  **Done when**: All criteria met, both spikes resolved & recorded, no hydration warning, human approves.
 
 ---
 
@@ -231,7 +233,8 @@ work natively; the client bundle shrinks (`marked` + `SpecPage` machinery leave 
 `marked`/loading-error-Retry/the custom hash-scroll effect; `main.tsx` drops the spec route and
 only ever `hydrate(App)`s; `marked` moves to a build-time (dev) dependency.
 **Required implementation skills**: `tdd`, `testing`, `front-end-testing`, `mutation-testing`, `refactoring`.
-**Acceptance criteria** *(present to human before coding)*:
+**Acceptance criteria** _(present to human before coding)_:
+
 - `dist/spec-guide.html` contains the rendered spec (e.g. the top-level spec heading + a known
   section heading with a slug `id`), has a distinct `<title>` + canonical, links the shared
   stylesheet, and contains **no** `<script>` tag.
@@ -241,16 +244,16 @@ only ever `hydrate(App)`s; `marked` moves to a build-time (dev) dependency.
   effect is removed; we assert the `id`s exist, not the scroll itself).
 - `/spec-guide` is served via the explicit rewrite; `/spec` (raw markdown) is unchanged.
 - `marked` no longer ships in the client bundle.
-**RED**: A test (node render/integration per Slice 2's choice) asserting `spec-guide.html` contains
-the known spec heading **and** `expect(html).not.toContain("<script")` **and** the canonical link.
-Mutator gaps: exact heading/slug assertion (kills empty/placeholder render), the no-`<script>`
-negative (kills accidental JS inclusion), canonical-href exact match (kills a wrong/missing canonical).
-**GREEN**: Extend `prerender.ts` to emit static `spec-guide.html`; strip `SpecPage`'s runtime
-machinery; simplify `main.tsx`; move `marked` to build-time use.
-**MUTATE**: As Slice 2 (node under Stryker where applicable; manual mutator scan for presentation).
-**KILL MUTANTS**: Add assertions for any survivor (esp. the no-`<script>` and canonical checks).
-**REFACTOR**: Remove now-dead `SpecPage` states/tests; assess `prerender.ts` shape. Only if valuable.
-**Done when**: All criteria met, bundle no longer contains `marked`, human approves.
+  **RED**: A test (node render/integration per Slice 2's choice) asserting `spec-guide.html` contains
+  the known spec heading **and** `expect(html).not.toContain("<script")` **and** the canonical link.
+  Mutator gaps: exact heading/slug assertion (kills empty/placeholder render), the no-`<script>`
+  negative (kills accidental JS inclusion), canonical-href exact match (kills a wrong/missing canonical).
+  **GREEN**: Extend `prerender.ts` to emit static `spec-guide.html`; strip `SpecPage`'s runtime
+  machinery; simplify `main.tsx`; move `marked` to build-time use.
+  **MUTATE**: As Slice 2 (node under Stryker where applicable; manual mutator scan for presentation).
+  **KILL MUTANTS**: Add assertions for any survivor (esp. the no-`<script>` and canonical checks).
+  **REFACTOR**: Remove now-dead `SpecPage` states/tests; assess `prerender.ts` shape. Only if valuable.
+  **Done when**: All criteria met, bundle no longer contains `marked`, human approves.
 
 ## Pre-PR Quality Gate (each slice)
 
@@ -264,7 +267,7 @@ machinery; simplify `main.tsx`; move `marked` to build-time use.
 
 ## Accepted consequences
 
-- **Crawlers/LLMs always see the King/Podium *fallback*, never the live champion.** The
+- **Crawlers/LLMs always see the King/Podium _fallback_, never the live champion.** The
   prerendered HTML shows "👑 The throne awaits" / "No champions have been crowned yet" to any
   non-JS fetcher, even when a king reigns — a deliberate consequence of keeping those two
   sections client-side. Accepted: the King is dynamic and secondary; the marketing + spec
@@ -281,4 +284,5 @@ machinery; simplify `main.tsx`; move `marked` to build-time use.
   when the feature closes; add a `docs/archive/README.md` entry then.
 
 ---
-*Delete/archive this file when the plan is complete. If `plans/` is empty, delete the directory.*
+
+_Delete/archive this file when the plan is complete. If `plans/` is empty, delete the directory._
