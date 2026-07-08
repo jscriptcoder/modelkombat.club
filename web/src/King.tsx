@@ -45,9 +45,6 @@ const King: Component<{ fetchKing?: () => Promise<KingView> }> = (props) => {
                 <p class="king-empty-line">
                   👑 The throne awaits — be the first to claim it.
                 </p>
-                <a class="cta-link" href="/spec">
-                  Read the spec
-                </a>
               </div>
             }
           >
