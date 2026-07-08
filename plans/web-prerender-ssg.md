@@ -97,8 +97,8 @@ then upgrades that shell from "empty + CSR `SpecPage`" to "fully static, no JS".
       (e.g. "The Arsenal", the Gauntlet fighter names, the empty-throne copy). — Slice 2.
 - [x] In a JS browser, `/` **hydrates** the prerendered markup with no hydration-mismatch
       warning; `King`/`Podium` still fetch `/king` and update from fallback → live state. — Slice 2.
-- [ ] `/spec-guide` returns fully static HTML containing the rendered spec (headings/body),
-      with **no** `<script>` tag, and native `#section` deep-links scroll correctly. — **Slice 3**.
+- [x] `/spec-guide` returns fully static HTML containing the rendered spec (headings/body),
+      with **no** `<script>` tag, and native `#section` deep-links scroll correctly. — Slice 3.
 - [x] `/spec` (raw markdown API) and the `api/*` functions, `INPUT_HASH`, and the engine/TCB
       are **untouched**. — held through Slice 2.
 - [x] The Vercel deploy stays **static files** (`outputDirectory: web/dist`); no server runtime added. — Slice 2.
@@ -275,6 +275,36 @@ only ever `hydrate(App)`s; `marked` moves to a build-time (dev) dependency.
   **KILL MUTANTS**: Add assertions for any survivor (esp. the no-`<script>` and canonical checks).
   **REFACTOR**: Remove now-dead `SpecPage` states/tests; assess `prerender.ts` shape. Only if valuable.
   **Done when**: All criteria met, bundle no longer contains `marked`, human approves.
+
+**✅ Slice 3 outcome (branch `feat/web-prerender-spec-guide`, off `main`):**
+
+- Landed in 3 commits: (1) `SpecPage` → pure presentational (`spec` prop → semantic HTML;
+  dropped fetch/loading/error/Retry/hash-scroll/`document.title`) + `main.tsx` hydrate-App-only
+  (coupled to the new required prop); (2) head transforms `setTitle`/`setCanonical`/`stripScripts`
+  + `renderSpecGuidePage`; (3) `prerender.ts` renders the static spec page + remove dead `isSpecRoute`.
+- **Deviations from the plan (approved at the CONFIRM gate):**
+  - **`document.title` REMOVED from `SpecPage`, not `onMount`-guarded.** `SpecPage` is now _only_
+    build-time SSR-rendered (`main.tsx` dropped the client spec route), so an `onMount` guard would
+    never fire; the static `<head>` (via `setTitle`) is the authoritative title. Removal is the
+    TDD-minimal fix that stops the SSR render touching `document`.
+  - **Two explicit entry functions (`renderHomePage` / `renderSpecGuidePage`), not a
+    `renderApp(pathname)` dispatch** — the build-time prerender emits two known files, so there is no
+    runtime routing to switch on. This is why `isSpecRoute` (and its test) became dead and were
+    removed; `SPEC_PATH` stays (Nav link + the spec page's own canonical, reused via
+    `${CANONICAL_ORIGIN}${SPEC_PATH}`).
+  - **`stripScripts` removes ALL `<script>` incl. the head JSON-LD** (per the plan's
+    `not.toContain("<script")`) → a truly inert page; the home page keeps its JSON-LD.
+  - **`generateSpec()` runs in `scripts/prerender.ts` (unbundled via `tsx`)** so its committed-source
+    `bots/*.json` reads resolve against the real repo layout, not the bundled `.ssr/` path; the
+    markdown string is passed into the SSR bundle. **`marked` was already a devDependency**, so no
+    `package.json` change — it leaves the client bundle purely because `main.tsx` no longer imports
+    `SpecPage` (smoke-verified: `walkTokens`/`spec-doc` absent from the client JS).
+- **Smoke (built artifact):** `spec-guide.html` = 0 `<script>`, own `<title>` + canonical
+  `…/spec-guide`, reused hashed CSS, `id="frame-table"` deep-link, real content (`Strategy primer`),
+  no `## API endpoints` envelope; `index.html` home unchanged (`_$HY` + module script + content). Live
+  routing (the `vercel.json` rewrite) + the Chromium hydration pass are confirmed on the Vercel
+  **preview** deploy — the rewrite is not applied by `vite preview`, and the home hydrate path is
+  byte-identical to Slice 2's verified branch.
 
 ## Pre-PR Quality Gate (each slice)
 

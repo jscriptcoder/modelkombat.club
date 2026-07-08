@@ -1,10 +1,21 @@
 import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
-import { renderApp, renderHomePage } from "./entry-server";
-import { injectBody, injectHead } from "./inject-body";
+import {
+  renderApp,
+  renderHomePage,
+  renderSpecGuidePage,
+} from "./entry-server";
+import {
+  injectBody,
+  injectHead,
+  setCanonical,
+  setTitle,
+  stripScripts,
+} from "./inject-body";
 import King from "./King";
 import Podium from "./Podium";
+import SpecPage from "./SpecPage";
 
 // When the page is prerendered at build time there is no browser and no network. The
 // two dynamic sections must therefore server-render their *empty* fallback — the empty
@@ -54,6 +65,31 @@ describe("renderApp (prerender entry)", () => {
     // King + Hall of Kings show their empty state — they fetch only after hydration.
     expect(html).toContain("The throne awaits");
     expect(html).toContain("No champions have been crowned yet");
+  });
+});
+
+// SpecPage is prerendered at build time (no browser, no network). Its render must be
+// SSR-safe — it must not touch the server-absent `document` — and it must turn the spec
+// markdown it is GIVEN (as a prop) into semantic HTML. The old page fetched /spec and set
+// `document.title` in its body (which throws under SSR); the static <head> owns the title
+// now and the content is passed in, so the component is a pure markdown→HTML transform.
+describe("SpecPage server render (build-time prerender)", () => {
+  const SPEC_FIXTURE = "# Bot authoring spec\n\n## Frame table\n\nnumbers";
+
+  it("renders to a string without touching the server-absent `document`", () => {
+    expect(() =>
+      renderToString(() => <SpecPage spec={SPEC_FIXTURE} />),
+    ).not.toThrow();
+  });
+
+  it("turns the given markdown into semantic HTML with slug-id headings", () => {
+    const html = renderToString(() => <SpecPage spec={SPEC_FIXTURE} />);
+
+    // The '# '/'## ' headings become real, deep-linkable <h1>/<h2> with slug ids...
+    expect(html).toContain("Bot authoring spec");
+    expect(html).toContain('id="frame-table"');
+    // ...and the raw markdown source lines do not survive rendering.
+    expect(html).not.toContain("# Bot authoring spec");
   });
 });
 
@@ -118,5 +154,89 @@ describe("renderHomePage", () => {
 
   it("includes Solid's hydration script so the browser can hydrate and run effects", () => {
     expect(renderHomePage(shell)).toContain("_$HY");
+  });
+});
+
+// The spec page names itself in the tab, distinct from the marketing home title.
+describe("setTitle", () => {
+  it("replaces the document <title>", () => {
+    const result = setTitle("<head><title>Home</title></head>", "Spec");
+
+    expect(result).toContain("<title>Spec</title>");
+    expect(result).not.toContain("<title>Home</title>");
+  });
+
+  it("throws (fail-fast) when the shell has no <title>", () => {
+    expect(() => setTitle("<head></head>", "Spec")).toThrow(/title/i);
+  });
+});
+
+// The spec page's canonical URL is its own, not the home page's.
+describe("setCanonical", () => {
+  it("points the canonical link at the given href", () => {
+    const result = setCanonical(
+      '<link rel="canonical" href="https://modelkombat.club/" />',
+      "https://modelkombat.club/spec-guide",
+    );
+
+    expect(result).toContain(
+      '<link rel="canonical" href="https://modelkombat.club/spec-guide"',
+    );
+  });
+
+  it("throws (fail-fast) when the shell has no canonical link", () => {
+    expect(() => setCanonical("<head></head>", "x")).toThrow(/canonical/i);
+  });
+});
+
+// The spec page is fully static — no client JS. Every <script> goes: the module
+// bundle in the body AND the JSON-LD block in the head.
+describe("stripScripts", () => {
+  it("removes every <script> block so the page ships no JS", () => {
+    const result = stripScripts(
+      '<head><script type="application/ld+json">{"a":1}</script></head>' +
+        '<body>keep me<script type="module" src="/a.js"></script></body>',
+    );
+
+    expect(result).not.toContain("<script");
+    // Non-script content is untouched.
+    expect(result).toContain("keep me");
+  });
+
+  it("throws (fail-fast) when the shell has no <script> to strip", () => {
+    expect(() => stripScripts("<head></head>")).toThrow(/script/i);
+  });
+});
+
+// The full static spec page: the rendered spec in #root, a distinct <head> (own title
+// + canonical), and NO client JS. There is deliberately no hydration script — nothing
+// hydrates a page that ships no JS.
+describe("renderSpecGuidePage", () => {
+  const shell =
+    "<!doctype html><html><head><title>Home</title>" +
+    '<link rel="canonical" href="https://modelkombat.club/" />' +
+    '<script type="application/ld+json">{}</script></head>' +
+    '<body><div id="root"></div>' +
+    '<script type="module" src="/assets/x.js"></script></body></html>';
+
+  const spec = "# Bot authoring spec\n\n## Frame table\n\nnumbers";
+
+  it("renders the spec into #root as static HTML with slug-id headings", () => {
+    const html = renderSpecGuidePage(shell, spec);
+
+    expect(html).toContain("Bot authoring spec");
+    expect(html).toContain('id="frame-table"');
+    // #root is filled — a no-op injection would leave it empty.
+    expect(html).not.toContain('<div id="root"></div>');
+  });
+
+  it("gives the page its own <title> and canonical, and ships no client JS", () => {
+    const html = renderSpecGuidePage(shell, spec);
+
+    expect(html).toContain("<title>ModelKombat — Bot authoring spec</title>");
+    expect(html).toContain(
+      '<link rel="canonical" href="https://modelkombat.club/spec-guide"',
+    );
+    expect(html).not.toContain("<script");
   });
 });
