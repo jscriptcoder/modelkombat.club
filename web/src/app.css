@@ -82,6 +82,107 @@ a {
   color: var(--muted);
 }
 
+/* Lead paragraph that names the human's real job — driving an LLM — above the
+   step boxes. */
+.how-lead {
+  margin: 0 0 1.5rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* The "fastest way in" block: an intro line, the ready-to-paste prompt, and its
+   copy button — the actionable close to the section. */
+.how-start {
+  margin-top: 1.5rem;
+}
+
+.how-start p {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+}
+
+/* The starter prompt is prose, not column-sensitive code: wrap it (breaking long
+   URLs) so the human can read the whole thing without a horizontal scrollbar. */
+.how-start pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.how-start .copy {
+  margin-top: 0.75rem;
+}
+
+/* Copyable field: the spec URL shown as a code chip that a human can click
+   (to open) or copy (via the button beside it). Wraps on narrow viewports. */
+.copy-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.copy-field-value {
+  padding: 0.2rem 0.5rem;
+  color: var(--accent);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9rem;
+  /* A long URL breaks rather than pushing the row sideways at 360px. */
+  word-break: break-all;
+}
+
+/* The copy control: an accent-outlined button with a decorative clipboard icon,
+   plus a polite live region that announces the confirmation. */
+.copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.copy-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  color: var(--accent);
+  background: transparent;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.copy-button:hover {
+  background: var(--code-bg);
+}
+
+.copy-icon {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+}
+
+/* The confirmation fades in on copy, holds, then fades away (JS clears the text
+   after the transition). Opacity-only, so it is gentle enough to keep under
+   reduced-motion, matching the hero's approach. */
+.copy-status {
+  color: var(--muted);
+  font-size: 0.85rem;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.copy-status--shown {
+  opacity: 1;
+}
+
 pre {
   margin: 0;
   padding: 1rem;

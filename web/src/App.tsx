@@ -1,6 +1,5 @@
 import "./app.css";
 import Arsenal from "./Arsenal";
-import Cta from "./Cta";
 import Fights from "./Fights";
 import Footer from "./Footer";
 import Gauntlet from "./Gauntlet";
@@ -36,7 +35,6 @@ export default function App() {
         <Hero />
         <HowItWorks />
         <Arsenal />
-        <Cta />
         <Gauntlet />
         <King />
         <Podium />
