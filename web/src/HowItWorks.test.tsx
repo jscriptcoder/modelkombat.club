@@ -126,4 +126,17 @@ describe("HowItWorks", () => {
     expect(curl).toContain(FIGHT_URL);
     expect(curl).toContain("X-Author-Handle");
   });
+
+  it("tells the model the author handle is required and must come from the human, not invented", () => {
+    const { container } = render(() => <HowItWorks />);
+
+    // The model has no handle of its own, so the prompt must (a) mark the header
+    // required and (b) direct the model to ask the human for it — otherwise an LLM
+    // driving the loop crowns a King under a fabricated or placeholder handle.
+    const prompt = codeBlockMatching(container, /fighter/i);
+
+    expect(prompt).toContain("X-Author-Handle");
+    expect(prompt).toMatch(/required/i);
+    expect(prompt.toLowerCase()).toContain("ask me");
+  });
 });

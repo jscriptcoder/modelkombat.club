@@ -709,6 +709,30 @@ describe("generateSpec — the factual machine-truth spec", () => {
       );
     });
   });
+
+  describe("submitting (how to enter the ring)", () => {
+    const HEADING = "## Submitting";
+
+    it("documents POST /fight and the required, human-sourced author handle", () => {
+      const submit = sectionOf(generateSpec(), HEADING);
+
+      expect(submit).not.toBe("");
+      expect(submit).toContain("/fight"); // the endpoint to POST to
+      expect(submit).toContain("X-Author-Handle"); // the attribution header
+      expect(submit.toLowerCase()).toContain("required"); // it is mandatory, not optional
+      // an LLM has no handle of its own — the spec must tell it to ask the human,
+      // not fabricate one (the whole point of making the header mandatory)
+      expect(submit.toLowerCase()).toContain("ask the human");
+    });
+
+    it("places the submit section last — after the benchmark rules", () => {
+      const spec = generateSpec();
+
+      expect(spec.indexOf("## Benchmark rules")).toBeLessThan(
+        spec.indexOf(HEADING),
+      );
+    });
+  });
 });
 
 describe("docs/spec.md is the committed, drift-free generator output", () => {

@@ -98,11 +98,26 @@ const staleReadStore = (
   compareAndSwap: inner.compareAndSwap,
 });
 
+// A valid stand-in handle every crowning/title test carries by default — the handle
+// is REQUIRED on `/fight`, so the throne-mechanics tests (which don't care about the
+// handle) supply this and stay focused on crowning. Handle-policy tests override it;
+// `noHandleRequest` omits it entirely to exercise the missing-header rejection.
+const DEFAULT_HANDLE = "test-author";
+
 const fightRequest = (
   body: string,
   headers?: Record<string, string>,
 ): Request =>
-  new Request("https://mk.example/fight", { method: "POST", body, headers });
+  new Request("https://mk.example/fight", {
+    method: "POST",
+    body,
+    headers: { "X-Author-Handle": DEFAULT_HANDLE, ...headers },
+  });
+
+// A request that OMITS the author handle header entirely (bypassing the default),
+// to drive the "handle is required" rejection.
+const noHandleRequest = (body: string): Request =>
+  new Request("https://mk.example/fight", { method: "POST", body });
 
 // An idle champion carrying a `model` field (provenance the interpreter never reads).
 // Pre-seated via `enthrone`, so it bypasses the clearing gate; a real challenger beats
@@ -561,7 +576,30 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     expect(res.status).toBe(400);
   });
 
-  it("treats an empty handle header as no handle (crown still succeeds)", async () => {
+  it("rejects a request with NO X-Author-Handle header with 400 and never touches the throne", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      noHandleRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(400);
+    expect(res.headers.get("content-type")).toContain(
+      "application/problem+json",
+    );
+
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/malformed-request");
+    // the message names the header AND that it is required, so the caller knows to add it
+    expect(body.title).toContain("X-Author-Handle");
+    expect(body.title.toLowerCase()).toContain("required");
+    // the clearer WOULD have crowned — the missing handle short-circuits before that
+    expect(await store.read("vTEST")).toBeUndefined();
+  });
+
+  it("rejects an EMPTY X-Author-Handle header with 400 and never touches the throne", async () => {
     const store = inMemoryThroneStore();
 
     const res = await handleFight(
@@ -571,12 +609,14 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
       arena("vTEST", store),
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
 
-    const body = (await res.json()) as { title?: { outcome: string } };
+    const body = (await res.json()) as { type: string; title: string };
 
-    expect(body.title?.outcome).toBe("throne-empty-crowned");
-    expect((await store.read("vTEST"))?.handle).toBeNull();
+    expect(body.type).toBe("/problems/malformed-request");
+    expect(body.title).toContain("X-Author-Handle");
+    expect(body.title.toLowerCase()).toContain("required");
+    expect(await store.read("vTEST")).toBeUndefined();
   });
 
   it("omits the incumbent from an empty-throne crown (you fought no one)", async () => {

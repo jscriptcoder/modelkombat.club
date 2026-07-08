@@ -59,9 +59,10 @@ const crown = async (
     : problem(409, "/problems/throne-moved", THRONE_MOVED_DETAIL);
 };
 
-// The author handle is an opaque, unverified label: at most 64 characters and free of
-// control characters (NUL/CR/LF never arrive — the Headers transport blocks them — but
-// DEL and the other C0 controls pass through, so the guard is the handler's own).
+// The author handle is a REQUIRED, opaque, unverified label: at most 64 characters and
+// free of control characters (NUL/CR/LF never arrive — the Headers transport blocks them
+// — but DEL and the other C0 controls pass through, so the guard is the handler's own).
+// Every crowned King is attributed to a handle; there is no anonymous crown.
 const HANDLE_MAX = 64;
 
 const hasControlChar = (s: string): boolean =>
@@ -71,14 +72,20 @@ const hasControlChar = (s: string): boolean =>
     return code < 0x20 || code === 0x7f;
   });
 
-// Read the optional `X-Author-Handle` header → a sanitized handle (absent / empty ⇒
-// `null`, "no handle"), or a `400` problem when it is over-length or carries control
-// characters. Runs before the gauntlet gate, so a malformed handle is rejected cheaply
-// and independently of whether the bot would clear.
-const readHandle = (req: Request): Response | { handle: string | null } => {
+// Read the required `X-Author-Handle` header → the sanitized handle, or a `400` problem
+// when it is absent/empty, over-length, or carries control characters. Runs before the
+// gauntlet gate, so a missing or malformed handle is rejected cheaply and independently
+// of whether the bot would clear.
+const readHandle = (req: Request): Response | { handle: string } => {
   const raw = req.headers.get("x-author-handle");
 
-  if (raw == null || raw === "") return { handle: null };
+  if (raw == null || raw === "") {
+    return problem(
+      400,
+      "/problems/malformed-request",
+      "The X-Author-Handle header is required — set it to the handle your fighter is credited under.",
+    );
+  }
 
   if (raw.length > HANDLE_MAX || hasControlChar(raw)) {
     return problem(

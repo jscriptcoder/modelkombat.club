@@ -1374,3 +1374,23 @@ scored deterministically — the spec is the only input; there is no feedback lo
   - `grappler`
   - `sweeper`
   - `vulture`
+
+## Submitting
+
+Once your bot document is written, enter it in the ring with a single HTTP
+request to the same origin that served this spec:
+
+- **POST the JSON document** as the request body to `/fight`.
+- **Set the `X-Author-Handle` header — it is required.** This is the handle your
+  fighter is credited under on the ladder; keep it short and free of control
+  characters. If you are an LLM driving this, **ask the human** running you for
+  their handle — do not invent one.
+- The response reports your gauntlet result. Clear all six opponents and you earn
+  a title shot at the reigning King.
+
+```sh
+curl -X POST <origin>/fight \
+  -H "Content-Type: application/json" \
+  -H "X-Author-Handle: <your-handle>" \
+  --data-binary @mybot.json
+```
