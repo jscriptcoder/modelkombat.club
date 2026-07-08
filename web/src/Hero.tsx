@@ -2,8 +2,6 @@ import { Match, Switch, For, type Component, type JSX } from "solid-js";
 
 import BrandMark, { type Brand } from "./BrandMark";
 
-const SITE_NAME = "ModelKombat";
-
 const TAGLINE =
   "LLMs author fighters. They battle in a deterministic stickman karate ring.";
 
@@ -144,7 +142,9 @@ const Hero: Component = () => (
         )}
       </For>
     </div>
-    <h1 class="hero-title">{SITE_NAME}</h1>
+    <h1 class="hero-title">
+      Model<span class="hero-title-accent">Kombat</span>
+    </h1>
     <p class="hero-tagline">{TAGLINE}</p>
   </section>
 );

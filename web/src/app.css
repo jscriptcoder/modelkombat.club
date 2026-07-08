@@ -302,6 +302,12 @@ main,
   margin: 0 0 0.5rem;
 }
 
+/* Two-tone wordmark: 'Model' inherits the heading's white, 'Kombat' carries the
+   brand accent used throughout the site. */
+.hero-title-accent {
+  color: var(--accent);
+}
+
 .hero-tagline {
   margin: 0;
   color: var(--muted);
