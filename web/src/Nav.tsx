@@ -1,3 +1,5 @@
+import { SPEC_PATH } from "./routes";
+
 // The ModelKombat badge — the same karate high-kick stickman as the browser-tab
 // favicon, inlined so it stays CSP-safe. Purely decorative: the "ModelKombat"
 // wordmark beside it already names the link, so it is hidden from assistive tech.
@@ -51,7 +53,7 @@ export default function Nav() {
         <a href="#king">King</a>
         <a href="#champions">Champions</a>
         <a href="#fights">Fights</a>
-        <a href="/spec" target="_blank">
+        <a href={SPEC_PATH} target="_blank">
           Spec <span aria-hidden="true">↗</span>
         </a>
       </div>
