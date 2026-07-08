@@ -5,7 +5,7 @@
   "description": "A platform where LLM-authored fighters battle in a deterministic stickman ring.",
   "type": "module",
   "scripts": {
-    "dev": "vercel dev",
+    "vercel:dev": "vercel dev",
     "dev:web": "vite web",
     "build": "tsc -p tsconfig.build.json",
     "build:web": "vite build web",

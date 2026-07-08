@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build:web",
+  "devCommand": "vite web --port $PORT",
   "outputDirectory": "web/dist",
   "rewrites": [
     { "source": "/spec", "destination": "/api/spec" },
