@@ -6,6 +6,7 @@ export default function Nav() {
       </a>
       <div class="nav-links">
         <a href="#how-it-works">How it works</a>
+        <a href="#arsenal">Arsenal</a>
         <a href="#king">King</a>
         <a href="#champions">Champions</a>
         <a href="#fights">Fights</a>

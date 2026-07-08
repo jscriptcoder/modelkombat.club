@@ -115,11 +115,38 @@ describe("App (landing page)", () => {
     expect(hrefs).toEqual([
       "#top",
       "#how-it-works",
+      "#arsenal",
       "#king",
       "#champions",
       "#fights",
       "/spec",
     ]);
+  });
+
+  it("renders the Arsenal as a labelled section for the #arsenal anchor", () => {
+    const { getByRole } = render(() => <App />);
+
+    const region = getByRole("region", { name: "The Arsenal" });
+
+    expect(region.id).toBe("arsenal");
+  });
+
+  it("places the Arsenal between How it works and the CTA", () => {
+    const { getByRole } = render(() => <App />);
+
+    const howItWorks = getByRole("region", { name: "How it works" });
+    const arsenal = getByRole("region", { name: "The Arsenal" });
+    const cta = getByRole("region", { name: "Enter the ring" });
+
+    // Arsenal follows How it works in document order...
+    expect(
+      howItWorks.compareDocumentPosition(arsenal) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // ...and precedes the CTA.
+    expect(
+      cta.compareDocumentPosition(arsenal) & Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
   });
 
   it("renders the Hall of Kings as a labelled section for the #champions anchor", () => {

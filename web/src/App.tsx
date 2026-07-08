@@ -1,4 +1,5 @@
 import "./app.css";
+import Arsenal from "./Arsenal";
 import Cta from "./Cta";
 import Fights from "./Fights";
 import Footer from "./Footer";
@@ -33,6 +34,7 @@ export default function App() {
       <main id="top">
         <Hero />
         <HowItWorks />
+        <Arsenal />
         <Cta />
         <King />
         <Podium />
