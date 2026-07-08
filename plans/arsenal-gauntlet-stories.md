@@ -151,11 +151,14 @@ example; restated here as the authoritative rule).
 
 ## Next Step
 
-Load **`planning`** for **S1 (Arsenal)** — the design-of-record is complete, so it goes
-straight to PR-sized slices. Each implementation slice must run the full
+**S1 (Arsenal) ✅ SHIPPED** — merged in **PR #218** (2026-07-08); plan archived at
+`docs/archive/arsenal-section.md`.
+
+**S2 (Gauntlet) = NOW ACTIVE.** Load **`planning`** for S2 — it is fully specified
+(AC-G1…AC-G9, find-gaps 2026-07-08), so it goes straight to PR-sized slices on branch
+`feat/web-gauntlet-section`. Each implementation slice must run the full
 **RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR** cycle (load `tdd`, `testing`,
-`mutation-testing`, `refactoring` before code). **S2 (Gauntlet)** is now fully specified
-(AC-G1…AC-G9, find-gaps 2026-07-08) and equally plannable.
+`mutation-testing`, `refactoring` before code).
 
 ## Gaps closed — find-gaps session, 2026-07-08 (S2 Gauntlet)
 

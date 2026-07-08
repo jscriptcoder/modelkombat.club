@@ -116,6 +116,7 @@ describe("App (landing page)", () => {
       "#top",
       "#how-it-works",
       "#arsenal",
+      "#gauntlet",
       "#king",
       "#champions",
       "#fights",
@@ -146,6 +147,31 @@ describe("App (landing page)", () => {
     // ...and precedes the CTA.
     expect(
       cta.compareDocumentPosition(arsenal) & Node.DOCUMENT_POSITION_PRECEDING,
+    ).toBeTruthy();
+  });
+
+  it("renders the Gauntlet as a labelled section for the #gauntlet anchor", () => {
+    const { getByRole } = render(() => <App />);
+
+    const region = getByRole("region", { name: "The Gauntlet" });
+
+    expect(region.id).toBe("gauntlet");
+  });
+
+  it("places the Gauntlet between the CTA and the King", () => {
+    const { getByRole } = render(() => <App />);
+
+    const cta = getByRole("region", { name: "Enter the ring" });
+    const gauntlet = getByRole("region", { name: "The Gauntlet" });
+    const king = getByRole("region", { name: "Current King" });
+
+    // Gauntlet follows the CTA in document order...
+    expect(
+      cta.compareDocumentPosition(gauntlet) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // ...and precedes the King.
+    expect(
+      king.compareDocumentPosition(gauntlet) & Node.DOCUMENT_POSITION_PRECEDING,
     ).toBeTruthy();
   });
 
