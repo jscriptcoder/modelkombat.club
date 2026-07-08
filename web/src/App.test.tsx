@@ -193,6 +193,25 @@ describe("App (landing page)", () => {
     expect(region.id).toBe("fights");
   });
 
+  it("fences each content section off with a hairline divider in the border colour", () => {
+    const { container } = render(() => <App />);
+
+    const sections = [...container.querySelectorAll(".section")];
+
+    // Every content section is delimited from the one above it by a top rule in
+    // the shared --border colour (rgb(30, 36, 48)), so the page reads as distinct
+    // blocks instead of one continuous column.
+    expect(sections.length).toBeGreaterThan(0);
+
+    for (const section of sections) {
+      const style = getComputedStyle(section);
+
+      expect(style.borderTopStyle).toBe("solid");
+      expect(parseFloat(style.borderTopWidth)).toBeGreaterThan(0);
+      expect(style.borderTopColor).toBe("rgb(30, 36, 48)");
+    }
+  });
+
   it("renders a footer landmark naming the site", () => {
     const { getByRole } = render(() => <App />);
 
