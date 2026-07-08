@@ -25,3 +25,42 @@ export const injectHead = (template: string, html: string): string => {
 
   return template.replace("</head>", `${html}</head>`);
 };
+
+// Replace the document `<title>` — the spec page names itself in the browser tab,
+// distinct from the marketing home title the shell was built with. Fail-fast (as
+// above) if the shell carries no `<title>`.
+const TITLE = /<title>[\s\S]*?<\/title>/;
+
+export const setTitle = (template: string, title: string): string => {
+  if (!TITLE.test(template)) {
+    throw new Error("prerender: no <title> found in the HTML shell");
+  }
+
+  return template.replace(TITLE, `<title>${title}</title>`);
+};
+
+// Point the canonical `<link>` at the given URL — the spec page's canonical is its own,
+// not the home page's. Fail-fast if the shell has no canonical link.
+const CANONICAL = /<link rel="canonical" href="[^"]*"\s*\/?>/;
+
+export const setCanonical = (template: string, href: string): string => {
+  if (!CANONICAL.test(template)) {
+    throw new Error("prerender: no canonical <link> found in the HTML shell");
+  }
+
+  return template.replace(CANONICAL, `<link rel="canonical" href="${href}" />`);
+};
+
+// Remove EVERY `<script>` block so the page ships no client JS: the module bundle in the
+// body and the JSON-LD block in the head both go. Fail-fast if the shell has no script at
+// all — the built shell always carries the module script, so its absence means the build
+// changed under us and the "fully static" guarantee is no longer meaningful to assert.
+const SCRIPT = /<script\b[\s\S]*?<\/script>\s*/g;
+
+export const stripScripts = (template: string): string => {
+  if (!/<script\b/.test(template)) {
+    throw new Error("prerender: no <script> found to strip from the HTML shell");
+  }
+
+  return template.replace(SCRIPT, "");
+};
