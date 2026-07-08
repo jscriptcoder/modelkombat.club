@@ -5,6 +5,7 @@ import { renderApp, renderHomePage } from "./entry-server";
 import { injectBody, injectHead } from "./inject-body";
 import King from "./King";
 import Podium from "./Podium";
+import SpecPage from "./SpecPage";
 
 // When the page is prerendered at build time there is no browser and no network. The
 // two dynamic sections must therefore server-render their *empty* fallback — the empty
@@ -54,6 +55,31 @@ describe("renderApp (prerender entry)", () => {
     // King + Hall of Kings show their empty state — they fetch only after hydration.
     expect(html).toContain("The throne awaits");
     expect(html).toContain("No champions have been crowned yet");
+  });
+});
+
+// SpecPage is prerendered at build time (no browser, no network). Its render must be
+// SSR-safe — it must not touch the server-absent `document` — and it must turn the spec
+// markdown it is GIVEN (as a prop) into semantic HTML. The old page fetched /spec and set
+// `document.title` in its body (which throws under SSR); the static <head> owns the title
+// now and the content is passed in, so the component is a pure markdown→HTML transform.
+describe("SpecPage server render (build-time prerender)", () => {
+  const SPEC_FIXTURE = "# Bot authoring spec\n\n## Frame table\n\nnumbers";
+
+  it("renders to a string without touching the server-absent `document`", () => {
+    expect(() =>
+      renderToString(() => <SpecPage spec={SPEC_FIXTURE} />),
+    ).not.toThrow();
+  });
+
+  it("turns the given markdown into semantic HTML with slug-id headings", () => {
+    const html = renderToString(() => <SpecPage spec={SPEC_FIXTURE} />);
+
+    // The '# '/'## ' headings become real, deep-linkable <h1>/<h2> with slug ids...
+    expect(html).toContain("Bot authoring spec");
+    expect(html).toContain('id="frame-table"');
+    // ...and the raw markdown source lines do not survive rendering.
+    expect(html).not.toContain("# Bot authoring spec");
   });
 });
 
