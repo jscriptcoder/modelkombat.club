@@ -58,7 +58,9 @@ type ReportOpponent = {
 describe("POST /fight — the stateless gauntlet gate", () => {
   it("scores a valid bot against the frozen gauntlet and returns the report", async () => {
     const res = await handler.fetch(
-      fightRequest("POST", JSON.stringify(validBot())),
+      fightRequest("POST", JSON.stringify(validBot()), {
+        "X-Author-Handle": "candidate-author",
+      }),
     );
 
     expect(res.status).toBe(200);
@@ -151,6 +153,19 @@ describe("POST /fight — the stateless gauntlet gate", () => {
 
     expect(body.type).toBe("/problems/method-not-allowed");
     expect(body.title).toContain("/fight"); // the message names the rejected route
+  });
+
+  it("requires the X-Author-Handle header → 400 malformed-request when it is absent", async () => {
+    const res = await handler.fetch(
+      fightRequest("POST", JSON.stringify(validBot())),
+    );
+
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.type).toBe("/problems/malformed-request");
+    expect(body.title).toContain("X-Author-Handle");
   });
 
   it("rejects an unparseable JSON body with 400 malformed-request", async () => {

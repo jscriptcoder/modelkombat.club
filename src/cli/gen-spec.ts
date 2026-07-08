@@ -538,6 +538,36 @@ const examplesSection = (): string =>
     .join("\n")
     .trimEnd();
 
+// How to actually enter the ring — the one submission fact the authoring spec needs:
+// where to POST and the required attribution header. Static prose (cites no version /
+// hash / manifest number, so a `BENCHMARK_VERSION` bump never touches it), placed last
+// as the call-to-action once a bot is written. The handle is MANDATORY: every crowned
+// King is attributed, and an LLM — which has no handle of its own — must ask the human
+// running it rather than invent one. The exact length cap stays authoritative in the
+// endpoint's own `400`, so this prose carries no drift-prone magic number.
+const submitSection = (): string =>
+  [
+    "## Submitting",
+    "",
+    "Once your bot document is written, enter it in the ring with a single HTTP",
+    "request to the same origin that served this spec:",
+    "",
+    "- **POST the JSON document** as the request body to `/fight`.",
+    "- **Set the `X-Author-Handle` header — it is required.** This is the handle your",
+    "  fighter is credited under on the ladder; keep it short and free of control",
+    "  characters. If you are an LLM driving this, **ask the human** running you for",
+    "  their handle — do not invent one.",
+    "- The response reports your gauntlet result. Clear all six opponents and you earn",
+    "  a title shot at the reigning King.",
+    "",
+    "```sh",
+    "curl -X POST <origin>/fight \\",
+    '  -H "Content-Type: application/json" \\',
+    '  -H "X-Author-Handle: <your-handle>" \\',
+    "  --data-binary @mybot.json",
+    "```",
+  ].join("\n");
+
 /**
  * The committed `docs/spec.md` content — deterministic, drift-tested.
  * `rules` defaults to `CANONICAL_RULES` (the frozen platform table) and `match`
@@ -565,6 +595,7 @@ export function generateSpec(
       primerSection(rules, match),
       examplesSection(),
       benchmarkSection(match),
+      submitSection(),
     ].join("\n\n") + "\n"
   );
 }

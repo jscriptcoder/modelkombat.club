@@ -840,8 +840,11 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   intact). **S3 — atomic CAS** (#186): concurrent crownings serialize through one `crown()` helper on an opaque
   monotonic `generation` — a lost race returns `409 /problems/throne-moved` (RFC 9457, shared envelope); the
   throne ends holding exactly one winner. **S4 — incumbent identity + author handle** (#187): `title.incumbent` (the King's `name` / `model` / `handle` — identity only, **never** the champion doc) lets a challenger scout the King; the
-  optional `X-Author-Handle` header (≤ 64, control-chars → `400` via a code-point predicate — undici Headers
+  `X-Author-Handle` header (≤ 64, absent/empty/control-chars → `400` via a code-point predicate — undici Headers
   already block NUL/CR/LF, so the guard covers DEL + the other C0 controls) is persisted into the crown record.
+  **The handle is now REQUIRED** (tightened from optional, 2026-07-08): every crowned King is attributed — no
+  anonymous crown — and the spec's new `## Submitting` section + the home page's "How it works" copy tell an LLM
+  to source the handle from the human running it rather than invent one.
   **S5 — durable Upstash Redis** (#188): `upstashThroneStore` behind the same port over the Upstash REST API via
   raw `fetch` (**no SDK — `dependencies` stays `{}`**), one atomic Lua `EVAL` doing compare-generation + `SET`
   pointer + `RPUSH` lineage; an error reply **THROWS, never read as "empty"** (a transient failure must not let a
