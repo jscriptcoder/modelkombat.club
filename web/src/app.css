@@ -510,6 +510,116 @@ main,
   font-size: 0.9rem;
 }
 
+/* The Gauntlet: the six house fighters as a responsive card grid — the same
+   idiom as the Arsenal (two-up on desktop, one column on narrow viewports; the
+   min(100%, …) cap keeps it from scrolling sideways at 360px). */
+.gauntlet-roster {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 0.85rem;
+}
+
+/* Each card is a two-column grid: the monogram tile and the name chip share the
+   header row (a clear column gap sets them apart), then the bio and signature
+   span the full width beneath. */
+.fighter {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem 0.85rem;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Monogram tile: a rounded, tinted square that visually separates the fighter
+   from the name beside it. Decorative (aria-hidden in markup) — the letter
+   tracks --fg so it stays legible if a light theme is ever added. */
+.fighter-monogram {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  color: var(--fg);
+  background: var(--fighter-tint, var(--code-bg));
+  border: 1px solid var(--border);
+  font-weight: 700;
+  font-size: 1.15rem;
+}
+
+/* Per-archetype tints — semi-transparent over the dark background, so the
+   near-white letter keeps a strong (AA) contrast. A secondary cue only: the
+   letter, name, and bio carry the identity, never colour alone. */
+.fighter-jabber {
+  --fighter-tint: rgba(122, 162, 255, 0.22);
+}
+
+.fighter-rekka {
+  --fighter-tint: rgba(255, 128, 128, 0.22);
+}
+
+.fighter-zoner {
+  --fighter-tint: rgba(120, 206, 255, 0.22);
+}
+
+.fighter-grappler {
+  --fighter-tint: rgba(184, 148, 255, 0.22);
+}
+
+.fighter-sweeper {
+  --fighter-tint: rgba(120, 226, 168, 0.22);
+}
+
+.fighter-vulture {
+  --fighter-tint: rgba(255, 198, 120, 0.22);
+}
+
+/* Name chip: the .move-id treatment from the Arsenal, kept to content width so
+   it reads as a token rather than a stretched bar. */
+.fighter-name {
+  justify-self: start;
+  padding: 0.1rem 0.4rem;
+  color: var(--accent);
+  background: var(--code-bg);
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+
+.fighter-bio {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.fighter-signature {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.fighter-signature-label {
+  color: var(--muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fighter-signature-token {
+  padding: 0.1rem 0.4rem;
+  color: var(--accent);
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+
 .fights p {
   color: var(--muted);
 }

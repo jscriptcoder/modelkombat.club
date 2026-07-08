@@ -3,6 +3,7 @@ import Arsenal from "./Arsenal";
 import Cta from "./Cta";
 import Fights from "./Fights";
 import Footer from "./Footer";
+import Gauntlet from "./Gauntlet";
 import Hero from "./Hero";
 import HowItWorks from "./HowItWorks";
 import King from "./King";
@@ -36,6 +37,7 @@ export default function App() {
         <HowItWorks />
         <Arsenal />
         <Cta />
+        <Gauntlet />
         <King />
         <Podium />
         <Fights />
