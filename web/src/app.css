@@ -110,14 +110,26 @@ main,
 }
 
 .nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.3rem;
   font-weight: 700;
   color: var(--fg);
   text-decoration: none;
 }
 
+.nav-logo {
+  flex: none;
+  width: 1.65rem;
+  height: 1.65rem;
+}
+
 .nav-links {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
+  font-size: 1.05rem;
 }
 
 .footer {
