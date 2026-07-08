@@ -42,8 +42,21 @@ a {
   outline-offset: 2px;
 }
 
+/* Each content section is fenced off from the one above by a full-width hairline
+   in the shared border colour, with generous space either side of the rule so the
+   page reads as distinct blocks rather than one continuous column. */
 .section {
-  margin-top: 2.5rem;
+  margin-top: 3.5rem;
+  padding-top: 3.5rem;
+  border-top: 2px solid var(--border);
+}
+
+/* Deterministic divider → title → content rhythm: drop the heading's default top
+   margin (the section padding already provides the gap) and make section titles
+   read a touch larger so each block announces itself. */
+.section > h2 {
+  margin: 0 0 1.25rem;
+  font-size: 1.6rem;
 }
 
 .steps {
@@ -110,14 +123,26 @@ main,
 }
 
 .nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.3rem;
   font-weight: 700;
   color: var(--fg);
   text-decoration: none;
 }
 
+.nav-logo {
+  flex: none;
+  width: 1.65rem;
+  height: 1.65rem;
+}
+
 .nav-links {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
+  font-size: 1.05rem;
 }
 
 .footer {
@@ -288,6 +313,12 @@ main,
 
 .hero-title {
   margin: 0 0 0.5rem;
+}
+
+/* Two-tone wordmark: 'Model' inherits the heading's white, 'Kombat' carries the
+   brand accent used throughout the site. */
+.hero-title-accent {
+  color: var(--accent);
 }
 
 .hero-tagline {

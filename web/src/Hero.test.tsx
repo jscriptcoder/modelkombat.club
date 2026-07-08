@@ -1,6 +1,7 @@
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
+import "./app.css";
 import Hero from "./Hero";
 
 // The composed face-off (left → right): OpenAI throws a reverse punch toward the centre,
@@ -21,6 +22,29 @@ describe("Hero", () => {
     expect(
       getByRole("heading", { level: 1, name: "ModelKombat" }),
     ).toBeTruthy();
+  });
+
+  it("keeps the wordmark one heading but tints 'Kombat' in the brand accent", () => {
+    const { getByRole, container } = render(() => <Hero />);
+
+    // Still a single wordmark for assistive tech...
+    const heading = getByRole("heading", { level: 1, name: "ModelKombat" });
+
+    // ...while 'Kombat' is split out and painted the brand accent (#7aa2ff),
+    // visibly distinct from the inherited white of the 'Model' half.
+    const accent = container.querySelector(".hero-title-accent");
+
+    if (!(accent instanceof HTMLElement)) {
+      throw new Error("expected a .hero-title-accent element in the heading");
+    }
+
+    expect(accent.textContent).toBe("Kombat");
+    expect(heading.textContent).toBe("ModelKombat");
+
+    const accentColor = getComputedStyle(accent).color;
+
+    expect(accentColor).toBe("rgb(122, 162, 255)");
+    expect(accentColor).not.toBe(getComputedStyle(heading).color);
   });
 
   it("stages the three fighters left → right, each in its named stance facing the centre", () => {
