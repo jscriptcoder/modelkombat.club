@@ -4,6 +4,7 @@ type Fighter = {
   readonly name: string;
   readonly monogram: string;
   readonly bio: string;
+  readonly signature: string;
 };
 
 // Source of truth: GAUNTLET_NAMES (src/engine/benchmark-config.ts) + the
@@ -18,31 +19,37 @@ const FIGHTERS: readonly Fighter[] = [
     name: "jabber",
     monogram: "J",
     bio: "Death by a thousand cuts. Walks you down, reads your strike's height and blocks it, then answers with the jab.",
+    signature: "kizami-zuki",
   },
   {
     name: "rekka",
     monogram: "R",
     bio: "Flurry artist. Chains cancel into cancel, then leaps in for a jump-kick ippon.",
+    signature: "tobi-geri",
   },
   {
     name: "zoner",
     monogram: "Z",
     bio: "Fights at the fence — picks the exact-length kick for the gap and retreats the instant you close the distance.",
+    signature: "ushiro-geri",
   },
   {
     name: "grappler",
     monogram: "G",
     bio: "Owns the clinch. Crowd him and he throws you to the mat, then punishes the knockdown with a reverse punch.",
+    signature: "throw",
   },
   {
     name: "sweeper",
     monogram: "S",
     bio: "Chops your base out with a foot sweep, then cashes the knockdown for a reverse-punch finish.",
+    signature: "sweep → gyaku-zuki",
   },
   {
     name: "vulture",
     monogram: "V",
     bio: "Patient predator. Baits the whiff, punishes it with a snap backfist — and feeds on a gassed opponent.",
+    signature: "uraken",
   },
 ];
 
@@ -67,6 +74,10 @@ export default function Gauntlet() {
               </span>
               <code class="fighter-name">{fighter.name}</code>
               <p class="fighter-bio">{fighter.bio}</p>
+              <p class="fighter-signature">
+                <span class="fighter-signature-label">Signature</span>{" "}
+                <code class="fighter-signature-token">{fighter.signature}</code>
+              </p>
             </li>
           )}
         </For>
