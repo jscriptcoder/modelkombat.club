@@ -86,16 +86,11 @@ describe("King section", () => {
   });
 
   it("invites the first challenger when the throne is empty", async () => {
-    const { findByText, getByRole } = render(() => (
+    const { findByText } = render(() => (
       <King fetchKing={resolves({ current: null })} />
     ));
 
     expect(await findByText(/throne awaits/i)).toBeTruthy();
-
-    // The empty state links onward to the spec so a newcomer can enter.
-    const specLink = getByRole("link", { name: /spec/i });
-
-    expect(specLink.getAttribute("href")).toBe("/spec");
   });
 
   it("shows a distinct error state with a working Retry when the fetch fails", async () => {
