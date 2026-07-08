@@ -712,6 +712,12 @@ main,
   font-size: 1.15rem;
 }
 
+/* A deep link (or the scroll-to-hash effect) lands on a heading; give it room to
+   clear the sticky header, matching the main page's `.section` scroll-margin. */
+.spec-doc :is(h1, h2, h3) {
+  scroll-margin-top: 4rem;
+}
+
 .spec-doc p,
 .spec-doc li {
   color: var(--muted);

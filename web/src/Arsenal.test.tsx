@@ -249,15 +249,15 @@ describe("Arsenal section", () => {
     }
   });
 
-  it("ends with a single /spec hand-off link framed around the frame table", () => {
+  it("ends with a single hand-off link deep-linking the rendered frame table", () => {
     const { getByRole } = render(() => <Arsenal />);
 
     const region = getByRole("region", { name: "The Arsenal" });
 
-    // Exactly one /spec link in the whole section — no per-card links.
+    // Exactly one spec hand-off link in the whole section — no per-card links.
     const specLinks = within(region)
       .getAllByRole("link")
-      .filter((link) => link.getAttribute("href") === "/spec");
+      .filter((link) => link.getAttribute("href")?.startsWith("/spec-guide"));
 
     expect(specLinks).toHaveLength(1);
 
@@ -267,8 +267,9 @@ describe("Arsenal section", () => {
       name: "Reach, frames, stamina, cancels — see the full frame table",
     });
 
-    expect(specLink.getAttribute("href")).toBe("/spec");
-    // Opens the spec in a new tab, matching the nav + CTA spec links.
+    // Deep-links straight to the Frame table section of the rendered spec page.
+    expect(specLink.getAttribute("href")).toBe("/spec-guide#frame-table");
+    // Opens in a new tab, matching the nav + CTA spec links.
     expect(specLink.getAttribute("target")).toBe("_blank");
   });
 });
