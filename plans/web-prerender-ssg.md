@@ -93,15 +93,15 @@ then upgrades that shell from "empty + CSR `SpecPage`" to "fully static, no JS".
 
 ## Acceptance Criteria (feature-level)
 
-- [ ] A no-JS fetch of `/` returns HTML whose body contains the real section content
-      (e.g. "The Arsenal", the Gauntlet fighter names, the empty-throne copy).
-- [ ] In a JS browser, `/` **hydrates** the prerendered markup with no hydration-mismatch
-      warning; `King`/`Podium` still fetch `/king` and update from fallback → live state.
+- [x] A no-JS fetch of `/` returns HTML whose body contains the real section content
+      (e.g. "The Arsenal", the Gauntlet fighter names, the empty-throne copy). — Slice 2.
+- [x] In a JS browser, `/` **hydrates** the prerendered markup with no hydration-mismatch
+      warning; `King`/`Podium` still fetch `/king` and update from fallback → live state. — Slice 2.
 - [ ] `/spec-guide` returns fully static HTML containing the rendered spec (headings/body),
-      with **no** `<script>` tag, and native `#section` deep-links scroll correctly.
-- [ ] `/spec` (raw markdown API) and the `api/*` functions, `INPUT_HASH`, and the engine/TCB
-      are **untouched**.
-- [ ] The Vercel deploy stays **static files** (`outputDirectory: web/dist`); no server runtime added.
+      with **no** `<script>` tag, and native `#section` deep-links scroll correctly. — **Slice 3**.
+- [x] `/spec` (raw markdown API) and the `api/*` functions, `INPUT_HASH`, and the engine/TCB
+      are **untouched**. — held through Slice 2.
+- [x] The Vercel deploy stays **static files** (`outputDirectory: web/dist`); no server runtime added. — Slice 2.
 
 ## Slices
 
@@ -218,6 +218,27 @@ variant remains available if belt-and-suspenders coverage is wanted.)
   **KILL MUTANTS**: Strengthen the fallback-branch and no-server-fetch assertions as needed.
   **REFACTOR**: Factor `renderApp`/`prerender.ts` for reuse by Slice 3; only if it adds value.
   **Done when**: All criteria met, both spikes resolved & recorded, no hydration warning, human approves.
+
+**✅ Slice 2 outcome (branch `feat/web-prerender-home`, stacked on Slice 1's `feat/web-canonical-urls`):**
+
+- Landed in 3 commits: (1) client-defer King/Podium fetch (`createClientResource` source-signal gate);
+  (2) `renderApp` + `injectBody` + App `onMount` head guard; (3) build pipeline (vite `isSsrBuild`
+  branch, SSR build → `web/.ssr/`, `scripts/prerender.ts`, `main.tsx` hydrate/render split,
+  `vercel.json` `/spec-guide` rewrite, `web/.ssr` git/eslint/prettier-ignored).
+- **KEY GOTCHA (found via the manual smoke, now regression-guarded):** `renderToString` alone is
+  **not** enough to hydrate — the prerendered HTML must also carry Solid's **hydration script**
+  (`generateHydrationScript()` → `window._$HY`) in the `<head>`. Without it `hydrate()` silently
+  no-ops: the page renders but is **inert** (no `onMount`, no client fetch), and a **production**
+  build emits **no** warning (Solid strips dev warnings). Fix: `renderHomePage(shell)` injects the
+  script via `injectHead` alongside the body; a `toContain("_$HY")` unit test is the guard. Verify
+  hydration in a **dev-mode** build (`vite build --mode development`) so the mismatch warning is
+  visible; prod is useless for that check.
+- **Refinements from the plan (both scope-reducing, TDD-driven):** `renderApp()` is **home-only**
+  this slice (the `pathname`/`isSpecRoute` dispatch + `SpecPage`'s `onMount` head guard move to
+  **Slice 3**, where a test SSR-renders SpecPage and demands them — nothing in Slice 2 does).
+- `/spec-guide` isolation rests on the new rewrite + the empty-root `spec-guide.html` shell; its
+  live CSR render is confirmed on the Vercel preview deploy (the rewrite is not applied by
+  `vite preview`).
 
 ---
 
