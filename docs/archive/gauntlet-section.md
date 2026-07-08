@@ -1,7 +1,9 @@
 # Plan: Gauntlet section (S2)
 
 **Branch**: `feat/web-gauntlet-section`
-**Status**: Active — awaiting AC approval before RED.
+**Status**: ✅ SHIPPED — all 4 increments merged in **PR #220** (2026-07-08). All AC-G1…AC-G9 met.
+Archived together with the spanning `arsenal-gauntlet-stories.md` + `arsenal-section-decisions.md`
+now that S2 has landed, closing the Arsenal + Gauntlet feature.
 **Design-of-record / Story + ACs**: `plans/arsenal-gauntlet-stories.md` (S2 row + **AC-G1…AC-G9**,
 find-gaps 2026-07-08). Sibling shipped slice: `docs/archive/arsenal-section.md` (S1 — the
 pattern this reuses).
@@ -152,6 +154,6 @@ majority against each to earn your challenge at the King."_
 
 ---
 
-_Archive on feature close (per the plans-archive rule): move this file **and** the spanning
-`arsenal-gauntlet-stories.md` + `arsenal-section-decisions.md` to `docs/archive/` — S2 landing
-closes the Arsenal+Gauntlet feature, so all three archive together._
+_Archived on feature close (per the plans-archive rule): this file **and** the spanning
+`arsenal-gauntlet-stories.md` + `arsenal-section-decisions.md` were moved to `docs/archive/` when
+S2 landed (PR #220) — all three archived together, closing the Arsenal + Gauntlet feature._
