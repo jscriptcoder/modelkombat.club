@@ -1,7 +1,7 @@
 # Plan: Human-readable spec page
 
 **Branch**: `feat/web-spec-page`
-**Status**: Active — plan drafted, awaiting human approval before any code.
+**Status**: Slice 1 shipped (commit `22e14d3`) + Slice 2 complete — ready for PR.
 
 ## Goal
 
@@ -36,25 +36,25 @@ Behaviour, verified by browser-mode Vitest with **exhaustive exact-assertion** (
 note). `web/`-only change plus one dependency (`marked`); **no** `src/engine`, TCB,
 benchmark, or `/spec` endpoint change.
 
-- [ ] Visiting **`/spec-guide`** renders the spec as a **human-readable HTML document**
+- [x] Visiting **`/spec-guide`** renders the spec as a **human-readable HTML document**
       (not raw markdown) inside the site shell (shared footer, brand, dark theme).
-- [ ] The rendered doc reflects `/spec` bytes as **semantic HTML**: markdown headings →
+- [x] The rendered doc reflects `/spec` bytes as **semantic HTML**: markdown headings →
       `<h1>`/`<h2>`/`<h3>`, the GFM frame table → a real `<table>` (with a known cell), a
       ` ```jsonc ` fence → `<pre><code>`, a blockquote → `<blockquote>`, bullet/numbered
       lists → `<ul>`/`<ol>`, inline `code`/**bold**/links preserved.
-- [ ] While the spec is loading, an accessible **status** region (`role="status"`) is shown.
-- [ ] On fetch failure a **distinct error state** (`role="alert"`) with a working **Retry**
+- [x] While the spec is loading, an accessible **status** region (`role="status"`) is shown.
+- [x] On fetch failure a **distinct error state** (`role="alert"`) with a working **Retry**
       is shown — never a blank page (mirrors the `King` card's states).
-- [ ] The Nav **"Spec ↗"** link points to **`/spec-guide`**, keeps `target="_blank"` and the
+- [x] The Nav **"Spec ↗"** link points to **`/spec-guide`**, keeps `target="_blank"` and the
       `↗` affordance, and derives its `href` from the shared **`SPEC_PATH`** constant.
-- [ ] `/spec` still returns raw markdown (endpoint untouched); the **`Cta`** and **`King`**
+- [x] `/spec` still returns raw markdown (endpoint untouched); the **`Cta`** and **`King`**
       "Read the spec" links still resolve to **`/spec`**.
-- [ ] The spec page has a **slim header**: the brand (logo + "ModelKombat") links **home
+- [x] The spec page has a **slim header**: the brand (logo + "ModelKombat") links **home
       (`/`)**, and a **"Raw markdown ↗"** link points to **`/spec`** (`target="_blank"`) for
       machine consumers.
-- [ ] `document.title` on the spec page names the spec (e.g. "ModelKombat — Bot authoring
+- [x] `document.title` on the spec page names the spec (e.g. "ModelKombat — Bot authoring
       spec"), and the home page title is unchanged.
-- [ ] The doc is **responsive** — the wide frame table scrolls inside **its own**
+- [x] The doc is **responsive** — the wide frame table scrolls inside **its own**
       `overflow-x:auto` container, so the page never scrolls sideways at 360px — and
       theme-consistent with the rest of the site.
 

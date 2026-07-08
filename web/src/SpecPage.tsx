@@ -2,6 +2,11 @@ import { marked } from "marked";
 import { createResource, Match, Show, Switch, type Component } from "solid-js";
 
 import Footer from "./Footer";
+import { NavLogo } from "./Nav";
+
+// The rendered document's own tab title — the spec is a distinct page from the
+// marketing home, so it names itself rather than inheriting the home title.
+const SPEC_PAGE_TITLE = "ModelKombat — Bot authoring spec";
 
 // The human-readable spec page: it fetches the SAME markdown the LLM reads from
 // GET /spec and renders it as an HTML document, so there is no second copy of the
@@ -28,12 +33,25 @@ const renderMarkdown = (markdown: string): string =>
   marked.parse(markdown, { async: false });
 
 const SpecPage: Component<{ fetchSpec?: () => Promise<string> }> = (props) => {
+  document.title = SPEC_PAGE_TITLE;
+
   const [spec, { refetch }] = createResource(
     props.fetchSpec ?? fetchSpecFromApi,
   );
 
   return (
     <>
+      <nav class="nav" aria-label="Spec">
+        <a class="nav-brand" href="/">
+          <NavLogo />
+          <span>ModelKombat</span>
+        </a>
+        <div class="nav-links">
+          <a href="/spec" target="_blank">
+            Raw markdown <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </nav>
       <main>
         <Switch
           fallback={

@@ -3,7 +3,7 @@ import { SPEC_PATH } from "./routes";
 // The ModelKombat badge — the same karate high-kick stickman as the browser-tab
 // favicon, inlined so it stays CSP-safe. Purely decorative: the "ModelKombat"
 // wordmark beside it already names the link, so it is hidden from assistive tech.
-const NavLogo = () => (
+export const NavLogo = () => (
   <svg class="nav-logo" viewBox="0 0 64 64" aria-hidden="true">
     <defs>
       <linearGradient id="navTile" x1="0" y1="0" x2="0" y2="1">

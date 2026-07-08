@@ -133,4 +133,28 @@ describe("SpecPage", () => {
     // The success content (the rendered heading) must be absent in the error state.
     expect(queryByRole("heading", { level: 1 })).toBeNull();
   });
+
+  it("heads the page with a brand that links home", () => {
+    const { getByRole } = render(() => <SpecPage fetchSpec={pending} />);
+
+    const brand = getByRole("link", { name: "ModelKombat" });
+
+    expect(brand.getAttribute("href")).toBe("/");
+  });
+
+  it("offers the raw markdown for machine consumers, opening in a new tab", () => {
+    const { getByRole } = render(() => <SpecPage fetchSpec={pending} />);
+
+    const raw = getByRole("link", { name: /raw markdown/i });
+
+    // The LLM/curl version stays reachable straight from the human page.
+    expect(raw.getAttribute("href")).toBe("/spec");
+    expect(raw.getAttribute("target")).toBe("_blank");
+  });
+
+  it("titles the browser tab after the spec", () => {
+    render(() => <SpecPage fetchSpec={pending} />);
+
+    expect(document.title).toBe("ModelKombat — Bot authoring spec");
+  });
 });
