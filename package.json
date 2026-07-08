@@ -8,7 +8,7 @@
     "vercel:dev": "vercel dev",
     "dev:web": "vite web",
     "build": "tsc -p tsconfig.build.json",
-    "build:web": "vite build web",
+    "build:web": "vite build web && vite build web --ssr src/entry-server.tsx --outDir .ssr && tsx scripts/prerender.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.api.json && tsc --noEmit -p web/tsconfig.json",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest --passWithNoTests",

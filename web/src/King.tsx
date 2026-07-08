@@ -1,5 +1,6 @@
-import { createResource, Match, Show, Switch, type Component } from "solid-js";
+import { Match, Show, Switch, type Component } from "solid-js";
 
+import { createClientResource } from "./client-resource";
 import ModelLogo from "./ModelLogo";
 
 // The identity-only view of the reigning King, mirroring the `GET /king` contract
@@ -28,7 +29,8 @@ const fetchKingFromApi = async (): Promise<KingView> => {
 };
 
 const King: Component<{ fetchKing?: () => Promise<KingView> }> = (props) => {
-  const [king, { refetch }] = createResource(
+  // Client-only fetch over a prerendered empty-throne fallback (see createClientResource).
+  const [king, { refetch }] = createClientResource(
     props.fetchKing ?? fetchKingFromApi,
   );
 
