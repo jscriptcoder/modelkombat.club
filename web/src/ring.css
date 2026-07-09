@@ -1,0 +1,108 @@
+/* The /ring submit page. Reuses the shared theme tokens from app.css (imported alongside this
+   file) for background, colours, and the centred `main` column. */
+
+.ring-title {
+  font-size: 1.8rem;
+  margin: 0 0 1.5rem;
+}
+
+.ring-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.ring-label {
+  font-weight: 600;
+}
+
+.ring-textarea,
+.ring-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  background: var(--code-bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.ring-textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  resize: vertical;
+}
+
+.ring-handle-note {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+.ring-submit {
+  justify-self: start;
+  margin-top: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  background: var(--accent);
+  color: #0b0e14;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.ring-error,
+.ring-send-error-line {
+  color: #ff8a8a;
+  margin: 0.25rem 0;
+}
+
+.ring-status {
+  color: var(--muted);
+  margin-top: 1rem;
+}
+
+.retry {
+  margin-top: 0.5rem;
+  padding: 0.4rem 1rem;
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ring-result {
+  margin-top: 2.5rem;
+  padding-top: 2rem;
+  border-top: 2px solid var(--border);
+}
+
+.ring-headline {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0 0 1rem;
+}
+
+.ring-banner {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+.ring-raw {
+  margin-top: 1rem;
+}
+
+/* The raw /fight JSON: a monospaced, scrollable block. Long lines scroll INSIDE the block
+   (overflow-x) so they never push the page body sideways on mobile; tall payloads scroll
+   vertically rather than running off the page. */
+.ring-raw-json {
+  margin-top: 0.75rem;
+  max-height: 24rem;
+  overflow: auto;
+  padding: 1rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ModelKombat — Send your bot into the ring</title>
+    <meta
+      name="description"
+      content="Paste your LLM-authored bot document, add your handle, and send it into the ModelKombat ring — it fights the gauntlet and contests the King of the Hill."
+    />
+    <link rel="canonical" href="https://modelkombat.club/ring" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0b0e14" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Icons & PWA manifest -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ModelKombat" />
+    <meta
+      property="og:title"
+      content="ModelKombat — Send your bot into the ring"
+    />
+    <meta
+      property="og:description"
+      content="Paste your LLM-authored bot document and send it into the ring against the King of the Hill."
+    />
+    <meta property="og:url" content="https://modelkombat.club/ring" />
+    <meta property="og:image" content="https://modelkombat.club/og.png" />
+    <meta property="og:locale" content="en_US" />
+  </head>
+  <body>
+    <div id="root">
+      <noscript>
+        Enable JavaScript to send your bot into the ring. To submit by hand,
+        POST your bot document to <code>/fight</code> with an
+        <code>X-Author-Handle</code> header — see <a href="/spec">/spec</a> for
+        the bot format.
+      </noscript>
+    </div>
+    <script type="module" src="/src/ring.tsx"></script>
+  </body>
+</html>
