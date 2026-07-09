@@ -918,6 +918,37 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   separation, 2-col grid, no horizontal overflow). Design trail + S2 plan archived at
   `docs/archive/{gauntlet-section,arsenal-gauntlet-stories,arsenal-section-decisions}.md` — all
   three Arsenal + Gauntlet artifacts archived together at feature close.
+- DONE (**web `/ring` — the browser bot-submit loop, PRs #237–#240**): the submit **and** iterate loop
+  closed in the browser. A human holding LLM-authored JSON opens **`/ring`**, pastes the bot document +
+  an author handle, POSTs it to the live **`POST /fight`** (LLM platforms can't POST — the human is the
+  courier), and reads the full fight card **and** the raw `/fight` JSON to hand straight back to the LLM
+  to iterate. A single-page `ring.html` + `ring.tsx` **client-render** (no prerender/hydration — the fetch
+  is button-triggered), on a `postFight?` prop seam resolving `{ status, body }` for **any** HTTP response
+  (problem+json bodies are content the human must see/copy), rejecting only on a true network failure or a
+  30s `AbortController` timeout. **Four slices, PR per slice**, all live + smoke-verified 2026-07-09:
+  **S1** (#237) the walking skeleton — paste + fight + outcome headline + the raw copyable result + the
+  `vite` multi-page input + a `vercel.json` `/ring` rewrite (verified not to regress the prerender
+  pipeline); **S2** (#238) the full fight card — one row per `gauntlet.perOpponent` in frozen
+  `GAUNTLET_NAMES` order (win-rate % + a **text** pass/fail marker, never colour alone), the `title` block
+  by outcome (first-King / dethrone / held-throne), the scouted `incumbent` (name + `<ModelLogo>` +
+  non-null handle + win-rate + bouts, **never** the King's DSL), above the persistent raw block; **S3**
+  (#239) every failure state — the **422 `/problems/invalid-bot`** validator issues as a readable
+  `path: reason` list, inline handle validation mirroring `readHandle` + trim (empty / `>64` /
+  control-char, 63/64/65 boundary), the 409 throne-moved resubmit prompt, 413/405/network transport
+  errors, submit disabled in-flight, and a `localStorage`-remembered handle degrading silently when
+  storage is blocked (pure logic in flat `web/src/ring-{handle,fight-error}.ts`); **S4** (#240)
+  discoverability — a same-tab Nav "Ring" link + a Hero CTA ("Send your bot into the ring →"), both to
+  `/ring`, plus a `sitemap.xml` `<url>` (priority 0.9) + an `llms.txt` "Send a bot into the ring" entry
+  framed for the reading LLM. The web layer stays decoupled — **local `web/src` view-model types mirroring
+  the `/fight` contract, no `src/engine` import**; **no `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB
+  change** throughout (transport + presentation only). `web/src` logic is outside the Node/Stryker scope ⇒
+  exhaustive exact-assertion browser-mode tests + a manual mutator scan (the S4 sitemap/llms.txt checks
+  `fetch` the **served** files and parse the XML with a real `DOMParser`), each slice preview-smoked on
+  Vercel before merge. Design trail + the single spanning plan archived at
+  `docs/archive/web-ring-submit.md`. **NB — build-log gap:** the interceding web features (the
+  `/spec-guide` rendered page #223–#224, the SSG/prerender #231–#233, and `/llms.txt` + raw `/spec.md`
+  #235–#236) shipped between the Gauntlet section (#220) and `/ring` but were never logged here; they
+  remain a pending backfill.
 
 ### §7 match structure built between C9 and Capability D
 
@@ -1038,6 +1069,9 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
 title fight persisted on Upstash Redis), and the **public page — the newcomer front door** is LIVE at
 `https://modelkombat.club/` (PRs #195–#213; a face-off hero + Current King + Hall of Kings on the new
-identity-only **`GET /king`** reads + an honest fights "coming soon" teaser). Remaining in the platform
-layer: the **KotH ladder** (the tournament-_bracket_ sense of "rounds" beyond the single throne),
-**`/replay`** + a champions-history read surface, and the **Pixi viewer**.
+identity-only **`GET /king`** reads + an honest fights "coming soon" teaser). The **`/ring` browser
+bot-submit loop** is now LIVE too (PRs #237–#240): a human courier pastes LLM-authored JSON, POSTs it to
+the live `/fight`, reads the full fight card, and hands the raw result back to the LLM to iterate —
+closing the authoring loop in the browser. Remaining in the platform layer: the **KotH ladder** (the
+tournament-_bracket_ sense of "rounds" beyond the single throne), **`/replay`** + a champions-history
+read surface, and the **Pixi viewer**.

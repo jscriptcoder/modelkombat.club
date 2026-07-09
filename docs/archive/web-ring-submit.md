@@ -2,10 +2,10 @@
 
 **Branch**: umbrella `feat/web-ring-submit` — **one PR (branch) per slice**:
 `feat/web-ring-skeleton` → `feat/web-ring-card` → `feat/web-ring-errors` → `feat/web-ring-discovery`.
-**Status**: Active — **Slices 1–3 ✅ shipped** (PR #237 skeleton · PR #238 full fight card ·
-PR #239 every failure state + handle polish; 2026-07-09, live + smoke-verified); Slice 4
-(discoverability — the final slice) next. Planned 2026-07-09 after a `grill-me` pass (decisions
-table below).
+**Status**: ✅ **COMPLETE** — **all 4 slices shipped** (PR #237 skeleton · PR #238 full fight
+card · PR #239 every failure state + handle polish · PR #240 discoverability; 2026-07-09, live +
+smoke-verified). Planned 2026-07-09 after a `grill-me` pass (decisions table below). Archived on
+feature close per [[archive-plans-not-delete]].
 
 ## Goal
 
@@ -385,7 +385,7 @@ modules** (matching `inject-body.ts`, not a one-off subfolder) → `RingPage` re
 
 ---
 
-### Slice 4: Discoverability — Nav link, Hero CTA, sitemap + llms.txt
+### Slice 4: Discoverability — Nav link, Hero CTA, sitemap + llms.txt ✅ SHIPPED (PR #240, 2026-07-09, live + smoke-verified)
 
 **Value**: Visitors and LLMs can find `/ring`; the landing page finally has the call-to-action
 the whole page builds toward, and an LLM reading `llms.txt` can tell its human where to paste.
@@ -399,14 +399,19 @@ documents it. (Placed **last** so we don't drive traffic to a half-built page.)
 `front-end-testing`.
 **Acceptance criteria** (present + confirm before code):
 
-- [ ] The Nav renders a link with an accessible name for the ring whose `href` is `/ring`,
-      positioned consistently with the other nav entries.
-- [ ] The Hero renders a prominent CTA (`<a>` with a clear accessible name, e.g. "Send your bot
+- [x] The Nav renders a link with an accessible name for the ring whose `href` is `/ring`,
+      positioned consistently with the other nav entries. _(Shipped: exact accessible name "Ring",
+      same-tab — `target` is `null`, unlike the new-tab Spec link — placed after "Fights".)_
+- [x] The Hero renders a prominent CTA (`<a>` with a clear accessible name, e.g. "Send your bot
       into the ring") whose `href` is `/ring`; the existing face-off/title/tagline are unchanged.
-- [ ] `sitemap.xml` contains a `<url>` for `https://modelkombat.club/ring`; the XML stays
-      well-formed (parse assertion).
-- [ ] `llms.txt` documents `/ring` (what it's for + that the human pastes JSON there), consistent
-      with the existing entries' voice.
+      _(Shipped: exact accessible name asserted so the decorative aria-hidden arrow can't leak; a
+      filled-accent `.hero-cta` button under the tagline.)_
+- [x] `sitemap.xml` contains a `<url>` for `https://modelkombat.club/ring`; the XML stays
+      well-formed (parse assertion). _(Shipped: priority 0.9; well-formedness verified via the
+      served file + a real `DOMParser` in a browser-mode test.)_
+- [x] `llms.txt` documents `/ring` (what it's for + that the human pastes JSON there), consistent
+      with the existing entries' voice. _(Shipped: a "Send a bot into the ring" bullet under
+      "Authoring a bot", framed for the reading LLM.)_
       **RED**: browser-mode `Nav.test.tsx` (ring link href `/ring`) + `Hero.test.tsx` (CTA name + href)
 
 * node tests parsing `sitemap.xml` (contains the `/ring` loc, well-formed) and asserting
@@ -417,6 +422,16 @@ documents it. (Placed **last** so we don't drive traffic to a half-built page.)
   **REFACTOR**: none expected.
   **Done when**: ACs met, static analysis passes, an `agent-browser` smoke clicks Nav + Hero → lands
   on `/ring`, human approves commit.
+
+**As-built (PR #240):** the sitemap/llms.txt assertions shipped as a **browser-mode**
+`ring-discovery.test.tsx` (not a node test) — it `fetch`es the **served** `/sitemap.xml` + `/llms.txt`
+(Vite serves `web/public/` at root in browser test mode) and parses the XML with the real
+`DOMParser`, a genuine well-formedness check with no XML dependency. The Hero CTA test asserts the
+**exact** accessible name (killing the aria-hidden-arrow-leak mutant). One extra edit beyond the plan:
+`App.test.tsx`'s full nav-href-order contract gained `/ring`. Preview-smoked read-only (no `/fight`
+submission ⇒ zero throne risk): sitemap `/ring` loc, llms.txt `/ring`, home carries both `href="/ring"`
+
+- the CTA text, and `/ring` serves its entry.
 
 ## Pre-PR Quality Gate (each slice)
 
