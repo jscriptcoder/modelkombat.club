@@ -281,7 +281,7 @@ only ever `hydrate(App)`s; `marked` moves to a build-time (dev) dependency.
 - Landed in 3 commits: (1) `SpecPage` → pure presentational (`spec` prop → semantic HTML;
   dropped fetch/loading/error/Retry/hash-scroll/`document.title`) + `main.tsx` hydrate-App-only
   (coupled to the new required prop); (2) head transforms `setTitle`/`setCanonical`/`stripScripts`
-  + `renderSpecGuidePage`; (3) `prerender.ts` renders the static spec page + remove dead `isSpecRoute`.
+  - `renderSpecGuidePage`; (3) `prerender.ts` renders the static spec page + remove dead `isSpecRoute`.
 - **Deviations from the plan (approved at the CONFIRM gate):**
   - **`document.title` REMOVED from `SpecPage`, not `onMount`-guarded.** `SpecPage` is now _only_
     build-time SSR-rendered (`main.tsx` dropped the client spec route), so an `onMount` guard would
