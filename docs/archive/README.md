@@ -264,3 +264,26 @@ whole feature — plan + `grill-me` decisions + `find-gaps` record — is one fi
   files only — no `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB change** across the whole feature. Like
   the other web work, `web/src` logic is outside the Node/Stryker scope ⇒ exhaustive exact-assertion
   browser-mode tests + a manual mutator scan, each slice preview-smoked on Vercel before merge.
+
+## Web King sections — single `/king` fetch + no-JS endpoint link (web) ✅ COMPLETE
+
+Two small follow-ups tightening the King / Hall-of-Kings sections on the home page (2026-07-09).
+Presentation-only, **no `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB change**; `web/src` logic is
+outside the Node/Stryker scope ⇒ exact-assertion browser tests (+ SSR render tests) and a manual mutator
+scan. Only the endpoint-link slice needed a written plan; it is archived here.
+
+- **Single `/king` fetch** (PR #245 — `King` and `Podium` each fetched `/king` independently, so the
+  home page fired two identical requests for a payload the endpoint returns whole (`{ current, recent }`).
+  Lifted ONE `createClientResource` into `App`, which now owns the fetch and feeds **presentational**
+  `King` (`current`) and `Podium` (`recent`) plus shared `loading` / `error` / `onRetry`; one request
+  feeds both, a Retry from either re-runs it. Props optional + default to the empty state, so the
+  prerender/hydration contract is unchanged). No plan doc (a direct refactor).
+- **No-JS `/king` endpoint link** (PR #247, superseding auto-closed #246 —
+  because the fetch is client-side, the prerender bakes only the **empty-state fallback** into the static
+  HTML, so LLM/crawler visitors saw the empty copy with no pointer to the live data. Added a followable
+  `<a href="/king">https://modelkombat.club/king</a>` inside each empty `<Show>` fallback (mirrors the
+  `/spec` link: relative href, absolute text). Empty-fallback ONLY (a populated card/podium replaces it;
+  loading/error never render it); **no SSR data fetch**. GOTCHA: hydratable SSR splits the
+  `{CANONICAL_ORIGIN}` text with `<!--$-->…<!--/-->` hydration markers, so tests assert `href` at the SSR
+  level and the exact absolute link text at the browser accessible-name level):
+  [king-fallback-endpoint-link.md](king-fallback-endpoint-link.md)
