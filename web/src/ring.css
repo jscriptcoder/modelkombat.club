@@ -51,9 +51,16 @@
 }
 
 .ring-error,
+.ring-handle-error,
 .ring-send-error-line {
   color: #ff8a8a;
   margin: 0.25rem 0;
+}
+
+/* Disabled while a fight is in flight — no second throne contest. */
+.ring-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .ring-status {
@@ -86,6 +93,36 @@
 .ring-banner {
   color: var(--muted);
   margin: 0 0 1rem;
+}
+
+/* The 422 validator issue list — a bordered card naming each rejected path so the author can fix
+   the bot in place (the full problem+json still rides in the raw block below). */
+.ring-validator {
+  margin: 0 0 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.ring-validator-intro {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.ring-issue-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.ring-issue {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  color: var(--fg);
+  /* Long JSON-pointer paths wrap inside the card rather than pushing the page sideways. */
+  overflow-wrap: anywhere;
 }
 
 .ring-raw {

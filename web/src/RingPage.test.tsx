@@ -8,6 +8,10 @@ import RingPage, { type FightResponse } from "./RingPage";
 // nodes break the label→control accessible-name lookup (which resolves ids against the whole doc).
 afterEach(cleanup);
 
+// The handle-prefill tests write to localStorage; reset it between tests so a remembered handle
+// from one test can't leak into another's initial render (idempotency — front-end-testing skill).
+afterEach(() => localStorage.clear());
+
 // A well-formed /fight report body, overridable per test. `title` is added only for cleared bots.
 const reportBody = (
   overrides?: Record<string, unknown>,
@@ -126,6 +130,26 @@ const submit = (
   });
   fireEvent.input(ui.getByRole("textbox", { name: /handle/i }), {
     target: { value: handle },
+  });
+  fireEvent.click(ui.getByRole("button", { name: /send into the ring/i }));
+};
+
+// A valid bot document for the guard tests (the doc isn't what's under test there — the handle
+// / empty-document guards are). Parsed back from its own JSON, it deep-equals this object.
+const VALID_DOC = { name: "brawler", model: null, rules: [] };
+
+// Type RAW (unstringified) field values, then submit — for guard tests whose inputs (empty /
+// whitespace / untrimmed / control-char) the JSON-stringifying `submit` helper can't express.
+const typeAndSend = (
+  ui: ReturnType<typeof render>,
+  rawDoc: string,
+  rawHandle: string,
+): void => {
+  fireEvent.input(ui.getByRole("textbox", { name: /bot document/i }), {
+    target: { value: rawDoc },
+  });
+  fireEvent.input(ui.getByRole("textbox", { name: /handle/i }), {
+    target: { value: rawHandle },
   });
   fireEvent.click(ui.getByRole("button", { name: /send into the ring/i }));
 };
@@ -660,6 +684,478 @@ describe("RingPage — the fight card", () => {
     // would be noise). Pins the `rows().length > 0` guard against a `>= 0` boundary mutant.
     await ui.findByLabelText(/raw fight result/i);
 
-    expect(ui.queryByRole("region", { name: /gauntlet scorecard/i })).toBeNull();
+    expect(
+      ui.queryByRole("region", { name: /gauntlet scorecard/i }),
+    ).toBeNull();
+  });
+});
+
+// Slice 3 — input guards: the handle is validated + trimmed CLIENT-side (mirroring the server's
+// `readHandle`), and an empty/whitespace document is caught with its own message — both BEFORE any
+// POST, so a bad handle or no input never contests the throne. All asserted on the injected
+// `postFight` (never called on rejection) + the inline message the author sees.
+describe("RingPage — input guards: handle + empty document", () => {
+  it("trims surrounding whitespace from the handle before sending", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "  grandmaster  ");
+
+    expect(postFight).toHaveBeenCalledWith({
+      doc: VALID_DOC,
+      handle: "grandmaster",
+    });
+  });
+
+  it("keeps an internal space in the handle (0x20 is not a control character)", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "ko ga");
+
+    expect(postFight).toHaveBeenCalledWith({ doc: VALID_DOC, handle: "ko ga" });
+  });
+
+  it("rejects an empty handle inline without calling the ring", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "");
+
+    expect(ui.getByText(/add an author handle/i)).toBeTruthy();
+    expect(postFight).not.toHaveBeenCalled();
+  });
+
+  it("rejects a whitespace-only handle inline without calling the ring", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "    ");
+
+    expect(ui.getByText(/add an author handle/i)).toBeTruthy();
+    expect(postFight).not.toHaveBeenCalled();
+  });
+
+  // The length boundary mirrors the server's `> 64` reject (handle-fight.ts `HANDLE_MAX`): 64 is
+  // the last accepted length, 65 the first rejected. The 63/64/65 triplet pins the `<=`/`<` mutant.
+  it("accepts a 63-character handle", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+    const handle = "a".repeat(63);
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), handle);
+
+    expect(postFight).toHaveBeenCalledWith({ doc: VALID_DOC, handle });
+  });
+
+  it("accepts a 64-character handle (the boundary)", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+    const handle = "a".repeat(64);
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), handle);
+
+    expect(postFight).toHaveBeenCalledWith({ doc: VALID_DOC, handle });
+  });
+
+  it("rejects a 65-character handle inline without calling the ring", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "a".repeat(65));
+
+    expect(ui.getByText(/64 characters or fewer/i)).toBeTruthy();
+    expect(postFight).not.toHaveBeenCalled();
+  });
+
+  it("rejects a handle carrying a control character without calling the ring", () => {
+    // NUL/CR/LF never reach here (the Headers transport blocks them); the C0 controls below (US)
+    // and DEL do, so the client guard mirrors the server's `code < 0x20 || code === 0x7f`.
+    const controls = [
+      { label: "US (0x1F)", code: 0x1f },
+      { label: "DEL (0x7F)", code: 0x7f },
+    ] as const;
+
+    for (const { code } of controls) {
+      const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+      const ui = render(() => <RingPage postFight={postFight} />);
+
+      typeAndSend(
+        ui,
+        JSON.stringify(VALID_DOC),
+        "bad" + String.fromCharCode(code) + "handle",
+      );
+
+      expect(ui.getByText(/control characters/i)).toBeTruthy();
+      expect(postFight).not.toHaveBeenCalled();
+
+      ui.unmount();
+    }
+  });
+
+  it("asks for the bot JSON on an empty document without calling the ring", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, "", "grandmaster");
+
+    expect(ui.getByText(/paste your bot json to continue/i)).toBeTruthy();
+    // The no-input case is DISTINCT from malformed JSON — not the "not valid JSON" copy.
+    expect(ui.queryByText(/not valid json/i)).toBeNull();
+    expect(postFight).not.toHaveBeenCalled();
+  });
+
+  it("treats a whitespace-only document as empty", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, "   \n  ", "grandmaster");
+
+    expect(ui.getByText(/paste your bot json to continue/i)).toBeTruthy();
+    expect(postFight).not.toHaveBeenCalled();
+  });
+});
+
+// Slice 3 — response failure states: a non-2xx is classified (422 validator / 409 throne-moved /
+// 413·405 transport / 400 handle) into a precise, human-readable state that REPLACES Slice 1's
+// generic banner; an unrecognised status falls back to that banner. The raw copy block persists in
+// every case (the LLM-handoff artifact). Expected copy/statuses hardcoded (never imported) as the
+// mutation guard — Stryker can't reach web/src (see the plan's Testing note).
+describe("RingPage — response failure states", () => {
+  it("lists the validator's issues for a 422 and replaces the generic banner", async () => {
+    const problem = {
+      type: "/problems/invalid-bot",
+      title: "The bot document failed validation.",
+      status: 422,
+      errors: [
+        { path: "/rules/0/when", reason: "unknown predicate" },
+        { path: "/name", reason: "must be a string" },
+      ],
+    };
+
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 422, body: problem })} />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // Each issue is rendered readably as "path: reason", in the API's order.
+    const region = await ui.findByRole("region", {
+      name: /validation issues/i,
+    });
+
+    const listed = within(region)
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
+
+    expect(listed).toEqual([
+      "/rules/0/when: unknown predicate",
+      "/name: must be a string",
+    ]);
+    // The specific list replaces the generic HTTP banner...
+    expect(ui.queryByText(/the ring returned an error/i)).toBeNull();
+    // ...no outcome headline is claimed for an error...
+    expect(
+      ui.queryByText(/didn't clear|new champion|first King|held the throne/i),
+    ).toBeNull();
+    // ...the pasted doc is kept so the author can fix it in place...
+    expect(ui.getByRole("textbox", { name: /bot document/i })).toHaveProperty(
+      "value",
+      JSON.stringify(VALID_DOC),
+    );
+    // ...and the raw problem+json is still there to copy back to the LLM.
+    const raw = await ui.findByLabelText(/raw fight result/i);
+
+    expect(raw.textContent).toBe(JSON.stringify(problem, null, 2));
+  });
+
+  it("skips malformed validator issue entries, listing only well-formed ones", async () => {
+    const problem = {
+      type: "/problems/invalid-bot",
+      title: "The bot document failed validation.",
+      status: 422,
+      errors: [
+        { path: "/name", reason: "must be a string" },
+        { path: "/rules", note: "missing reason" }, // malformed → skipped
+        "not even an object", // malformed → skipped
+      ],
+    };
+
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 422, body: problem })} />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // Only the { path, reason } entry renders — the defensive filter drops the rest (no
+    // "undefined: undefined" row), the same identity-only discipline as the incumbent scout.
+    const region = await ui.findByRole("region", {
+      name: /validation issues/i,
+    });
+
+    const listed = within(region)
+      .getAllByRole("listitem")
+      .map((li) => li.textContent);
+
+    expect(listed).toEqual(["/name: must be a string"]);
+  });
+
+  it("prompts a resubmit when the throne moved (409), replacing the banner", async () => {
+    const problem = {
+      type: "/problems/throne-moved",
+      title:
+        "The throne advanced to a new champion before your crown landed; resubmit to challenge the current King.",
+      status: 409,
+    };
+
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 409, body: problem })} />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // Scope to the alert: the message also appears verbatim in the raw payload block below (by
+    // design — that's the LLM copy), so a bare text query would be ambiguous.
+    const alert = await ui.findByRole("alert");
+
+    expect(alert.textContent).toMatch(/throne advanced/i);
+    expect(await ui.findByRole("button", { name: /resubmit/i })).toBeTruthy();
+    expect(ui.queryByText(/the ring returned an error/i)).toBeNull();
+  });
+
+  it("re-enters the ring when the author resubmits after a throne-moved", async () => {
+    let calls = 0;
+
+    const flaky = (): Promise<FightResponse> => {
+      calls += 1;
+
+      return calls === 1
+        ? Promise.resolve({
+            status: 409,
+            body: {
+              type: "/problems/throne-moved",
+              title: "The throne advanced; resubmit to challenge the King.",
+              status: 409,
+            },
+          })
+        : Promise.resolve({
+            status: 200,
+            body: reportBody({ cleared: true, title: { outcome: "crowned" } }),
+          });
+    };
+
+    const ui = render(() => <RingPage postFight={flaky} />);
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    const resubmit = await ui.findByRole("button", { name: /resubmit/i });
+
+    fireEvent.click(resubmit);
+
+    // The second attempt lands the crown; the stale throne-moved prompt is cleared.
+    expect(await ui.findByText(/new champion/i)).toBeTruthy();
+    expect(ui.queryByText(/throne advanced|resubmit/i)).toBeNull();
+  });
+
+  it("shows a retryable transport error for a 413 payload-too-large", async () => {
+    const problem = {
+      type: "/problems/payload-too-large",
+      title: "The bot document exceeds the maximum size.",
+      status: 413,
+    };
+
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 413, body: problem })} />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    const alert = await ui.findByRole("alert");
+
+    expect(alert.textContent).toMatch(/exceeds the maximum size/i);
+    expect(await ui.findByRole("button", { name: /retry/i })).toBeTruthy();
+    expect(ui.queryByText(/the ring returned an error/i)).toBeNull();
+  });
+
+  it("shows a retryable transport error for a 405 method-not-allowed", async () => {
+    const problem = {
+      type: "/problems/method-not-allowed",
+      title: "Only POST is supported on /fight.",
+      status: 405,
+    };
+
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 405, body: problem })} />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    const alert = await ui.findByRole("alert");
+
+    expect(alert.textContent).toMatch(/only post is supported/i);
+    expect(await ui.findByRole("button", { name: /retry/i })).toBeTruthy();
+  });
+
+  it("falls back to the generic banner for an unrecognized non-2xx", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 500,
+          body: { type: "about:blank", title: "Internal error" },
+        })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // 500 isn't a status we specially recognise → the neutral HTTP banner is the fallback.
+    expect(
+      await ui.findByText(/the ring returned an error \(http 500\)/i),
+    ).toBeTruthy();
+  });
+
+  it("surfaces a server handle rejection on the handle field, replacing the banner", async () => {
+    const problem = {
+      type: "/problems/malformed-request",
+      title:
+        "The X-Author-Handle header must be at most 64 characters and contain no control characters.",
+      status: 400,
+    };
+
+    // A client-valid handle passes the client gate and POSTs; the (simulated) server rejects it —
+    // the belt-and-braces path. The server's message surfaces on the handle field, not a banner.
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 400, body: problem })} />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // The server message surfaces on the handle field (a role=alert), not a banner. Scope to it —
+    // the same text also appears in the raw payload block below.
+    const alert = await ui.findByRole("alert");
+
+    expect(alert.textContent).toMatch(/x-author-handle header must be/i);
+    expect(ui.queryByText(/the ring returned an error/i)).toBeNull();
+  });
+});
+
+// Slice 3 — submit lifecycle: the button is disabled while a fight is in flight (no double throne
+// contest), and the author's handle is remembered across visits (prefilled from + persisted to
+// localStorage on any client-valid submit, per the confirmed decision — regardless of the fight
+// outcome). Blocked storage (private mode) degrades silently.
+describe("RingPage — submit lifecycle: disable + remembered handle", () => {
+  const STORAGE_KEY = "modelkombat.ring.handle";
+
+  it("disables the submit button while a fight is in flight", () => {
+    const ui = render(() => <RingPage postFight={pending()} />);
+    const button = ui.getByRole("button", { name: /send into the ring/i });
+
+    // Enabled before submit...
+    expect(button).toHaveProperty("disabled", false);
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // ...disabled while the (never-settling) request is in flight — no second contest possible.
+    expect(button).toHaveProperty("disabled", true);
+  });
+
+  it("re-enables the submit button once the result is in", async () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: reportBody() })} />
+    ));
+
+    const button = ui.getByRole("button", { name: /send into the ring/i });
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    await ui.findByLabelText(/raw fight result/i);
+
+    expect(button).toHaveProperty("disabled", false);
+  });
+
+  it("prefills the handle from a remembered value", () => {
+    localStorage.setItem(STORAGE_KEY, "returning-author");
+
+    const ui = render(() => <RingPage />);
+
+    expect(ui.getByRole("textbox", { name: /handle/i })).toHaveProperty(
+      "value",
+      "returning-author",
+    );
+  });
+
+  it("remembers the handle (trimmed) after a valid submit", () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: reportBody() })} />
+    ));
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "  keeper  ");
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBe("keeper");
+  });
+
+  it("remembers the handle even when the fight fails", () => {
+    const ui = render(() => (
+      <RingPage postFight={rejectsWith(new Error("offline"))} />
+    ));
+
+    submit(ui, VALID_DOC, "persisted-anyway");
+
+    // Persisted at POST-fire time — the handle was valid regardless of the transport failure.
+    expect(localStorage.getItem(STORAGE_KEY)).toBe("persisted-anyway");
+  });
+
+  it("does not remember an invalid handle", () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: reportBody() })} />
+    ));
+
+    // Empty handle → rejected client-side → no POST, and nothing worth remembering.
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "");
+
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it("degrades to an empty handle field when storage reads are blocked", () => {
+    const getItem = vi
+      .spyOn(Storage.prototype, "getItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+
+    try {
+      const ui = render(() => <RingPage />);
+
+      expect(ui.getByRole("textbox", { name: /handle/i })).toHaveProperty(
+        "value",
+        "",
+      );
+    } finally {
+      getItem.mockRestore();
+    }
+  });
+
+  it("still enters the ring when storage writes are blocked", () => {
+    const setItem = vi
+      .spyOn(Storage.prototype, "setItem")
+      .mockImplementation(() => {
+        throw new Error("blocked");
+      });
+
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+
+    try {
+      const ui = render(() => <RingPage postFight={postFight} />);
+
+      submit(ui, VALID_DOC, "grandmaster");
+
+      // A blocked write must not abort the submit — the fight still runs.
+      expect(postFight).toHaveBeenCalledWith({
+        doc: VALID_DOC,
+        handle: "grandmaster",
+      });
+    } finally {
+      setItem.mockRestore();
+    }
   });
 });

@@ -4,6 +4,12 @@ import "./app.css";
 import "./ring.css";
 import CopyButton from "./CopyButton";
 import ModelLogo from "./ModelLogo";
+import {
+  fightError,
+  type FightError,
+  type ValidationIssue,
+} from "./ring-fight-error";
+import { validateHandle } from "./ring-handle";
 
 // The result of a POST /fight: the HTTP status plus the parsed JSON body. `body` is `unknown`
 // because a non-2xx carries a problem+json, not a report — the human still sees and copies it.
@@ -79,6 +85,44 @@ const outcomeHeadline = (body: unknown): string => {
 };
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300;
+
+// Parse the pasted document, distinguishing "no input yet" from "malformed JSON" so each gets its
+// own message: a trim-empty document → a prompt to paste; a `JSON.parse` throw → the invalid-JSON
+// message. Runs before the POST, so neither case ever reaches the ring.
+type DocResult = { ok: true; doc: unknown } | { ok: false; error: string };
+
+const parseDoc = (raw: string): DocResult => {
+  if (raw.trim() === "") {
+    return { ok: false, error: "Paste your bot JSON to continue." };
+  }
+
+  try {
+    return { ok: true, doc: JSON.parse(raw) };
+  } catch {
+    return { ok: false, error: "That's not valid JSON." };
+  }
+};
+
+// The author handle is remembered across visits — a quality-of-life touch (the handle is
+// public-if-you-win, not a secret). Reads/writes are wrapped: private-mode or disabled storage
+// throws on access, and a remembered handle simply isn't available then (silent degrade).
+const HANDLE_STORAGE_KEY = "modelkombat.ring.handle";
+
+const recallHandle = (): string => {
+  try {
+    return localStorage.getItem(HANDLE_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+};
+
+const rememberHandle = (handle: string): void => {
+  try {
+    localStorage.setItem(HANDLE_STORAGE_KEY, handle);
+  } catch {
+    // Storage blocked (private mode / disabled) — the handle just isn't remembered.
+  }
+};
 
 // One per-opponent scorecard row, shaped from the /fight report's `gauntlet.perOpponent`. Local
 // types (not imported from `src/`) keep the web layer decoupled — the King.tsx precedent.
@@ -168,8 +212,9 @@ const titleView = (body: unknown): TitleView | null => {
 
 const RingPage: Component<RingPageProps> = (props) => {
   const [docText, setDocText] = createSignal("");
-  const [handle, setHandle] = createSignal("");
+  const [handle, setHandle] = createSignal(recallHandle());
   const [parseError, setParseError] = createSignal("");
+  const [handleError, setHandleError] = createSignal("");
   const [sendError, setSendError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
   const [result, setResult] = createSignal<FightResponse | null>(null);
@@ -191,27 +236,80 @@ const RingPage: Component<RingPageProps> = (props) => {
     return current ? titleView(current.body) : null;
   };
 
+  // The classified error for the current result — null for a 2xx or an unrecognised status (which
+  // falls back to the generic banner). Derived so every error branch reads from one source.
+  const responseError = (): FightError | null => {
+    const current = result();
+
+    return current && !isSuccess(current.status)
+      ? fightError(current.status, current.body)
+      : null;
+  };
+
+  const validatorIssues = (): ValidationIssue[] | null => {
+    const err = responseError();
+
+    return err?.kind === "validator" ? err.issues : null;
+  };
+
+  const throneMovedMessage = (): string | null => {
+    const err = responseError();
+
+    return err?.kind === "throne-moved" ? err.message : null;
+  };
+
+  const transportMessage = (): string | null => {
+    const err = responseError();
+
+    return err?.kind === "transport" ? err.message : null;
+  };
+
+  // The generic HTTP banner shows ONLY for a non-2xx we didn't specifically recognise — so a
+  // recognised error's specific message (or the handle-field message) replaces it.
+  const showGenericBanner = (): boolean => {
+    const current = result();
+
+    return (
+      current !== null && !isSuccess(current.status) && responseError() === null
+    );
+  };
+
   const runFight = async (): Promise<void> => {
     setParseError("");
+    setHandleError("");
     setSendError("");
     setResult(null);
 
-    let doc: unknown;
+    const parsed = parseDoc(docText());
+    const handleCheck = validateHandle(handle());
 
-    try {
-      doc = JSON.parse(docText());
-    } catch {
-      setParseError("That's not valid JSON.");
+    if (!parsed.ok) setParseError(parsed.error);
+    if (!handleCheck.ok) setHandleError(handleCheck.error);
+    if (!parsed.ok || !handleCheck.ok) return;
 
-      return;
-    }
+    // Remember the handle for next time — at POST-fire time, so a returning author never retypes
+    // it even if this fight fails.
+    rememberHandle(handleCheck.handle);
 
     const post = props.postFight ?? postFightToApi;
 
     setLoading(true);
 
     try {
-      setResult(await post({ doc, handle: handle() }));
+      const response = await post({
+        doc: parsed.doc,
+        handle: handleCheck.handle,
+      });
+
+      setResult(response);
+
+      // A server-side handle rejection (belt-and-braces — the client already validated) surfaces
+      // on the handle field, mirroring the client-side inline error rather than a banner.
+      const err = !isSuccess(response.status)
+        ? fightError(response.status, response.body)
+        : null;
+
+      if (err?.kind === "handle") setHandleError(err.message);
     } catch (error) {
       setSendError(
         isAbortError(error)
@@ -259,13 +357,19 @@ const RingPage: Component<RingPageProps> = (props) => {
           Your handle and bot name are public if you win.
         </p>
 
+        <Show when={handleError()}>
+          <p class="ring-handle-error" role="alert">
+            {handleError()}
+          </p>
+        </Show>
+
         <Show when={parseError()}>
           <p class="ring-error" role="alert">
             {parseError()}
           </p>
         </Show>
 
-        <button type="submit" class="ring-submit">
+        <button type="submit" class="ring-submit" disabled={loading()}>
           Send into the ring
         </button>
       </form>
@@ -291,10 +395,64 @@ const RingPage: Component<RingPageProps> = (props) => {
             <Show
               when={isSuccess(response().status)}
               fallback={
-                <p class="ring-banner">
-                  The ring returned an error (HTTP {response().status}) — copy
-                  the result below for your LLM.
-                </p>
+                <>
+                  <Show when={validatorIssues()}>
+                    {(issues) => (
+                      <section
+                        class="ring-validator"
+                        aria-label="Validation issues"
+                      >
+                        <p class="ring-validator-intro">
+                          The ring rejected this bot. Fix these and resubmit:
+                        </p>
+                        <ul class="ring-issue-list">
+                          <For each={issues()}>
+                            {(issue) => (
+                              <li class="ring-issue">{`${issue.path}: ${issue.reason}`}</li>
+                            )}
+                          </For>
+                        </ul>
+                      </section>
+                    )}
+                  </Show>
+
+                  <Show when={throneMovedMessage()}>
+                    {(message) => (
+                      <div class="ring-send-error" role="alert">
+                        <p class="ring-send-error-line">{message()}</p>
+                        <button
+                          type="button"
+                          class="retry"
+                          onClick={() => void runFight()}
+                        >
+                          Resubmit
+                        </button>
+                      </div>
+                    )}
+                  </Show>
+
+                  <Show when={transportMessage()}>
+                    {(message) => (
+                      <div class="ring-send-error" role="alert">
+                        <p class="ring-send-error-line">{message()}</p>
+                        <button
+                          type="button"
+                          class="retry"
+                          onClick={() => void runFight()}
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                  </Show>
+
+                  <Show when={showGenericBanner()}>
+                    <p class="ring-banner">
+                      The ring returned an error (HTTP {response().status}) —
+                      copy the result below for your LLM.
+                    </p>
+                  </Show>
+                </>
               }
             >
               <p class="ring-headline">{outcomeHeadline(response().body)}</p>
