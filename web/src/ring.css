@@ -106,3 +106,122 @@
   font-size: 0.8rem;
   line-height: 1.5;
 }
+
+/* ---- The fight card: per-opponent scorecard + the title-fight block ---------------------- */
+
+/* The gauntlet scorecard — one row per house fighter, above the raw block. */
+.ring-scorecard {
+  margin-top: 1.5rem;
+}
+
+.ring-score-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+/* Each row: fighter name | win rate | pass/fail pill. `auto` side columns keep the name column
+   fluid so long names (grappler) never wrap; the whole row fits at 360px. */
+.ring-score-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* Name chip: the shared .move-id / .fighter-name token treatment (accent on code-bg). */
+.ring-score-name {
+  justify-self: start;
+  padding: 0.1rem 0.4rem;
+  color: var(--accent);
+  background: var(--code-bg);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.ring-score-rate {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+/* Pass/fail pill. Text ("beat"/"lost") always carries the signal; the tint is a secondary cue,
+   never the only one (AC-1). Default is the failed (red) tint; `.passed` flips it to green. */
+.ring-score-result {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--fg);
+  background: rgba(255, 128, 128, 0.22);
+}
+
+.ring-score-result-passed {
+  background: rgba(120, 226, 168, 0.22);
+}
+
+/* The title-fight block — a centred card in the King's visual language. */
+.ring-title-fight {
+  margin-top: 1.5rem;
+  padding: 1.5rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.ring-throne-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ring-incumbent .brand-mark {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+
+.ring-incumbent-label {
+  margin: 0.5rem 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ring-incumbent-name {
+  display: inline-block;
+  margin: 0.25rem 0;
+  padding: 0.1rem 0.4rem;
+  color: var(--accent);
+  background: var(--code-bg);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.ring-incumbent-handle {
+  margin: 0.25rem 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ring-title-result {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.ring-title-winrate {
+  color: var(--fg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ring-title-bouts {
+  font-variant-numeric: tabular-nums;
+}

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from "@solidjs/testing-library";
+import { cleanup, fireEvent, render, within } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import RingPage, { type FightResponse } from "./RingPage";
@@ -18,6 +18,86 @@ const reportBody = (
   diagnostics: { degrade: {} },
   ...overrides,
 });
+
+// The frozen gauntlet order — hardcoded here (NOT imported from the component or engine) so a
+// dropped, reordered, or renamed opponent row fails the test. This IS the mutation guard, since
+// Stryker can't reach web/src (see the plan's Testing note). Mirrors GAUNTLET_NAMES.
+const GAUNTLET_ORDER = [
+  "jabber",
+  "rekka",
+  "zoner",
+  "grappler",
+  "sweeper",
+  "vulture",
+] as const;
+
+// One `gauntlet.perOpponent` row (the /fight report shape), overridable per test. The extra
+// fields (wins/losses/draws/net/endReasons) ride along verbatim in the raw block; the card reads
+// name/winRate/passed.
+const opp = (overrides?: Record<string, unknown>): Record<string, unknown> => ({
+  name: "jabber",
+  winRate: 0.4,
+  wins: 8,
+  losses: 12,
+  draws: 0,
+  net: -37,
+  passed: false,
+  endReasons: {},
+  ...overrides,
+});
+
+// A six-row scorecard with distinct, exactly-representable win rates and pass/fail flags. `zoner`
+// at 0.5 / passed:false pins BOTH the strict-`>` gate (an exact tie doesn't pass) and the
+// 50%-boundary win-rate formatting. Duplicated verbatim in each expectation below.
+const SCORECARD: ReadonlyArray<{
+  name: string;
+  winRate: number;
+  passed: boolean;
+  rate: string;
+  result: string;
+}> = [
+  { name: "jabber", winRate: 0.4, passed: false, rate: "40%", result: "lost" },
+  { name: "rekka", winRate: 0.55, passed: true, rate: "55%", result: "beat" },
+  { name: "zoner", winRate: 0.5, passed: false, rate: "50%", result: "lost" },
+  {
+    name: "grappler",
+    winRate: 0.65,
+    passed: true,
+    rate: "65%",
+    result: "beat",
+  },
+  { name: "sweeper", winRate: 0.3, passed: false, rate: "30%", result: "lost" },
+  { name: "vulture", winRate: 0.75, passed: true, rate: "75%", result: "beat" },
+];
+
+// A well-formed report carrying the six-row scorecard (uncleared by default).
+const scoredBody = (
+  overrides?: Record<string, unknown>,
+): Record<string, unknown> =>
+  reportBody({
+    gauntlet: {
+      seeds: [1, 2, 3],
+      perOpponent: SCORECARD.map((row) =>
+        opp({ name: row.name, winRate: row.winRate, passed: row.passed }),
+      ),
+    },
+    ...overrides,
+  });
+
+// Read a labelled cell's text out of a scorecard row (the per-slot idiom from Gauntlet.test).
+const cell = (row: HTMLElement, selector: string): string | null =>
+  row.querySelector(selector)?.textContent ?? null;
+
+// A cleared report carrying a `title` block, for the celebration/incumbent-scout tests.
+const titledBody = (title: Record<string, unknown>): Record<string, unknown> =>
+  scoredBody({ cleared: true, title });
+
+// A scouted incumbent (identity only — the /fight contract never carries the King's DSL).
+const INCUMBENT = {
+  name: "old-king",
+  model: "claude-opus-4",
+  handle: "prev-champ",
+};
 
 // A `postFight` stub resolving a given HTTP status + body — the injected network seam.
 const resolves =
@@ -302,5 +382,284 @@ describe("RingPage — the /ring submit surface", () => {
     } finally {
       fetchSpy.mockRestore();
     }
+  });
+});
+
+// The fight card (Slice 2): the 200 report expands from a bare headline into a per-opponent
+// scorecard + a title/incumbent block, while the Slice 1 raw-JSON + Copy block persists below it
+// as the machine-readable source of truth. All behavior asserted on what the author sees; the
+// expected rows/copy are hardcoded (never imported from the component) as the mutation guard.
+describe("RingPage — the fight card", () => {
+  it("renders one scorecard row per opponent, in the report's order", async () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const scorecard = await ui.findByRole("region", {
+      name: /gauntlet scorecard/i,
+    });
+
+    const names = within(scorecard)
+      .getAllByRole("listitem")
+      .map((row) => cell(row, ".ring-score-name"));
+
+    // Pins BOTH the count (exactly six rows, one per perOpponent entry) and the frozen
+    // GAUNTLET_NAMES order — a dropped, extra, or reordered row fails here.
+    expect(names).toEqual([...GAUNTLET_ORDER]);
+  });
+
+  it("shows each opponent's win rate as a percentage", async () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const scorecard = await ui.findByRole("region", {
+      name: /gauntlet scorecard/i,
+    });
+
+    const rates = within(scorecard)
+      .getAllByRole("listitem")
+      .map((row) => cell(row, ".ring-score-rate"));
+
+    // Exact percentages, in order, including the 0.5 → "50%" boundary — pins the `* 100` scaling
+    // and rounding so a dropped multiply or an off-by-one rounding mutant fails.
+    expect(rates).toEqual(SCORECARD.map((row) => row.rate));
+  });
+
+  it("marks each opponent beaten or lost with a text result, never colour alone", async () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const scorecard = await ui.findByRole("region", {
+      name: /gauntlet scorecard/i,
+    });
+
+    const results = within(scorecard)
+      .getAllByRole("listitem")
+      .map((row) => cell(row, ".ring-score-result"));
+
+    // The pass/fail signal is carried by "beat"/"lost" TEXT (not colour) — an accessibility
+    // requirement AND the mutation guard for a flipped `passed` boolean. `zoner` at exactly 0.5
+    // reads "lost" (strict-`>` gate), pinning the boundary.
+    expect(results).toEqual(SCORECARD.map((row) => row.result));
+  });
+
+  it("celebrates the first crown with a throne link and no incumbent scout", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: titledBody({ outcome: "throne-empty-crowned" }),
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const region = await ui.findByRole("region", { name: /title fight/i });
+
+    // The crown links to the (now-yours) throne.
+    expect(
+      within(region)
+        .getByRole("link", { name: /throne/i })
+        .getAttribute("href"),
+    ).toBe("#king");
+
+    // First King: there was no reigning champion to scout — no win rate / bouts line.
+    expect(region.querySelector(".ring-incumbent")).toBeNull();
+    expect(within(region).queryByText(/bouts/i)).toBeNull();
+  });
+
+  it("scouts the dethroned King on a crown: identity, win rate and bouts", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: titledBody({
+            outcome: "crowned",
+            winRate: 0.6,
+            seeds: [7, 8],
+            bouts: 20,
+            incumbent: INCUMBENT,
+          }),
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const region = await ui.findByRole("region", { name: /title fight/i });
+
+    // A crown links to the throne...
+    expect(
+      within(region)
+        .getByRole("link", { name: /throne/i })
+        .getAttribute("href"),
+    ).toBe("#king");
+    // ...and scouts the King you dethroned: model mark (accessible), name, handle...
+    expect(within(region).getByRole("img", { name: /claude/i })).toBeTruthy();
+    expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
+    expect(cell(region, ".ring-incumbent-handle")).toBe("by prev-champ");
+    // ...plus the exact title-fight win rate and bout count.
+    expect(cell(region, ".ring-title-winrate")).toBe("60%");
+    expect(cell(region, ".ring-title-bouts")).toBe("20");
+  });
+
+  it("shows the held throne's King and result, with no new-crown link", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: titledBody({
+            outcome: "king-retained",
+            winRate: 0.45,
+            seeds: [7, 8],
+            bouts: 20,
+            incumbent: INCUMBENT,
+          }),
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const region = await ui.findByRole("region", { name: /title fight/i });
+
+    // The King held on, so the scout is shown with the losing title-fight result...
+    expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
+    expect(cell(region, ".ring-title-winrate")).toBe("45%");
+    expect(cell(region, ".ring-title-bouts")).toBe("20");
+    // ...but the throne didn't change hands — no new-crown link.
+    expect(within(region).queryByRole("link", { name: /throne/i })).toBeNull();
+  });
+
+  it("omits the by-line and shows a generic mark when the King has no handle or model", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: titledBody({
+            outcome: "crowned",
+            winRate: 0.6,
+            seeds: [7, 8],
+            bouts: 20,
+            incumbent: { name: "anon-king", model: null, handle: null },
+          }),
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const region = await ui.findByRole("region", { name: /title fight/i });
+
+    expect(cell(region, ".ring-incumbent-name")).toBe("anon-king");
+    // A null handle renders no by-line (King.tsx precedent); a null model → the generic mark.
+    expect(region.querySelector(".ring-incumbent-handle")).toBeNull();
+    expect(
+      within(region).getByRole("img", { name: /mystery challenger/i }),
+    ).toBeTruthy();
+  });
+
+  it("never renders the scouted King's DSL — identity only", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: titledBody({
+            outcome: "crowned",
+            winRate: 0.6,
+            seeds: [7, 8],
+            bouts: 20,
+            // A hostile payload smuggling the King's rules must never surface.
+            incumbent: {
+              ...INCUMBENT,
+              rules: [{ when: "SMUGGLED_SECRET_RULE", do: "attack" }],
+            },
+          }),
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const region = await ui.findByRole("region", { name: /title fight/i });
+
+    // Identity still shows, but the DSL never leaks into the card.
+    expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
+    expect(region.textContent).not.toMatch(/SMUGGLED_SECRET_RULE/);
+  });
+
+  it("shows no title block when the bot didn't clear the gauntlet", async () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    // The scorecard proves the result rendered — but with no title celebration.
+    await ui.findByRole("region", { name: /gauntlet scorecard/i });
+
+    expect(ui.queryByRole("region", { name: /title fight/i })).toBeNull();
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
+  });
+
+  it("keeps the complete raw payload below the card as the source of truth", async () => {
+    const body = titledBody({
+      outcome: "crowned",
+      winRate: 0.6,
+      seeds: [7, 8],
+      bouts: 20,
+      incumbent: INCUMBENT,
+    });
+
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body })} />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const scorecard = await ui.findByRole("region", {
+      name: /gauntlet scorecard/i,
+    });
+
+    const raw = await ui.findByLabelText(/raw fight result/i);
+
+    // The card summarises the human-readable subset, but the raw block remains the byte-exact,
+    // complete payload — so the machine detail the card omits (net, endReasons, degrade, seeds)
+    // is still there for the author to copy back to their LLM.
+    expect(raw.textContent).toBe(JSON.stringify(body, null, 2));
+
+    // ...and it sits BELOW the card (AC-5): the scorecard precedes the raw block in document order.
+    expect(
+      scorecard.compareDocumentPosition(raw) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("renders no scorecard when the response carries no opponents", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 400,
+          body: { type: "/problems/malformed-request", title: "Invalid" },
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    // An error (or any body without `gauntlet.perOpponent`) still shows the raw block for the
+    // LLM, but there are zero rows — so the scorecard region must not render (an empty scorecard
+    // would be noise). Pins the `rows().length > 0` guard against a `>= 0` boundary mutant.
+    await ui.findByLabelText(/raw fight result/i);
+
+    expect(ui.queryByRole("region", { name: /gauntlet scorecard/i })).toBeNull();
   });
 });

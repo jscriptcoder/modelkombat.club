@@ -1,8 +1,9 @@
-import { createSignal, Show, type Component } from "solid-js";
+import { createSignal, For, Show, type Component } from "solid-js";
 
 import "./app.css";
 import "./ring.css";
 import CopyButton from "./CopyButton";
+import ModelLogo from "./ModelLogo";
 
 // The result of a POST /fight: the HTTP status plus the parsed JSON body. `body` is `unknown`
 // because a non-2xx carries a problem+json, not a report — the human still sees and copies it.
@@ -79,6 +80,92 @@ const outcomeHeadline = (body: unknown): string => {
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300;
 
+// One per-opponent scorecard row, shaped from the /fight report's `gauntlet.perOpponent`. Local
+// types (not imported from `src/`) keep the web layer decoupled — the King.tsx precedent.
+type ScoreRow = { name: string; winRate: number; passed: boolean };
+
+// Extract the per-opponent rows from an unknown /fight body, preserving the report's order (the
+// frozen GAUNTLET_NAMES order). A body without a well-formed `gauntlet.perOpponent` — an error
+// response, or a shape we don't recognise — yields no rows, so the card simply doesn't render.
+const scoreRows = (body: unknown): ScoreRow[] => {
+  if (!isRecord(body)) return [];
+
+  const gauntlet = body.gauntlet;
+
+  if (!isRecord(gauntlet) || !Array.isArray(gauntlet.perOpponent)) return [];
+
+  return gauntlet.perOpponent.flatMap((row: unknown) =>
+    isRecord(row) &&
+    typeof row.name === "string" &&
+    typeof row.winRate === "number" &&
+    typeof row.passed === "boolean"
+      ? [{ name: row.name, winRate: row.winRate, passed: row.passed }]
+      : [],
+  );
+};
+
+// A 0–1 win rate → a whole-number percentage. Bouts run in multiples of 1/20, so the percentage
+// is an integer; rounding pins it and clears float noise (0.55 * 100 = 55.00000000000001).
+const formatRate = (winRate: number): string => `${Math.round(winRate * 100)}%`;
+
+// The pass/fail signal as TEXT — never colour alone (accessibility). The strict-`>`-half gate is
+// already resolved server-side in `passed`; the card only names it.
+const resultLabel = (passed: boolean): string => (passed ? "beat" : "lost");
+
+// The scouted incumbent King — identity ONLY. `readIncumbent` extracts exactly these three fields,
+// so a payload smuggling extra fields (e.g. the King's `rules` DSL) can never leak into the card.
+type Incumbent = { name: string; model: string | null; handle: string | null };
+
+// The title-fight scout: who you faced + how the championship bout went. Absent for the first
+// crown (an empty throne has no incumbent to scout).
+type TitleScout = { incumbent: Incumbent; winRate: number; bouts: number };
+
+// The title block's view-model. `linksToThrone` is true for the two crownings (the throne is now
+// yours to view); false when the King held on (the scout already shows them). `scout` is null only
+// for the first crown.
+type TitleView = { linksToThrone: boolean; scout: TitleScout | null };
+
+const readIncumbent = (value: unknown): Incumbent | null => {
+  if (!isRecord(value) || typeof value.name !== "string") return null;
+
+  return {
+    name: value.name,
+    model: typeof value.model === "string" ? value.model : null,
+    handle: typeof value.handle === "string" ? value.handle : null,
+  };
+};
+
+// Shape the /fight `title` block into the view-model, or null when there is no well-formed title —
+// an uncleared report, an error body, or an unrecognised outcome — so the card omits the block.
+const titleView = (body: unknown): TitleView | null => {
+  if (!isRecord(body) || !isRecord(body.title)) return null;
+
+  const title = body.title;
+
+  if (title.outcome === "throne-empty-crowned") {
+    return { linksToThrone: true, scout: null };
+  }
+
+  if (title.outcome === "crowned" || title.outcome === "king-retained") {
+    const incumbent = readIncumbent(title.incumbent);
+
+    if (
+      incumbent === null ||
+      typeof title.winRate !== "number" ||
+      typeof title.bouts !== "number"
+    ) {
+      return null;
+    }
+
+    return {
+      linksToThrone: title.outcome === "crowned",
+      scout: { incumbent, winRate: title.winRate, bouts: title.bouts },
+    };
+  }
+
+  return null;
+};
+
 const RingPage: Component<RingPageProps> = (props) => {
   const [docText, setDocText] = createSignal("");
   const [handle, setHandle] = createSignal("");
@@ -86,6 +173,23 @@ const RingPage: Component<RingPageProps> = (props) => {
   const [sendError, setSendError] = createSignal("");
   const [loading, setLoading] = createSignal(false);
   const [result, setResult] = createSignal<FightResponse | null>(null);
+
+  // The per-opponent scorecard rows for the current result — empty until a report with a
+  // well-formed gauntlet arrives (so an error response renders no card). Derived so the guard
+  // and the list read from one source.
+  const rows = (): ScoreRow[] => {
+    const current = result();
+
+    return current ? scoreRows(current.body) : [];
+  };
+
+  // The title-fight view-model for the current result — null until a cleared report with a
+  // well-formed title arrives (so uncleared/error results render no title block).
+  const title = (): TitleView | null => {
+    const current = result();
+
+    return current ? titleView(current.body) : null;
+  };
 
   const runFight = async (): Promise<void> => {
     setParseError("");
@@ -194,6 +298,68 @@ const RingPage: Component<RingPageProps> = (props) => {
               }
             >
               <p class="ring-headline">{outcomeHeadline(response().body)}</p>
+            </Show>
+
+            <Show when={rows().length > 0}>
+              <section class="ring-scorecard" aria-label="Gauntlet scorecard">
+                <ul class="ring-score-list">
+                  <For each={rows()}>
+                    {(row) => (
+                      <li class="ring-score-row">
+                        <code class="ring-score-name">{row.name}</code>
+                        <span class="ring-score-rate">
+                          {formatRate(row.winRate)}
+                        </span>
+                        <span
+                          class="ring-score-result"
+                          classList={{ "ring-score-result-passed": row.passed }}
+                        >
+                          {resultLabel(row.passed)}
+                        </span>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </section>
+            </Show>
+
+            <Show when={title()}>
+              {(t) => (
+                <section class="ring-title-fight" aria-label="Title fight">
+                  <Show when={t().linksToThrone}>
+                    <a class="ring-throne-link" href="#king">
+                      See the throne
+                    </a>
+                  </Show>
+
+                  <Show when={t().scout}>
+                    {(s) => (
+                      <div class="ring-incumbent">
+                        <p class="ring-incumbent-label">
+                          Title fight vs the King
+                        </p>
+                        <ModelLogo model={s().incumbent.model} />
+                        <code class="ring-incumbent-name">
+                          {s().incumbent.name}
+                        </code>
+                        <Show when={s().incumbent.handle}>
+                          {(handle) => (
+                            <p class="ring-incumbent-handle">by {handle()}</p>
+                          )}
+                        </Show>
+                        <p class="ring-title-result">
+                          <span class="ring-title-winrate">
+                            {formatRate(s().winRate)}
+                          </span>{" "}
+                          across{" "}
+                          <span class="ring-title-bouts">{s().bouts}</span>{" "}
+                          bouts
+                        </p>
+                      </div>
+                    )}
+                  </Show>
+                </section>
+              )}
             </Show>
 
             <div class="ring-raw">
