@@ -494,7 +494,7 @@ describe("RingPage — the fight card", () => {
       within(region)
         .getByRole("link", { name: /throne/i })
         .getAttribute("href"),
-    ).toBe("#king");
+    ).toBe("/#king");
 
     // First King: there was no reigning champion to scout — no win rate / bouts line.
     expect(region.querySelector(".ring-incumbent")).toBeNull();
@@ -526,7 +526,7 @@ describe("RingPage — the fight card", () => {
       within(region)
         .getByRole("link", { name: /throne/i })
         .getAttribute("href"),
-    ).toBe("#king");
+    ).toBe("/#king");
     // ...and scouts the King you dethroned: model mark (accessible), name, handle...
     expect(within(region).getByRole("img", { name: /claude/i })).toBeTruthy();
     expect(cell(region, ".ring-incumbent-name")).toBe("old-king");

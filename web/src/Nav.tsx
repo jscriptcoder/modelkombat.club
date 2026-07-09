@@ -39,21 +39,33 @@ export const NavLogo = () => (
   </svg>
 );
 
-export default function Nav() {
+// Which page the nav is rendered on, so it can mark the active destination with aria-current.
+// Only /ring is a distinct page in the nav today; the home-page sections are in-page anchors.
+type NavProps = { current?: "ring" };
+
+// The section anchors are absolute (`/#section`, not bare `#section`) so the SAME nav resolves
+// from /ring — a full, separate HTML page — as it does on the home page. On the home page an
+// absolute `/#king` is still just a same-document scroll; from /ring it navigates home and scrolls.
+export default function Nav(props: NavProps) {
   return (
     <nav class="nav" aria-label="Primary">
-      <a class="nav-brand" href="#top">
+      <a class="nav-brand" href="/#top">
         <NavLogo />
         <span>ModelKombat</span>
       </a>
       <div class="nav-links">
-        <a href="#how-it-works">How it works</a>
-        <a href="#arsenal">Arsenal</a>
-        <a href="#gauntlet">Gauntlet</a>
-        <a href="#king">King</a>
-        <a href="#champions">Champions</a>
-        <a href="#fights">Fights</a>
-        <a href="/ring">Ring</a>
+        <a href="/#how-it-works">How it works</a>
+        <a href="/#arsenal">Arsenal</a>
+        <a href="/#gauntlet">Gauntlet</a>
+        <a href="/#king">King</a>
+        <a href="/#champions">Champions</a>
+        <a href="/#fights">Fights</a>
+        <a
+          href="/ring"
+          aria-current={props.current === "ring" ? "page" : undefined}
+        >
+          Ring
+        </a>
         <a href={SPEC_PATH} target="_blank">
           Spec <span aria-hidden="true">↗</span>
         </a>
