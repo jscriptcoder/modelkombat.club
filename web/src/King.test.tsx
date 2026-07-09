@@ -1,129 +1,96 @@
 import { fireEvent, render } from "@solidjs/testing-library";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import King, { type Champion, type KingView } from "./King";
+import King, { type Champion } from "./King";
 
-// A resolved King view. Overrides let a test null out `model`/`handle` or inject a
-// hostile `name` without restating the whole shape.
-const kingView = (overrides?: Partial<Champion>): KingView => ({
-  current: {
-    name: "reigning-king",
-    model: "claude-opus-4-8",
-    handle: "grandmaster",
-    generation: 3,
-    ...overrides,
-  },
+// A resolved champion. Overrides let a test null out `model`/`handle` or inject a
+// hostile `name` without restating the whole identity shape.
+const champion = (overrides?: Partial<Champion>): Champion => ({
+  name: "reigning-king",
+  model: "claude-opus-4-8",
+  handle: "grandmaster",
+  generation: 3,
+  ...overrides,
 });
-
-// A fetcher that never settles — holds the resource in its loading state.
-const pending = (): Promise<KingView> => new Promise<KingView>(() => {});
-
-// A one-shot resolved/ rejected fetcher.
-const resolves =
-  (view: KingView): (() => Promise<KingView>) =>
-  () =>
-    Promise.resolve(view);
-
-const rejects = (): (() => Promise<KingView>) => () =>
-  Promise.reject(new Error("throne store unreachable"));
 
 describe("King section", () => {
   it("shows an accessible loading state while the throne is being fetched", () => {
-    const { getByRole } = render(() => <King fetchKing={pending} />);
+    const { getByRole } = render(() => <King loading={true} />);
 
     // A live status region announces the in-flight fetch (AC-K5).
     expect(getByRole("status")).toBeTruthy();
   });
 
-  it("shows the reigning champion's name, model, and generation once loaded", async () => {
-    const { findByText } = render(() => (
-      <King fetchKing={resolves(kingView())} />
-    ));
+  it("shows the reigning champion's name, model, and generation", () => {
+    const { getByText } = render(() => <King current={champion()} />);
 
-    expect(await findByText("reigning-king")).toBeTruthy();
-    expect(await findByText("claude-opus-4-8")).toBeTruthy();
-    expect(await findByText(/Gen\s*3/)).toBeTruthy();
+    expect(getByText("reigning-king")).toBeTruthy();
+    expect(getByText("claude-opus-4-8")).toBeTruthy();
+    expect(getByText(/Gen\s*3/)).toBeTruthy();
   });
 
-  it("brands the reigning champion with its model's logo", async () => {
-    const { findByRole } = render(() => (
-      <King fetchKing={resolves(kingView({ model: "gpt-4o" }))} />
+  it("brands the reigning champion with its model's logo", () => {
+    const { getByRole } = render(() => (
+      <King current={champion({ model: "gpt-4o" })} />
     ));
 
     // The card head is the model's brand mark, not a generic placeholder (AC-L3).
-    expect(
-      await findByRole("img", { name: "authored by OpenAI" }),
-    ).toBeTruthy();
+    expect(getByRole("img", { name: "authored by OpenAI" })).toBeTruthy();
   });
 
-  it("renders a hostile champion name as inert text, never as markup", async () => {
+  it("renders a hostile champion name as inert text, never as markup", () => {
     const hostile = "<script>alert(1)</script>";
 
-    const { findByText, container } = render(() => (
-      <King fetchKing={resolves(kingView({ name: hostile }))} />
+    const { getByText, container } = render(() => (
+      <King current={champion({ name: hostile })} />
     ));
 
     // The literal string is shown as text (Solid auto-escapes)...
-    expect(await findByText(hostile)).toBeTruthy();
+    expect(getByText(hostile)).toBeTruthy();
     // ...and no actual <script> element was injected into the DOM.
     expect(container.querySelector("script")).toBeNull();
   });
 
-  it("omits the model label and handle byline when they are absent", async () => {
-    const { findByText, findByRole, queryByText } = render(() => (
-      <King fetchKing={resolves(kingView({ model: null, handle: null }))} />
+  it("omits the model label and handle byline when they are absent", () => {
+    const { getByText, getByRole, queryByText } = render(() => (
+      <King current={champion({ model: null, handle: null })} />
     ));
 
     // The name still anchors the card...
-    expect(await findByText("reigning-king")).toBeTruthy();
+    expect(getByText("reigning-king")).toBeTruthy();
     // ...an absent model falls back to the generic mystery-challenger mark (AC-C4)...
-    expect(
-      await findByRole("img", { name: /mystery challenger/i }),
-    ).toBeTruthy();
+    expect(getByRole("img", { name: /mystery challenger/i })).toBeTruthy();
     // ...but no "null"/"undefined" leaks, and the handle byline is gone.
     expect(queryByText(/null|undefined/)).toBeNull();
     expect(queryByText(/grandmaster/)).toBeNull();
   });
 
-  it("invites the first challenger when the throne is empty", async () => {
-    const { findByText } = render(() => (
-      <King fetchKing={resolves({ current: null })} />
-    ));
+  it("invites the first challenger when the throne is empty", () => {
+    const { getByText } = render(() => <King current={null} />);
 
-    expect(await findByText(/throne awaits/i)).toBeTruthy();
+    expect(getByText(/throne awaits/i)).toBeTruthy();
   });
 
-  it("shows a distinct error state with a working Retry when the fetch fails", async () => {
-    // Fail the first fetch, succeed on the retry.
-    let calls = 0;
+  it("shows a distinct error state whose Retry re-requests the throne", () => {
+    const onRetry = vi.fn();
 
-    const flaky = (): Promise<KingView> => {
-      calls += 1;
-
-      return calls === 1
-        ? Promise.reject(new Error("throne store unreachable"))
-        : Promise.resolve(kingView());
-    };
-
-    const { findByText, findByRole } = render(() => <King fetchKing={flaky} />);
+    const { getByText, getByRole } = render(() => (
+      <King error={true} onRetry={onRetry} />
+    ));
 
     // Distinct failure copy — NOT the empty-throne CTA.
-    expect(await findByText(/couldn't reach the ring/i)).toBeTruthy();
+    expect(getByText(/couldn't reach the ring/i)).toBeTruthy();
 
-    const retry = await findByRole("button", { name: /retry/i });
+    fireEvent.click(getByRole("button", { name: /retry/i }));
 
-    fireEvent.click(retry);
-
-    // The retry succeeds and the King appears.
-    expect(await findByText("reigning-king")).toBeTruthy();
+    // The Retry button drives the shared /king refetch owned by the parent (App).
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
-  it("never shows the empty-throne CTA on a fetch failure", async () => {
-    const { findByText, queryByText } = render(() => (
-      <King fetchKing={rejects()} />
-    ));
+  it("never shows the empty-throne CTA on a fetch failure", () => {
+    const { getByText, queryByText } = render(() => <King error={true} />);
 
-    expect(await findByText(/couldn't reach the ring/i)).toBeTruthy();
+    expect(getByText(/couldn't reach the ring/i)).toBeTruthy();
     expect(queryByText(/throne awaits/i)).toBeNull();
   });
 });

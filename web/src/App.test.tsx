@@ -1,7 +1,8 @@
-import { render, within } from "@solidjs/testing-library";
+import { fireEvent, render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
-import App from "./App";
+import App, { type KingResponse } from "./App";
+import { type Champion } from "./King";
 import { CANONICAL_ORIGIN } from "./config";
 
 const isDark = (color: string): boolean => {
@@ -11,6 +12,16 @@ const isDark = (color: string): boolean => {
 
   return luminance < 0.35;
 };
+
+// A champion identity for the /king payload. Overrides let a test rename or renumber a
+// reign without restating the whole shape.
+const champ = (overrides?: Partial<Champion>): Champion => ({
+  name: "champion",
+  model: "claude-opus-4-8",
+  handle: "grandmaster",
+  generation: 1,
+  ...overrides,
+});
 
 describe("App (landing page)", () => {
   it("names the site in the top-level heading", () => {
@@ -252,5 +263,87 @@ describe("App (landing page)", () => {
     }
 
     expect(reducedMotionGate.cssText).toMatch(/scroll-behavior:\s*smooth/);
+  });
+});
+
+describe("App — single /king fetch feeding both throne sections", () => {
+  it("shows both sections' loading state while the shared fetch is in flight", async () => {
+    // A fetch that never settles holds the single shared resource in its loading state.
+    const pending = (): Promise<KingResponse> =>
+      new Promise<KingResponse>(() => {});
+
+    const { findByText } = render(() => <App fetchKing={pending} />);
+
+    // The one in-flight request drives BOTH sections' loading copy at once.
+    expect(await findByText(/summoning the reigning champion/i)).toBeTruthy();
+    expect(await findByText(/gathering the champions/i)).toBeTruthy();
+  });
+
+  it("fetches /king once and feeds `current` to the King and `recent` to the Hall of Kings", async () => {
+    let calls = 0;
+
+    const fetchKing = (): Promise<KingResponse> => {
+      calls += 1;
+
+      return Promise.resolve({
+        current: champ({ name: "reigning-king", generation: 7 }),
+        recent: [
+          champ({ name: "gold-king", generation: 6 }),
+          champ({ name: "silver-king", generation: 5 }),
+        ],
+      });
+    };
+
+    const { findByText, getByRole } = render(() => (
+      <App fetchKing={fetchKing} />
+    ));
+
+    // The King section renders the reigning champion...
+    const king = getByRole("region", { name: "Current King" });
+
+    expect(await within(king).findByText("reigning-king")).toBeTruthy();
+
+    // ...and the Hall of Kings renders the recent succession...
+    const hall = getByRole("region", { name: "Hall of Kings" });
+
+    expect(await within(hall).findByText("gold-king")).toBeTruthy();
+    expect(within(hall).getByText("silver-king")).toBeTruthy();
+
+    // ...from ONE shared request, not one fetch per section.
+    await findByText("reigning-king");
+    expect(calls).toBe(1);
+  });
+
+  it("shows the shared error in both sections, and a single Retry recovers both", async () => {
+    let calls = 0;
+
+    const flaky = (): Promise<KingResponse> => {
+      calls += 1;
+
+      return calls === 1
+        ? Promise.reject(new Error("throne store unreachable"))
+        : Promise.resolve({
+            current: champ({ name: "recovered-king" }),
+            recent: [champ({ name: "recovered-king" })],
+          });
+    };
+
+    const { findAllByRole, findAllByText } = render(() => (
+      <App fetchKing={flaky} />
+    ));
+
+    // Both sections surface the shared failure — two error copies, two Retry buttons.
+    const errors = await findAllByText(/couldn't reach the ring/i);
+
+    expect(errors).toHaveLength(2);
+
+    // Retrying from ONE section re-runs the single shared fetch and refills both.
+    const [retry] = await findAllByRole("button", { name: /retry/i });
+
+    fireEvent.click(retry);
+
+    // One shared refetch refills BOTH the King and the Hall of Kings.
+    expect(await findAllByText("recovered-king")).toHaveLength(2);
+    expect(calls).toBe(2);
   });
 });
