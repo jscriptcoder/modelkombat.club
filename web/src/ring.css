@@ -8,7 +8,14 @@
 
 .ring-form {
   display: grid;
-  gap: 0.5rem;
+  gap: 1rem;
+}
+
+/* A field group stacks its label, control, (optional note) and inline error slot with tight
+   spacing, independent of the looser gap between groups. */
+.ring-field {
+  display: grid;
+  gap: 0.35rem;
 }
 
 .ring-label {
@@ -31,10 +38,18 @@
   resize: vertical;
 }
 
+/* A rejected field turns its border red. Keyed off aria-invalid so the visual cue and the
+   assistive-tech state can never disagree — the JSX sets exactly one flag. */
+.ring-textarea[aria-invalid="true"],
+.ring-input[aria-invalid="true"] {
+  border-color: #ff8a8a;
+  box-shadow: 0 0 0 1px #ff8a8a;
+}
+
 .ring-handle-note {
   color: var(--muted);
   font-size: 0.85rem;
-  margin: 0.25rem 0 0.5rem;
+  margin: 0;
 }
 
 .ring-submit {
@@ -50,11 +65,40 @@
   cursor: pointer;
 }
 
-.ring-error,
-.ring-handle-error,
 .ring-send-error-line {
   color: #ff8a8a;
   margin: 0.25rem 0;
+}
+
+/* Each field's inline error, in a slot that is ALWAYS in the layout so the form never reflows as
+   the message appears: it reserves one line's height and the message fades in. Opacity-only, so it
+   stays gentle under reduced motion (the .copy-status precedent). */
+.ring-field-error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 1.25rem;
+  margin: 0;
+  color: #ff8a8a;
+  font-size: 0.85rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.ring-field-error-shown {
+  opacity: 1;
+}
+
+/* The warning glyph beside the message — stroked (like .copy-icon) so the "!" reads on the tint. */
+.ring-field-error-icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
 }
 
 /* Disabled while a fight is in flight — no second throne contest. */

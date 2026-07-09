@@ -1159,3 +1159,123 @@ describe("RingPage — submit lifecycle: disable + remembered handle", () => {
     }
   });
 });
+
+// Inline field errors: a rejected field is flagged on the control itself (aria-invalid, which the
+// red border keys off) and its message rides in an always-mounted slot directly under the field —
+// mounted even when empty so the form never reflows as the message toggles (reserved space), silent
+// to assistive tech until it carries a message, and accompanied by a decorative warning icon.
+describe("RingPage — inline field errors", () => {
+  // Resolve the element a control points its aria-describedby at (the field's own error slot).
+  const describedBy = (
+    control: HTMLElement,
+    container: Element,
+  ): Element | null => {
+    const id = control.getAttribute("aria-describedby");
+
+    return id ? container.querySelector(`#${id}`) : null;
+  };
+
+  it("flags the bot-document field and describes it with the parse error", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, "", "grandmaster");
+
+    const textarea = ui.getByRole("textbox", { name: /bot document/i });
+
+    // The control carries the invalid state (what the red border and screen readers read)...
+    expect(textarea.getAttribute("aria-invalid")).toBe("true");
+    // ...and its described-by slot holds the parse message.
+    expect(describedBy(textarea, ui.container)?.textContent).toMatch(
+      /paste your bot json to continue/i,
+    );
+    // The other field, whose handle was valid, is left untouched.
+    expect(
+      ui.getByRole("textbox", { name: /handle/i }).getAttribute("aria-invalid"),
+    ).not.toBe("true");
+    // A field-level rejection never contests the throne.
+    expect(postFight).not.toHaveBeenCalled();
+  });
+
+  it("flags the handle field and describes it with the handle error", () => {
+    const postFight = vi.fn(resolves({ status: 200, body: reportBody() }));
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "");
+
+    const input = ui.getByRole("textbox", { name: /handle/i });
+
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(describedBy(input, ui.container)?.textContent).toMatch(
+      /add an author handle/i,
+    );
+    // The document was valid, so the textarea is not flagged.
+    expect(
+      ui
+        .getByRole("textbox", { name: /bot document/i })
+        .getAttribute("aria-invalid"),
+    ).not.toBe("true");
+  });
+
+  it("shows a decorative warning icon alongside the field error", () => {
+    const ui = render(() => <RingPage />);
+
+    typeAndSend(ui, "", "grandmaster");
+
+    const slot = ui.container.querySelector("#bot-document-error");
+    const icon = slot?.querySelector(".ring-field-error-icon");
+
+    // The icon accompanies the message but is hidden from assistive tech — the text carries meaning.
+    expect(icon).toBeTruthy();
+    expect(icon?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("keeps both error slots mounted, empty and silent before any submit", () => {
+    const ui = render(() => <RingPage />);
+
+    // Neither control is flagged on first paint.
+    expect(
+      ui
+        .getByRole("textbox", { name: /bot document/i })
+        .getAttribute("aria-invalid"),
+    ).not.toBe("true");
+    expect(
+      ui.getByRole("textbox", { name: /handle/i }).getAttribute("aria-invalid"),
+    ).not.toBe("true");
+
+    const docSlot = ui.container.querySelector("#bot-document-error");
+    const handleSlot = ui.container.querySelector("#author-handle-error");
+
+    // Both slots exist up front (reserved space — the form can't jump when a message appears)...
+    expect(docSlot).toBeTruthy();
+    expect(handleSlot).toBeTruthy();
+    // ...but carry no message, no icon, and no alert role until there's something to announce.
+    expect(docSlot?.textContent).toBe("");
+    expect(handleSlot?.textContent).toBe("");
+    expect(docSlot?.getAttribute("role")).toBeNull();
+    expect(handleSlot?.getAttribute("role")).toBeNull();
+    expect(ui.container.querySelector(".ring-field-error-icon")).toBeNull();
+  });
+
+  it("clears the flag and message once a later submit is valid", async () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: reportBody() })} />
+    ));
+
+    typeAndSend(ui, "", "grandmaster");
+
+    const textarea = ui.getByRole("textbox", { name: /bot document/i });
+
+    expect(textarea.getAttribute("aria-invalid")).toBe("true");
+
+    // Fix the document and resubmit — the fresh valid run must clear the stale flag and message.
+    typeAndSend(ui, JSON.stringify(VALID_DOC), "grandmaster");
+
+    await ui.findByLabelText(/raw fight result/i);
+
+    expect(textarea.getAttribute("aria-invalid")).not.toBe("true");
+    expect(ui.container.querySelector("#bot-document-error")?.textContent).toBe(
+      "",
+    );
+  });
+});

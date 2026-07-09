@@ -210,6 +210,37 @@ const titleView = (body: unknown): TitleView | null => {
   return null;
 };
 
+// A warning triangle. Decorative — the adjacent message text carries the meaning — so it is hidden
+// from assistive tech and inlined to stay CSP-safe (the CopyButton ClipboardIcon precedent). Drawn
+// with strokes so the exclamation "!" reads on any background; the dot is a zero-length round-capped
+// line.
+const WarningIcon = () => (
+  <svg class="ring-field-error-icon" viewBox="0 0 16 16" aria-hidden="true">
+    <path d="M8 2.2 14.6 13.6H1.4z" />
+    <line x1="8" y1="6.2" x2="8" y2="9.6" />
+    <line x1="8" y1="11.4" x2="8" y2="11.6" />
+  </svg>
+);
+
+// One field's inline error slot, rendered directly under its control. Always mounted — even when
+// empty — so the form never reflows as the message toggles: the slot reserves one line's height in
+// CSS and the message fades in. `role="alert"` is added only when a message is present, so an empty
+// slot is silent to assistive tech (and leaves exactly one live alert for the response-error states
+// to own).
+const FieldError: Component<{ id: string; message: string }> = (props) => (
+  <p
+    id={props.id}
+    class="ring-field-error"
+    classList={{ "ring-field-error-shown": props.message !== "" }}
+    role={props.message !== "" ? "alert" : undefined}
+  >
+    <Show when={props.message}>
+      <WarningIcon />
+      <span class="ring-field-error-text">{props.message}</span>
+    </Show>
+  </p>
+);
+
 const RingPage: Component<RingPageProps> = (props) => {
   const [docText, setDocText] = createSignal("");
   const [handle, setHandle] = createSignal(recallHandle());
@@ -332,42 +363,40 @@ const RingPage: Component<RingPageProps> = (props) => {
           void runFight();
         }}
       >
-        <label class="ring-label" for="bot-document">
-          Bot document (JSON)
-        </label>
-        <textarea
-          id="bot-document"
-          class="ring-textarea"
-          rows="14"
-          value={docText()}
-          onInput={(e) => setDocText(e.currentTarget.value)}
-        />
+        <div class="ring-field">
+          <label class="ring-label" for="bot-document">
+            Bot document (JSON)
+          </label>
+          <textarea
+            id="bot-document"
+            class="ring-textarea"
+            rows="14"
+            value={docText()}
+            onInput={(e) => setDocText(e.currentTarget.value)}
+            aria-invalid={parseError() !== "" ? "true" : undefined}
+            aria-describedby="bot-document-error"
+          />
+          <FieldError id="bot-document-error" message={parseError()} />
+        </div>
 
-        <label class="ring-label" for="author-handle">
-          Author handle
-        </label>
-        <input
-          id="author-handle"
-          class="ring-input"
-          type="text"
-          value={handle()}
-          onInput={(e) => setHandle(e.currentTarget.value)}
-        />
-        <p class="ring-handle-note">
-          Your handle and bot name are public if you win.
-        </p>
-
-        <Show when={handleError()}>
-          <p class="ring-handle-error" role="alert">
-            {handleError()}
+        <div class="ring-field">
+          <label class="ring-label" for="author-handle">
+            Author handle
+          </label>
+          <input
+            id="author-handle"
+            class="ring-input"
+            type="text"
+            value={handle()}
+            onInput={(e) => setHandle(e.currentTarget.value)}
+            aria-invalid={handleError() !== "" ? "true" : undefined}
+            aria-describedby="author-handle-error"
+          />
+          <p class="ring-handle-note">
+            Your handle and bot name are public if you win.
           </p>
-        </Show>
-
-        <Show when={parseError()}>
-          <p class="ring-error" role="alert">
-            {parseError()}
-          </p>
-        </Show>
+          <FieldError id="author-handle-error" message={handleError()} />
+        </div>
 
         <button type="submit" class="ring-submit" disabled={loading()}>
           Send into the ring
