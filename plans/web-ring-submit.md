@@ -2,9 +2,10 @@
 
 **Branch**: umbrella `feat/web-ring-submit` — **one PR (branch) per slice**:
 `feat/web-ring-skeleton` → `feat/web-ring-card` → `feat/web-ring-errors` → `feat/web-ring-discovery`.
-**Status**: Active — **Slices 1–2 ✅ shipped** (PR #237 skeleton · PR #238 full fight card;
-2026-07-09, live + smoke-verified); Slice 3 (every failure state + handle polish) next. Planned
-2026-07-09 after a `grill-me` pass (decisions table below).
+**Status**: Active — **Slices 1–3 ✅ shipped** (PR #237 skeleton · PR #238 full fight card ·
+PR #239 every failure state + handle polish; 2026-07-09, live + smoke-verified); Slice 4
+(discoverability — the final slice) next. Planned 2026-07-09 after a `grill-me` pass (decisions
+table below).
 
 ## Goal
 
@@ -314,7 +315,7 @@ Gauntlet card idioms + `ModelLogo` for the incumbent) → `ring.css`. **Skipped*
 
 ---
 
-### Slice 3: Every failure state + handle polish
+### Slice 3: Every failure state + handle polish ✅ SHIPPED (PR #239, 2026-07-09, live + smoke-verified)
 
 **Value**: An author who pastes a malformed bot, a bad handle, or hits a throne race / bad
 network gets a precise, actionable **human-readable** message instead of the generic fallback
@@ -345,28 +346,28 @@ modules** (matching `inject-body.ts`, not a one-off subfolder) → `RingPage` re
 
 **Acceptance criteria** (present + confirm before code):
 
-- [ ] **AC-1 — Validator issues (422).** A **`422 /problems/invalid-bot`** response renders its
+- [x] **AC-1 — Validator issues (422).** A **`422 /problems/invalid-bot`** response renders its
       `errors: { path, reason }[]` as a **readable list** (each `path: reason`), keeping the pasted
       doc so the author can fix it. The Slice 1 raw copy block still carries the full problem+json;
       the specific list **replaces** the generic banner for this status.
-- [ ] **AC-2 — Empty / whitespace-only textarea** shows a distinct _"Paste your bot JSON to
+- [x] **AC-2 — Empty / whitespace-only textarea** shows a distinct _"Paste your bot JSON to
       continue."_ message (not the "That's not valid JSON" copy) and makes **no** `postFight` call —
       refining the Slice 1 parse guard for the no-input case.
-- [ ] **AC-3 — Client handle validation** (mirrors `readHandle` + trims): the handle is **trimmed**,
+- [x] **AC-3 — Client handle validation** (mirrors `readHandle` + trims): the handle is **trimmed**,
       then **empty** (incl. whitespace-only) / **trimmed length > 64** / **control char**
       (code `< 0x20 || === 0x7f`) each show an **inline field error** and make **no** `postFight`
       call; a valid handle is sent **trimmed**. Boundary tested at **63 (ok) / 64 (ok) / 65
       (rejected)**. A server **400 malformed-request** whose `title` names `X-Author-Handle`
       (belt-and-braces) also surfaces on the handle field.
-- [ ] **AC-4 — `fightError(status, body)` taxonomy** (pure, exhaustive): **409 throne-moved** →
+- [x] **AC-4 — `fightError(status, body)` taxonomy** (pure, exhaustive): **409 throne-moved** →
       "the throne advanced — resubmit to challenge the current King" + a resubmit affordance;
       **413 / 405 / network / abort** → a distinct generic transport error with Retry; an
       **unrecognized non-2xx** → Slice 1's generic banner (the fallback). Each recognized status'
       specific message replaces the generic banner.
-- [ ] **AC-5 — Submit disabled in-flight** (no double throne contest). _(The in-flight loading
+- [x] **AC-5 — Submit disabled in-flight** (no double throne contest). _(The in-flight loading
       status copy is already Slice 1's — "Running the gauntlet — this can take a few seconds";
       Slice 3 adds only the disable.)_
-- [ ] **AC-6 — Handle localStorage.** The handle input **prefills from `localStorage`** and
+- [x] **AC-6 — Handle localStorage.** The handle input **prefills from `localStorage`** and
       **persists on every client-valid submit** (at POST-fire time); absent/blocked storage (private
       mode, disabled) degrades silently to an empty field (access wrapped in try/catch).
       **RED**: browser-mode `RingPage.test.tsx` behavior **only** (no standalone pure-fn tests — see

@@ -53,6 +53,7 @@ export default function Nav() {
         <a href="#king">King</a>
         <a href="#champions">Champions</a>
         <a href="#fights">Fights</a>
+        <a href="/ring">Ring</a>
         <a href={SPEC_PATH} target="_blank">
           Spec <span aria-hidden="true">↗</span>
         </a>
