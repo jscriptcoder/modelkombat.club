@@ -194,3 +194,36 @@ plus a generic per-section deep-link mechanism — **both shipped**.
   Solid `createResource` accessor inside an effect **re-throws** in the error state → gate on
   `spec.state === "ready"`. **web-only, no new dependency**):
   [web-arsenal-frametable-deeplink.md](web-arsenal-frametable-deeplink.md)
+
+## Web SSG / prerender — LLM- & crawler-readable pages (web) ✅ COMPLETE
+
+Build-time **prerendering (SSG)** makes the `web/` home page **and** `/spec-guide` server-visible to
+LLMs and crawlers — a no-JS fetch now returns real HTML, not an empty `<div id="root">` shell — while
+**Current King** + **Hall of Kings** stay client-side. Not a SolidStart/SSR-server migration: a
+hand-rolled post-build `tsx` script over a Vite **SSR build** of `entry-server.tsx` + a **hydratable**
+client build. **Three slices, PR per slice**; the plan + resolved grill-me decisions:
+[web-prerender-ssg.md](web-prerender-ssg.md).
+
+- **Slice 1 — canonical absolute spec/fight URLs** (PR #231 — a single `CANONICAL_ORIGIN`
+  (`https://modelkombat.club`) feeds the shown/copied spec + fight URLs so they are pasteable into an
+  LLM from any environment and stable at build time; the `href`s stay the relative `/spec`. This
+  **reverses** the prior "follow the serving origin, never a baked-in host" design — SSG has no runtime
+  origin and the starter-prompt affordance needs an absolute URL).
+- **Slice 2 — prerender + hydrate the home page** (PR #232 — `vite-plugin-solid({ hydratable })` client
+  build + a Vite SSR build of `entry-server.tsx`'s `renderApp` (sync `renderToString`) + a post-build
+  `scripts/prerender.ts` injecting the rendered body into `#root`; King/Podium fetches deferred to the
+  client via a `createClientResource` source-signal gate so the prerender shows their empty fallback and
+  the first hydrated frame agrees; `App`'s head side-effects moved into `onMount`. **KEY GOTCHA:**
+  `renderToString` alone doesn't hydrate — the HTML must also carry Solid's `generateHydrationScript()`
+  (`window._$HY`) in `<head>`, else `hydrate()` silently no-ops and a **prod** build emits **no** warning
+  (Solid strips dev warnings); verify in a dev-mode build. A `toContain("_$HY")` unit test guards it).
+- **Slice 3 — `/spec-guide` as fully static HTML, no client JS** (PR #233 — `SpecPage` becomes a pure
+  presentational component (`spec` prop → semantic HTML; drops the `/spec` fetch, loading/error/Retry,
+  the custom hash-scroll effect, and the SSR-unsafe `document.title`); `renderSpecGuidePage` renders
+  `generateSpec()` (**envelope omitted**, called **unbundled** in the prerender for correct `bots/*.json`
+  fs paths) into `dist/spec-guide.html` with a distinct `<head>` (title + canonical from
+  `CANONICAL_ORIGIN` + `SPEC_PATH`), the reused hashed CSS, and **every `<script>` stripped** (module
+  bundle + JSON-LD) — zero client JS, native `#section` deep-links via slug-id headings; `main.tsx` only
+  ever hydrates the home `App`, so the now-dead `isSpecRoute` (+ its test) are removed and `marked` +
+  `SpecPage` leave the client bundle. **web-only, no `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB
+  change**; node-vitest render tests + a manual smoke on the built `dist/`).
