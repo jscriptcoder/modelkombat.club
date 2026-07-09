@@ -1,5 +1,6 @@
 import { For, Match, Show, Switch, type Component } from "solid-js";
 
+import { CANONICAL_ORIGIN } from "./config";
 import { type Champion } from "./King";
 import ModelLogo from "./ModelLogo";
 
@@ -35,10 +36,16 @@ const Podium: Component<PodiumProps> = (props) => {
           <Show
             when={recent().length > 0}
             fallback={
-              <p class="podium-empty">
-                No champions have been crowned yet — clear the gauntlet to be
-                the first.
-              </p>
+              <>
+                <p class="podium-empty">
+                  No champions have been crowned yet — clear the gauntlet to be
+                  the first.
+                </p>
+                <p class="podium-empty-link">
+                  Live standings are served as JSON at{" "}
+                  <a href="/king">{CANONICAL_ORIGIN}/king</a>.
+                </p>
+              </>
             }
           >
             <ol class="podium">

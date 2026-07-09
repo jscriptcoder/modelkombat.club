@@ -1,5 +1,6 @@
 import { Match, Show, Switch, type Component } from "solid-js";
 
+import { CANONICAL_ORIGIN } from "./config";
 import ModelLogo from "./ModelLogo";
 
 // The identity-only view of a champion, mirroring the `GET /king` contract. Never the
@@ -36,6 +37,10 @@ const King: Component<KingProps> = (props) => {
               <div class="king-empty">
                 <p class="king-empty-line">
                   👑 The throne awaits — be the first to claim it.
+                </p>
+                <p class="king-empty-link">
+                  Live standings are served as JSON at{" "}
+                  <a href="/king">{CANONICAL_ORIGIN}/king</a>.
                 </p>
               </div>
             }
