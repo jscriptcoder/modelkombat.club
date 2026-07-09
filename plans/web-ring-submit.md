@@ -2,8 +2,9 @@
 
 **Branch**: umbrella `feat/web-ring-submit` — **one PR (branch) per slice**:
 `feat/web-ring-skeleton` → `feat/web-ring-card` → `feat/web-ring-errors` → `feat/web-ring-discovery`.
-**Status**: Active — **Slice 1 ✅ shipped (PR #237, 2026-07-09, live + smoke-verified)**; Slice 2
-(full fight card) next. Planned 2026-07-09 after a `grill-me` pass (decisions table below).
+**Status**: Active — **Slices 1–2 ✅ shipped** (PR #237 skeleton · PR #238 full fight card;
+2026-07-09, live + smoke-verified); Slice 3 (every failure state + handle polish) next. Planned
+2026-07-09 after a `grill-me` pass (decisions table below).
 
 ## Goal
 
@@ -100,12 +101,19 @@ A **cleared** bot additionally carries a `title` block (three shapes):
 - Occupied + won → `"title": { "outcome": "crowned",       "winRate": 0.6, "seeds": [...], "bouts": 20, "incumbent": { "name", "model": string|null, "handle": string|null } }`
 - Occupied + lost/level → `"title": { "outcome": "king-retained", "winRate": 0.45, "seeds": [...], "bouts": 20, "incumbent": {...} }`
 
-**Error responses** (RFC 9457 `application/problem+json`):
+**Error responses** (RFC 9457 `application/problem+json`). NOTE (corrected 2026-07-09 from source
+`src/http/envelope.ts` — the plan originally mislabelled the validator failure as 400):
 
-- **400** invalid bot doc — the validator's structured issues (from `readValidatedBot`)
-- **400** `/problems/malformed-request` — missing/empty/over-64/control-char `X-Author-Handle`
-- **409** `/problems/throne-moved` — a lost crowning CAS race; the detail says "resubmit"
-- **413 / 405** — body too large / wrong method (envelope guards)
+- **422** `/problems/invalid-bot` — the validator's structured issues, carried in an
+  `errors: { path, reason }[]` extension member (BOTH the forbidden-key and the schema-validate
+  failures return 422; from `readValidatedBot`)
+- **400** `/problems/malformed-request` — EITHER missing/empty/over-64/control-char
+  `X-Author-Handle` (from `readHandle`) OR an unparseable JSON body. The human string is the
+  problem's **`title`** (this envelope has no `detail` field), so handle-vs-bad-JSON is told apart
+  by whether `title` names `X-Author-Handle`
+- **409** `/problems/throne-moved` — a lost crowning CAS race; the `title` says "resubmit"
+- **413** `/problems/payload-too-large` / **405** `/problems/method-not-allowed` — body too large /
+  wrong method (envelope guards)
 
 Request: `POST /fight`, body = the JSON doc, header `X-Author-Handle: <handle>`,
 `content-type: application/json`. Same-origin — no CORS.
@@ -246,7 +254,7 @@ sitemap/llms.txt.
 
 ---
 
-### Slice 2: The full fight card — gauntlet breakdown + title block + crown celebration ✅ GREEN (pending commit + preview smoke)
+### Slice 2: The full fight card — gauntlet breakdown + title block + crown celebration ✅ SHIPPED (PR #238, 2026-07-09, live + smoke-verified)
 
 **Value**: The payoff — an author sees _how_ the bot did against each of the six house fighters,
 the title fight vs the King, and a crown moment, in the site's existing visual language.
@@ -255,9 +263,9 @@ the title fight vs the King, and a crown moment, in the site's existing visual l
 `incumbent`), a crown celebration linking to `#king`, and deep diagnostics behind a disclosure.
 **Path**: pure card-shaping helpers (`scoreRows` → an ordered row list, `formatRate`, `resultLabel`,
 `titleView`/`readIncumbent` → a title view-model) with **local `web/src` types** mirroring the
-contract — **co-located in `RingPage.tsx`** (the King.tsx precedent; a separate `web/src/ring/`
-module was assessed at REFACTOR and deferred — the shared `isRecord` guard makes a clean split not
-yet net-positive, and Slice 3 introduces the `ring/` folder as the natural home) → `RingPage`
+contract — **co-located in `RingPage.tsx`** (the King.tsx precedent; a separate module was assessed
+at REFACTOR and deferred — the shared `isRecord` guard makes a clean split not yet net-positive,
+and Slice 3 introduces flat `web/src/ring-*.ts` sibling modules as the natural home) → `RingPage`
 renders the card **above the persistent raw-result `<pre>` + Copy block from Slice 1** (reusing
 Gauntlet card idioms + `ModelLogo` for the incumbent) → `ring.css`. **Skipped**: error taxonomy
 (Slice 3).
@@ -315,36 +323,56 @@ the structured issues regardless) — and returning authors don't retype their h
 **Actor / Trigger / Outcome**: Same page, unhappy paths → specific states: rendered validator
 issues, inline handle errors, a throne-moved resubmit prompt, and network/oversize/method errors;
 the button disables in-flight; the last handle is remembered.
-**Path**: pure `web/src/ring/handle.ts` (validate: non-empty, ≤64, no control chars, trim) + pure
-`web/src/ring/fight-error.ts` (HTTP status/problem+json → an error kind + message) →
-`RingPage` renders each + a `localStorage` prefill. **Skipped**: nothing further — this
-completes the interaction.
+**Path**: pure `web/src/ring-handle.ts` (validate: non-empty, ≤64, no control chars, trim) + pure
+`web/src/ring-fight-error.ts` (HTTP status/problem+json → an error kind + message) — **flat sibling
+modules** (matching `inject-body.ts`, not a one-off subfolder) → `RingPage` renders each + a
+`localStorage` prefill. **Skipped**: nothing further — this completes the interaction.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`,
 `front-end-testing`.
+
+**Tee-up decisions (2026-07-09, confirmed before RED):**
+
+1. **Validator failure is 422, not 400** (source-corrected above). AC-1 keys on
+   `422 /problems/invalid-bot` + its `errors: { path, reason }[]`.
+2. **Handle persists on any client-valid submit** — at POST-fire time, regardless of the fight
+   outcome or a transport error (the handle was valid; maximizes "never retype"). Not gated on 2xx.
+3. **A recognized status' specific message REPLACES the Slice 1 generic banner**; the generic
+   "The ring returned an error (HTTP {status})…" banner survives only as the fallback for an
+   **unrecognized** non-2xx. The raw copy block persists below in every case.
+4. **Client mirrors `readHandle` + trims** — deliberately STRICTER than the server on one point: a
+   whitespace-only handle is rejected client-side (empty after trim) though the server would accept
+   it (`0x20` is not a control char). Length is measured on the TRIMMED handle.
+
 **Acceptance criteria** (present + confirm before code):
 
-- [ ] A **400 validator** response renders the structured RFC 9457 issues as a **readable list**
-      (in addition to the raw problem+json in the Slice 1 copy block), keeping the pasted doc so
-      the author can fix it.
-- [ ] An **empty / whitespace-only** textarea shows a distinct _"Paste your bot JSON to
-      continue."_ message (not the "That's not valid JSON" copy) and makes no `postFight` call —
+- [ ] **AC-1 — Validator issues (422).** A **`422 /problems/invalid-bot`** response renders its
+      `errors: { path, reason }[]` as a **readable list** (each `path: reason`), keeping the pasted
+      doc so the author can fix it. The Slice 1 raw copy block still carries the full problem+json;
+      the specific list **replaces** the generic banner for this status.
+- [ ] **AC-2 — Empty / whitespace-only textarea** shows a distinct _"Paste your bot JSON to
+      continue."_ message (not the "That's not valid JSON" copy) and makes **no** `postFight` call —
       refining the Slice 1 parse guard for the no-input case.
-- [ ] Handle is validated **client-side before POST** — empty / >64 chars / control chars show an
-      **inline field error** and make no `postFight` call; a valid handle is **trimmed**. Boundary
-      tested at **63 (ok) / 64 (ok) / 65 (rejected)**. A server **400 malformed-request** (belt-and-
-      braces) also surfaces on the handle field.
-- [ ] A **409 throne-moved** renders "the throne advanced — resubmit to challenge the current
-      King" with a resubmit affordance; a **413 / 405 / network/offline** renders a distinct
-      generic transport error with Retry. (Pure `fightError(status, body)` maps each, exhaustively.)
-- [ ] The submit button is **disabled while a request is in flight** (no double throne contest).
-      _(The in-flight loading status copy itself is already defined in Slice 1 — "Running the
-      gauntlet — this can take a few seconds"; Slice 3 adds only the disable.)_
-- [ ] The handle input **prefills from `localStorage`** with the last successful handle and
-      persists on submit; absent/blocked storage degrades silently to an empty field.
+- [ ] **AC-3 — Client handle validation** (mirrors `readHandle` + trims): the handle is **trimmed**,
+      then **empty** (incl. whitespace-only) / **trimmed length > 64** / **control char**
+      (code `< 0x20 || === 0x7f`) each show an **inline field error** and make **no** `postFight`
+      call; a valid handle is sent **trimmed**. Boundary tested at **63 (ok) / 64 (ok) / 65
+      (rejected)**. A server **400 malformed-request** whose `title` names `X-Author-Handle`
+      (belt-and-braces) also surfaces on the handle field.
+- [ ] **AC-4 — `fightError(status, body)` taxonomy** (pure, exhaustive): **409 throne-moved** →
+      "the throne advanced — resubmit to challenge the current King" + a resubmit affordance;
+      **413 / 405 / network / abort** → a distinct generic transport error with Retry; an
+      **unrecognized non-2xx** → Slice 1's generic banner (the fallback). Each recognized status'
+      specific message replaces the generic banner.
+- [ ] **AC-5 — Submit disabled in-flight** (no double throne contest). _(The in-flight loading
+      status copy is already Slice 1's — "Running the gauntlet — this can take a few seconds";
+      Slice 3 adds only the disable.)_
+- [ ] **AC-6 — Handle localStorage.** The handle input **prefills from `localStorage`** and
+      **persists on every client-valid submit** (at POST-fire time); absent/blocked storage (private
+      mode, disabled) degrades silently to an empty field (access wrapped in try/catch).
       **RED**: browser-mode `RingPage.test.tsx` behavior **only** (no standalone pure-fn tests — see
       Testing note): validator-issues list rendered; empty-textarea distinct message; inline handle
       error + no call at the **63/64/65** boundary and for control chars; trimmed handle; each error
-      status (400-validator / 400-handle / 409 / 413 / 405 / network) → its distinct message; in-flight
+      status (422-validator / 400-handle / 409 / 413 / 405 / network) → its distinct message; in-flight
       disable; localStorage prefill/persist with a stubbed storage. Likely mutants killed: the `<= 64`
       boundary, the control-char predicate, the trim, each status arm, the disabled guard.
       **GREEN**: the two pure modules + rendering + storage prefill.
