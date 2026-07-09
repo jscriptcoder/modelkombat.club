@@ -1,13 +1,11 @@
-import { hydrate } from "solid-js/web";
-
 import App from "./App";
+import { mount } from "./mount";
 
 const root = document.getElementById("root");
 
 if (root) {
-  // The home page is prerendered into #root at build time, so the browser *hydrates*
-  // it (attaching to the existing markup, no re-render flash). /spec-guide is served as
-  // fully static HTML with no client JS, so it never reaches this bootstrap — the home
-  // page is the only route the client renders.
-  hydrate(() => <App />, root);
+  // The home page is prerendered into #root at build time, so in production the browser *hydrates*
+  // the existing markup (no re-render flash). The local dev server serves an empty #root, so `mount`
+  // renders fresh there instead — otherwise a bare hydrate() no-ops and the page is blank in dev.
+  mount(() => <App />, root);
 }
