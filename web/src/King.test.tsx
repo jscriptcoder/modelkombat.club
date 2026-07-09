@@ -2,6 +2,7 @@ import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
 import King, { type Champion } from "./King";
+import { CANONICAL_ORIGIN } from "./config";
 
 // A resolved champion. Overrides let a test null out `model`/`handle` or inject a
 // hostile `name` without restating the whole identity shape.
@@ -69,6 +70,33 @@ describe("King section", () => {
     const { getByText } = render(() => <King current={null} />);
 
     expect(getByText(/throne awaits/i)).toBeTruthy();
+  });
+
+  it("points visitors to the live /king endpoint from the empty throne", () => {
+    // The empty fallback is exactly what the prerender bakes into the no-JS HTML, so this
+    // link is a no-JS bot's pointer to the live standings (mirrors the /spec link).
+    const { getByRole } = render(() => <King current={null} />);
+
+    const link = getByRole("link", { name: `${CANONICAL_ORIGIN}/king` });
+
+    expect(link.getAttribute("href")).toBe("/king");
+  });
+
+  it("drops the /king endpoint link once a champion reigns", () => {
+    // The link lives in the empty fallback only — a populated throne replaces it.
+    const { queryByRole } = render(() => <King current={champion()} />);
+
+    expect(
+      queryByRole("link", { name: `${CANONICAL_ORIGIN}/king` }),
+    ).toBeNull();
+  });
+
+  it("drops the /king endpoint link in the error state", () => {
+    const { queryByRole } = render(() => <King error={true} />);
+
+    expect(
+      queryByRole("link", { name: `${CANONICAL_ORIGIN}/king` }),
+    ).toBeNull();
   });
 
   it("shows a distinct error state whose Retry re-requests the throne", () => {

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import Podium from "./Podium";
 import { type Champion } from "./King";
+import { CANONICAL_ORIGIN } from "./config";
 
 // A resolved champion. Overrides let a test rename, bump the generation, or null out
 // model/handle without restating the whole identity shape.
@@ -99,6 +100,33 @@ describe("Hall of Kings podium", () => {
 
     // ...but the #champions anchor still exists so the nav link stays valid.
     expect(container.querySelector("#champions")).toBeTruthy();
+  });
+
+  it("points visitors to the live /king endpoint from the empty hall", () => {
+    // The empty fallback is exactly what the prerender bakes into the no-JS HTML, so this
+    // link is a no-JS bot's pointer to the live standings (mirrors the /spec link).
+    const { getByRole } = render(() => <Podium recent={[]} />);
+
+    const link = getByRole("link", { name: `${CANONICAL_ORIGIN}/king` });
+
+    expect(link.getAttribute("href")).toBe("/king");
+  });
+
+  it("drops the /king endpoint link once the hall has champions", () => {
+    // The link lives in the empty fallback only — a populated podium replaces it.
+    const { queryByRole } = render(() => <Podium recent={[champ()]} />);
+
+    expect(
+      queryByRole("link", { name: `${CANONICAL_ORIGIN}/king` }),
+    ).toBeNull();
+  });
+
+  it("drops the /king endpoint link in the error state", () => {
+    const { queryByRole } = render(() => <Podium error={true} />);
+
+    expect(
+      queryByRole("link", { name: `${CANONICAL_ORIGIN}/king` }),
+    ).toBeNull();
   });
 
   it("shows the same name on multiple steps for a dethroned-then-re-crowned King", () => {

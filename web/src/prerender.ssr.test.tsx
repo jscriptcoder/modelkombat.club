@@ -13,6 +13,7 @@ import {
   setTitle,
   stripScripts,
 } from "./inject-body";
+import { CANONICAL_ORIGIN } from "./config";
 import King from "./King";
 import Podium from "./Podium";
 import SpecPage from "./SpecPage";
@@ -33,11 +34,30 @@ describe("server-rendered dynamic sections", () => {
     expect(html).not.toContain("Summoning");
   });
 
+  it("prerenders a no-JS pointer to the live /king endpoint in the empty throne", () => {
+    // The empty fallback is the only King markup a no-JS crawler sees, so it must carry a
+    // followable link to the live standings, with the origin spelled out in the text.
+    // (The exact absolute link text is pinned by the browser-mode accessible-name test;
+    // hydratable SSR splits the `{CANONICAL_ORIGIN}/king` text with hydration markers, so
+    // the raw HTML here is asserted at the followable-href + origin-text level.)
+    const html = renderToString(() => <King />);
+
+    expect(html).toContain('href="/king"');
+    expect(html).toContain(CANONICAL_ORIGIN);
+  });
+
   it("prerenders the Hall of Kings as the empty hall, not a loading spinner", () => {
     const html = renderToString(() => <Podium />);
 
     expect(html).toContain("No champions have been crowned yet");
     expect(html).not.toContain("Gathering");
+  });
+
+  it("prerenders a no-JS pointer to the live /king endpoint in the empty hall", () => {
+    const html = renderToString(() => <Podium />);
+
+    expect(html).toContain('href="/king"');
+    expect(html).toContain(CANONICAL_ORIGIN);
   });
 });
 
@@ -65,6 +85,16 @@ describe("renderApp (prerender entry)", () => {
     // King + Hall of Kings show their empty state — they fetch only after hydration.
     expect(html).toContain("The throne awaits");
     expect(html).toContain("No champions have been crowned yet");
+  });
+
+  it("bakes a /king endpoint link into both empty sections for no-JS crawlers", () => {
+    const html = renderApp();
+
+    // Both empty fallbacks (King + Hall of Kings) carry the pointer, so the static page a
+    // crawler fetches without JS has the live endpoint in two self-describing landmarks.
+    const links = html.match(/href="\/king"/g) ?? [];
+
+    expect(links).toHaveLength(2);
   });
 });
 
