@@ -373,6 +373,7 @@ const RingPage: Component<RingPageProps> = (props) => {
             rows="14"
             value={docText()}
             onInput={(e) => setDocText(e.currentTarget.value)}
+            onFocus={(e) => e.currentTarget.select()}
             aria-invalid={parseError() !== "" ? "true" : undefined}
             aria-describedby="bot-document-error"
           />

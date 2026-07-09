@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, within } from "@solidjs/testing-library";
+import { userEvent } from "vitest/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import RingPage, { type FightResponse } from "./RingPage";
@@ -1277,5 +1278,58 @@ describe("RingPage — inline field errors", () => {
     expect(ui.container.querySelector("#bot-document-error")?.textContent).toBe(
       "",
     );
+  });
+});
+
+// Select-all on focus: the /ring flow is paste-a-new-bot-over-the-last-one (the human couriers each
+// LLM revision into the field), so selecting the whole document the moment the field is focused
+// means the next paste REPLACES it — no manual select-all-then-delete between iterations. Verified
+// in real Chromium (browser mode), where `select()` genuinely sets the selection range.
+describe("RingPage — select-all on focus", () => {
+  it("selects the entire bot document when the field gains focus", () => {
+    const ui = render(() => <RingPage />);
+    const textarea = ui.getByRole("textbox", { name: /bot document/i });
+
+    // Narrow to <textarea> so the selection range is readable without a type assertion, and to
+    // pin the control's element type (the selection API only exists on text controls).
+    if (!(textarea instanceof HTMLTextAreaElement)) {
+      throw new Error("expected the bot-document field to be a <textarea>");
+    }
+
+    const doc = JSON.stringify(VALID_DOC);
+
+    // A previous bot is sitting in the field from the last iteration...
+    fireEvent.input(textarea, { target: { value: doc } });
+    // ...and the author focuses it to paste the next revision.
+    fireEvent.focus(textarea);
+
+    // The whole previous document is selected (start 0 → end = full length), so the next paste
+    // overwrites it outright. Both bounds are asserted: a collapsed caret (start === end) can't
+    // satisfy both when the document is non-empty.
+    expect(textarea.selectionStart).toBe(0);
+    expect(textarea.selectionEnd).toBe(doc.length);
+  });
+
+  // The real workflow is a MOUSE click into the field, not a synthetic focus. A genuine click
+  // (real trusted input events via the browser driver) exercises the native mouseup, which on some
+  // engines collapses a focus-time selection back to a caret — the classic select-on-focus failure.
+  // This pins that the whole document stays selected through a real click, so a mouse-paste
+  // overwrites it. fireEvent can't reproduce this path, so it's asserted with a real interaction.
+  it("keeps the whole document selected after a real mouse click", async () => {
+    const ui = render(() => <RingPage />);
+    const textarea = ui.getByRole("textbox", { name: /bot document/i });
+
+    if (!(textarea instanceof HTMLTextAreaElement)) {
+      throw new Error("expected the bot-document field to be a <textarea>");
+    }
+
+    const doc = JSON.stringify(VALID_DOC);
+
+    fireEvent.input(textarea, { target: { value: doc } });
+
+    await userEvent.click(textarea);
+
+    expect(textarea.selectionStart).toBe(0);
+    expect(textarea.selectionEnd).toBe(doc.length);
   });
 });
