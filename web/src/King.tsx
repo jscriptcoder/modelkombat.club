@@ -1,10 +1,9 @@
 import { Match, Show, Switch, type Component } from "solid-js";
 
-import { createClientResource } from "./client-resource";
 import ModelLogo from "./ModelLogo";
 
-// The identity-only view of the reigning King, mirroring the `GET /king` contract
-// (`{ current }`; `recent` lineage arrives in Slice 3). Never the champion's DSL.
+// The identity-only view of a champion, mirroring the `GET /king` contract. Never the
+// champion's bot DSL.
 export type Champion = {
   name: string;
   model: string | null;
@@ -12,28 +11,19 @@ export type Champion = {
   generation: number;
 };
 
-export type KingView = { current: Champion | null };
-
-// Default fetcher: read the live endpoint. A non-2xx (including a 503 store-unavailable)
-// THROWS — driving the resource's error state, which is deliberately distinct from an
-// empty throne (a 200 `{ current: null }`). Injectable via props so tests drive every
-// state deterministically without the network.
-const fetchKingFromApi = async (): Promise<KingView> => {
-  const res = await fetch("/king");
-
-  if (!res.ok) {
-    throw new Error(`/king responded ${res.status}`);
-  }
-
-  return (await res.json()) as KingView;
+// Presentational: the King section renders the reigning champion — or the empty throne,
+// loading, or error state — from props. The single `/king` fetch lives in App, which
+// feeds this section AND the Hall of Kings from ONE request (see App). Every prop is
+// optional so the build-time prerender (`<King />` with no props) renders the empty
+// throne, matching the client's first hydrated frame.
+type KingProps = {
+  current?: Champion | null;
+  loading?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
 };
 
-const King: Component<{ fetchKing?: () => Promise<KingView> }> = (props) => {
-  // Client-only fetch over a prerendered empty-throne fallback (see createClientResource).
-  const [king, { refetch }] = createClientResource(
-    props.fetchKing ?? fetchKingFromApi,
-  );
-
+const King: Component<KingProps> = (props) => {
   return (
     <section id="king" class="section king" aria-labelledby="king-heading">
       <h2 id="king-heading">Current King</h2>
@@ -41,7 +31,7 @@ const King: Component<{ fetchKing?: () => Promise<KingView> }> = (props) => {
       <Switch
         fallback={
           <Show
-            when={king()?.current}
+            when={props.current}
             fallback={
               <div class="king-empty">
                 <p class="king-empty-line">
@@ -68,15 +58,19 @@ const King: Component<{ fetchKing?: () => Promise<KingView> }> = (props) => {
           </Show>
         }
       >
-        <Match when={king.loading}>
+        <Match when={props.loading}>
           <p role="status" class="king-status">
             Summoning the reigning champion…
           </p>
         </Match>
-        <Match when={king.error}>
+        <Match when={props.error}>
           <div class="king-error" role="alert">
             <p class="king-error-line">⚠ Couldn't reach the ring.</p>
-            <button type="button" class="retry" onClick={() => void refetch()}>
+            <button
+              type="button"
+              class="retry"
+              onClick={() => props.onRetry?.()}
+            >
               Retry
             </button>
           </div>
