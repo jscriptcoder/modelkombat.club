@@ -485,7 +485,7 @@ const RingPage: Component<RingPageProps> = (props) => {
               {(t) => (
                 <section class="ring-title-fight" aria-label="Title fight">
                   <Show when={t().linksToThrone}>
-                    <a class="ring-throne-link" href="#king">
+                    <a class="ring-throne-link" href="/#king">
                       See the throne
                     </a>
                   </Show>

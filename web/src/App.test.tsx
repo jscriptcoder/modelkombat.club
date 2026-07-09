@@ -118,13 +118,13 @@ describe("App (landing page)", () => {
       .map((link) => link.getAttribute("href"));
 
     expect(hrefs).toEqual([
-      "#top",
-      "#how-it-works",
-      "#arsenal",
-      "#gauntlet",
-      "#king",
-      "#champions",
-      "#fights",
+      "/#top",
+      "/#how-it-works",
+      "/#arsenal",
+      "/#gauntlet",
+      "/#king",
+      "/#champions",
+      "/#fights",
       "/ring",
       "/spec-guide",
     ]);

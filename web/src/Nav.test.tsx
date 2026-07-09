@@ -1,15 +1,17 @@
-import { render } from "@solidjs/testing-library";
+import { render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
 import Nav from "./Nav";
 
 describe("Nav", () => {
-  it("brands the header with the site name linking back to the top", () => {
+  it("brands the header with the site name linking back to the home page top", () => {
     const { getByRole } = render(() => <Nav />);
 
     const brand = getByRole("link", { name: "ModelKombat" });
 
-    expect(brand.getAttribute("href")).toBe("#top");
+    // Absolute (`/#top`, not `#top`) so the brand is a way HOME from /ring — a separate page —
+    // as much as a scroll-to-top on the home page itself.
+    expect(brand.getAttribute("href")).toBe("/#top");
   });
 
   it("badges the brand with a decorative logo mark that leaves the link name clean", () => {
@@ -47,5 +49,47 @@ describe("Nav", () => {
     // tab, unlike the raw-markdown Spec link which opens a new tab.
     expect(ring.getAttribute("href")).toBe("/ring");
     expect(ring.getAttribute("target")).toBe(null);
+  });
+
+  it("points every nav link home absolutely so the same nav works from any page", () => {
+    const { getByRole } = render(() => <Nav />);
+
+    const hrefs = within(getByRole("navigation"))
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+
+    // In-page section anchors are absolute `/#section` (not bare `#section`) so the shared nav
+    // resolves from /ring — a full, separate page — exactly as it does on the home page. `/ring`
+    // and `/spec-guide` are already real paths, so they're unchanged.
+    expect(hrefs).toEqual([
+      "/#top",
+      "/#how-it-works",
+      "/#arsenal",
+      "/#gauntlet",
+      "/#king",
+      "/#champions",
+      "/#fights",
+      "/ring",
+      "/spec-guide",
+    ]);
+  });
+
+  it("marks no link as the current page by default (the home nav)", () => {
+    const { getByRole } = render(() => <Nav />);
+
+    // On the home page nothing is the "current page" — the sections are in-page anchors.
+    expect(
+      getByRole("link", { name: "Ring" }).getAttribute("aria-current"),
+    ).toBe(null);
+  });
+
+  it("marks the Ring link as the current page when told it is on /ring", () => {
+    const { getByRole } = render(() => <Nav current="ring" />);
+
+    // Rendered on /ring, the shared header names where the visitor is (aria-current), so it isn't
+    // ambiguous about which page is active.
+    expect(
+      getByRole("link", { name: "Ring" }).getAttribute("aria-current"),
+    ).toBe("page");
   });
 });
