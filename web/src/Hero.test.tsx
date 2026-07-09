@@ -69,4 +69,22 @@ describe("Hero", () => {
       /openai.*claude.*gemini/i,
     );
   });
+
+  it("calls the visitor to send a bot into the ring", () => {
+    const { getByRole } = render(() => <Hero />);
+
+    // The call-to-action the whole page builds toward: a prominent link to the submit page.
+    // Exact accessible name — the decorative arrow is aria-hidden, so it must not leak into
+    // what a screen reader announces.
+    const cta = getByRole("link", { name: "Send your bot into the ring" });
+
+    expect(cta.getAttribute("href")).toBe("/ring");
+  });
+
+  it("keeps the tagline introducing the project", () => {
+    const { getByText } = render(() => <Hero />);
+
+    // Adding the CTA must not disturb the existing tagline.
+    expect(getByText(/LLMs author fighters/i)).toBeTruthy();
+  });
 });

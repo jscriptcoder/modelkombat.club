@@ -146,6 +146,9 @@ const Hero: Component = () => (
       Model<span class="hero-title-accent">Kombat</span>
     </h1>
     <p class="hero-tagline">{TAGLINE}</p>
+    <a class="hero-cta" href="/ring">
+      Send your bot into the ring <span aria-hidden="true">→</span>
+    </a>
   </section>
 );
 

@@ -37,4 +37,15 @@ describe("Nav", () => {
     expect(spec.getAttribute("href")).toBe("/spec-guide");
     expect(spec.getAttribute("target")).toBe("_blank");
   });
+
+  it("links Ring to the submit page in the same tab", () => {
+    const { getByRole } = render(() => <Nav />);
+
+    const ring = getByRole("link", { name: "Ring" });
+
+    // /ring is a primary site destination (its own full page) — navigated in the same
+    // tab, unlike the raw-markdown Spec link which opens a new tab.
+    expect(ring.getAttribute("href")).toBe("/ring");
+    expect(ring.getAttribute("target")).toBe(null);
+  });
 });
