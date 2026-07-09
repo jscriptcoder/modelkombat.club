@@ -227,3 +227,40 @@ client build. **Three slices, PR per slice**; the plan + resolved grill-me decis
   ever hydrates the home `App`, so the now-dead `isSpecRoute` (+ its test) are removed and `marked` +
   `SpecPage` leave the client bundle. **web-only, no `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB
   change**; node-vitest render tests + a manual smoke on the built `dist/`).
+
+## Web `/ring` — the browser bot-submit loop (web) ✅ COMPLETE
+
+The submit + iterate loop closed in the browser: a human holding LLM-authored JSON opens **`/ring`**,
+pastes the bot document + an author handle, POSTs it to the live `POST /fight` (LLM platforms can't
+POST — the human is the courier), and reads the full fight card **and** the raw `/fight` JSON to hand
+back to the LLM. A single-page `ring.html` + `ring.tsx` client-render (no prerender/hydration — the
+fetch is button-triggered). **Four slices, one PR each**, all live + smoke-verified 2026-07-09; the
+whole feature — plan + `grill-me` decisions + `find-gaps` record — is one file:
+[web-ring-submit.md](web-ring-submit.md).
+
+- **Slice 1 — walking skeleton** (PR #237 — paste + `POST /fight` + an outcome headline for each of the
+  four outcomes + the raw pretty-printed response in a scrollable `<pre>` with a reused `<CopyButton>`;
+  a `postFight?` prop seam resolving `{ status, body }` for **any** HTTP response (problem+json bodies
+  are content the human must see/copy), rejecting only on a true network failure or the 30s
+  `AbortController` timeout; one generic error state; `vite` multi-page input + a `vercel.json` `/ring`
+  rewrite before the SPA fallback, verified not to regress the prerender pipeline).
+- **Slice 2 — the full fight card** (PR #238 — the result expands from a headline into a card: one row
+  per `gauntlet.perOpponent` entry in frozen `GAUNTLET_NAMES` order (win-rate percentage + a **text**
+  pass/fail marker, never colour alone), the `title` block by outcome (first-King / dethrone / held-throne
+  celebration), the scouted `incumbent` (name + `<ModelLogo>` + non-null handle + win-rate + bouts, never
+  the King's DSL), all above the persistent raw-copy block; local `web/src` view-model types mirroring the
+  contract, **no `src/engine` import**).
+- **Slice 3 — every failure state + handle polish** (PR #239 — precise human-readable states replacing the
+  generic banner: the **422 `/problems/invalid-bot`** validator issues as a readable `path: reason` list,
+  inline handle validation mirroring `readHandle` + trim (empty/`>64`/control-char, 63/64/65 boundary), the
+  409 throne-moved resubmit prompt, 413/405/network transport errors, submit disabled in-flight, and a
+  `localStorage`-remembered handle degrading silently when storage is blocked; pure logic in flat
+  `web/src/ring-handle.ts` + `web/src/ring-fight-error.ts` sibling modules).
+- **Slice 4 — discoverability** (PR #240 — the finale, placed last so we never drove traffic to a
+  half-built page: a same-tab Nav "Ring" link + a filled-accent Hero CTA ("Send your bot into the ring →"),
+  both to `/ring`; a `sitemap.xml` `<url>` (priority 0.9) + an `llms.txt` "Send a bot into the ring" entry
+  framed for the reading LLM; both surfaces verified by a browser-mode `ring-discovery.test.tsx` that
+  `fetch`es the served files and parses the sitemap with a real `DOMParser`). **Presentation + two static
+  files only — no `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB change** across the whole feature. Like
+  the other web work, `web/src` logic is outside the Node/Stryker scope ⇒ exhaustive exact-assertion
+  browser-mode tests + a manual mutator scan, each slice preview-smoked on Vercel before merge.
