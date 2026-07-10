@@ -18,7 +18,7 @@ The drafted fix inlined the derivation in the handler and reused `toReportOppone
   `src/http/fight-report.ts` (next to `toReportOpponent`). The handler's `title` block is now
   just `{ outcome, ...toTitleFightReport(titleFight), seeds, incumbent }`. Derivation lives in a
   directly-unit-testable pure function — matching this repo's established pattern (the gauntlet
-  shaper is unit-tested against a *synthetic* `BenchmarkResult`, because draws are unrealizable
+  shaper is unit-tested against a _synthetic_ `BenchmarkResult`, because draws are unrealizable
   through a real fight). This is what let a `draws:2` unit test kill the `losses` `- draws`
   arithmetic mutant that survived when the derivation was buried in the fight-running handler.
 - **No `perOpponent[0]?` lookup / no empty-guard.** Every field derives from always-defined
@@ -46,7 +46,7 @@ counter on parry** = guaranteed 3 pts, which took zoner 0.5→0.8). See memory
 `winRate` + `wins`/`losses`/`draws` + **`net`** + `passed` + **`endReasons`** (gap/time/senshu/
 overtime), plus top-level **`degrade`** diagnostics. Those three bolded fields did the heavy
 lifting (e.g. `degrade` exposed self-gassing = 1515 idle-degrades → the stamina fix;
-`endReasons` revealed the *shape* of each loss — jabber's all-overtime vs sweeper's all-gap).
+`endReasons` revealed the _shape_ of each loss — jabber's all-overtime vs sweeper's all-gap).
 
 ---
 
@@ -59,7 +59,7 @@ where it can never satisfy both objectives at once and loses a previously-clean 
 
 This is a **real multi-objective optimization hazard** (it happened repeatedly during warden's
 26 iterations: fixing rushers broke pokers, jump-in fixed zoner but broke grappler/rekka, etc.).
-What made it *survivable* on the gauntlet: (a) the **full board prints on every submission**, so a
+What made it _survivable_ on the gauntlet: (a) the **full board prints on every submission**, so a
 regression is immediately visible and rejectable, and (b) mechanistic reasoning about which changes
 are orthogonal vs trade-offs. The oscillation is only tractable when feedback is rich enough to see
 the trade-offs.
@@ -69,7 +69,7 @@ the trade-offs.
 ## 3. THE FINDING (confirmed against the implementation)
 
 **The King challenge does NOT return the same telemetry as the gauntlet — it returns strictly
-less.** The rich data is *computed* but *discarded* before serialization.
+less.** The rich data is _computed_ but _discarded_ before serialization.
 
 ### Evidence
 
@@ -107,13 +107,13 @@ less.** The rich data is *computed* but *discarded* before serialization.
 2. **Every King probe must first clear the gauntlet** — no clear, no title fight
    (`handle-fight.ts:145`: `if (!report.cleared) return json(report)`). So you can't build a cheap
    specialized King-prober; each experiment is a full gauntlet-clearer, and the only King-signal is
-   `winRate`. Learning about the King is *coupled* to maintaining clearance, on the lowest signal.
+   `winRate`. Learning about the King is _coupled_ to maintaining clearance, on the lowest signal.
 3. Dethrone is strictly `titleFight.winRate > 0.5` (`handle-fight.ts:176`); `net` is NOT a King-fight
    tiebreak (unlike the gauntlet metric), so a 10-10 title fight just retains the King with zero texture.
 
 Net: a challenger tuning against a lone `winRate` (no `net`/`endReasons`/`degrade`) must **guess why**
 it's losing to the King — and blind guesses are exactly what regress a clean 6/6. The user's worry is
-well-founded *given the current serialization*.
+well-founded _given the current serialization_.
 
 ---
 
@@ -130,6 +130,7 @@ King-appropriate variant without `passed`, since the King gate is `>0.5` not the
 apply it to `titleFight.perOpponent[0]`. Also include `titleFight.degrade`.
 
 Proposed shape (final naming TBD in TDD):
+
 ```ts
 title: {
   outcome: dethroned ? "crowned" : "king-retained",
@@ -145,6 +146,7 @@ title: {
   incumbent: incumbentOf(current),
 }
 ```
+
 Guard the `perOpponent[0]` access: the no-mirror rule skips a byte-clone challenger
 (`benchmark` → winRate 0, empty `perOpponent`), so `perOpponent` can be empty — handle undefined.
 
@@ -175,7 +177,7 @@ Guard the `perOpponent[0]` access: the no-mirror rule skips a byte-clone challen
 
 **Human chose (A) — full parity** (2026-07-10). Rationale carried over: make the King challenge
 as debuggable as the gauntlet, remove the asymmetry, keep clear-then-dethrone tractable and the
-ladder turning. The King's *doc* stays hidden either way (scouting-by-behavior only); this change
+ladder turning. The King's _doc_ stays hidden either way (scouting-by-behavior only); this change
 only enriches the challenger's OWN result telemetry. (Option B — deliberate opacity — was declined.)
 
 ---
