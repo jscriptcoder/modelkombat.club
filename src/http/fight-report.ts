@@ -48,6 +48,36 @@ const toReportOpponent = (o: OpponentScore): FightReportOpponent => ({
   endReasons: o.endReasons,
 });
 
+// The championship-bout telemetry, at the SAME fidelity a gauntlet member's row carries —
+// net / win-loss-draw / endReasons / degrade — so a title challenger can diagnose WHY it lost
+// the crown (close vs blown out, on gap/time/senshu, self-gassing) instead of guessing from a
+// lone win-rate and regressing its 6/6 gauntlet clearance. The title fight is a SINGLE-opponent
+// benchmark, so its top-level aggregates ARE that one matchup's score; `officiating.endedBy` and
+// `degrade` stay fully-keyed even when the no-mirror rule skips a byte-clone (empty breakdown,
+// totalFights 0 ⇒ every figure a clean zero), so no per-opponent lookup — and no empty guard —
+// is needed. Sibling of `toReportOpponent`; `losses` derives identically (fights − wins − draws).
+export type TitleFightReport = {
+  winRate: number;
+  net: number; // Σ (botScore − oppScore) across the title bouts
+  wins: number;
+  losses: number; // bouts − wins − draws
+  draws: number;
+  bouts: number; // |freshSeeds| × 2, or 0 for a mirror skip
+  endReasons: EndReasonTally; // how the title bouts ended (sums to bouts)
+  degrade: DegradeTally; // the challenger's degraded frames vs the King
+};
+
+export const toTitleFightReport = (r: BenchmarkResult): TitleFightReport => ({
+  winRate: r.winRate,
+  net: r.netPoints,
+  wins: r.wins,
+  losses: r.totalFights - r.wins - r.draws,
+  draws: r.draws,
+  bouts: r.totalFights,
+  endReasons: r.officiating.endedBy,
+  degrade: r.degrade,
+});
+
 export const buildFightReport = (
   result: BenchmarkResult,
   opts: {

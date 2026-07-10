@@ -633,3 +633,110 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     expect(body.title).not.toHaveProperty("incumbent");
   });
 });
+
+// The title block a challenger reads back must be as debuggable as a gauntlet member's
+// row: the same net / win-loss-draw / endReasons / degrade telemetry the gauntlet gate
+// prints, so a would-be King can diagnose WHY it lost the championship bout (not just a
+// lone win-rate scalar) and adjust without blindly regressing its 6/6 gauntlet clearance.
+describe("handleFight — S4 slice 5: title-fight telemetry parity", () => {
+  // The enriched title-fight stats under test (identity/seeds asserted elsewhere).
+  type TitleStats = {
+    outcome: string;
+    winRate: number;
+    net: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    bouts: number;
+    endReasons: Record<string, number>;
+    degrade: Record<string, number>;
+  };
+
+  const sumTally = (t: Record<string, number>): number =>
+    Object.values(t).reduce((a, b) => a + b, 0);
+
+  it("surfaces full-fidelity telemetry on a crowning (net / W-L-D / endReasons / degrade)", async () => {
+    const store = inMemoryThroneStore();
+
+    await enthrone(store, "vTEST", loadBot("aggressor"));
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))), // beats aggressor 1.00
+      arena("vTEST", store),
+    );
+
+    const t = ((await res.json()) as { title?: TitleStats }).title;
+
+    expect(t?.outcome).toBe("crowned");
+    // winRate 1.00 ⇒ every bout a win, none drawn or lost (10 seeds × both sides)
+    expect(t?.wins).toBe(20);
+    expect(t?.draws).toBe(0);
+    expect(t?.losses).toBe(0);
+    // the win-loss-draw split accounts for exactly the bouts fought
+    expect(t!.wins + t!.losses + t!.draws).toBe(t?.bouts);
+    // winning decisively ⇒ a positive net-points margin (not a bare count)
+    expect(t?.net).toBeGreaterThan(0);
+    // endReasons is a full four-key tally that sums to the bout count
+    expect(sumTally(t!.endReasons)).toBe(20);
+    // degrade carries the five-reason self-diagnostic shape
+    expect(t?.degrade).toEqual(
+      expect.objectContaining({
+        unaffordable: expect.any(Number),
+        "out-of-band": expect.any(Number),
+        locked: expect.any(Number),
+        inert: expect.any(Number),
+        "wrong-context": expect.any(Number),
+      }),
+    );
+  });
+
+  it("surfaces full-fidelity telemetry on a king-retained loss (negative net, zero wins)", async () => {
+    const store = inMemoryThroneStore();
+
+    await enthrone(store, "vTEST", loadBot("berserker"));
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))), // loses to berserker 0.00
+      arena("vTEST", store),
+    );
+
+    const t = ((await res.json()) as { title?: TitleStats }).title;
+
+    expect(t?.outcome).toBe("king-retained");
+    expect(t?.wins).toBe(0);
+    // losing every scored bout ⇒ a negative net margin the challenger can read
+    expect(t?.net).toBeLessThan(0);
+    expect(t!.wins + t!.losses + t!.draws).toBe(t?.bouts);
+    expect(t?.bouts).toBe(20);
+    expect(sumTally(t!.endReasons)).toBe(20);
+  });
+
+  it("emits all-zero title telemetry for a mirror clone (empty breakdown, no crash)", async () => {
+    const store = inMemoryThroneStore();
+
+    await enthrone(store, "vTEST", loadBot("berserker"));
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))), // byte-identical ⇒ no-mirror skip
+      arena("vTEST", store),
+    );
+
+    const t = ((await res.json()) as { title?: TitleStats }).title;
+
+    // the mirror skip leaves an empty breakdown; every figure must degrade to a clean zero
+    expect(t?.outcome).toBe("king-retained");
+    expect(t?.bouts).toBe(0);
+    expect(t?.wins).toBe(0);
+    expect(t?.losses).toBe(0);
+    expect(t?.draws).toBe(0);
+    expect(t?.net).toBe(0);
+    expect(sumTally(t!.endReasons)).toBe(0);
+    expect(t?.degrade).toEqual({
+      unaffordable: 0,
+      "out-of-band": 0,
+      locked: 0,
+      inert: 0,
+      "wrong-context": 0,
+    });
+  });
+});
