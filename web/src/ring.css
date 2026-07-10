@@ -52,9 +52,22 @@
   margin: 0;
 }
 
+/* The handle input and the submit button share one row: the input grows to fill and the button
+   sits at the right. On a row too narrow for both, the button wraps below — still right-aligned. */
+.ring-handle-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.ring-handle-row .ring-input {
+  flex: 1 1 12rem;
+}
+
 .ring-submit {
-  justify-self: start;
-  margin-top: 0.5rem;
+  flex: none;
   padding: 0.6rem 1.4rem;
   background: var(--accent);
   color: #0b0e14;
@@ -169,16 +182,35 @@
   overflow-wrap: anywhere;
 }
 
+/* A column: the JSON pane on top, the copy control beneath it. */
 .ring-raw {
   margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The copy control sits UNDER the JSON, spaced off it (the .how-start .copy idiom), and spans the
+   full column width — button on top, the transient "Copied!" confirmation centred beneath it. */
+.ring-raw .copy {
+  margin-top: 0.75rem;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.ring-raw .copy-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.ring-raw .copy-status {
+  text-align: center;
 }
 
 /* The raw /fight JSON: a monospaced, scrollable block. Long lines scroll INSIDE the block
    (overflow-x) so they never push the page body sideways on mobile; tall payloads scroll
    vertically rather than running off the page. */
 .ring-raw-json {
-  margin-top: 0.75rem;
-  max-height: 24rem;
+  max-height: 12rem;
   overflow: auto;
   padding: 1rem;
   background: var(--code-bg);
@@ -190,7 +222,45 @@
 
 /* ---- The fight card: per-opponent scorecard + the title-fight block ---------------------- */
 
-/* The gauntlet scorecard — one row per house fighter, above the raw block. */
+/* The scorecard and the raw JSON: stacked by default (narrow viewports). The `-split` modifier
+   is present only when there IS a scorecard (a 200 with a gauntlet) — an error response, whose
+   only child is the raw block, stays full width. */
+.ring-result-cols {
+  margin-top: 1.5rem;
+}
+
+.ring-result-cols > .ring-scorecard,
+.ring-result-cols > .ring-raw {
+  margin-top: 0;
+}
+
+/* Wide enough for two columns: the bot list (left) and the raw JSON (right), side by side and
+   equal height. The list drives the row height; the JSON pane fills the rest of that height and
+   scrolls, so both columns end level instead of the JSON running the page long. */
+@media (min-width: 40rem) {
+  .ring-result-cols-split {
+    display: flex;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  /* Equal columns; min-width:0 lets each shrink so the JSON's own scrollbar handles long lines
+     rather than widening the column. */
+  .ring-result-cols-split > .ring-scorecard,
+  .ring-result-cols-split > .ring-raw {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  /* The JSON pane fills the column's height (set by the taller bot list) and scrolls within it. */
+  .ring-result-cols-split .ring-raw-json {
+    flex: 1 1 0;
+    min-height: 0;
+    max-height: none;
+  }
+}
+
+/* The gauntlet scorecard — one row per house fighter. */
 .ring-scorecard {
   margin-top: 1.5rem;
 }
