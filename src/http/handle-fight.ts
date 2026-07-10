@@ -5,7 +5,7 @@
 // and the platform-layer throne store — no DSL op, TCB untouched (invariant #2).
 import { championIdentity } from "./champion-identity.js";
 import { problem, readValidatedBot } from "./envelope.js";
-import { buildFightReport } from "./fight-report.js";
+import { buildFightReport, toTitleFightReport } from "./fight-report.js";
 import type { ThroneRecord, ThroneStore } from "./throne-store.js";
 import { benchmark, type BenchmarkConfig } from "../engine/benchmark.js";
 import type { BotDoc } from "../engine/dsl.js";
@@ -191,9 +191,11 @@ export const handleFight = async (
     ...report,
     title: {
       outcome: dethroned ? "crowned" : "king-retained",
-      winRate: titleFight.winRate,
+      // Full championship-bout telemetry at gauntlet fidelity (net / win-loss-draw /
+      // endReasons / degrade) so a challenger can diagnose WHY it lost the crown rather
+      // than guess from a lone win-rate and regress its 6/6 gauntlet clearance.
+      ...toTitleFightReport(titleFight),
       seeds,
-      bouts: titleFight.totalFights,
       // Scout the King you fought (identity only, never the doc).
       incumbent: incumbentOf(current),
     },
