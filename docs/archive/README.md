@@ -128,6 +128,22 @@ archived here.
 - **S3 — `POST /fight`** (the stateless gauntlet gate — `cleared` verdict vs the frozen `v19` gauntlet + a compact leak-free per-member report with `endReasons` + `diagnostics.degrade`; 4 slices, PRs #178–#181; shared `src/http/` RFC 9457 envelope, advertised + rate-limited at 20 req/min via Vercel WAF): [platform-http-api-s3-fight.md](platform-http-api-s3-fight.md)
 - **S4 — the version-scoped KotH throne** (the **first stateful** platform piece — a gauntlet-clearer earns a title shot; bootstrap crown → fresh-seeded title fight → dethrone on `> 0.5` else king-retained, atomic-CAS `409 /problems/throne-moved`, incumbent identity + `X-Author-Handle`, durably persisted on Upstash Redis behind a `ThroneStore` port with an in-memory fake; 5 slices, PRs #184–#188; code-complete, live-durability pending the Upstash Marketplace provisioning): [platform-http-api-s4-throne.md](platform-http-api-s4-throne.md)
 
+## `/fight` King-challenge telemetry parity ✅ COMPLETE
+
+A follow-up to the S4 throne surfaced by a live dogfood (a bot cleared v19 6/6 blind then took the
+empty throne): the King-challenge `title` block returned only `winRate` + `bouts` + identity, even
+though the title fight is a full benchmark that already computes `net` / win-loss-draw / `endReasons`
+/ `degrade` — the rich data was **computed then discarded**. That made the King fight strictly less
+debuggable than the gauntlet gate and set up a clear-then-dethrone **oscillation** (tuning against a
+lone win-rate scalar blindly regresses a clean 6/6). Fixed at gauntlet fidelity via a new pure
+`toTitleFightReport(BenchmarkResult)` shaper (sibling of `toReportOpponent`), sourcing every field
+from always-defined aggregates so the no-mirror skip yields clean all-zero telemetry with no
+empty-guard. Purely additive; TCB untouched. Extracting the derivation to a pure fn was **required**
+to kill the `losses = bouts − wins − draws` mutant (draws are unrealizable through a real title fight,
+so it's only reachable via a synthetic-`draws` unit test — the repo's established shaper-test pattern).
+PR #250, 2026-07-10; TDD + 100% mutation on both changed regions:
+[king-telemetry-parity.md](king-telemetry-parity.md)
+
 ## Public page — the newcomer front door (first web-UI feature) ✅ COMPLETE
 
 The public single-page site: a Vite + SolidJS app that Vercel builds and serves at `/`,
