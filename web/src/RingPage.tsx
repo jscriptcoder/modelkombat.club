@@ -370,7 +370,7 @@ const RingPage: Component<RingPageProps> = (props) => {
           <textarea
             id="bot-document"
             class="ring-textarea"
-            rows="14"
+            rows="7"
             value={docText()}
             onInput={(e) => setDocText(e.currentTarget.value)}
             onFocus={(e) => e.currentTarget.select()}
@@ -384,24 +384,25 @@ const RingPage: Component<RingPageProps> = (props) => {
           <label class="ring-label" for="author-handle">
             Author handle
           </label>
-          <input
-            id="author-handle"
-            class="ring-input"
-            type="text"
-            value={handle()}
-            onInput={(e) => setHandle(e.currentTarget.value)}
-            aria-invalid={handleError() !== "" ? "true" : undefined}
-            aria-describedby="author-handle-error"
-          />
+          <div class="ring-handle-row">
+            <input
+              id="author-handle"
+              class="ring-input"
+              type="text"
+              value={handle()}
+              onInput={(e) => setHandle(e.currentTarget.value)}
+              aria-invalid={handleError() !== "" ? "true" : undefined}
+              aria-describedby="author-handle-error"
+            />
+            <button type="submit" class="ring-submit" disabled={loading()}>
+              Send into the ring
+            </button>
+          </div>
           <p class="ring-handle-note">
             Your handle and bot name are public if you win.
           </p>
           <FieldError id="author-handle-error" message={handleError()} />
         </div>
-
-        <button type="submit" class="ring-submit" disabled={loading()}>
-          Send into the ring
-        </button>
       </form>
 
       <Show when={loading()}>
@@ -488,29 +489,6 @@ const RingPage: Component<RingPageProps> = (props) => {
               <p class="ring-headline">{outcomeHeadline(response().body)}</p>
             </Show>
 
-            <Show when={rows().length > 0}>
-              <section class="ring-scorecard" aria-label="Gauntlet scorecard">
-                <ul class="ring-score-list">
-                  <For each={rows()}>
-                    {(row) => (
-                      <li class="ring-score-row">
-                        <code class="ring-score-name">{row.name}</code>
-                        <span class="ring-score-rate">
-                          {formatRate(row.winRate)}
-                        </span>
-                        <span
-                          class="ring-score-result"
-                          classList={{ "ring-score-result-passed": row.passed }}
-                        >
-                          {resultLabel(row.passed)}
-                        </span>
-                      </li>
-                    )}
-                  </For>
-                </ul>
-              </section>
-            </Show>
-
             <Show when={title()}>
               {(t) => (
                 <section class="ring-title-fight" aria-label="Title fight">
@@ -550,15 +528,45 @@ const RingPage: Component<RingPageProps> = (props) => {
               )}
             </Show>
 
-            <div class="ring-raw">
-              <CopyButton
-                value={JSON.stringify(response().body, null, 2)}
-                label="Copy result for your LLM"
-                copy={props.copy}
-              />
-              <pre class="ring-raw-json" aria-label="Raw fight result (JSON)">
-                {JSON.stringify(response().body, null, 2)}
-              </pre>
+            <div
+              class="ring-result-cols"
+              classList={{ "ring-result-cols-split": rows().length > 0 }}
+            >
+              <Show when={rows().length > 0}>
+                <section class="ring-scorecard" aria-label="Gauntlet scorecard">
+                  <ul class="ring-score-list">
+                    <For each={rows()}>
+                      {(row) => (
+                        <li class="ring-score-row">
+                          <code class="ring-score-name">{row.name}</code>
+                          <span class="ring-score-rate">
+                            {formatRate(row.winRate)}
+                          </span>
+                          <span
+                            class="ring-score-result"
+                            classList={{
+                              "ring-score-result-passed": row.passed,
+                            }}
+                          >
+                            {resultLabel(row.passed)}
+                          </span>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </section>
+              </Show>
+
+              <div class="ring-raw">
+                <pre class="ring-raw-json" aria-label="Raw fight result (JSON)">
+                  {JSON.stringify(response().body, null, 2)}
+                </pre>
+                <CopyButton
+                  value={JSON.stringify(response().body, null, 2)}
+                  label="Copy result for your LLM"
+                  copy={props.copy}
+                />
+              </div>
             </div>
           </section>
         )}
