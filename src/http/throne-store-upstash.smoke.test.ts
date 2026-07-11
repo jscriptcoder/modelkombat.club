@@ -66,7 +66,12 @@ describe.skipIf(!live)(
 
     afterAll(async () => {
       for (const version of namespaces) {
-        await rest(["DEL", `throne:${version}`, `champions:${version}`]);
+        await rest([
+          "DEL",
+          `throne:${version}`,
+          `champions:${version}`,
+          `arena:${version}`,
+        ]);
       }
     });
   },

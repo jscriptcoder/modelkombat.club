@@ -96,6 +96,8 @@ const staleReadStore = (
   read: () => Promise.resolve(seenAtRead),
   recent: inner.recent,
   compareAndSwap: inner.compareAndSwap,
+  readArena: inner.readArena,
+  commitArena: inner.commitArena,
 });
 
 // A valid stand-in handle every crowning/title test carries by default — the handle
