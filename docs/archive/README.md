@@ -330,3 +330,43 @@ mutation on the changed files.
   simply stopped calling it, avoiding a double-churn of `handle-king`'s tests. `/king` + podium unchanged.
 
 [koth-ladder-s1-arena-skeleton.md](koth-ladder-s1-arena-skeleton.md)
+
+## KotH ladder — S2 the ranked arena becomes real (N=3, first multi-champion behavior) ✅ COMPLETE
+
+The second story of the KotH **ladder**: flip the arena cap from N=1 to **N=3** and make it a true top-3
+that churns. A gauntlet-clearer now runs a **deterministic round-robin** against the current arena on the
+frozen version seeds (D-A), is ranked by **win → net-points → seniority** (D2), and **crowns (#1)**, **enters
+as a defender (#2–#3)**, or is **unplaced** — a full arena **relegates its weakest**, and byte-identical
+resubmits / relegated re-entries behave per **C4 / D3**. `/fight` speaks the C7 vocab (`crowned` / `entered` /
+`unplaced` + `rank`), through to `web/src/RingPage.tsx`. Platform-layer (`src/http` + its `web/` consumer)
+only — **TCB untouched**, no DSL op, no engine change, **no `INPUT_HASH` / `BENCHMARK_VERSION` bump**. Design
+trail (still live for S3–S5): `plans/koth-ladder-{decisions,stories}.md`. Each slice TDD'd at **100%
+mutation** on the changed files (web presentation manual-scanned — outside the node-only Stryker scope).
+
+- **S2.1 — rank + crown/enter while filling** (PR #253, `feat/arena-ranked-fill-n3`) — N→3 for the
+  **non-full** case: a round-robin (`arena-standings.ts`: challenger-vs-defenders + defender-vs-defender) on
+  the frozen seeds, ranked win→net→seniority by the widened pure `rankArena`, **joins if there's room** (C2 — a
+  loser to the King now ENTERS as a defender, not "king-retained"). Outcome vocab migrated to C7 `crowned` /
+  `entered` / `unplaced` + `rank` (D-B; first-King vs dethrone told apart by incumbent **presence**, not a
+  distinct string), through `RingPage`. `commitArena` is now **King-succession-aware** (D-E `sameKing`, keyed
+  on the unique seniority stamp) — it appends to the lineage only when `arena[0]` changes, else a non-crowning
+  placement would duplicate the sitting King in `/king recent`. Full-arena → `unplaced` **placeholder** (D-D).
+  Prod cap `ARENA_N = 3` in `api/fight.ts`.
+- **S2.2 — relegation once full + full-parity unplaced** (PR #254, `feat/arena-relegation`) — removed the
+  S2.1 D-D short-circuit: a full arena runs the **same** round-robin, `rankArena` gained `n` and cuts to the
+  top N (`slice(0,n)` survivors, `slice(n)` = the single relegated defender), widening `ArenaPlacement` with
+  `displaced` (identity-only, via the shared `championIdentity` / `memberIdentity` extracted into
+  `champion-identity.ts`). An `unplaced` clearer reads **full parity** — it genuinely fought the #1 King, so it
+  carries the same King-fight telemetry + `incumbent` scout as a placement; it commits **nothing** (the arena
+  keeps its own top N).
+- **S2.3 — mirror-reject (C4) + re-entry (D3), closes S2** (PR #255, `feat/arena-mirror-reentry`) — a
+  submission byte-identical to a current member (`sameDoc`, now **exported** from `benchmark.ts` — shared with
+  the gauntlet's no-mirror rule) is rejected as a no-op with **`409 /problems/arena-mirror`** naming the held
+  1-based slot, read **before** the gauntlet gate (one arena snapshot feeds both the mirror guard and the
+  placement) — honoring C4 "no benchmark run". A **relegated** veteran is no longer in `members`, so the guard
+  doesn't fire — it re-competes as a fresh entrant (D3); a deterministic committed re-entry is impossible
+  without a matchup cycle, so the D3 test characterizes "relegated ≠ mirror → **200 unplaced, not 409**". WEB:
+  `ring-fight-error.ts`'s `typeOf` splits the two 409s → a new `mirror` `FightError` kind → a `RingPage` alert
+  with **no retry button** (resubmitting the same bot just 409s again); throne-moved keeps its Resubmit button.
+
+[koth-ladder-s2-ranked-arena.md](koth-ladder-s2-ranked-arena.md)
