@@ -1,8 +1,9 @@
 # Plan: KotH ladder — S4 (placement telemetry — the per-defender board)
 
 **Branches**: `feat/arena-placement-telemetry` (S4.1) → S4.2 branch TBD at the slice
-**Status**: Active — **S4.1 code-complete** (board on `/fight`, additive; TDD + 100% mutation on
-`handle-fight.ts`), awaiting commit approval. S4.2 (web render + retire the flat scout) next.
+**Status**: Active. **S4.1 ✅ MERGED** (PR #260 — board on `/fight`, additive). **S4.2 code-complete**
+(`/ring` renders the per-defender board; web reads only `board`; TDD + manual mutator scan), awaiting
+commit approval. **S4.3** (retire the flat scout from `/fight`) next. Slicing split confirmed 2026-07-12.
 **Story**: S4 in `plans/koth-ladder-stories.md`. **Design source of truth**: `plans/koth-ladder-decisions.md`
 — **C7** (response contract: an arena-placement report at gauntlet fidelity), **D2** (rank key), **D-C**
 (the King fight doubles as the title scout).
@@ -105,44 +106,71 @@ for testability); the `board[0]` / flat-scout overlap is the intentional transie
 **Done when**: all ACs met ✅, mutation report reviewed ✅, node (1586) + web suites green ✅,
 typecheck/lint clean ✅ — **awaiting commit approval**. (The plan file lands with this PR, per the S3 precedent.)
 
-### Slice S4.2: `/ring` renders the board + retire the redundant flat King scout
+> **Split confirmed 2026-07-12**: at the CONFIRM gate the planned "render + retire" was split into
+> **S4.2 (web render, additive)** + **S4.3 (retire the flat scout, pure `src/http`)** — the web render +
+> ~10 fight-card test migrations is a full PR on its own, and mixing it with the contract retirement +
+> ~15 node-test migrations couples web+http and muddies review. Render-first is dead-safe (the flat scout
+> stays in the response, unused). Mirrors S3.1 (add the new read) → S3.2 (retire the old path).
+
+### Slice S4.2: `/ring` renders the per-defender board (additive read)
 
 **Value**: The human courier at `/ring` sees a per-defender breakdown (all N rows) on the fight card,
-not just the King line — the same diagnostic they hand back to the LLM. With the web reading the board,
-the now-duplicated flat King scout is dropped from the `/fight` contract (`board[0]` is the King),
-simplifying the title block to `{ outcome, rank?, board, displaced? }`.
-**Path**: `web/src/RingPage.tsx` reads `title.board` and renders a rank-ordered per-defender table
-(identity + winRate/W-L-D/net; King row marked) → then `handle-fight.ts` drops the flat
-`...toTitleFightReport(kingFight)` spread + top-level `incumbent` (board[0] carries both) → the web
-view-model (`TitleScout` / `readIncumbent`) reads the King from `board[0]`.
+not just the King line — the same diagnostic they hand back to the LLM. Additive: the flat scout stays
+in the response but is now fully unused by the web (S4.3 removes it).
+**Path**: `web/src/RingPage.tsx` — `titleView` reshapes to read `title.board`; `outcomeHeadline` decides
+first-King vs dethrone by **board emptiness** (not the flat `incumbent`); the render swaps the single
+King scout block for a rank-ordered defender list; `ring.css` swaps `.ring-incumbent`/`.ring-title-*`
+for `.ring-defender-*`. After this slice the web reads **only** `board` (+ `outcome`/`rank`).
+**Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
+**Acceptance criteria** (confirmed 2026-07-12):
+
+- Given a crowned/entered/unplaced fight card with a board of N defenders, then `/ring` shows one row
+  per defender in board order (board[0] first), each with name + model mark + handle by-line + win-rate
+  (%) + beat/lost text (winRate > 0.5 = "beat", never colour alone).
+- Given board[0], then its row is marked as the reigning **King** (text marker, not colour alone).
+- Given a `crowned` outcome, then the "See the throne" link (`/#king`) shows; `entered`/`unplaced` omit it.
+- Given the first-ever crown (`board: []`), then the throne link shows and **no** defender rows render.
+- Given the headline, then first-King vs dethrone is decided by board emptiness (empty → "first King").
+- Given any row, then no defender document leaks (identity + numbers only); malformed board entries are
+  dropped (defensive filter), not rendered as `NaN%` or a crash.
+- Given a cleared body with no well-formed board and not crowned, then the title section omits (degrade).
+
+**RED** ✅ — browser-mode `RingPage` tests: N-row board (count + rank order + King marker), rate +
+beat/lost incl. the 0.5 → "lost" boundary, per-defender identity (model mark + handle by-line), null
+model/handle → generic mark + no by-line, entered/unplaced full board + no crown link, first-crown empty
+board, graceful degrade, identity-only DSL-smuggle, and malformed-entry filtering.
+**GREEN** ✅ — `readBoard` (sibling of `readIncumbent`) + reshaped `titleView`/`outcomeHeadline` +
+`beatLabel` (sibling of `resultLabel`) + the defender-list render + `.ring-defender-*` CSS.
+**MUTATE** ✅ — manual mutator scan (web isn't Stryker-reachable): the `> 0.5` threshold, `index === 0`
+King flag, graceful-degrade `&&`/`length === 0`, `board.length > 0` headline split, and the defensive
+filter are each killed by an exact-assertion test; `readBoard`'s redundant `isRecord` guard is equivalent.
+**KILL MUTANTS** ✅ — added the malformed-entry-filter test to demand + pin the defensive drop.
+**REFACTOR** — none: the new helpers mirror existing siblings; no duplication.
+**Done when**: all ACs met ✅, manual scan reviewed ✅, node + web suites green (**1589**) ✅,
+typecheck/lint clean ✅ — **awaiting commit approval**.
+
+### Slice S4.3: retire the redundant flat King scout from `/fight` (pure `src/http`)
+
+**Value**: The `/fight` `title` block simplifies to `{ outcome, rank?, board, displaced? }` — `board[0]`
+is the King, so the flat `...toTitleFightReport(challengerFights[0])` spread + top-level `incumbent`
+are dead weight. Web already reads `board` (S4.2), so this is a safe, web-invisible cleanup.
+**Path**: `handle-fight.ts` drops the `scout` composition from the unplaced + placement returns (keep
+`board`); `handle-fight.test.ts` migrates the ~15 flat-scout assertions (the S2.1 incumbent + telemetry
+blocks, the unplaced test) to read `board[0]`. Pure platform-layer; no web change.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (present at CONFIRM before any code):
 
-- Given a crowned/entered/unplaced fight card, then `/ring` shows one row per defender (identity +
-  win-rate + pass/fail), rank-ordered, with the King row distinguished.
-- Given the first-ever crown (`board: []`), then `/ring` shows the existing empty/first-crown copy (no
-  board rows), and still links to the (now-yours) throne.
-- Given S4.2, then the `/fight` `title` block no longer carries the flat King scout fields
-  (`winRate`/`bouts`/`incumbent` at the title top level) — the King is read from `board[0]`; the node
-  `handle-fight` tests assert their absence.
-- Given any rendered row, then no defender document is exposed (identity + numbers only).
-  **RED**: browser-mode `RingPage` test — the card lists all N defender rows for a placement, King marked;
-  empty-board first-crown path; identity-only. Node `handle-fight` test — the flat scout fields are gone;
-  `board` is the sole King source.
-  **GREEN**: render the board table in `RingPage`; migrate the view-model to `board[0]`; remove the flat
-  scout composition from `handle-fight`.
-  **MUTATE**: Stryker over `handle-fight.ts` (node); manual mutator scan for the web presentation (browser
-  project isn't Stryker-mutable — exhaustive exact-assertion + manual scan, per house rule).
-  **KILL MUTANTS**: address survivors; manual scan kills the aria/identity-leak + empty-copy mutants.
-  **REFACTOR**: assess the `RingPage` view-model now that the King reads from `board[0]`.
-  **Done when**: all ACs met, mutation report reviewed, node + web suites green, typecheck/lint clean,
-  human approves commit.
+- Given any cleared placement, then `title` has no top-level `winRate`/`net`/`wins`/`losses`/`draws`/
+  `bouts`/`endReasons`/`degrade`/`incumbent` — the King fight is read from `board[0]`.
+- Given the King telemetry, then `board[0]` still carries it at full fidelity (net / W-L-D / endReasons /
+  degrade + identity) — nothing is lost, only de-duplicated.
+- Given the empty-arena bootstrap crown, then `title` is `{ outcome: "crowned", rank: 1, board: [] }`.
 
-**Sub-split lever (decide at S4.2's CONFIRM gate)**: if "render the board" + "retire the flat scout"
-proves too big for one PR, split into **S4.2 render** (web reads `board`, ignores the still-present flat
-scout) → **S4.3 retire** (pure `src/http` removal of the flat scout, web already migrated) — mirroring
-S3.1 → S3.2. Recommended default is the single coupled slice (the web is the only consumer; migrating it
-and dropping the dead field is one coherent "the board is the title card's source of truth" change).
+**RED**: migrate the node `handle-fight` telemetry/incumbent assertions to `board[0]`; add an assertion
+that the flat scout keys are absent. **GREEN**: remove the `scout` spread from the two returns.
+**MUTATE**: Stryker over `handle-fight.ts` (node) — expect 100%. **REFACTOR**: assess whether the
+`scout` local + `toTitleFightReport(challengerFights[0])` call fully retire. **Done when**: ACs met,
+mutation 100%, suites green, human approves commit.
 
 ## Pre-PR quality gate (each slice)
 
