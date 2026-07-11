@@ -57,15 +57,25 @@ export const CROWN_SCRIPT = [
 ].join("\n");
 
 // The atomic arena commit. KEYS = [arena pointer, lineage]; ARGV = [expectedGeneration,
-// nextArenaJson, lineageEntryJson]. Mirrors CROWN_SCRIPT but the arena record (ARGV[2]) and the
-// appended King (ARGV[3]) differ, so the swap and the lineage append move together, or not at all.
+// nextArenaJson, lineageEntryJson]. Mirrors CROWN_SCRIPT, but the RPUSH is CONDITIONAL (D-E): the
+// King (arena #1) is appended to the succession lineage only when the crown changes hands, detected
+// by comparing arena #1's unique `seniority` stamp on the stored vs. the next arena (a safe scalar
+// compare — a champion-doc compare would hit cjson key-order instability). A non-crowning placement
+// (a defender entering below #1) swaps the arena but must NOT grow the lineage. The swap and any
+// append still land together in one EVAL, or not at all (the CAS returns 'moved').
 export const COMMIT_ARENA_SCRIPT = [
   "local ptr = redis.call('GET', KEYS[1])",
   "local current = ''",
   "if ptr then current = tostring(cjson.decode(ptr)['generation']) end",
   "if current ~= ARGV[1] then return 'moved' end",
+  "local append = true",
+  "if ptr then",
+  "  local prevSeniority = cjson.decode(ptr)['members'][1]['seniority']",
+  "  local nextSeniority = cjson.decode(ARGV[2])['members'][1]['seniority']",
+  "  if prevSeniority == nextSeniority then append = false end",
+  "end",
   "redis.call('SET', KEYS[1], ARGV[2])",
-  "redis.call('RPUSH', KEYS[2], ARGV[3])",
+  "if append then redis.call('RPUSH', KEYS[2], ARGV[3]) end",
   "return 'ok'",
 ].join("\n");
 

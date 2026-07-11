@@ -99,6 +99,20 @@ export const lineageEntryOf = (arena: ArenaRecord): ThroneRecord => {
   };
 };
 
+// Whether a commit keeps the SAME reigning King (arena #1) — the signal for whether the succession
+// lineage grows (D-E). Keyed on arena #1's `seniority`: a unique, strictly-increasing per-version
+// stamp, so equal seniority ⇔ the very same entry still reigns. This catches BOTH cases a crown
+// changes hands — the challenger taking #1, AND an existing defender promoted to #1 by the reshuffle
+// (which the challenger's own outcome would miss) — while staying a safe scalar compare the Upstash
+// Lua adapter mirrors byte-for-byte (a champion-doc compare would hit cjson key-order instability).
+// An empty prior arena is always a new reign. A non-crowning placement (a defender entering below #1)
+// must not duplicate the sitting King in `read()`/`recent()`.
+export const sameKing = (
+  prev: ArenaRecord | undefined,
+  next: ArenaRecord,
+): boolean =>
+  prev !== undefined && prev.members[0].seniority === next.members[0].seniority;
+
 export const inMemoryThroneStore = (): InMemoryThroneStore => {
   const lineages = new Map<string, ThroneRecord[]>();
   const arenas = new Map<string, ArenaRecord>();
@@ -112,9 +126,6 @@ export const inMemoryThroneStore = (): InMemoryThroneStore => {
 
   const currentGeneration = (version: string): number | null =>
     reigning(version)?.generation ?? null;
-
-  const currentArenaGeneration = (version: string): number | null =>
-    arenas.get(version)?.generation ?? null;
 
   return {
     read: (version) => Promise.resolve(reigning(version)),
@@ -135,13 +146,20 @@ export const inMemoryThroneStore = (): InMemoryThroneStore => {
     readArena: (version) => Promise.resolve(arenas.get(version)),
 
     commitArena: (version, expected, next) => {
-      if (currentArenaGeneration(version) !== expected) {
+      const current = arenas.get(version);
+
+      if ((current?.generation ?? null) !== expected) {
         return Promise.resolve({ ok: false, reason: "moved" });
       }
 
-      // One atomic step: swap the arena record AND append the new King to the crowning lineage.
+      // One atomic step: swap the arena record AND — only when the crown changes hands (D-E) —
+      // append the new King to the succession lineage. A non-crowning placement leaves arena #1,
+      // so it must not grow `read()`/`recent()` (else the sitting King duplicates in the podium).
       arenas.set(version, next);
-      lineages.set(version, [...entries(version), lineageEntryOf(next)]);
+
+      if (!sameKing(current, next)) {
+        lineages.set(version, [...entries(version), lineageEntryOf(next)]);
+      }
 
       return Promise.resolve({ ok: true, record: next });
     },

@@ -304,6 +304,16 @@ describe("buildCommitArenaRequest — the atomic arena compare-and-swap EVAL pay
     expect(COMMIT_ARENA_SCRIPT).toContain("'ok'");
     expect(COMMIT_ARENA_SCRIPT).toContain("\n");
   });
+
+  it("guards the lineage append on a change of King — keyed on arena #1 seniority (D-E)", () => {
+    // A non-crowning placement (a defender entering below #1) leaves the King, so the RPUSH must
+    // be CONDITIONAL: the script decodes arena #1's unique `seniority` stamp on both the stored and
+    // the next arena and appends only when they differ (a new reign). End-to-end behavior is the
+    // live smoke test; here we pin the guard so a refactor can't drop it and re-duplicate the
+    // sitting King in `recent()` (the Hall of Kings).
+    expect(COMMIT_ARENA_SCRIPT).toContain("seniority");
+    expect(COMMIT_ARENA_SCRIPT).toContain("members");
+  });
 });
 
 describe("buildReadArenaRequest — fetch the current arena record", () => {

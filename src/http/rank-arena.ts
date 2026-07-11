@@ -1,36 +1,53 @@
-// The arena ranking decision — the pure heart of `/fight` crowning, extracted so the N=1
-// boundary logic is unit-testable in isolation (the PR #250 extract-to-pure lesson) and is the
-// exact seam that widens to the win→net→seniority ranking of N>1 in S2. Platform layer, no engine
-// reach: it takes the challenger's already-computed title-fight win rates and the current arena.
+// The arena ranking decision — the pure heart of `/fight` crowning, extracted so the ranking
+// logic is unit-testable in isolation (the PR #250 extract-to-pure lesson). Platform layer, no
+// engine reach: `handle-fight` runs the round-robin, tallies each contestant's Copeland win-count
+// and Σ net-points, and hands the standings here; this module is the total-order sort + keep-top-N.
 import type { ArenaMember } from "./throne-store.js";
 
-export type ArenaRanking = {
-  // The new arena after this submission, rank-ordered (`[0]` is the King), length ≤ N.
-  members: ArenaMember[];
-  // Did the challenger make the arena (crown at N=1)?
-  placed: boolean;
-  // The challenger's final 1-based arena rank, or `null` when it did not place.
-  rank: number | null;
+// One contestant's standing over the contested set (the current defenders + the challenger, each
+// pair fought once): the member itself + its Copeland win-count (opponents it beat) and Σ net-points.
+// Seniority — the dead-even backstop — lives on the member (lower = longer unbroken arena tenure).
+export type Standing = {
+  member: ArenaMember;
+  wins: number;
+  net: number;
 };
 
-// Rank a gauntlet-clearing challenger against the current arena and keep the top N. At N=1 (the
-// S1 skeleton) the decision is a single boundary: an empty arena crowns the challenger by default
-// (the bootstrap — no fight was run), and an occupied arena crowns it iff it beat the sole
-// defender strictly `> 0.5`; a level (`= 0.5`) or losing fight — including a mirror `benchmark`
-// skips to `0` — retains the King. `winRates[i]` is the challenger's win rate vs `arena[i]`
-// (empty when the arena is). S2 generalizes this to the win-count → net → seniority order.
+// The placement of a gauntlet-clearing challenger against the arena.
+export type ArenaPlacement = {
+  // The new arena, rank-ordered (`[0]` is the King). In S2.1 (filling only) every contestant is
+  // kept, so length ≤ N follows from the caller (which never contests a full arena).
+  members: ArenaMember[];
+  // `crowned` = ranked #1; `entered` = ranked #2..N (a defender). (`unplaced` — cleared but ranked
+  // below all N of a FULL arena — arrives with relegation in S2.2.)
+  outcome: "crowned" | "entered";
+  // The challenger's final 1-based arena rank.
+  rank: number;
+};
+
+// The strict total order (D2): win-count desc → Σ net-points desc → seniority asc. Because every
+// seniority stamp is unique per version, no two contestants can fully tie — the order (and any
+// relegation choice built on it) is always unambiguous, and an exact win+net tie retains the
+// longer-tenured (lower-seniority) incumbent.
+const byRank = (a: Standing, b: Standing): number =>
+  b.wins - a.wins || b.net - a.net || a.member.seniority - b.member.seniority;
+
+// Rank a gauntlet-clearing challenger against the current (non-full) arena, keeping EVERY contestant.
+// While the arena has room (the S2.1 filling case — `handle-fight` short-circuits a full arena to the
+// D-D `unplaced` placeholder) nobody is relegated: an empty arena crowns the lone challenger by
+// default, and a challenger that LOSES its fights still enters at its true rank (C2 join-if-room).
+// #1 is King. The keep-top-N cut (and the `unplaced` outcome + `displaced` defender) arrive with
+// relegation-once-full in S2.2.
 export const rankArena = (input: {
-  arena: readonly ArenaMember[];
-  challenger: ArenaMember;
-  winRates: readonly number[];
-}): ArenaRanking => {
-  if (input.arena.length === 0) {
-    return { members: [input.challenger], placed: true, rank: 1 };
-  }
+  defenders: readonly Standing[];
+  challenger: Standing;
+}): ArenaPlacement => {
+  const ranked = [...input.defenders, input.challenger].sort(byRank);
+  const rank = ranked.indexOf(input.challenger) + 1;
 
-  if (input.winRates[0] > 0.5) {
-    return { members: [input.challenger], placed: true, rank: 1 };
-  }
-
-  return { members: [...input.arena], placed: false, rank: null };
+  return {
+    members: ranked.map((standing) => standing.member),
+    outcome: rank === 1 ? "crowned" : "entered",
+    rank,
+  };
 };

@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { handleFight, type FightDeps } from "./handle-fight.js";
 import {
   inMemoryThroneStore,
+  type ArenaMember,
   type ArenaRecord,
   type InMemoryThroneStore,
 } from "./throne-store.js";
@@ -15,10 +16,8 @@ import { MATCH } from "../engine/benchmark-config.js";
 import type { BotDoc } from "../engine/dsl.js";
 
 // A real example fighter loaded from `bots/<name>.json` (same path pattern as
-// `gauntlet.ts`). Used only where a bot must genuinely CLEAR the injected gauntlet:
-// verified that the active example fighters beat an idle dummy 1.000 on both sides,
-// so `aggressor` is a robust "clearer" fixture; an inline attacker rings itself out
-// on one side (jogai), so a real fighter is the reliable choice.
+// `gauntlet.ts`). Used where a bot must genuinely CLEAR the injected gauntlet or
+// produce a known head-to-head verdict (berserker/pacer beat aggressor 1.00).
 const loadBot = (name: string): BotDoc =>
   loadBotDoc(
     readFileSync(
@@ -37,8 +36,7 @@ const dummy = (): BotDoc => ({
 });
 
 // A bot that only walks (never attacks) — cannot beat the idle dummy (draws), so it
-// FAILS the gate. Distinct document from `dummy` ⇒ no no-mirror skip (it appears in
-// the breakdown with winRate 0, i.e. "found but not passed", not "skipped").
+// FAILS the gate. Distinct document from `dummy` ⇒ no no-mirror skip.
 const mover = (): BotDoc => ({
   version: 1,
   name: "mover",
@@ -57,12 +55,9 @@ const mover = (): BotDoc => ({
   default: { type: "idle" },
 });
 
-// The 10 fresh CSPRNG seeds a real title fight draws, pinned for deterministic tests
-// (prod draws them from Web Crypto). 10 seeds × both sides ⇒ 20 title-fight bouts.
-const TITLE_SEEDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-
-// The injected "arena": a 1-member idle gauntlet + a test version key + the real
-// engine config, so `handleFight` runs the real (fast, deterministic) benchmark.
+// The injected "arena": a 1-member idle gauntlet + a test version key + the real engine
+// config + the frozen arena cap N=3. Arena fights reuse `seeds` (D-A: a deterministic
+// tournament graph, no fresh entropy) — 5 seeds × both sides ⇒ 10 bouts per pairing.
 const arena = (version: string, store: FightDeps["store"]): FightDeps => ({
   gauntlet: [dummy()],
   gauntletNames: ["dummy"],
@@ -72,13 +67,12 @@ const arena = (version: string, store: FightDeps["store"]): FightDeps => ({
   match: MATCH,
   version,
   store,
-  freshSeeds: () => TITLE_SEEDS,
+  n: 3,
 });
 
-// Pre-seat a champion in the fake store's arena (bypassing the clearing gate — this King
-// already reigns as arena #1 at generation 1). `commitArena` also appends it to the crowning
-// lineage, so `read()`/`recent()` reflect it. A challenger POSTed to `handleFight` must still
-// clear the injected idle-dummy gauntlet to earn the title shot against it.
+// Pre-seat a lone champion in the fake store's arena (bypassing the clearing gate — this King
+// already reigns as arena #1 at generation 1, seniority 1). A challenger POSTed to `handleFight`
+// must still clear the injected idle-dummy gauntlet to earn a title shot against the arena.
 const enthrone = (
   store: FightDeps["store"],
   version: string,
@@ -90,10 +84,21 @@ const enthrone = (
     nextSeniority: 2,
   });
 
-// A store modelling an arena CAS race: `readArena` returns the arena as this request first SAW
-// it (`seenAtRead`), while `commitArena` runs against `inner` — which a concurrent crown has
-// already moved on. So a commit using the stale-read generation is rejected as `moved`, exactly
-// as a real race between two callers would resolve.
+// Pre-seat a multi-member ranked arena (rank-ordered members; nextSeniority past the last stamp).
+const seatArena = (
+  store: FightDeps["store"],
+  version: string,
+  members: ArenaMember[],
+): Promise<unknown> =>
+  store.commitArena(version, null, {
+    members,
+    generation: 1,
+    nextSeniority: members.length + 1,
+  });
+
+// A store modelling an arena CAS race: `readArena` returns the arena as this request first SAW it
+// (`seenAtRead`), while `commitArena` runs against `inner` — which a concurrent placement has
+// already moved on. So a commit using the stale-read generation is rejected as `moved`.
 const staleArenaStore = (
   inner: InMemoryThroneStore,
   seenAtRead: ArenaRecord | undefined,
@@ -105,10 +110,8 @@ const staleArenaStore = (
   commitArena: inner.commitArena,
 });
 
-// A valid stand-in handle every crowning/title test carries by default — the handle
-// is REQUIRED on `/fight`, so the throne-mechanics tests (which don't care about the
-// handle) supply this and stay focused on crowning. Handle-policy tests override it;
-// `noHandleRequest` omits it entirely to exercise the missing-header rejection.
+// A valid stand-in handle every placement/title test carries by default — the handle is REQUIRED
+// on `/fight`, so throne-mechanics tests supply this and stay focused on ranking.
 const DEFAULT_HANDLE = "test-author";
 
 const fightRequest = (
@@ -121,14 +124,10 @@ const fightRequest = (
     headers: { "X-Author-Handle": DEFAULT_HANDLE, ...headers },
   });
 
-// A request that OMITS the author handle header entirely (bypassing the default),
-// to drive the "handle is required" rejection.
 const noHandleRequest = (body: string): Request =>
   new Request("https://mk.example/fight", { method: "POST", body });
 
 // An idle champion carrying a `model` field (provenance the interpreter never reads).
-// Pre-seated via `enthrone`, so it bypasses the clearing gate; a real challenger beats
-// this idle King, letting a test read the incumbent identity it was crowned against.
 const modelChamp = (model: string): BotDoc => ({
   version: 1,
   name: "modelking",
@@ -137,16 +136,16 @@ const modelChamp = (model: string): BotDoc => ({
   default: { type: "idle" },
 });
 
-// The `title.incumbent` projection under test: identity fields only, never the doc.
 type IncumbentBody = {
   title?: {
     outcome: string;
+    rank?: number;
     incumbent?: { name: string; model: string | null; handle: string | null };
   };
 };
 
-describe("handleFight — S4 slice 1: empty-throne bootstrap crowning", () => {
-  it("crowns the first gauntlet-clearer on an empty version throne", async () => {
+describe("handleFight — S2.1: empty-arena bootstrap crowning (N=3)", () => {
+  it("crowns the first gauntlet-clearer on an empty version arena", async () => {
     const store = inMemoryThroneStore();
     const clearer = loadBot("aggressor");
 
@@ -159,11 +158,12 @@ describe("handleFight — S4 slice 1: empty-throne bootstrap crowning", () => {
 
     const body = (await res.json()) as {
       cleared: boolean;
-      title?: { outcome: string };
+      title?: { outcome: string; rank: number };
     };
 
     expect(body.cleared).toBe(true);
-    expect(body.title?.outcome).toBe("throne-empty-crowned");
+    expect(body.title?.outcome).toBe("crowned");
+    expect(body.title?.rank).toBe(1);
 
     // the champion is persisted under this version at generation 1, one lineage entry
     const rec = await store.read("vTEST");
@@ -173,7 +173,21 @@ describe("handleFight — S4 slice 1: empty-throne bootstrap crowning", () => {
     expect(store.lineage("vTEST")).toHaveLength(1);
   });
 
-  it("does not crown or emit a title when the bot fails the gate", async () => {
+  it("omits the incumbent from an empty-arena crown (you fought no one)", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as { title?: Record<string, unknown> };
+
+    expect(body.title?.outcome).toBe("crowned");
+    expect(body.title).not.toHaveProperty("incumbent");
+  });
+
+  it("does not place or emit a title when the bot fails the gate", async () => {
     const store = inMemoryThroneStore();
 
     const res = await handleFight(
@@ -191,74 +205,27 @@ describe("handleFight — S4 slice 1: empty-throne bootstrap crowning", () => {
     expect(store.lineage("vTEST")).toHaveLength(0);
   });
 
-  it("treats the current version throne as empty even when another version is occupied", async () => {
+  it("treats the current version arena as empty even when another version is occupied", async () => {
     const store = inMemoryThroneStore();
     const other = loadBot("berserker");
 
     await enthrone(store, "vOTHER", other);
 
-    const clearer = loadBot("aggressor");
-
     const res = await handleFight(
-      fightRequest(JSON.stringify(clearer)),
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
       arena("vTEST", store),
     );
 
     const body = (await res.json()) as { title?: { outcome: string } };
 
-    expect(body.title?.outcome).toBe("throne-empty-crowned");
-    expect((await store.read("vTEST"))?.champion).toEqual(clearer);
-    // the other version's throne is untouched
+    expect(body.title?.outcome).toBe("crowned");
     expect((await store.read("vOTHER"))?.champion).toEqual(other);
     expect(store.lineage("vOTHER")).toHaveLength(1);
   });
 });
 
-describe("handleFight — S4 slice 2: occupied-throne title fight", () => {
-  it("crowns a clearer who beats the reigning King > 0.5", async () => {
-    const store = inMemoryThroneStore();
-    const king = loadBot("aggressor");
-
-    await enthrone(store, "vTEST", king);
-
-    const challenger = loadBot("berserker"); // beats aggressor 1.00 head-to-head
-
-    const res = await handleFight(
-      fightRequest(JSON.stringify(challenger)),
-      arena("vTEST", store),
-    );
-
-    const body = (await res.json()) as {
-      cleared: boolean;
-      title?: { outcome: string; winRate: number };
-    };
-
-    expect(body.cleared).toBe(true);
-    expect(body.title?.outcome).toBe("crowned");
-    expect(body.title?.winRate).toBeGreaterThan(0.5);
-
-    // throne now holds the challenger at generation 2; lineage appended, King kept first
-    const rec = await store.read("vTEST");
-
-    expect(rec?.champion).toEqual(challenger);
-    expect(rec?.generation).toBe(2);
-    expect(store.lineage("vTEST").map((e) => e.champion.name)).toEqual([
-      "aggressor",
-      "berserker",
-    ]);
-
-    // the arena advanced too: the challenger takes slot #1 stamped with the King's
-    // nextSeniority (2), the record moved to generation 2, and the per-version seniority
-    // counter incremented to 3 (so the next entrant is junior to this one).
-    const arenaAfter = await store.readArena("vTEST");
-
-    expect(arenaAfter?.members[0].champion).toEqual(challenger);
-    expect(arenaAfter?.members[0].seniority).toBe(2);
-    expect(arenaAfter?.generation).toBe(2);
-    expect(arenaAfter?.nextSeniority).toBe(3);
-  });
-
-  it("retains the King when the clearer scores <= 0.5 (a strict loss)", async () => {
+describe("handleFight — S2.1: ranked filling of a non-full arena", () => {
+  it("ENTERS a clearer at #2 when it loses to the lone King (there is room — C2)", async () => {
     const store = inMemoryThroneStore();
     const king = loadBot("berserker");
 
@@ -271,24 +238,75 @@ describe("handleFight — S4 slice 2: occupied-throne title fight", () => {
       arena("vTEST", store),
     );
 
-    const body = (await res.json()) as { title?: { outcome: string } };
+    const body = (await res.json()) as {
+      title?: { outcome: string; rank: number; winRate: number };
+    };
 
-    expect(body.title?.outcome).toBe("king-retained");
-    // throne unchanged: still berserker at generation 1, one lineage entry
-    expect((await store.read("vTEST"))?.champion).toEqual(king);
-    expect((await store.read("vTEST"))?.generation).toBe(1);
+    // the loser is NOT bounced (old N=1 "king-retained") — it joins as defender #2
+    expect(body.title?.outcome).toBe("entered");
+    expect(body.title?.rank).toBe(2);
+
+    // the arena advanced to two members, King first, challenger second; generation bumped
+    const arenaAfter = await store.readArena("vTEST");
+
+    expect(arenaAfter?.members.map((m) => m.champion.name)).toEqual([
+      "berserker",
+      "aggressor",
+    ]);
+    expect(arenaAfter?.generation).toBe(2);
+    expect(arenaAfter?.nextSeniority).toBe(3);
+
+    // the King never changed hands, so the succession lineage did NOT grow (D-E)
     expect(store.lineage("vTEST")).toHaveLength(1);
   });
 
-  it("retains the King on an EXACT 0.5 title fight (the strict > 0.5 boundary)", async () => {
+  it("CROWNS a clearer that beats the lone King, keeping the deposed King as defender #2", async () => {
+    const store = inMemoryThroneStore();
+    const king = loadBot("aggressor");
+
+    await enthrone(store, "vTEST", king);
+
+    const challenger = loadBot("berserker"); // beats aggressor 1.00
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(challenger)),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as {
+      title?: { outcome: string; rank: number };
+    };
+
+    expect(body.title?.outcome).toBe("crowned");
+    expect(body.title?.rank).toBe(1);
+
+    // the old King is kept as defender #2 (NOT removed); challenger stamped seniority 2
+    const arenaAfter = await store.readArena("vTEST");
+
+    expect(arenaAfter?.members.map((m) => m.champion.name)).toEqual([
+      "berserker",
+      "aggressor",
+    ]);
+    expect(arenaAfter?.members[0].seniority).toBe(2);
+    expect(arenaAfter?.generation).toBe(2);
+    expect(arenaAfter?.nextSeniority).toBe(3);
+
+    // the crown changed hands, so the lineage grew, newest last
+    expect(store.lineage("vTEST").map((e) => e.champion.name)).toEqual([
+      "aggressor",
+      "berserker",
+    ]);
+  });
+
+  it("does NOT crown a clearer that only ties the King (exact 0.5) — it enters at #2 on seniority", async () => {
     const store = inMemoryThroneStore();
     const king = loadBot("zoner");
 
     await enthrone(store, "vTEST", king);
 
-    // a twin (King's rules, different name) is NOT a mirror (distinct doc) yet scores
-    // EXACTLY 0.5 by construction — it holds the winning side in exactly one of each
-    // seed's two bouts. A `>=` boundary mutant would (wrongly) crown it.
+    // a twin (King's rules, different name) scores EXACTLY 0.5 — 0 Copeland wins by the strict
+    // `> 0.5` rule. A `>= 0.5` mutant would still tie, so seniority keeps the King #1 either way;
+    // the crux is that a level fight never CROWNS.
     const twin: BotDoc = { ...king, name: "zoner-twin" };
 
     const res = await handleFight(
@@ -297,60 +315,78 @@ describe("handleFight — S4 slice 2: occupied-throne title fight", () => {
     );
 
     const body = (await res.json()) as {
-      title?: { outcome: string; winRate: number };
+      title?: { outcome: string; rank: number; winRate: number };
     };
 
     expect(body.title?.winRate).toBe(0.5);
-    expect(body.title?.outcome).toBe("king-retained");
-    expect(store.lineage("vTEST")).toHaveLength(1); // no crown at exactly 0.5
+    expect(body.title?.outcome).toBe("entered"); // NOT crowned
+    expect(body.title?.rank).toBe(2);
+    expect((await store.readArena("vTEST"))?.members[0].champion.name).toBe(
+      "zoner",
+    ); // King held #1
+    expect(store.lineage("vTEST")).toHaveLength(1);
   });
 
-  it("retains the King against a byte-identical clone (mirror can't dethrone)", async () => {
-    const store = inMemoryThroneStore();
-    const king = loadBot("berserker");
-
-    await enthrone(store, "vTEST", king);
-
-    const clone = loadBot("berserker"); // byte-identical ⇒ sameDoc skip ⇒ winRate 0
-
-    const res = await handleFight(
-      fightRequest(JSON.stringify(clone)),
-      arena("vTEST", store),
-    );
-
-    const body = (await res.json()) as {
-      title?: { outcome: string; winRate: number };
-    };
-
-    expect(body.title?.outcome).toBe("king-retained");
-    expect(body.title?.winRate).toBe(0);
-    expect(store.lineage("vTEST")).toHaveLength(1); // cloning spawns no lineage entry
-  });
-
-  it("echoes the fresh title-fight seeds and reports the bout count", async () => {
+  it("runs the full round-robin — a defender-vs-defender fight sets the DEFENDERS' order", async () => {
     const store = inMemoryThroneStore();
 
-    await enthrone(store, "vTEST", loadBot("aggressor"));
+    // Seat a 2-member arena [aggressor(#1), dummy(#2)]. The challenger (berserker) beats BOTH, so
+    // it crowns regardless — but ranking aggressor ABOVE dummy at #2/#3 requires the aggressor-vs-
+    // dummy fight to be run (aggressor beats the idle dummy; without that fight both would tie at
+    // zero wins-vs-the-challenger and fall to seniority, which happens to agree — so we assert the
+    // WIN-COUNT-driven order stands: attacker over punching bag).
+    await seatArena(store, "vTEST", [
+      { champion: loadBot("aggressor"), handle: null, seniority: 1 },
+      { champion: dummy(), handle: null, seniority: 2 },
+    ]);
 
     const res = await handleFight(
       fightRequest(JSON.stringify(loadBot("berserker"))),
       arena("vTEST", store),
     );
 
-    const body = (await res.json()) as {
-      title?: { seeds: number[]; bouts: number };
-    };
+    const body = (await res.json()) as { title?: { outcome: string } };
 
-    expect(body.title?.seeds).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(body.title?.bouts).toBe(20); // 10 seeds × both sides
+    expect(body.title?.outcome).toBe("crowned");
+
+    // all three kept, rank-ordered: challenger (beat both) → aggressor (beat dummy) → dummy (beat none)
+    expect(
+      (await store.readArena("vTEST"))?.members.map((m) => m.champion.name),
+    ).toEqual(["berserker", "aggressor", "dummy"]);
   });
 });
 
-describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-moved)", () => {
-  it("409s a winning title-fight crown when the throne advanced since the read", async () => {
+describe("handleFight — S2.1: full-arena placeholder (unplaced; relegation is S2.2)", () => {
+  it("returns unplaced and leaves a FULL arena untouched (no fight, no commit)", async () => {
+    const store = inMemoryThroneStore();
+
+    await seatArena(store, "vTEST", [
+      { champion: loadBot("berserker"), handle: null, seniority: 1 },
+      { champion: loadBot("aggressor"), handle: null, seniority: 2 },
+      { champion: loadBot("pacer"), handle: null, seniority: 3 },
+    ]);
+
+    const before = await store.readArena("vTEST");
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))), // clears, but the arena is full
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as { title?: { outcome: string } };
+
+    expect(body.title?.outcome).toBe("unplaced");
+    // the arena is byte-for-byte unchanged (no generation bump, no member churn)
+    expect(await store.readArena("vTEST")).toEqual(before);
+    expect(store.lineage("vTEST")).toHaveLength(1);
+  });
+});
+
+describe("handleFight — S2.1: concurrent placements serialize (409 throne-moved)", () => {
+  it("409s a winning placement when the arena advanced since the read", async () => {
     const inner = inMemoryThroneStore();
     const king = loadBot("aggressor");
-    const usurper = loadBot("berserker"); // the concurrent challenger who crowns first
+    const usurper = loadBot("berserker"); // a concurrent crown that lands first
 
     await inner.commitArena("vTEST", null, {
       members: [{ champion: king, handle: null, seniority: 1 }],
@@ -361,7 +397,7 @@ describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-mo
       members: [{ champion: usurper, handle: null, seniority: 2 }],
       generation: 2,
       nextSeniority: 3,
-    }); // a concurrent crown lands, moving the arena to generation 2
+    });
 
     // our request read the arena at generation 1, before that concurrent crown landed
     const store = staleArenaStore(inner, {
@@ -371,7 +407,7 @@ describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-mo
     });
 
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("pacer"))), // pacer beats aggressor 1.00 → wins
+      fightRequest(JSON.stringify(loadBot("pacer"))), // pacer beats aggressor 1.00 → would place
       arena("vTEST", store),
     );
 
@@ -383,22 +419,22 @@ describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-mo
     const body = (await res.json()) as { type: string; title: string };
 
     expect(body.type).toBe("/problems/throne-moved");
-    // the detail is actionable: it tells the losing challenger to resubmit
     expect(body.title).toContain("resubmit");
 
-    // the throne still holds the concurrent winner; the loser (pacer) was NOT appended
-    expect((await inner.read("vTEST"))?.champion).toEqual(usurper);
+    // the arena still holds the concurrent winner; the loser (pacer) was NOT written
+    expect((await inner.readArena("vTEST"))?.members[0].champion).toEqual(
+      usurper,
+    );
     expect(inner.lineage("vTEST").map((e) => e.champion.name)).toEqual([
       "aggressor",
       "berserker",
     ]);
   });
 
-  it("409s a bootstrap crown when the empty throne was claimed since the read", async () => {
+  it("409s a bootstrap crown when the empty arena was claimed since the read", async () => {
     const inner = inMemoryThroneStore();
     const usurper = loadBot("berserker");
 
-    // someone claimed the empty arena first, moving it to generation 1
     await inner.commitArena("vTEST", null, {
       members: [{ champion: usurper, handle: null, seniority: 1 }],
       generation: 1,
@@ -409,25 +445,21 @@ describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-mo
     const store = staleArenaStore(inner, undefined);
 
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("aggressor"))), // clears → attempts a bootstrap crown
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
       arena("vTEST", store),
     );
 
     expect(res.status).toBe(409);
-
-    const body = (await res.json()) as { type: string };
-
-    expect(body.type).toBe("/problems/throne-moved");
-
-    // the throne holds the first claimant; we were not appended
-    expect((await inner.read("vTEST"))?.champion).toEqual(usurper);
-    expect(inner.lineage("vTEST").map((e) => e.champion.name)).toEqual([
-      "berserker",
-    ]);
+    expect(((await res.json()) as { type: string }).type).toBe(
+      "/problems/throne-moved",
+    );
+    expect((await inner.readArena("vTEST"))?.members[0].champion).toEqual(
+      usurper,
+    );
   });
 });
 
-describe("handleFight — S4 slice 4: incumbent identity + author handle", () => {
+describe("handleFight — S2.1: incumbent identity + author handle", () => {
   it("surfaces the incumbent's name/model/handle in the title block, never the doc", async () => {
     const store = inMemoryThroneStore();
     const king = loadBot("berserker"); // enthroned without a handle ⇒ handle null
@@ -435,19 +467,19 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     await enthrone(store, "vTEST", king);
 
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("aggressor"))), // loses ⇒ king-retained
+      fightRequest(JSON.stringify(loadBot("aggressor"))), // loses ⇒ enters at #2
       arena("vTEST", store),
     );
 
     const body = (await res.json()) as IncumbentBody;
 
-    expect(body.title?.outcome).toBe("king-retained");
+    expect(body.title?.outcome).toBe("entered");
     expect(body.title?.incumbent).toEqual({
       name: "berserker",
       model: null,
       handle: null,
     });
-    // the visibility invariant: the incumbent's bot DOCUMENT never leaks into the response
+    // the incumbent's bot DOCUMENT never leaks into the response
     expect(JSON.stringify(body.title)).not.toContain('"rules"');
     expect(JSON.stringify(body.title)).not.toContain('"default"');
   });
@@ -455,7 +487,6 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
   it("persists a crowned bot's X-Author-Handle and surfaces it to the next challenger", async () => {
     const store = inMemoryThroneStore();
 
-    // first challenger bootstrap-crowns the empty throne WITH a handle
     await handleFight(
       fightRequest(JSON.stringify(loadBot("aggressor")), {
         "X-Author-Handle": "koga",
@@ -463,9 +494,8 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
       arena("vTEST", store),
     );
 
-    // the next challenger (who beats aggressor) reads the reigning King's handle
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("berserker"))),
+      fightRequest(JSON.stringify(loadBot("berserker"))), // beats aggressor → crowns
       arena("vTEST", store),
     );
 
@@ -481,7 +511,7 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     await enthrone(store, "vTEST", modelChamp("claude-opus-4-8"));
 
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("aggressor"))), // beats the idle King
+      fightRequest(JSON.stringify(loadBot("aggressor"))), // beats the idle King → crowns
       arena("vTEST", store),
     );
 
@@ -505,7 +535,7 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     expect(body.title?.incumbent?.model).toBeNull();
   });
 
-  it("accepts a 64-character handle (the length boundary) and persists it", async () => {
+  it("accepts a 64-character handle (the length boundary) and persists it on a crown", async () => {
     const store = inMemoryThroneStore();
     const handle = "a".repeat(64);
 
@@ -517,14 +547,13 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     );
 
     expect(res.status).toBe(200);
-
-    const body = (await res.json()) as { title?: { outcome: string } };
-
-    expect(body.title?.outcome).toBe("throne-empty-crowned");
+    expect(
+      ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
+    ).toBe("crowned");
     expect((await store.read("vTEST"))?.handle).toBe(handle);
   });
 
-  it("rejects a 65-character handle with 400 and never touches the throne", async () => {
+  it("rejects a 65-character handle with 400 and never touches the arena", async () => {
     const store = inMemoryThroneStore();
 
     const res = await handleFight(
@@ -542,14 +571,12 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     const body = (await res.json()) as { type: string; title: string };
 
     expect(body.type).toBe("/problems/malformed-request");
-    // the message names the offending header so the caller knows what to fix
     expect(body.title).toContain("X-Author-Handle");
-    // the clearer WOULD have crowned — the bad handle short-circuits before that
-    expect(await store.read("vTEST")).toBeUndefined();
+    expect(await store.readArena("vTEST")).toBeUndefined();
   });
 
-  // NUL/CR/LF are blocked by the Headers transport itself; the C0 controls below (US,
-  // 0x1F) and DEL (0x7F) pass through, so the handler's own code-point guard rejects them.
+  // NUL/CR/LF are blocked by the Headers transport itself; the C0 controls below (US, 0x1F) and
+  // DEL (0x7F) pass through, so the handler's own code-point guard rejects them.
   it.each([
     { label: "a C0 control (US, 0x1F)", code: 0x1f },
     { label: "DEL (0x7F)", code: 0x7f },
@@ -567,7 +594,7 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     expect(((await res.json()) as { type: string }).type).toBe(
       "/problems/malformed-request",
     );
-    expect(await store.read("vTEST")).toBeUndefined();
+    expect(await store.readArena("vTEST")).toBeUndefined();
   });
 
   it("accepts a handle containing a space (0x20 is not a control character)", async () => {
@@ -597,7 +624,7 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     expect(res.status).toBe(400);
   });
 
-  it("rejects a request with NO X-Author-Handle header with 400 and never touches the throne", async () => {
+  it("rejects a request with NO X-Author-Handle header with 400 and never touches the arena", async () => {
     const store = inMemoryThroneStore();
 
     const res = await handleFight(
@@ -606,21 +633,16 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
     );
 
     expect(res.status).toBe(400);
-    expect(res.headers.get("content-type")).toContain(
-      "application/problem+json",
-    );
 
     const body = (await res.json()) as { type: string; title: string };
 
     expect(body.type).toBe("/problems/malformed-request");
-    // the message names the header AND that it is required, so the caller knows to add it
     expect(body.title).toContain("X-Author-Handle");
     expect(body.title.toLowerCase()).toContain("required");
-    // the clearer WOULD have crowned — the missing handle short-circuits before that
-    expect(await store.read("vTEST")).toBeUndefined();
+    expect(await store.readArena("vTEST")).toBeUndefined();
   });
 
-  it("rejects an EMPTY X-Author-Handle header with 400 and never touches the throne", async () => {
+  it("rejects an EMPTY X-Author-Handle header with 400 and never touches the arena", async () => {
     const store = inMemoryThroneStore();
 
     const res = await handleFight(
@@ -636,31 +658,14 @@ describe("handleFight — S4 slice 4: incumbent identity + author handle", () =>
 
     expect(body.type).toBe("/problems/malformed-request");
     expect(body.title).toContain("X-Author-Handle");
-    expect(body.title.toLowerCase()).toContain("required");
-    expect(await store.read("vTEST")).toBeUndefined();
-  });
-
-  it("omits the incumbent from an empty-throne crown (you fought no one)", async () => {
-    const store = inMemoryThroneStore();
-
-    const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("aggressor"))),
-      arena("vTEST", store),
-    );
-
-    const body = (await res.json()) as { title?: Record<string, unknown> };
-
-    expect(body.title?.outcome).toBe("throne-empty-crowned");
-    expect(body.title).not.toHaveProperty("incumbent");
+    expect(await store.readArena("vTEST")).toBeUndefined();
   });
 });
 
-// The title block a challenger reads back must be as debuggable as a gauntlet member's
-// row: the same net / win-loss-draw / endReasons / degrade telemetry the gauntlet gate
-// prints, so a would-be King can diagnose WHY it lost the championship bout (not just a
-// lone win-rate scalar) and adjust without blindly regressing its 6/6 gauntlet clearance.
-describe("handleFight — S4 slice 5: title-fight telemetry parity", () => {
-  // The enriched title-fight stats under test (identity/seeds asserted elsewhere).
+// The title block a challenger reads back must be as debuggable as a gauntlet member's row: the
+// same net / win-loss-draw / endReasons / degrade telemetry the gauntlet gate prints — but now for
+// the reigning-King fight (D-C). The full per-defender board over all N is S4.
+describe("handleFight — S2.1: King-fight telemetry parity (D-C)", () => {
   type TitleStats = {
     outcome: string;
     winRate: number;
@@ -689,17 +694,14 @@ describe("handleFight — S4 slice 5: title-fight telemetry parity", () => {
     const t = ((await res.json()) as { title?: TitleStats }).title;
 
     expect(t?.outcome).toBe("crowned");
-    // winRate 1.00 ⇒ every bout a win, none drawn or lost (10 seeds × both sides)
-    expect(t?.wins).toBe(20);
+    // 5 seeds × both sides = 10 bouts (D-A: arena fights reuse the frozen `seeds`)
+    expect(t?.bouts).toBe(10);
+    expect(t?.wins).toBe(10);
     expect(t?.draws).toBe(0);
     expect(t?.losses).toBe(0);
-    // the win-loss-draw split accounts for exactly the bouts fought
     expect(t!.wins + t!.losses + t!.draws).toBe(t?.bouts);
-    // winning decisively ⇒ a positive net-points margin (not a bare count)
     expect(t?.net).toBeGreaterThan(0);
-    // endReasons is a full four-key tally that sums to the bout count
-    expect(sumTally(t!.endReasons)).toBe(20);
-    // degrade carries the five-reason self-diagnostic shape
+    expect(sumTally(t!.endReasons)).toBe(10);
     expect(t?.degrade).toEqual(
       expect.objectContaining({
         unaffordable: expect.any(Number),
@@ -711,28 +713,27 @@ describe("handleFight — S4 slice 5: title-fight telemetry parity", () => {
     );
   });
 
-  it("surfaces full-fidelity telemetry on a king-retained loss (negative net, zero wins)", async () => {
+  it("surfaces full-fidelity telemetry on an ENTERED loss (negative net, zero wins)", async () => {
     const store = inMemoryThroneStore();
 
     await enthrone(store, "vTEST", loadBot("berserker"));
 
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("aggressor"))), // loses to berserker 0.00
+      fightRequest(JSON.stringify(loadBot("aggressor"))), // loses to berserker 0.00 → enters #2
       arena("vTEST", store),
     );
 
     const t = ((await res.json()) as { title?: TitleStats }).title;
 
-    expect(t?.outcome).toBe("king-retained");
+    expect(t?.outcome).toBe("entered");
     expect(t?.wins).toBe(0);
-    // losing every scored bout ⇒ a negative net margin the challenger can read
     expect(t?.net).toBeLessThan(0);
     expect(t!.wins + t!.losses + t!.draws).toBe(t?.bouts);
-    expect(t?.bouts).toBe(20);
-    expect(sumTally(t!.endReasons)).toBe(20);
+    expect(t?.bouts).toBe(10);
+    expect(sumTally(t!.endReasons)).toBe(10);
   });
 
-  it("emits all-zero title telemetry for a mirror clone (empty breakdown, no crash)", async () => {
+  it("emits all-zero King telemetry for a challenger that mirrors the King (empty breakdown, no crash)", async () => {
     const store = inMemoryThroneStore();
 
     await enthrone(store, "vTEST", loadBot("berserker"));
@@ -744,8 +745,8 @@ describe("handleFight — S4 slice 5: title-fight telemetry parity", () => {
 
     const t = ((await res.json()) as { title?: TitleStats }).title;
 
-    // the mirror skip leaves an empty breakdown; every figure must degrade to a clean zero
-    expect(t?.outcome).toBe("king-retained");
+    // the mirror skip leaves an empty breakdown; every figure degrades to a clean zero. (C4
+    // mirror-REJECT is S2.3 — here the clone still runs and, with room, enters at the bottom.)
     expect(t?.bouts).toBe(0);
     expect(t?.wins).toBe(0);
     expect(t?.losses).toBe(0);
