@@ -9,7 +9,6 @@ export type Champion = {
   name: string;
   model: string | null;
   handle: string | null;
-  generation: number;
 };
 
 // Presentational: the King section renders the reigning champion — or the empty throne,
@@ -54,7 +53,6 @@ const King: Component<KingProps> = (props) => {
                 <Show when={champion().model}>
                   {(model) => <p class="king-model">{model()}</p>}
                 </Show>
-                <p class="king-gen">Gen {champion().generation}</p>
                 <Show when={champion().handle}>
                   {(handle) => <p class="king-handle">by {handle()}</p>}
                 </Show>

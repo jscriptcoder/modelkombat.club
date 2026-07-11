@@ -78,6 +78,7 @@ const App: Component<{ fetchKing?: () => Promise<KingResponse> }> = (props) => {
           onRetry={() => void refetch()}
         />
         <Podium
+          current={king()?.current ?? null}
           recent={king()?.recent ?? []}
           loading={king.loading}
           error={Boolean(king.error)}

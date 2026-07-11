@@ -10,7 +10,6 @@ const champion = (overrides?: Partial<Champion>): Champion => ({
   name: "reigning-king",
   model: "claude-opus-4-8",
   handle: "grandmaster",
-  generation: 3,
   ...overrides,
 });
 
@@ -22,12 +21,15 @@ describe("King section", () => {
     expect(getByRole("status")).toBeTruthy();
   });
 
-  it("shows the reigning champion's name, model, and generation", () => {
-    const { getByText } = render(() => <King current={champion()} />);
+  it("shows the reigning champion's name and model, and no generation line", () => {
+    const { getByText, queryByText } = render(() => (
+      <King current={champion()} />
+    ));
 
     expect(getByText("reigning-king")).toBeTruthy();
     expect(getByText("claude-opus-4-8")).toBeTruthy();
-    expect(getByText(/Gen\s*3/)).toBeTruthy();
+    // The throne CAS token (Gen N) no longer surfaces on the card (dropped in S3).
+    expect(queryByText(/Gen\s*\d/)).toBeNull();
   });
 
   it("brands the reigning champion with its model's logo", () => {
