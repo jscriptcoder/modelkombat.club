@@ -71,6 +71,8 @@ const failingStore = (): ThroneStore => ({
   read: () => Promise.reject(new Error("upstash unreachable")),
   recent: () => Promise.reject(new Error("upstash unreachable")),
   compareAndSwap: () => Promise.reject(new Error("unused in /king")),
+  readArena: () => Promise.reject(new Error("upstash unreachable")),
+  commitArena: () => Promise.reject(new Error("unused in /king")),
 });
 
 type Champion = {
@@ -303,6 +305,8 @@ describe("GET /king — the version-scoped reigning-King read", () => {
       read: () => Promise.resolve({ champion: champion(), generation: 1 }),
       recent: () => Promise.reject(new Error("lineage unreachable")),
       compareAndSwap: () => Promise.reject(new Error("unused in /king")),
+      readArena: () => Promise.reject(new Error("unused in /king")),
+      commitArena: () => Promise.reject(new Error("unused in /king")),
     };
 
     const res = await handleKing(kingRequest(), {

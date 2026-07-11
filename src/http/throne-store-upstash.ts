@@ -2,7 +2,14 @@
 // via raw `fetch` (no SDK — keeps `dependencies` empty). One atomic Lua `EVAL` performs
 // compare-generation + set-pointer + append-lineage together, so a crown can never tear.
 // Platform layer (transport + storage) — the engine and its TCB stay untouched.
-import type { CasResult, ThroneRecord, ThroneStore } from "./throne-store.js";
+import { lineageEntryOf } from "./throne-store.js";
+import type {
+  ArenaCasResult,
+  ArenaRecord,
+  CasResult,
+  ThroneRecord,
+  ThroneStore,
+} from "./throne-store.js";
 
 // The `fetch` seam: injected so the adapter is unit-testable with a double. Global
 // `fetch` (Node 24 default) satisfies it; production passes it implicitly.
@@ -17,6 +24,7 @@ export type UpstashConfig = { url: string; token: string };
 
 const throneKey = (version: string): string => `throne:${version}`;
 const lineageKey = (version: string): string => `champions:${version}`;
+const arenaKey = (version: string): string => `arena:${version}`;
 
 // The shape of every Upstash REST call: POST the command array as JSON with bearer auth.
 const restRequest = (
@@ -45,6 +53,19 @@ export const CROWN_SCRIPT = [
   "if current ~= ARGV[1] then return 'moved' end",
   "redis.call('SET', KEYS[1], ARGV[2])",
   "redis.call('RPUSH', KEYS[2], ARGV[2])",
+  "return 'ok'",
+].join("\n");
+
+// The atomic arena commit. KEYS = [arena pointer, lineage]; ARGV = [expectedGeneration,
+// nextArenaJson, lineageEntryJson]. Mirrors CROWN_SCRIPT but the arena record (ARGV[2]) and the
+// appended King (ARGV[3]) differ, so the swap and the lineage append move together, or not at all.
+export const COMMIT_ARENA_SCRIPT = [
+  "local ptr = redis.call('GET', KEYS[1])",
+  "local current = ''",
+  "if ptr then current = tostring(cjson.decode(ptr)['generation']) end",
+  "if current ~= ARGV[1] then return 'moved' end",
+  "redis.call('SET', KEYS[1], ARGV[2])",
+  "redis.call('RPUSH', KEYS[2], ARGV[3])",
   "return 'ok'",
 ].join("\n");
 
@@ -86,6 +107,36 @@ export const buildRecentRequest = (
   limit: number,
 ): { url: string; init: RequestInit } =>
   restRequest(config, ["LRANGE", lineageKey(version), String(-limit), "-1"]);
+
+// Pure: build the Upstash REST request to read the current arena record (a `GET` of the pointer).
+export const buildReadArenaRequest = (
+  config: UpstashConfig,
+  version: string,
+): { url: string; init: RequestInit } =>
+  restRequest(config, ["GET", arenaKey(version)]);
+
+// Pure: build the Upstash REST request for an atomic arena commit EVAL. `expected` is stringified
+// (null ⇒ "" = "expect empty arena"); ARGV[2] is the next arena JSON, ARGV[3] the derived lineage
+// entry (the new King, via `lineageEntryOf`) so the arena swap and the lineage append land together.
+export const buildCommitArenaRequest = (
+  config: UpstashConfig,
+  version: string,
+  expected: number | null,
+  next: ArenaRecord,
+): { url: string; init: RequestInit } => {
+  const expectedArg = expected === null ? "" : String(expected);
+
+  return restRequest(config, [
+    "EVAL",
+    COMMIT_ARENA_SCRIPT,
+    "2",
+    arenaKey(version),
+    lineageKey(version),
+    expectedArg,
+    JSON.stringify(next),
+    JSON.stringify(lineageEntryOf(next)),
+  ]);
+};
 
 // The Upstash REST reply: exactly one of `result` (success) or `error` (failure).
 export type UpstashReply = { result: unknown } | { error: unknown };
@@ -140,6 +191,44 @@ export const interpretCrownReply = (
   throw new Error(`Unexpected Upstash crown reply: ${String(reply.result)}`);
 };
 
+// Interpret an arena pointer `GET` reply: `null` ⇒ empty arena (undefined); a JSON string ⇒ the
+// stored arena. An error is thrown, NEVER read as empty — a transient failure must not let a
+// challenger bootstrap-crown over a live arena.
+export const interpretReadArenaReply = (
+  reply: UpstashReply,
+): ArenaRecord | undefined => {
+  if ("error" in reply) {
+    throw new Error(`Upstash arena read failed: ${String(reply.error)}`);
+  }
+
+  if (reply.result === null) return undefined;
+
+  // Trust-boundary parse of a record this adapter itself wrote (round-trip of our own JSON).
+  const parsed: unknown = JSON.parse(String(reply.result));
+
+  return parsed as ArenaRecord;
+};
+
+// Interpret an arena commit `EVAL` reply: 'ok' ⇒ the commit landed (carrying the committed arena),
+// 'moved' ⇒ a lost CAS race. An error, or any other result, throws (a contract violation is never
+// silently treated as a successful commit).
+export const interpretCommitArenaReply = (
+  reply: UpstashReply,
+  next: ArenaRecord,
+): ArenaCasResult => {
+  if ("error" in reply) {
+    throw new Error(`Upstash arena commit failed: ${String(reply.error)}`);
+  }
+
+  if (reply.result === "ok") return { ok: true, record: next };
+
+  if (reply.result === "moved") return { ok: false, reason: "moved" };
+
+  throw new Error(
+    `Unexpected Upstash arena commit reply: ${String(reply.result)}`,
+  );
+};
+
 // POST one REST command to Upstash and decode its JSON reply.
 const post = async (
   fetchImpl: FetchLike,
@@ -174,5 +263,22 @@ export const upstashThroneStore = (
     const { url, init } = buildCrownRequest(config, version, expected, next);
 
     return interpretCrownReply(await post(fetchImpl, url, init), next);
+  },
+
+  readArena: async (version) => {
+    const { url, init } = buildReadArenaRequest(config, version);
+
+    return interpretReadArenaReply(await post(fetchImpl, url, init));
+  },
+
+  commitArena: async (version, expected, next) => {
+    const { url, init } = buildCommitArenaRequest(
+      config,
+      version,
+      expected,
+      next,
+    );
+
+    return interpretCommitArenaReply(await post(fetchImpl, url, init), next);
   },
 });
