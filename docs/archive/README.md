@@ -303,3 +303,30 @@ scan. Only the endpoint-link slice needed a written plan; it is archived here.
   `{CANONICAL_ORIGIN}` text with `<!--$-->…<!--/-->` hydration markers, so tests assert `href` at the SSR
   level and the exact absolute link text at the browser accessible-name level):
   [king-fallback-endpoint-link.md](king-fallback-endpoint-link.md)
+
+## KotH ladder — S1 arena skeleton (N=1, behavior-preserving) ✅ COMPLETE
+
+The first slice of the version-scoped King-of-the-Hill **ladder** (the roadmap item after the S4 single
+throne): re-architect the single-champion throne into a top-N **ranked arena record** with a
+generation-guarded atomic commit + a per-version seniority counter, configured at **N=1** so `/fight`
+and `/king` stay **byte-for-byte identical**. Platform-layer (`src/http`) only — **TCB untouched**, no
+DSL op, no engine change, **no `INPUT_HASH` / `BENCHMARK_VERSION` bump**. Design trail (still live for
+S2–S5): `plans/koth-ladder-{decisions,stories}.md`. Both implementation slices were TDD'd at 100%
+mutation on the changed files.
+
+- **Slice 1 — the arena store record** (PR #251 — `readArena` / `commitArena` on the `ThroneStore` port,
+  implemented across the in-memory fake **and** the Upstash Lua adapter together and pinned by the shared
+  `runThroneStoreContract`; `commitArena` is one atomic unit that swaps the arena record **and** appends
+  arena #1 to the crowning lineage via the shared `lineageEntryOf`, so `read()`/`recent()` — and the
+  "Gen N" display — stay byte-identical; no consumer wired ⇒ zero observable change).
+- **Slice 2 — `/fight` crowns through the arena** (PR #252 — `handleFight` reworked to `readArena` → pure
+  `rankArena({arena, challenger, winRates})` → `commitArena`, byte-identical `/fight` responses; the
+  entrant is stamped with the next seniority; the incumbent scouts arena #1 via
+  `incumbentOf(lineageEntryOf(arena))`; the local `crown` helper became `commit`. `rank-arena.ts` is the
+  N=1 seam S2 widens to win→net→seniority. GOTCHA: the two 409 tests were rewired to model an **arena**
+  race — the failing test that demanded the migration off `read()`/`compareAndSwap`).
+- **Refinement:** the old single-throne crown path (`compareAndSwap`, `CROWN_SCRIPT`, `buildCrownRequest`,
+  `interpretCrownReply`) is **kept prod-unused** and retired in **S3** with the lineage — `handle-fight`
+  simply stopped calling it, avoiding a double-churn of `handle-king`'s tests. `/king` + podium unchanged.
+
+[koth-ladder-s1-arena-skeleton.md](koth-ladder-s1-arena-skeleton.md)

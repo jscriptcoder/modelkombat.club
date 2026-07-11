@@ -1,7 +1,7 @@
 # Plan: KotH ladder — S1 arena skeleton (N=1, behavior-preserving)
 
 **Branch**: per-slice (see each slice) — `feat/arena-store-record`, then `feat/arena-crown-n1`
-**Status**: Active — Slice 1 ✅ **merged (PR #251)**; Slice 2 ✅ **green, awaiting commit/PR**.
+**Status**: ✅ **COMPLETE & ARCHIVED** — both slices merged (PR #251, PR #252), 2026-07-11.
 Plan approved 2026-07-10 (defer all `/king`/podium edits to S3).
 **Refinement (2026-07-11):** the old single-throne crown path (`compareAndSwap`, `CROWN_SCRIPT`,
 `buildCrownRequest`, `interpretCrownReply`) is **retired in S3** with the lineage, not in Slice 2 —
