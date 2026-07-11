@@ -12,6 +12,7 @@ export type FightError =
   | { kind: "validator"; issues: ValidationIssue[] }
   | { kind: "handle"; message: string }
   | { kind: "throne-moved"; message: string }
+  | { kind: "mirror"; message: string }
   | { kind: "transport"; message: string };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -20,6 +21,11 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 // The problem's human string — carried as `title` (this envelope has no `detail` member).
 const titleOf = (body: unknown): string =>
   isRecord(body) && typeof body.title === "string" ? body.title : "";
+
+// The problem's machine-readable `type` URI — used to split the two 409s (a lost CAS race vs a
+// byte-identical arena mirror), which share a status but drive different UI (retry vs edit-the-doc).
+const typeOf = (body: unknown): string =>
+  isRecord(body) && typeof body.type === "string" ? body.type : "";
 
 // The validator's structured issues (the 422 `errors` array), keeping only well-formed
 // { path, reason } entries so a malformed payload can't inject arbitrary shapes into the list.
@@ -46,7 +52,11 @@ export const fightError = (
   }
 
   if (status === 409) {
-    return { kind: "throne-moved", message: titleOf(body) };
+    // A byte-identical arena mirror (C4) shares 409 with a lost throne CAS but needs a different
+    // message + no retry (resubmitting the same bot just 409s again) — split them by `type`.
+    return typeOf(body) === "/problems/arena-mirror"
+      ? { kind: "mirror", message: titleOf(body) }
+      : { kind: "throne-moved", message: titleOf(body) };
   }
 
   if (status === 413 || status === 405) {

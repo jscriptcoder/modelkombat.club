@@ -991,6 +991,35 @@ describe("RingPage — response failure states", () => {
     expect(ui.queryByText(/the ring returned an error/i)).toBeNull();
   });
 
+  it("names the duplicated slot when the arena rejects a mirror (409 arena-mirror), with no resubmit prompt", async () => {
+    const problem = {
+      type: "/problems/arena-mirror",
+      title:
+        "This exact bot already holds arena slot #2 — a byte-identical fighter can't displace itself.",
+      status: 409,
+    };
+
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 409, body: problem })} />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // Scope to the alert: the message also appears verbatim in the raw payload block below.
+    const alert = await ui.findByRole("alert");
+
+    expect(alert.textContent).toMatch(/already holds arena slot #2/i);
+    // A mirror is NOT a throne-moved: resubmitting the SAME bot would 409 again, so the alert offers
+    // no resubmit/retry button — the author edits the (still-pasted) doc and sends a new fighter.
+    expect(within(alert).queryByRole("button")).toBeNull();
+    // It replaces the generic banner and claims no crown/placement headline or throne link.
+    expect(ui.queryByText(/the ring returned an error/i)).toBeNull();
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
+    expect(
+      ui.queryByText(/new champion|first King|joined the arena|didn't crack/i),
+    ).toBeNull();
+  });
+
   it("re-enters the ring when the author resubmits after a throne-moved", async () => {
     let calls = 0;
 

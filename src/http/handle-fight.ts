@@ -17,6 +17,7 @@ import type {
 } from "./throne-store.js";
 import {
   benchmark,
+  sameDoc,
   type BenchmarkConfig,
   type BenchmarkResult,
 } from "../engine/benchmark.js";
@@ -121,6 +122,26 @@ const incumbentOf = (
   return identity;
 };
 
+// The RFC 9457 detail for a byte-identical resubmit of a sitting arena member (C4). A clone can
+// never out-rank its original, so it is rejected as a no-op before any benchmark; the detail names
+// the 1-based slot it duplicates so the author knows which fighter already holds that ground.
+const arenaMirrorDetail = (slot: number): string =>
+  `This exact bot already holds arena slot #${slot} — a byte-identical fighter can't displace itself.`;
+
+// If the submitted document is byte-identical to a current arena member, the 409 that rejects it
+// (naming the member's 1-based slot); otherwise `undefined`, and the submission proceeds. `sameDoc`
+// is the same serialization deep-equal the benchmark's no-mirror rule uses (shared knowledge).
+const mirrorSlot = (
+  members: readonly ArenaMember[],
+  doc: BotDoc,
+): Response | undefined => {
+  const index = members.findIndex((member) => sameDoc(member.champion, doc));
+
+  return index === -1
+    ? undefined
+    : problem(409, "/problems/arena-mirror", arenaMirrorDetail(index + 1));
+};
+
 // Run the arena round-robin on the frozen version seeds (D-A: a deterministic tournament graph —
 // each pair one permanent verdict) and reduce it to each contestant's Copeland win-count + Σ
 // net-points (`arenaStandings`, the pure tally). The challenger fights every defender directly, and
@@ -188,6 +209,17 @@ export const handleFight = async (
 
   const { handle } = handleResult;
 
+  // Read the arena up front — before the costly gauntlet benchmark — so a byte-identical resubmit
+  // of a current member is rejected as a no-op (C4): a clone can never displace its original. The
+  // same read feeds the placement below (one snapshot; the commit is still gen-guarded).
+  const arena = await deps.store.readArena(deps.version);
+
+  if (arena !== undefined) {
+    const mirror = mirrorSlot(arena.members, parsed.doc);
+
+    if (mirror !== undefined) return mirror;
+  }
+
   const result = benchmark({
     bot: parsed.doc,
     gauntlet: deps.gauntlet,
@@ -205,8 +237,6 @@ export const handleFight = async (
 
   // Failed the gate: plain gauntlet report, no title, arena untouched.
   if (!report.cleared) return json(report);
-
-  const arena = await deps.store.readArena(deps.version);
 
   // Empty arena: bootstrap-crown the clearer as this version's first champion (arena #1 at
   // generation 1, seniority 1). `commitArena` also appends it to the crowning lineage.
