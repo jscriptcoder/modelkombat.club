@@ -123,7 +123,7 @@ const tallyDegrade = (reasons: DegradeReason[]): DegradeTally =>
 // -identical doc would NOT be skipped — which only ever yields a (harmless) extra
 // mirror fight, never a wrong skip; the real trigger is the SAME file submitted
 // against itself, where order is identical.
-const sameDoc = (a: BotDoc, b: BotDoc): boolean =>
+export const sameDoc = (a: BotDoc, b: BotDoc): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
 // Play one (bot vs opponent) matchup at one seed on BOTH sides, each reduced to

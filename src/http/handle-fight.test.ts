@@ -862,33 +862,190 @@ describe("handleFight — S2.1: King-fight telemetry parity (D-C)", () => {
     expect(t?.bouts).toBe(10);
     expect(sumTally(t!.endReasons)).toBe(10);
   });
+});
 
-  it("emits all-zero King telemetry for a challenger that mirrors the King (empty breakdown, no crash)", async () => {
+// C4: a submission byte-identical to a current arena member is rejected as a no-op BEFORE the
+// gauntlet gate — a clone can never displace its original, so there is no point benchmarking it.
+// D3: relegation is permanent from the ACTIVE arena, but a departed veteran is not a "clone" — it
+// may re-submit and re-compete as a fresh entrant (this is where C4 and D3 meet).
+describe("handleFight — S2.3: mirror-reject (C4) + re-entry (D3)", () => {
+  // Wrap a store so a stray commit on the reject path is caught by count, not merely inferred from
+  // unchanged state (the S2.2 belt-and-braces pattern).
+  const countingCommits = (
+    inner: InMemoryThroneStore,
+  ): { store: FightDeps["store"]; commits: () => number } => {
+    let commits = 0;
+
+    return {
+      commits: () => commits,
+      store: {
+        read: inner.read,
+        recent: inner.recent,
+        compareAndSwap: inner.compareAndSwap,
+        readArena: inner.readArena,
+        commitArena: (v, e, n) => {
+          commits += 1;
+
+          return inner.commitArena(v, e, n);
+        },
+      },
+    };
+  };
+
+  it("rejects a byte-identical clone of a current defender as a no-op, naming its slot", async () => {
+    const inner = inMemoryThroneStore();
+
+    // A two-member arena; the challenger is byte-identical to defender #2 (aggressor).
+    await seatArena(inner, "vTEST", [
+      { champion: loadBot("berserker"), handle: null, seniority: 1 },
+      { champion: loadBot("aggressor"), handle: null, seniority: 2 },
+    ]);
+
+    const before = await inner.readArena("vTEST");
+    const { store, commits } = countingCommits(inner);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(409);
+    expect(res.headers.get("content-type")).toContain(
+      "application/problem+json",
+    );
+
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/arena-mirror");
+    // the reported slot is the MATCHED member's 1-based rank (#2 here) — not a hardcoded #1
+    expect(body.title).toContain("#2");
+    expect(body.title.toLowerCase()).toContain("already");
+
+    // no benchmark, no CAS: commitArena was never called and the arena is byte-identical
+    expect(commits()).toBe(0);
+    expect(await inner.readArena("vTEST")).toEqual(before);
+    expect(inner.lineage("vTEST")).toHaveLength(1);
+  });
+
+  it("rejects the clone BEFORE the gauntlet gate (a clone of a gate-failing member still 409s)", async () => {
+    const store = inMemoryThroneStore();
+
+    // Seat a member that could NOT clear the injected idle-dummy gauntlet (a mover only walks). If
+    // the mirror check ran AFTER the gate this clone would fail the gate and return a plain
+    // `cleared: false` report; a 409 proves the reject precedes the benchmark.
+    await seatArena(store, "vTEST", [
+      { champion: mover(), handle: null, seniority: 1 },
+    ]);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(mover())),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(409);
+
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/arena-mirror");
+    expect(body.title).toContain("#1");
+  });
+
+  it("does NOT reject a submission that differs from every member by even one byte", async () => {
     const store = inMemoryThroneStore();
 
     await enthrone(store, "vTEST", loadBot("berserker"));
 
+    // Same rules, different name → a distinct document. It proceeds (ties the King on strength,
+    // enters at #2 on seniority) rather than being rejected as a mirror.
+    const nearClone: BotDoc = { ...loadBot("berserker"), name: "berserker-ii" };
+
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("berserker"))), // byte-identical ⇒ no-mirror skip
+      fightRequest(JSON.stringify(nearClone)),
       arena("vTEST", store),
     );
 
-    const t = ((await res.json()) as { title?: TitleStats }).title;
+    expect(res.status).toBe(200);
 
-    // the mirror skip leaves an empty breakdown; every figure degrades to a clean zero. (C4
-    // mirror-REJECT is S2.3 — here the clone still runs and, with room, enters at the bottom.)
-    expect(t?.bouts).toBe(0);
-    expect(t?.wins).toBe(0);
-    expect(t?.losses).toBe(0);
-    expect(t?.draws).toBe(0);
-    expect(t?.net).toBe(0);
-    expect(sumTally(t!.endReasons)).toBe(0);
-    expect(t?.degrade).toEqual({
-      unaffordable: 0,
-      "out-of-band": 0,
-      locked: 0,
-      inert: 0,
-      "wrong-context": 0,
-    });
+    const body = (await res.json()) as {
+      title?: { outcome: string; rank: number };
+    };
+
+    expect(body.title?.outcome).toBe("entered");
+    expect(body.title?.rank).toBe(2);
+    expect(
+      (await store.readArena("vTEST"))?.members.map((m) => m.champion.name),
+    ).toEqual(["berserker", "berserker-ii"]);
+  });
+
+  it("lets one author hold multiple slots with DISTINCT bots (rejection keys on the doc, not the handle)", async () => {
+    const store = inMemoryThroneStore();
+
+    // Crown aggressor under handle "koga".
+    await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Author-Handle": "koga",
+      }),
+      arena("vTEST", store),
+    );
+
+    // A DIFFERENT bot, SAME handle → not a mirror; it crowns and both occupy slots.
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker")), {
+        "X-Author-Handle": "koga",
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(200);
+    expect(
+      ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
+    ).toBe("crowned");
+
+    const after = await store.readArena("vTEST");
+
+    expect(after?.members.map((m) => m.champion.name)).toEqual([
+      "berserker",
+      "aggressor",
+    ]);
+    expect(after?.members.every((m) => m.handle === "koga")).toBe(true);
+  });
+
+  it("does NOT mirror-reject a RELEGATED veteran on re-submission — it re-competes (D3)", async () => {
+    const store = inMemoryThroneStore();
+    const berserker2: BotDoc = { ...loadBot("berserker"), name: "berserker-2" };
+    const berserker3: BotDoc = { ...loadBot("berserker"), name: "berserker-3" };
+
+    // Full arena: two berserker twins + aggressor. Every berserker beats aggressor and ties the
+    // other berserkers, so submitting a THIRD twin relegates aggressor (uniquely 0 wins).
+    await seatArena(store, "vTEST", [
+      { champion: loadBot("berserker"), handle: null, seniority: 1 },
+      { champion: berserker2, handle: null, seniority: 2 },
+      { champion: loadBot("aggressor"), handle: null, seniority: 3 },
+    ]);
+
+    const relegate = await handleFight(
+      fightRequest(JSON.stringify(berserker3)),
+      arena("vTEST", store),
+    );
+
+    const relegateBody = (await relegate.json()) as {
+      title?: { displaced?: { name: string } };
+    };
+
+    expect(relegateBody.title?.displaced?.name).toBe("aggressor"); // the veteran left the arena
+
+    // The relegated aggressor re-submits. It is no longer a current member, so the mirror guard does
+    // not fire (a returning veteran is not a clone); it re-runs the round-robin and — against the
+    // three berserkers that displaced it — is unplaced. The point: 200, NOT a 409 mirror-reject.
+    const reenter = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    expect(reenter.status).toBe(200);
+    expect(
+      ((await reenter.json()) as { title?: { outcome: string } }).title
+        ?.outcome,
+    ).toBe("unplaced");
   });
 });

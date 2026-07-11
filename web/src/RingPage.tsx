@@ -317,6 +317,12 @@ const RingPage: Component<RingPageProps> = (props) => {
     return err?.kind === "throne-moved" ? err.message : null;
   };
 
+  const mirrorMessage = (): string | null => {
+    const err = responseError();
+
+    return err?.kind === "mirror" ? err.message : null;
+  };
+
   const transportMessage = (): string | null => {
     const err = responseError();
 
@@ -501,6 +507,14 @@ const RingPage: Component<RingPageProps> = (props) => {
                         >
                           Retry
                         </button>
+                      </div>
+                    )}
+                  </Show>
+
+                  <Show when={mirrorMessage()}>
+                    {(message) => (
+                      <div class="ring-send-error" role="alert">
+                        <p class="ring-send-error-line">{message()}</p>
                       </div>
                     )}
                   </Show>

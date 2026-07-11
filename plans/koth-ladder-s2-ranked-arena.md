@@ -1,7 +1,7 @@
 # Plan: KotH ladder — S2 (the ranked arena becomes real, N=3)
 
 **Branches**: `feat/arena-ranked-fill-n3` → `feat/arena-relegation` → `feat/arena-mirror-reentry`
-**Status**: Active — decisions **confirmed 2026-07-11** (D-A frozen seeds · D-B C7 vocab · D-C/D-D/D-E as recommended). **S2.1 ✅ MERGED + LIVE** (PR #253, `feat/arena-ranked-fill-n3`; 1606 tests green; mutation **100%** on `rank-arena` / `arena-standings` / `handle-fight` / `throne-store`; `throne-store-upstash` 94.89% — 7 Lua-script `StringLiteral` survivors, the documented smoke-verified exception). **S2.2 ✅ CODE-COMPLETE** on `feat/arena-relegation` (1613 tests green; mutation **100%** on `rank-arena` / `handle-fight` / `champion-identity`). **S2.3 next.**
+**Status**: Active — decisions **confirmed 2026-07-11** (D-A frozen seeds · D-B C7 vocab · D-C/D-D/D-E as recommended). **S2.1 ✅ MERGED + LIVE** (PR #253, `feat/arena-ranked-fill-n3`; 1606 tests green; mutation **100%** on `rank-arena` / `arena-standings` / `handle-fight` / `throne-store`; `throne-store-upstash` 94.89% — 7 Lua-script `StringLiteral` survivors, the documented smoke-verified exception). **S2.2 ✅ MERGED + LIVE** (PR #254, `feat/arena-relegation`; 1613 tests green; mutation **100%** on `rank-arena` / `handle-fight` / `champion-identity`). **S2.3 ✅ CODE-COMPLETE** on `feat/arena-mirror-reentry` (mirror-reject C4 + re-entry D3; 1618 tests green; mutation **100%** on `handle-fight` — 110 killed; web mirror render manual-scanned). Ready for PR — this closes S2.
 **Story**: S2 in `plans/koth-ladder-stories.md`. **Design source of truth**: `plans/koth-ladder-decisions.md` (D1–D7, C1–C7).
 **Builds on**: S1 arena skeleton (`docs/archive/koth-ladder-s1-arena-skeleton.md`, PRs #251–#252).
 
@@ -67,8 +67,10 @@ These shape the acceptance criteria. **All confirmed 2026-07-11**: D-A → **fro
       arena unchanged. _(S2.2 — removed the D-D placeholder)_
 - [x] Ties resolve **win → net → seniority** (longer-tenured / lower-seniority wins); the order is a strict
       total order (unique seniority) so ranking + the relegation choice are unambiguous. _(S2.1)_
-- [ ] A submission **byte-identical** to any current defender is **rejected as a no-op** before ranking (C4). _(S2.3)_
-- [ ] A **relegated** former champion re-submitted gets a **fresh junior seniority** (D3) and can re-enter. _(S2.3)_
+- [x] A submission **byte-identical** to any current defender is **rejected as a no-op** before ranking (C4)
+      — a `409 /problems/arena-mirror` naming the held slot, read before the gauntlet gate (no benchmark). _(S2.3)_
+- [x] A **relegated** former champion re-submitted is **not** treated as a mirror (it left the arena) — it
+      re-competes as a fresh entrant, drawing a **fresh junior seniority** (D3) like any newcomer. _(S2.3)_
 - [x] `/king` + podium remain **King-only** via the (now succession-aware) lineage bridge — ranked-podium is S3. _(S2.1)_
 - [x] The full `/fight` + `/king` + `throne-store` contract suites pass; `RingPage` renders every new outcome. _(S2.1)_
 - [x] Concurrency preserved: a placement that loses the arena-generation CAS returns `409 /problems/throne-moved`
