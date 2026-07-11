@@ -66,7 +66,7 @@ const postFightToApi: PostFight = async ({ doc, handle }) => {
 
 // Map a /fight report body to the author-facing headline. A bot that didn't clear stops at the
 // gauntlet; a clearer reads its arena placement (C7): crowned (first King vs dethrone, told apart
-// by whether there was an incumbent — D-B), entered as a defender, or cleared-but-unplaced.
+// by whether the board is empty — you fought no one — D-B), entered as a defender, or unplaced.
 const outcomeHeadline = (body: unknown): string => {
   if (!isRecord(body) || body.cleared !== true) {
     return "Didn't clear the gauntlet.";
@@ -76,7 +76,10 @@ const outcomeHeadline = (body: unknown): string => {
   const outcome = title?.outcome;
 
   if (outcome === "crowned") {
-    return isRecord(title?.incumbent)
+    // A dethrone fought the sitting King (a non-empty board); an empty board is the first crown.
+    const board = title?.board;
+
+    return Array.isArray(board) && board.length > 0
       ? "New champion — you dethroned the reigning King! 👑"
       : "Cleared the gauntlet — you're the first King! 👑";
   }
@@ -168,18 +171,23 @@ const formatRate = (winRate: number): string => `${Math.round(winRate * 100)}%`;
 // already resolved server-side in `passed`; the card only names it.
 const resultLabel = (passed: boolean): string => (passed ? "beat" : "lost");
 
-// The scouted incumbent King — identity ONLY. `readIncumbent` extracts exactly these three fields,
-// so a payload smuggling extra fields (e.g. the King's `rules` DSL) can never leak into the card.
+// The per-defender result as TEXT (never colour alone). You "beat" a defender by winning more than
+// half the head-to-head bouts — the strict-`>`-half convention the gauntlet gate uses.
+const beatLabel = (winRate: number): string =>
+  winRate > 0.5 ? "beat" : "lost";
+
+// A scouted defender — identity ONLY. `readIncumbent` extracts exactly these three fields, so a
+// payload smuggling extra fields (e.g. the defender's `rules` DSL) can never leak into the card.
 type Incumbent = { name: string; model: string | null; handle: string | null };
 
-// The title-fight scout: who you faced + how the championship bout went. Absent for the first
-// crown (an empty throne has no incumbent to scout).
-type TitleScout = { incumbent: Incumbent; winRate: number; bouts: number };
+// One arena-board row: a defender's identity + the challenger's win rate vs it, plus whether it is
+// the reigning King (board[0]). The card reads these; the fuller telemetry rides in the raw block.
+type BoardRow = { defender: Incumbent; winRate: number; isKing: boolean };
 
 // The title block's view-model. `linksToThrone` is true for a crown (the throne is now yours to
-// view); false when you entered as a defender (the scout shows the King you fought). `scout` is
-// null only for the first crown (no incumbent to scout).
-type TitleView = { linksToThrone: boolean; scout: TitleScout | null };
+// view); false when you entered/were unplaced. `board` is the per-defender board, in rank order —
+// empty for the first crown (an empty arena had no defenders to fight).
+type TitleView = { linksToThrone: boolean; board: BoardRow[] };
 
 const readIncumbent = (value: unknown): Incumbent | null => {
   if (!isRecord(value) || typeof value.name !== "string") return null;
@@ -191,51 +199,46 @@ const readIncumbent = (value: unknown): Incumbent | null => {
   };
 };
 
-// Shape the /fight `title` block into the view-model, or null when there is no scoutable title —
-// an uncleared report, an error body, a title without a well-formed King scout, or an unrecognised
-// outcome — so the card omits the block.
+// Shape the /fight `title.board` into rows, dropping any entry without a well-formed defender
+// identity or numeric win rate (the same identity-only discipline as `readIncumbent`). board[0]
+// is the reigning King — the board is rank-ordered.
+const readBoard = (value: unknown): BoardRow[] => {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((entry: unknown, index) => {
+    if (!isRecord(entry) || typeof entry.winRate !== "number") return [];
+
+    const defender = readIncumbent(entry.defender);
+
+    return defender === null
+      ? []
+      : [{ defender, winRate: entry.winRate, isKing: index === 0 }];
+  });
+};
+
+// Shape the /fight `title` block into the view-model, or null when there is nothing to show — an
+// uncleared/error body, an unrecognised outcome, or a non-crown with no scoutable board — so the
+// card omits the section. A crown always shows (its throne link); a placement shows its board.
 const titleView = (body: unknown): TitleView | null => {
   if (!isRecord(body) || !isRecord(body.title)) return null;
 
-  const title = body.title;
+  const { outcome, board } = body.title;
 
-  // A crown links to the (now-yours) throne. A first-King crown has no incumbent to scout.
-  if (title.outcome === "crowned") {
-    const incumbent = readIncumbent(title.incumbent);
-
-    if (incumbent === null) return { linksToThrone: true, scout: null };
-
-    if (typeof title.winRate !== "number" || typeof title.bouts !== "number") {
-      return null;
-    }
-
-    return {
-      linksToThrone: true,
-      scout: { incumbent, winRate: title.winRate, bouts: title.bouts },
-    };
+  if (
+    outcome !== "crowned" &&
+    outcome !== "entered" &&
+    outcome !== "unplaced"
+  ) {
+    return null;
   }
 
-  // Entered as a defender OR cleared-but-unplaced: either way you fought the #1 King, so scout it
-  // with the title-fight result — but you are not King (no crown link). Full parity: an unplaced
-  // near-miss reads the same scout as a defender (D-C diagnose-don't-guess).
-  if (title.outcome === "entered" || title.outcome === "unplaced") {
-    const incumbent = readIncumbent(title.incumbent);
+  const rows = readBoard(board);
+  const linksToThrone = outcome === "crowned";
 
-    if (
-      incumbent === null ||
-      typeof title.winRate !== "number" ||
-      typeof title.bouts !== "number"
-    ) {
-      return null;
-    }
-
-    return {
-      linksToThrone: false,
-      scout: { incumbent, winRate: title.winRate, bouts: title.bouts },
-    };
-  }
-
-  return null;
+  // A non-crown with no board has nothing to render — omit the section (graceful degrade).
+  return !linksToThrone && rows.length === 0
+    ? null
+    : { linksToThrone, board: rows };
 };
 
 // A warning triangle. Decorative — the adjacent message text carries the meaning — so it is hidden
@@ -540,31 +543,43 @@ const RingPage: Component<RingPageProps> = (props) => {
                     </a>
                   </Show>
 
-                  <Show when={t().scout}>
-                    {(s) => (
-                      <div class="ring-incumbent">
-                        <p class="ring-incumbent-label">
-                          Title fight vs the King
-                        </p>
-                        <ModelLogo model={s().incumbent.model} />
-                        <code class="ring-incumbent-name">
-                          {s().incumbent.name}
-                        </code>
-                        <Show when={s().incumbent.handle}>
-                          {(handle) => (
-                            <p class="ring-incumbent-handle">by {handle()}</p>
-                          )}
-                        </Show>
-                        <p class="ring-title-result">
-                          <span class="ring-title-winrate">
-                            {formatRate(s().winRate)}
-                          </span>{" "}
-                          across{" "}
-                          <span class="ring-title-bouts">{s().bouts}</span>{" "}
-                          bouts
-                        </p>
-                      </div>
-                    )}
+                  <Show when={t().board.length > 0}>
+                    <p class="ring-defenders-label">
+                      The arena defenders you fought
+                    </p>
+                    <ul class="ring-defender-list" aria-label="Arena defenders">
+                      <For each={t().board}>
+                        {(row) => (
+                          <li class="ring-defender-row">
+                            <ModelLogo model={row.defender.model} />
+                            <code class="ring-defender-name">
+                              {row.defender.name}
+                            </code>
+                            <Show when={row.isKing}>
+                              <span class="ring-defender-crown">King</span>
+                            </Show>
+                            <Show when={row.defender.handle}>
+                              {(handle) => (
+                                <span class="ring-defender-handle">
+                                  by {handle()}
+                                </span>
+                              )}
+                            </Show>
+                            <span class="ring-defender-rate">
+                              {formatRate(row.winRate)}
+                            </span>
+                            <span
+                              class="ring-defender-result"
+                              classList={{
+                                "ring-defender-result-beat": row.winRate > 0.5,
+                              }}
+                            >
+                              {beatLabel(row.winRate)}
+                            </span>
+                          </li>
+                        )}
+                      </For>
+                    </ul>
                   </Show>
                 </section>
               )}

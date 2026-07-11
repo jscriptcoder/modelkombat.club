@@ -332,47 +332,87 @@
   font-weight: 600;
 }
 
-.ring-incumbent .brand-mark {
-  width: 2.25rem;
-  height: 2.25rem;
-}
-
-.ring-incumbent-label {
-  margin: 0.5rem 0;
+/* The arena-defender board — every defender the challenger fought (S4), rank-ordered, King first. */
+.ring-defenders-label {
+  margin: 0.5rem 0 0.75rem;
   color: var(--muted);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
-.ring-incumbent-name {
-  display: inline-block;
-  margin: 0.25rem 0;
+.ring-defender-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+  text-align: left;
+}
+
+/* One defender row: model mark · name · [King] · [by handle] · win rate · beat/lost pill. Flex so
+   the optional King/handle tokens flow inline; the rate + result are pushed to the trailing edge. */
+.ring-defender-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.ring-defender-row .brand-mark {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: none;
+}
+
+/* Name chip: the shared .move-id / .fighter-name token treatment (accent on code-bg). */
+.ring-defender-name {
   padding: 0.1rem 0.4rem;
   color: var(--accent);
   background: var(--code-bg);
   border-radius: 4px;
-  font-size: 1rem;
-}
-
-.ring-incumbent-handle {
-  margin: 0.25rem 0;
-  color: var(--muted);
   font-size: 0.9rem;
 }
 
-.ring-title-result {
-  margin: 0.75rem 0 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.ring-title-winrate {
+/* The reigning-King tag on board[0] — a TEXT marker (never colour alone). */
+.ring-defender-crown {
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(240, 200, 96, 0.22);
   color: var(--fg);
+  font-size: 0.72rem;
   font-weight: 700;
-  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
-.ring-title-bouts {
+.ring-defender-handle {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Win rate + result are pushed to the trailing edge (auto left margin on the first of the pair). */
+.ring-defender-rate {
+  margin-left: auto;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+/* Beat/lost pill. Text always carries the signal; the tint is a secondary cue (AC-1). Default is
+   the lost (red) tint; `-beat` flips it to green. */
+.ring-defender-result {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--fg);
+  background: rgba(255, 128, 128, 0.22);
+}
+
+.ring-defender-result-beat {
+  background: rgba(120, 226, 168, 0.22);
 }

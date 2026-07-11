@@ -104,6 +104,81 @@ const INCUMBENT = {
   handle: "prev-champ",
 };
 
+// One arena-board entry — the /fight `title.board` shape (S4): a defender's identity plus the
+// challenger's telemetry vs it. The card reads `defender` + `winRate`; the rest rides along in the
+// raw block. Defaults to the old-king dethrone row; each test overrides what it pins.
+const boardEntry = (
+  over?: Record<string, unknown>,
+): Record<string, unknown> => ({
+  defender: { name: "old-king", model: "claude-opus-4", handle: "prev-champ" },
+  winRate: 0.2,
+  net: -18,
+  wins: 2,
+  losses: 18,
+  draws: 0,
+  bouts: 20,
+  endReasons: {},
+  degrade: {},
+  ...over,
+});
+
+// A rank-ordered three-defender board (board[0] = King). Distinct rates incl. the 0.5 boundary
+// (→ "lost", strict-`>` gate) and a mix of model/handle presence. Duplicated verbatim in each
+// expectation below — this IS the mutation guard (Stryker can't reach web/src).
+const BOARD: ReadonlyArray<{
+  name: string;
+  model: string | null;
+  handle: string | null;
+  winRate: number;
+  rate: string;
+  result: string;
+  king: boolean;
+}> = [
+  {
+    name: "old-king",
+    model: "claude-opus-4",
+    handle: "prev-champ",
+    winRate: 0.2,
+    rate: "20%",
+    result: "lost",
+    king: true,
+  },
+  {
+    name: "runner-up",
+    model: null,
+    handle: "silver",
+    winRate: 0.5,
+    rate: "50%",
+    result: "lost",
+    king: false,
+  },
+  {
+    name: "third-seat",
+    model: "claude-sonnet",
+    handle: null,
+    winRate: 0.75,
+    rate: "75%",
+    result: "beat",
+    king: false,
+  },
+];
+
+// A cleared report whose title carries the three-row BOARD, at the given placement outcome.
+const boardedBody = (
+  outcome: string,
+  extra?: Record<string, unknown>,
+): Record<string, unknown> =>
+  titledBody({
+    outcome,
+    board: BOARD.map((r) =>
+      boardEntry({
+        defender: { name: r.name, model: r.model, handle: r.handle },
+        winRate: r.winRate,
+      }),
+    ),
+    ...extra,
+  });
+
 // A `postFight` stub resolving a given HTTP status + body — the injected network seam.
 const resolves =
   (response: FightResponse): (() => Promise<FightResponse>) =>
@@ -198,25 +273,25 @@ describe("RingPage — the /ring submit surface", () => {
         headline: /didn't clear the gauntlet/i,
       },
       {
-        // crowned with NO incumbent ⇒ the first King (D-B: distinguished by incumbent presence)
+        // crowned with an EMPTY board ⇒ the first King (D-B: distinguished by board emptiness)
         body: reportBody({
           cleared: true,
-          title: { outcome: "crowned", rank: 1 },
+          title: { outcome: "crowned", rank: 1, board: [] },
         }),
         headline: /first King/i,
       },
       {
-        // crowned WITH an incumbent ⇒ a dethrone
+        // crowned with a NON-EMPTY board ⇒ a dethrone (you fought the sitting King)
         body: reportBody({
           cleared: true,
-          title: { outcome: "crowned", rank: 1, incumbent: INCUMBENT },
+          title: { outcome: "crowned", rank: 1, board: [boardEntry()] },
         }),
         headline: /new champion/i,
       },
       {
         body: reportBody({
           cleared: true,
-          title: { outcome: "entered", rank: 2, incumbent: INCUMBENT },
+          title: { outcome: "entered", rank: 2, board: [boardEntry()] },
         }),
         // pins the rank into the headline (not just "joined the arena") — the #-branch guard
         headline: /joined the arena at #2/i,
@@ -488,13 +563,13 @@ describe("RingPage — the fight card", () => {
     expect(results).toEqual(SCORECARD.map((row) => row.result));
   });
 
-  it("celebrates the first crown with a throne link and no incumbent scout", async () => {
+  it("celebrates the first crown with a throne link and no defender board (you fought no one)", async () => {
     const ui = render(() => (
       <RingPage
         postFight={resolves({
           status: 200,
-          // a crown with NO incumbent is the first King (D-B) — the throne is yours, no one to scout
-          body: titledBody({ outcome: "crowned", rank: 1 }),
+          // a crown with an EMPTY board is the first King (D-B) — the throne is yours, no one fought
+          body: titledBody({ outcome: "crowned", rank: 1, board: [] }),
         })}
       />
     ));
@@ -510,22 +585,76 @@ describe("RingPage — the fight card", () => {
         .getAttribute("href"),
     ).toBe("/#king");
 
-    // First King: there was no reigning champion to scout — no win rate / bouts line.
-    expect(region.querySelector(".ring-incumbent")).toBeNull();
-    expect(within(region).queryByText(/bouts/i)).toBeNull();
+    // First King: no defenders were fought — no board list, no rows.
+    expect(ui.queryByRole("list", { name: /arena defenders/i })).toBeNull();
+    expect(region.querySelector(".ring-defender-row")).toBeNull();
   });
 
-  it("scouts the dethroned King on a crown: identity, win rate and bouts", async () => {
+  it("renders one board row per arena defender, in board order with the King first", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: boardedBody("crowned") })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+
+    // Pins BOTH the count (one row per board entry) and the rank order (board[0] = King, first) —
+    // a dropped, extra, or reordered row fails here.
+    const names = within(list)
+      .getAllByRole("listitem")
+      .map((row) => cell(row, ".ring-defender-name"));
+
+    expect(names).toEqual(BOARD.map((r) => r.name));
+
+    // Exactly board[0] is marked as the reigning King — a text marker, never colour alone.
+    const crowns = within(list)
+      .getAllByRole("listitem")
+      .map((row) => cell(row, ".ring-defender-crown"));
+
+    expect(crowns).toEqual(["King", null, null]);
+  });
+
+  it("shows each defender's win rate and beat/lost, including the 0.5 boundary", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: boardedBody("crowned") })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+    const rows = within(list).getAllByRole("listitem");
+
+    // Exact percentages incl. 0.5 → "50%" (pins the `* 100` + rounding), and the beat/lost TEXT with
+    // 0.5 reading "lost" (strict-`>` gate) — a flipped threshold or dropped scaling fails here.
+    expect(rows.map((r) => cell(r, ".ring-defender-rate"))).toEqual(
+      BOARD.map((r) => r.rate),
+    );
+    expect(rows.map((r) => cell(r, ".ring-defender-result"))).toEqual(
+      BOARD.map((r) => r.result),
+    );
+  });
+
+  it("skips malformed board entries, rendering only well-formed defender rows", async () => {
     const ui = render(() => (
       <RingPage
         postFight={resolves({
           status: 200,
           body: titledBody({
             outcome: "crowned",
-            winRate: 0.6,
-            seeds: [7, 8],
-            bouts: 20,
-            incumbent: INCUMBENT,
+            board: [
+              boardEntry({
+                defender: { name: "good-king", model: null, handle: null },
+                winRate: 0.6,
+              }),
+              { winRate: 0.5 }, // no defender → skipped
+              "not even an object", // not a record → skipped
+              { defender: { name: "no-rate", model: null, handle: null } }, // no winRate → skipped
+            ],
           }),
         })}
       />
@@ -533,82 +662,106 @@ describe("RingPage — the fight card", () => {
 
     submit(ui, { name: "b", model: null, rules: [] }, "h");
 
-    const region = await ui.findByRole("region", { name: /title fight/i });
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+    const rows = within(list).getAllByRole("listitem");
 
-    // A crown links to the throne...
+    // The defensive filter drops the three malformed entries — only the well-formed row renders (no
+    // "NaN%" row, no crash on a null defender), the identity-only discipline of the incumbent scout.
+    expect(rows.map((r) => cell(r, ".ring-defender-name"))).toEqual([
+      "good-king",
+    ]);
+  });
+
+  it("scouts each defender's identity: model mark, name and handle by-line", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: boardedBody("crowned") })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+    const [kingRow] = within(list).getAllByRole("listitem");
+
+    // board[0] = the King: an accessible model mark, the name chip, and the "by <handle>" by-line.
+    expect(within(kingRow).getByRole("img", { name: /claude/i })).toBeTruthy();
+    expect(cell(kingRow, ".ring-defender-name")).toBe("old-king");
+    expect(cell(kingRow, ".ring-defender-handle")).toBe("by prev-champ");
+  });
+
+  it("omits the by-line and shows a generic mark for a defender with no handle or model", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: titledBody({
+            outcome: "crowned",
+            board: [
+              boardEntry({
+                defender: { name: "anon-king", model: null, handle: null },
+                winRate: 0.6,
+              }),
+            ],
+          }),
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+    const [row] = within(list).getAllByRole("listitem");
+
+    expect(cell(row, ".ring-defender-name")).toBe("anon-king");
+    // A null handle renders no by-line (King.tsx precedent); a null model → the generic mark.
+    expect(row.querySelector(".ring-defender-handle")).toBeNull();
     expect(
-      within(region)
-        .getByRole("link", { name: /throne/i })
-        .getAttribute("href"),
-    ).toBe("/#king");
-    // ...and scouts the King you dethroned: model mark (accessible), name, handle...
-    expect(within(region).getByRole("img", { name: /claude/i })).toBeTruthy();
-    expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
-    expect(cell(region, ".ring-incumbent-handle")).toBe("by prev-champ");
-    // ...plus the exact title-fight win rate and bout count.
-    expect(cell(region, ".ring-title-winrate")).toBe("60%");
-    expect(cell(region, ".ring-title-bouts")).toBe("20");
+      within(row).getByRole("img", { name: /mystery challenger/i }),
+    ).toBeTruthy();
   });
 
-  it("scouts the King you fought when you ENTER the arena as a defender, with no crown link", async () => {
+  it("renders the full board when you ENTER as a defender, with no crown link", async () => {
     const ui = render(() => (
       <RingPage
         postFight={resolves({
           status: 200,
-          body: titledBody({
-            outcome: "entered",
-            rank: 2,
-            winRate: 0.45,
-            bouts: 20,
-            incumbent: INCUMBENT,
-          }),
+          body: boardedBody("entered", { rank: 2 }),
         })}
       />
     ));
 
     submit(ui, { name: "b", model: null, rules: [] }, "h");
 
-    const region = await ui.findByRole("region", { name: /title fight/i });
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+    const rows = within(list).getAllByRole("listitem");
 
-    // You entered as a defender, so the King you fought is scouted with the title-fight result...
-    expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
-    expect(cell(region, ".ring-title-winrate")).toBe("45%");
-    expect(cell(region, ".ring-title-bouts")).toBe("20");
-    // ...but you are not King — no crown link (the ranked podium is a later slice).
-    expect(within(region).queryByRole("link", { name: /throne/i })).toBeNull();
+    // You fought every defender, so the whole board renders (King still first)...
+    expect(rows).toHaveLength(BOARD.length);
+    expect(cell(rows[0], ".ring-defender-name")).toBe("old-king");
+    // ...but you are not King — no crown link.
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
   });
 
-  it("scouts the King you fought even when UNPLACED (full parity), with no crown link", async () => {
+  it("renders the full board even when UNPLACED (full parity), with no crown link", async () => {
     const ui = render(() => (
       <RingPage
-        postFight={resolves({
-          status: 200,
-          body: titledBody({
-            outcome: "unplaced",
-            winRate: 0.2,
-            bouts: 20,
-            incumbent: INCUMBENT,
-          }),
-        })}
+        postFight={resolves({ status: 200, body: boardedBody("unplaced") })}
       />
     ));
 
     submit(ui, { name: "b", model: null, rules: [] }, "h");
 
-    const region = await ui.findByRole("region", { name: /title fight/i });
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
 
-    // Full parity: an unplaced clearer still fought the #1 King, so the same scout renders — the
-    // King's identity plus the title-fight result...
-    expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
-    expect(cell(region, ".ring-title-winrate")).toBe("20%");
-    expect(cell(region, ".ring-title-bouts")).toBe("20");
-    // ...but you did not place — no crown link...
-    expect(within(region).queryByRole("link", { name: /throne/i })).toBeNull();
-    // ...and the headline still names the miss.
+    // Full parity: an unplaced clearer still fought every defender, so the whole board renders...
+    expect(within(list).getAllByRole("listitem")).toHaveLength(BOARD.length);
+    // ...with no crown link, and the headline names the miss.
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
     expect(ui.getByText(/didn't crack the top ranks/i)).toBeTruthy();
   });
 
-  it("shows no title scout for an unplaced clearer whose title omits the King scout (graceful degrade)", async () => {
+  it("shows no title section for a clearer whose title omits the board (graceful degrade)", async () => {
     const ui = render(() => (
       <RingPage
         postFight={resolves({
@@ -623,56 +776,30 @@ describe("RingPage — the fight card", () => {
     // The scorecard proves the cleared result rendered...
     await ui.findByRole("region", { name: /gauntlet scorecard/i });
 
-    // ...but with no incumbent/winRate/bouts in the title, the scout gracefully omits (no crash)...
+    // ...but with no board and no crown, the title section gracefully omits (no crash)...
     expect(ui.queryByRole("region", { name: /title fight/i })).toBeNull();
+    expect(ui.queryByRole("list", { name: /arena defenders/i })).toBeNull();
     expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
     // ...and the headline names the miss.
     expect(ui.getByText(/didn't crack the top ranks/i)).toBeTruthy();
   });
 
-  it("omits the by-line and shows a generic mark when the King has no handle or model", async () => {
+  it("never renders a scouted defender's DSL — identity only", async () => {
     const ui = render(() => (
       <RingPage
         postFight={resolves({
           status: 200,
           body: titledBody({
             outcome: "crowned",
-            winRate: 0.6,
-            seeds: [7, 8],
-            bouts: 20,
-            incumbent: { name: "anon-king", model: null, handle: null },
-          }),
-        })}
-      />
-    ));
-
-    submit(ui, { name: "b", model: null, rules: [] }, "h");
-
-    const region = await ui.findByRole("region", { name: /title fight/i });
-
-    expect(cell(region, ".ring-incumbent-name")).toBe("anon-king");
-    // A null handle renders no by-line (King.tsx precedent); a null model → the generic mark.
-    expect(region.querySelector(".ring-incumbent-handle")).toBeNull();
-    expect(
-      within(region).getByRole("img", { name: /mystery challenger/i }),
-    ).toBeTruthy();
-  });
-
-  it("never renders the scouted King's DSL — identity only", async () => {
-    const ui = render(() => (
-      <RingPage
-        postFight={resolves({
-          status: 200,
-          body: titledBody({
-            outcome: "crowned",
-            winRate: 0.6,
-            seeds: [7, 8],
-            bouts: 20,
-            // A hostile payload smuggling the King's rules must never surface.
-            incumbent: {
-              ...INCUMBENT,
-              rules: [{ when: "SMUGGLED_SECRET_RULE", do: "attack" }],
-            },
+            board: [
+              boardEntry({
+                // A hostile payload smuggling a defender's rules must never surface.
+                defender: {
+                  ...INCUMBENT,
+                  rules: [{ when: "SMUGGLED_SECRET_RULE", do: "attack" }],
+                },
+              }),
+            ],
           }),
         })}
       />
@@ -683,7 +810,7 @@ describe("RingPage — the fight card", () => {
     const region = await ui.findByRole("region", { name: /title fight/i });
 
     // Identity still shows, but the DSL never leaks into the card.
-    expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
+    expect(cell(region, ".ring-defender-name")).toBe("old-king");
     expect(region.textContent).not.toMatch(/SMUGGLED_SECRET_RULE/);
   });
 
@@ -702,13 +829,7 @@ describe("RingPage — the fight card", () => {
   });
 
   it("keeps the complete raw payload below the card as the source of truth", async () => {
-    const body = titledBody({
-      outcome: "crowned",
-      winRate: 0.6,
-      seeds: [7, 8],
-      bouts: 20,
-      incumbent: INCUMBENT,
-    });
+    const body = boardedBody("crowned");
 
     const ui = render(() => (
       <RingPage postFight={resolves({ status: 200, body })} />
@@ -1039,7 +1160,7 @@ describe("RingPage — response failure states", () => {
             status: 200,
             body: reportBody({
               cleared: true,
-              title: { outcome: "crowned", rank: 1, incumbent: INCUMBENT },
+              title: { outcome: "crowned", rank: 1, board: [boardEntry()] },
             }),
           });
     };
