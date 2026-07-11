@@ -4,7 +4,7 @@
 // deps. Pure transport + orchestration over the deterministic engine (`benchmark`)
 // and the platform-layer throne store — no DSL op, TCB untouched (invariant #2).
 import { arenaStandings, pairIndices } from "./arena-standings.js";
-import { championIdentity } from "./champion-identity.js";
+import { championIdentity, memberIdentity } from "./champion-identity.js";
 import { problem, readValidatedBot } from "./envelope.js";
 import { buildFightReport, toTitleFightReport } from "./fight-report.js";
 import { rankArena, type Standing } from "./rank-arena.js";
@@ -226,15 +226,11 @@ export const handleFight = async (
     return moved ?? json({ ...report, title: { outcome: "crowned", rank: 1 } });
   }
 
-  // Full arena: unplaced placeholder — a clearer against a full arena does not place, and the arena
-  // is untouched (no fight, no commit). Relegation-once-full is S2.2 (the D-D placeholder).
-  if (arena.members.length >= deps.n) {
-    return json({ ...report, title: { outcome: "unplaced" } });
-  }
-
-  // Non-full arena (C2 join-if-room): rank the challenger against the current defenders via a
-  // round-robin, keep the top N (all of them while filling), #1 is King. The entrant is stamped
-  // with the next per-version seniority.
+  // A non-empty arena — whether it has room or is full: rank the challenger against the current
+  // defenders via a round-robin, keep the top N, #1 is King. While filling nobody is relegated (C2
+  // join-if-room); a full arena relegates its weakest (the (N+1)-th by the total order) unless the
+  // challenger is itself the weakest, in which case it is `unplaced` and the arena is untouched. The
+  // entrant is stamped with the next per-version seniority.
   const challenger: ArenaMember = {
     champion: parsed.doc,
     handle,
@@ -250,10 +246,26 @@ export const handleFight = async (
   const placement = rankArena({
     defenders: defenderStandings,
     challenger: challengerStanding,
+    n: deps.n,
   });
 
-  // Every filling placement mutates the arena at the next generation. A CAS race (the arena moved
-  // since our read) surfaces as 409 throne-moved; the loser resubmits against the new arena.
+  // The King-fight scout every placement carries (D-C): the challenger genuinely fought arena #1,
+  // whatever the outcome, so crowned / entered / unplaced all diagnose the same way — full telemetry
+  // (net / win-loss-draw / endReasons / degrade) + the scouted King (identity only, never the doc).
+  const scout = {
+    ...toTitleFightReport(kingFight),
+    incumbent: incumbentOf(lineageEntryOf(arena)),
+  };
+
+  // Unplaced: the challenger cleared but ranked below every defender of a FULL arena. It joins no
+  // arena and nothing is committed (the arena keeps its own top N); the scout still diagnoses the
+  // near-miss, at full parity with a placement.
+  if (placement.outcome === "unplaced") {
+    return json({ ...report, title: { outcome: "unplaced", ...scout } });
+  }
+
+  // A placement mutates the arena at the next generation. A CAS race (the arena moved since our
+  // read) surfaces as 409 throne-moved; the loser resubmits against the new arena.
   const moved = await commit(deps.store, deps.version, arena.generation, {
     members: placement.members,
     generation: arena.generation + 1,
@@ -267,12 +279,12 @@ export const handleFight = async (
     title: {
       outcome: placement.outcome,
       rank: placement.rank,
-      // Full championship-bout telemetry vs the reigning King (arena #1 you fought) at gauntlet
-      // fidelity (net / win-loss-draw / endReasons / degrade) so a challenger can diagnose its
-      // placement rather than guess from a lone win-rate. The full per-defender board is S4.
-      ...toTitleFightReport(kingFight),
-      // Scout the King you fought (identity only, never the doc) — arena #1 at read time.
-      incumbent: incumbentOf(lineageEntryOf(arena)),
+      ...scout,
+      // The relegated defender (identity only, never the doc) — present only when a full arena shed
+      // its weakest to seat this challenger; omitted while the arena still had room.
+      ...(placement.displaced
+        ? { displaced: memberIdentity(placement.displaced) }
+        : {}),
     },
   });
 };
