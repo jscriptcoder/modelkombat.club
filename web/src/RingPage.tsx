@@ -192,8 +192,8 @@ const readIncumbent = (value: unknown): Incumbent | null => {
 };
 
 // Shape the /fight `title` block into the view-model, or null when there is no scoutable title —
-// an uncleared report, an error body, an `unplaced` clearer (no King fought in S2.1), or an
-// unrecognised outcome — so the card omits the block.
+// an uncleared report, an error body, a title without a well-formed King scout, or an unrecognised
+// outcome — so the card omits the block.
 const titleView = (body: unknown): TitleView | null => {
   if (!isRecord(body) || !isRecord(body.title)) return null;
 
@@ -215,8 +215,10 @@ const titleView = (body: unknown): TitleView | null => {
     };
   }
 
-  // Entered as a defender: scout the King you fought, but you are not King (no crown link).
-  if (title.outcome === "entered") {
+  // Entered as a defender OR cleared-but-unplaced: either way you fought the #1 King, so scout it
+  // with the title-fight result — but you are not King (no crown link). Full parity: an unplaced
+  // near-miss reads the same scout as a defender (D-C diagnose-don't-guess).
+  if (title.outcome === "entered" || title.outcome === "unplaced") {
     const incumbent = readIncumbent(title.incumbent);
 
     if (

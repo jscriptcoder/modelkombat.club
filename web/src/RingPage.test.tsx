@@ -578,7 +578,37 @@ describe("RingPage — the fight card", () => {
     expect(within(region).queryByRole("link", { name: /throne/i })).toBeNull();
   });
 
-  it("shows no title scout when the clearer is unplaced (a full arena, no fight)", async () => {
+  it("scouts the King you fought even when UNPLACED (full parity), with no crown link", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: titledBody({
+            outcome: "unplaced",
+            winRate: 0.2,
+            bouts: 20,
+            incumbent: INCUMBENT,
+          }),
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const region = await ui.findByRole("region", { name: /title fight/i });
+
+    // Full parity: an unplaced clearer still fought the #1 King, so the same scout renders — the
+    // King's identity plus the title-fight result...
+    expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
+    expect(cell(region, ".ring-title-winrate")).toBe("20%");
+    expect(cell(region, ".ring-title-bouts")).toBe("20");
+    // ...but you did not place — no crown link...
+    expect(within(region).queryByRole("link", { name: /throne/i })).toBeNull();
+    // ...and the headline still names the miss.
+    expect(ui.getByText(/didn't crack the top ranks/i)).toBeTruthy();
+  });
+
+  it("shows no title scout for an unplaced clearer whose title omits the King scout (graceful degrade)", async () => {
     const ui = render(() => (
       <RingPage
         postFight={resolves({
@@ -593,7 +623,7 @@ describe("RingPage — the fight card", () => {
     // The scorecard proves the cleared result rendered...
     await ui.findByRole("region", { name: /gauntlet scorecard/i });
 
-    // ...but an unplaced clearer fought no King in S2.1 — no title-fight scout, no throne link...
+    // ...but with no incumbent/winRate/bouts in the title, the scout gracefully omits (no crash)...
     expect(ui.queryByRole("region", { name: /title fight/i })).toBeNull();
     expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
     // ...and the headline names the miss.

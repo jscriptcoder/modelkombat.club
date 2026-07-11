@@ -356,29 +356,159 @@ describe("handleFight — S2.1: ranked filling of a non-full arena", () => {
   });
 });
 
-describe("handleFight — S2.1: full-arena placeholder (unplaced; relegation is S2.2)", () => {
-  it("returns unplaced and leaves a FULL arena untouched (no fight, no commit)", async () => {
+describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
+  it("ENTERS a mid-ranked challenger and relegates the weakest defender (the dummy)", async () => {
     const store = inMemoryThroneStore();
 
+    // Full arena: two attackers that each beat aggressor 1.00, plus an idle dummy. The challenger
+    // (aggressor) beats only the dummy, so it ranks above the dummy but below both attackers — it
+    // enters at #3 and the dummy (0 wins) relegates. Robust to the berserker-vs-pacer order.
     await seatArena(store, "vTEST", [
       { champion: loadBot("berserker"), handle: null, seniority: 1 },
-      { champion: loadBot("aggressor"), handle: null, seniority: 2 },
-      { champion: loadBot("pacer"), handle: null, seniority: 3 },
+      { champion: loadBot("pacer"), handle: null, seniority: 2 },
+      { champion: dummy(), handle: null, seniority: 3 },
     ]);
 
-    const before = await store.readArena("vTEST");
-
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("berserker"))), // clears, but the arena is full
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
       arena("vTEST", store),
     );
 
-    const body = (await res.json()) as { title?: { outcome: string } };
+    const body = (await res.json()) as {
+      title?: {
+        outcome: string;
+        rank: number;
+        displaced?: {
+          name: string;
+          model: string | null;
+          handle: string | null;
+        };
+      };
+    };
+
+    expect(body.title?.outcome).toBe("entered");
+    expect(body.title?.rank).toBe(3);
+    // the relegated defender is surfaced by IDENTITY only — never its bot document
+    expect(body.title?.displaced).toEqual({
+      name: "dummy",
+      model: null,
+      handle: null,
+    });
+    expect(JSON.stringify(body.title?.displaced)).not.toContain('"rules"');
+
+    const after = await store.readArena("vTEST");
+
+    // the arena is still 3, the challenger seated at #3 with a fresh stamp, the dummy evicted
+    expect(after?.members).toHaveLength(3);
+    expect(after?.members[2].champion.name).toBe("aggressor");
+    expect(after?.members[2].seniority).toBe(4);
+    expect(after?.members.map((m) => m.champion.name)).not.toContain("dummy");
+    expect(after?.generation).toBe(2);
+  });
+
+  it("CROWNS a challenger that beats the whole arena, relegating the weakest and growing the lineage", async () => {
+    const store = inMemoryThroneStore();
+    const aggressor2: BotDoc = { ...loadBot("aggressor"), name: "aggressor-2" };
+
+    // Full arena: two aggressors (King + twin) and a dummy. The challenger (berserker) beats all
+    // three (berserker beats aggressor 1.00, and the idle dummy), so it crowns; the dummy (0 wins)
+    // relegates. The King changes (aggressor → berserker), so the succession lineage grows.
+    await seatArena(store, "vTEST", [
+      { champion: loadBot("aggressor"), handle: null, seniority: 1 },
+      { champion: aggressor2, handle: null, seniority: 2 },
+      { champion: dummy(), handle: null, seniority: 3 },
+    ]);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as {
+      title?: { outcome: string; rank: number; displaced?: { name: string } };
+    };
+
+    expect(body.title?.outcome).toBe("crowned");
+    expect(body.title?.rank).toBe(1);
+    expect(body.title?.displaced?.name).toBe("dummy");
+
+    const after = await store.readArena("vTEST");
+
+    expect(after?.members[0].champion.name).toBe("berserker"); // the new King
+    expect(after?.members).toHaveLength(3);
+    expect(after?.members.map((m) => m.champion.name)).not.toContain("dummy");
+
+    // the crown changed hands (aggressor → berserker), so the lineage grew, newest last (D-E)
+    expect(store.lineage("vTEST").map((e) => e.champion.name)).toEqual([
+      "aggressor",
+      "berserker",
+    ]);
+  });
+
+  it("leaves a challenger ranked below the FULL arena UNPLACED, committing nothing", async () => {
+    const inner = inMemoryThroneStore();
+    const berserker2: BotDoc = { ...loadBot("berserker"), name: "berserker-2" };
+
+    // Full arena: three bots that each beat aggressor 1.00. The challenger (aggressor) beats none
+    // of them, so it is uniquely last (0 wins) — unplaced, and the arena is untouched.
+    await seatArena(inner, "vTEST", [
+      { champion: loadBot("berserker"), handle: null, seniority: 1 },
+      { champion: loadBot("pacer"), handle: null, seniority: 2 },
+      { champion: berserker2, handle: null, seniority: 3 },
+    ]);
+
+    const before = await inner.readArena("vTEST");
+
+    // Wrap the store so a stray commit on the unplaced path is caught, not just inferred from state.
+    let commits = 0;
+
+    const store: FightDeps["store"] = {
+      read: inner.read,
+      recent: inner.recent,
+      compareAndSwap: inner.compareAndSwap,
+      readArena: inner.readArena,
+      commitArena: (v, e, n) => {
+        commits += 1;
+
+        return inner.commitArena(v, e, n);
+      },
+    };
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as {
+      title?: {
+        outcome: string;
+        rank?: number;
+        winRate: number;
+        bouts: number;
+        incumbent?: {
+          name: string;
+          model: string | null;
+          handle: string | null;
+        };
+      };
+    };
 
     expect(body.title?.outcome).toBe("unplaced");
-    // the arena is byte-for-byte unchanged (no generation bump, no member churn)
-    expect(await store.readArena("vTEST")).toEqual(before);
-    expect(store.lineage("vTEST")).toHaveLength(1);
+    expect(body.title).not.toHaveProperty("rank");
+    // full parity: the unplaced clearer still fought the #1 King, so it reads the same scout —
+    // telemetry + incumbent — as an `entered` placement (D-C diagnose-don't-guess).
+    expect(body.title?.incumbent).toEqual({
+      name: "berserker",
+      model: null,
+      handle: null,
+    });
+    expect(body.title?.bouts).toBe(10);
+    expect(body.title?.winRate).toBe(0); // lost all ten to the King
+
+    // nothing was committed — commitArena was never called and the arena is byte-identical
+    expect(commits).toBe(0);
+    expect(await inner.readArena("vTEST")).toEqual(before);
+    expect(inner.lineage("vTEST")).toHaveLength(1);
   });
 });
 

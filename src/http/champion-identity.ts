@@ -3,7 +3,8 @@
 // DSL) is never surfaced, preserving the King's competitive edge (decision 5). This is
 // the shared shaper behind `GET /king` and `/fight`'s title `incumbent` block, so the
 // "never leak the doc, default provenance to null" knowledge lives in exactly one place.
-import type { ThroneRecord } from "./throne-store.js";
+import type { ArenaMember, ThroneRecord } from "./throne-store.js";
+import type { BotDoc } from "../engine/dsl.js";
 
 export type ChampionIdentity = {
   name: string;
@@ -31,9 +32,26 @@ const sanitize = (value: string): string =>
     })
     .join("");
 
+// The identity-only projection shared by the King (`championIdentity`) and any arena member
+// (`memberIdentity`): the sanitized name + provenance, NEVER the bot document. The generation
+// (a throne CAS token) is layered on top only for the King.
+const publicIdentity = (source: {
+  champion: BotDoc;
+  handle?: string | null;
+}): Omit<ChampionIdentity, "generation"> => ({
+  name: sanitize(source.champion.name),
+  model: source.champion.model == null ? null : sanitize(source.champion.model),
+  handle: source.handle == null ? null : sanitize(source.handle),
+});
+
 export const championIdentity = (record: ThroneRecord): ChampionIdentity => ({
-  name: sanitize(record.champion.name),
-  model: record.champion.model == null ? null : sanitize(record.champion.model),
-  handle: record.handle == null ? null : sanitize(record.handle),
+  ...publicIdentity(record),
   generation: record.generation,
 });
+
+// The public identity of an arena member — the same never-leak-the-doc projection as the King's,
+// without the throne generation (a member carries a seniority stamp, not a CAS token). Surfaced as
+// the `displaced` (relegated) defender on a `/fight` placement.
+export const memberIdentity = (
+  member: ArenaMember,
+): Omit<ChampionIdentity, "generation"> => publicIdentity(member);

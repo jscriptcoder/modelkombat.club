@@ -1,7 +1,7 @@
 # Plan: KotH ladder — S2 (the ranked arena becomes real, N=3)
 
 **Branches**: `feat/arena-ranked-fill-n3` → `feat/arena-relegation` → `feat/arena-mirror-reentry`
-**Status**: Active — decisions **confirmed 2026-07-11** (D-A frozen seeds · D-B C7 vocab · D-C/D-D/D-E as recommended). **S2.1 ✅ CODE-COMPLETE** on `feat/arena-ranked-fill-n3` (1606 tests green; mutation **100%** on `rank-arena` / `arena-standings` / `handle-fight` / `throne-store`; `throne-store-upstash` 94.89% — 7 Lua-script `StringLiteral` survivors, the documented smoke-verified exception). **S2.2 next.**
+**Status**: Active — decisions **confirmed 2026-07-11** (D-A frozen seeds · D-B C7 vocab · D-C/D-D/D-E as recommended). **S2.1 ✅ MERGED + LIVE** (PR #253, `feat/arena-ranked-fill-n3`; 1606 tests green; mutation **100%** on `rank-arena` / `arena-standings` / `handle-fight` / `throne-store`; `throne-store-upstash` 94.89% — 7 Lua-script `StringLiteral` survivors, the documented smoke-verified exception). **S2.2 ✅ CODE-COMPLETE** on `feat/arena-relegation` (1613 tests green; mutation **100%** on `rank-arena` / `handle-fight` / `champion-identity`). **S2.3 next.**
 **Story**: S2 in `plans/koth-ladder-stories.md`. **Design source of truth**: `plans/koth-ladder-decisions.md` (D1–D7, C1–C7).
 **Builds on**: S1 arena skeleton (`docs/archive/koth-ladder-s1-arena-skeleton.md`, PRs #251–#252).
 
@@ -62,9 +62,9 @@ These shape the acceptance criteria. **All confirmed 2026-07-11**: D-A → **fro
 - [x] A clearer against a **non-full** arena **always joins** (C2 join-if-room) — even losing every fight — and
       is ranked among the present set by win→net→seniority; `/fight` returns `crowned` (rank 1) or `entered`
       (rank 2–N) + `rank`. _(S2.1)_
-- [ ] A clearer against a **full** arena that out-ranks a defender **enters**, shifts the rest, and **relegates**
-      the weakest; a clearer ranked below all three is **`unplaced`**, arena unchanged. _(S2.2 — S2.1 stubs
-      `unplaced` for a full arena, D-D placeholder)_
+- [x] A clearer against a **full** arena that out-ranks a defender **enters**, shifts the rest, and **relegates**
+      the weakest (`displaced` identity); a clearer ranked below all three is **`unplaced`** (full-parity scout),
+      arena unchanged. _(S2.2 — removed the D-D placeholder)_
 - [x] Ties resolve **win → net → seniority** (longer-tenured / lower-seniority wins); the order is a strict
       total order (unique seniority) so ranking + the relegation choice are unambiguous. _(S2.1)_
 - [ ] A submission **byte-identical** to any current defender is **rejected as a no-op** before ranking (C4). _(S2.3)_
@@ -146,17 +146,24 @@ defender **displaces** the weakest (relegated, evictable), and a clearer that ca
 member relegates; response gains `unplaced` + `displaced` identity; `RingPage` renders `unplaced`.
 **Intentionally skipped**: mirror-reject (S2.3); per-defender board (S4); ranked podium (S3).
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`, browser-mode testing.
+**Decision (confirmed 2026-07-11) — `unplaced` payload = FULL PARITY.** Now that a full arena runs the
+round-robin (the S2.1 no-fight short-circuit is gone), an `unplaced` challenger genuinely fought the #1 King,
+so its response carries the same King-fight telemetry + `incumbent` scout as `entered` (in the JSON **and** the
+`RingPage` scout card). Honors D-C's diagnose-don't-guess intent; a #4-miss reads the same King readout as a
+#3-enter. `displaced` (the relegated defender) is surfaced identity-only in the JSON; the `RingPage` UI for it
+is deferred (raw JSON only this slice).
 **Acceptance criteria** (confirm before code):
 
 - Given a **full** arena `[#1,#2,#3]` and a challenger that out-ranks #2 but not #1, then it **enters at #2**,
   the rest shift, the previous **#3 relegates**, `displaced` = #3's identity (name/model/handle, **never doc**).
-- Given a full arena and a challenger ranked **below all three**, then `outcome: "unplaced"`, `rank` absent/null,
-  arena **unchanged**, nothing committed.
+- Given a full arena and a challenger ranked **below all three**, then `outcome: "unplaced"`, `rank` null,
+  arena **unchanged**, nothing committed — but the response still carries the King-fight telemetry + `incumbent`
+  scout (full parity).
 - Given a full arena and a challenger that **crowns** (#1), then old #3 relegates and the new King is appended
   to the lineage (King changed).
 - Given a relegated member, then it is **absent** from the committed arena (evictable — its pin, if any, is S5).
 - Given `RingPage`, then an `unplaced` result renders a distinct "cleared but didn't place" headline (no throne
-  link, no false crown).
+  link, no false crown) **and the King scout card** (full parity with `entered`).
   **RED**: `rank-arena.test.ts` — entrants = N+1 → keep top N, `displaced` = the (N+1)-th by the total order
   (kills "drop the challenger always" / "drop by wrong key"); challenger-is-the-dropped → `unplaced`, `displaced`
   null (it never joined). `handle-fight.test.ts` — full-arena enter-and-relegate commits the shifted arena +
