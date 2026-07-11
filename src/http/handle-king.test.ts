@@ -54,7 +54,7 @@ const arenaMember = (
 });
 
 // Seat a ranked arena under a version (members already in rank order, `[0]` = King). Uses the
-// arena commit path — the single source of truth /king now reads (no more compareAndSwap seeding).
+// arena commit path — the single source of truth /king reads.
 const seatArena = (
   store: ThroneStore,
   members: ArenaMember[],
@@ -69,9 +69,6 @@ const seatArena = (
 // A store whose arena read fails — models Upstash being unreachable (the real adapter THROWS
 // on an error reply, never silently reads empty). Drives the 503 path.
 const failingStore = (): ThroneStore => ({
-  read: () => Promise.reject(new Error("unused in /king")),
-  recent: () => Promise.reject(new Error("unused in /king")),
-  compareAndSwap: () => Promise.reject(new Error("unused in /king")),
   readArena: () => Promise.reject(new Error("upstash unreachable")),
   commitArena: () => Promise.reject(new Error("unused in /king")),
 });
