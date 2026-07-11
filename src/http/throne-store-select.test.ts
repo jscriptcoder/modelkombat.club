@@ -1,37 +1,54 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { selectThroneStore } from "./throne-store-select.js";
+import {
+  selectThroneStore,
+  type ThroneStoreEnv,
+} from "./throne-store-select.js";
 
-// The fake (in-memory) exposes `lineage()` for test introspection; the durable Upstash adapter
-// does not. So `"lineage" in store` cleanly discriminates WHICH store was selected — without
-// touching the network (the adapter's own behavior is covered by throne-store-upstash.test.ts).
-const isFake = (store: object): boolean => "lineage" in store;
+// Both concrete stores now share one 2-method port shape, so discriminate WHICH was selected by
+// BEHAVIOR, not shape: the in-memory fake serves reads from memory and never touches the network,
+// while the durable Upstash adapter POSTs to the REST API. Stub fetch FIRST (the adapter binds the
+// global `fetch` at construction), select, read once, and report whether the network stayed
+// untouched — the adapter's own behavior is covered by throne-store-upstash.test.ts.
+const selectsFake = async (env: ThroneStoreEnv): Promise<boolean> => {
+  const fetchMock = vi.fn(() =>
+    Promise.resolve(
+      new Response(JSON.stringify({ result: null }), { status: 200 }),
+    ),
+  );
+
+  vi.stubGlobal("fetch", fetchMock);
+
+  try {
+    await selectThroneStore(env).readArena("probe");
+
+    return fetchMock.mock.calls.length === 0;
+  } finally {
+    vi.unstubAllGlobals();
+  }
+};
 
 describe("selectThroneStore — durable store when configured, else the in-memory fake", () => {
-  it("uses the fake when no Upstash config is present", () => {
-    expect(isFake(selectThroneStore({}))).toBe(true);
+  it("uses the fake when no Upstash config is present", async () => {
+    expect(await selectsFake({})).toBe(true);
   });
 
-  it("uses the fake when only the URL is set (partial config never half-configures)", () => {
-    expect(
-      isFake(selectThroneStore({ UPSTASH_REDIS_REST_URL: "https://x" })),
-    ).toBe(true);
-  });
-
-  it("uses the fake when only the token is set", () => {
-    expect(isFake(selectThroneStore({ UPSTASH_REDIS_REST_TOKEN: "t" }))).toBe(
+  it("uses the fake when only the URL is set (partial config never half-configures)", async () => {
+    expect(await selectsFake({ UPSTASH_REDIS_REST_URL: "https://x" })).toBe(
       true,
     );
   });
 
-  it("uses the fake when a var is present but empty", () => {
+  it("uses the fake when only the token is set", async () => {
+    expect(await selectsFake({ UPSTASH_REDIS_REST_TOKEN: "t" })).toBe(true);
+  });
+
+  it("uses the fake when a var is present but empty", async () => {
     expect(
-      isFake(
-        selectThroneStore({
-          UPSTASH_REDIS_REST_URL: "",
-          UPSTASH_REDIS_REST_TOKEN: "t",
-        }),
-      ),
+      await selectsFake({
+        UPSTASH_REDIS_REST_URL: "",
+        UPSTASH_REDIS_REST_TOKEN: "t",
+      }),
     ).toBe(true);
   });
 
@@ -50,12 +67,10 @@ describe("selectThroneStore — durable store when configured, else the in-memor
         UPSTASH_REDIS_REST_TOKEN: "t",
       });
 
-      // Not the fake (the fake never touches the network) ...
-      expect(isFake(store)).toBe(false);
-
-      // ... and reading it hits the CONFIGURED url — proving `{ url, token }` threaded through
-      // (not an empty config, which would POST to `undefined`).
-      await store.read("v19");
+      // Reading it hits the CONFIGURED url — proving `{ url, token }` threaded through (not an
+      // empty config, which would POST to `undefined`) and that it is NOT the fake (which never
+      // touches the network).
+      await store.readArena("v19");
       expect(fetchMock).toHaveBeenCalledWith(
         "https://x.upstash.io",
         expect.anything(),
@@ -82,9 +97,7 @@ describe("selectThroneStore — durable store when configured, else the in-memor
         UPSTASH_REDIS_REST_KV_REST_API_TOKEN: "t",
       });
 
-      expect(isFake(store)).toBe(false);
-
-      await store.read("v19");
+      await store.readArena("v19");
       expect(fetchMock).toHaveBeenCalledWith(
         "https://prefixed.upstash.io",
         expect.anything(),
@@ -94,15 +107,13 @@ describe("selectThroneStore — durable store when configured, else the in-memor
     }
   });
 
-  it("selects the durable adapter via the default Vercel-KV names", () => {
-    // What a default-prefix re-provision would inject.
+  it("selects the durable adapter via the default Vercel-KV names", async () => {
+    // What a default-prefix re-provision would inject — no canonical or Marketplace-prefixed names.
     expect(
-      isFake(
-        selectThroneStore({
-          KV_REST_API_URL: "https://kv.upstash.io",
-          KV_REST_API_TOKEN: "t",
-        }),
-      ),
+      await selectsFake({
+        KV_REST_API_URL: "https://kv.upstash.io",
+        KV_REST_API_TOKEN: "t",
+      }),
     ).toBe(false);
   });
 
@@ -124,7 +135,7 @@ describe("selectThroneStore — durable store when configured, else the in-memor
         UPSTASH_REDIS_REST_TOKEN: "t",
       });
 
-      await store.read("v19");
+      await store.readArena("v19");
       expect(fetchMock).toHaveBeenCalledWith(
         "https://canonical.upstash.io",
         expect.anything(),

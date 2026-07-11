@@ -2,7 +2,6 @@ import { afterAll, describe } from "vitest";
 
 import { runThroneStoreContract } from "./throne-store.contract.js";
 import { upstashThroneStore } from "./throne-store-upstash.js";
-import type { ThroneRecord } from "./throne-store.js";
 
 // Post-deploy smoke: env-gated, so it runs ONLY when live Upstash creds are present (e.g. after
 // `vercel env pull`). Skipped in the ordinary suite — the in-memory fake carries the contract
@@ -19,8 +18,8 @@ describe.skipIf(!live)(
     const config = { url: String(url), token: String(token) };
     const namespaces: string[] = [];
 
-    // A raw Upstash REST command (used only to observe lineage + clean up — the store under test
-    // owns read/crown). Throws on an error reply so a broken command fails the smoke loudly.
+    // A raw Upstash REST command (used only to clean up throwaway keys — the store under test owns
+    // read/commit). Throws on an error reply so a broken command fails the smoke loudly.
     const rest = async (command: unknown[]): Promise<unknown> => {
       const res = await fetch(config.url, {
         method: "POST",
@@ -49,16 +48,6 @@ describe.skipIf(!live)(
 
       return {
         store: upstashThroneStore(config),
-        readLineage: async (version) => {
-          const entries = (await rest([
-            "LRANGE",
-            `champions:${version}`,
-            "0",
-            "-1",
-          ])) as string[];
-
-          return entries.map((entry) => JSON.parse(entry) as ThroneRecord);
-        },
         versionA,
         versionB,
       };
@@ -66,12 +55,7 @@ describe.skipIf(!live)(
 
     afterAll(async () => {
       for (const version of namespaces) {
-        await rest([
-          "DEL",
-          `throne:${version}`,
-          `champions:${version}`,
-          `arena:${version}`,
-        ]);
+        await rest(["DEL", `arena:${version}`]);
       }
     });
   },

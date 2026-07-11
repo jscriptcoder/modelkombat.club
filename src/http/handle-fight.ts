@@ -4,17 +4,11 @@
 // deps. Pure transport + orchestration over the deterministic engine (`benchmark`)
 // and the platform-layer throne store — no DSL op, TCB untouched (invariant #2).
 import { arenaStandings, pairIndices } from "./arena-standings.js";
-import { championIdentity, memberIdentity } from "./champion-identity.js";
+import { memberIdentity } from "./champion-identity.js";
 import { problem, readValidatedBot } from "./envelope.js";
 import { buildFightReport, toTitleFightReport } from "./fight-report.js";
 import { rankArena, type Standing } from "./rank-arena.js";
-import { lineageEntryOf } from "./throne-store.js";
-import type {
-  ArenaMember,
-  ArenaRecord,
-  ThroneRecord,
-  ThroneStore,
-} from "./throne-store.js";
+import type { ArenaMember, ArenaRecord, ThroneStore } from "./throne-store.js";
 import {
   benchmark,
   sameDoc,
@@ -108,18 +102,6 @@ const readHandle = (req: Request): Response | { handle: string } => {
   }
 
   return { handle: raw };
-};
-
-// The reigning champion's public identity — surfaced to a challenger so they can scout the King.
-// Reuses the shared `championIdentity` shaper (identity only, never the doc; `model`/`handle`
-// default to `null`) and drops the `generation`: the title block scouts the King, and the
-// challenger has no use for the throne's CAS token.
-const incumbentOf = (
-  record: ThroneRecord,
-): { name: string; model: string | null; handle: string | null } => {
-  const { generation, ...identity } = championIdentity(record);
-
-  return identity;
 };
 
 // The RFC 9457 detail for a byte-identical resubmit of a sitting arena member (C4). A clone can
@@ -284,7 +266,7 @@ export const handleFight = async (
   // (net / win-loss-draw / endReasons / degrade) + the scouted King (identity only, never the doc).
   const scout = {
     ...toTitleFightReport(kingFight),
-    incumbent: incumbentOf(lineageEntryOf(arena)),
+    incumbent: memberIdentity(arena.members[0]),
   };
 
   // Unplaced: the challenger cleared but ranked below every defender of a FULL arena. It joins no

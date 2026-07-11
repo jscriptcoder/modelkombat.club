@@ -1,13 +1,10 @@
-// The production `ThroneStore` adapter (S4 slice 5): Upstash Redis over the REST API,
-// via raw `fetch` (no SDK — keeps `dependencies` empty). One atomic Lua `EVAL` performs
-// compare-generation + set-pointer + append-lineage together, so a crown can never tear.
-// Platform layer (transport + storage) — the engine and its TCB stay untouched.
-import { lineageEntryOf } from "./throne-store.js";
+// The production `ThroneStore` adapter: Upstash Redis over the REST API, via raw `fetch` (no SDK —
+// keeps `dependencies` empty). One atomic Lua `EVAL` performs compare-generation + set-arena
+// together, so an arena commit can never tear. Platform layer (transport + storage) — the engine
+// and its TCB stay untouched.
 import type {
   ArenaCasResult,
   ArenaRecord,
-  CasResult,
-  ThroneRecord,
   ThroneStore,
 } from "./throne-store.js";
 
@@ -22,8 +19,6 @@ export type FetchLike = (
 // root (`api/fight.ts`) reads the env and constructs the store, keeping this unit-testable.
 export type UpstashConfig = { url: string; token: string };
 
-const throneKey = (version: string): string => `throne:${version}`;
-const lineageKey = (version: string): string => `champions:${version}`;
 const arenaKey = (version: string): string => `arena:${version}`;
 
 // The shape of every Upstash REST call: POST the command array as JSON with bearer auth.
@@ -42,81 +37,18 @@ const restRequest = (
   },
 });
 
-// The atomic crown. KEYS = [pointer, lineage]; ARGV = [expectedGeneration, nextRecordJson].
-// The reigning generation is read out of the pointer record; ARGV[1] is the empty-string
-// sentinel to mean "expect the throne empty". On a match: set the pointer to the new record
-// AND RPUSH it onto the append-only lineage; otherwise report "moved" (a lost CAS race → 409).
-export const CROWN_SCRIPT = [
-  "local ptr = redis.call('GET', KEYS[1])",
-  "local current = ''",
-  "if ptr then current = tostring(cjson.decode(ptr)['generation']) end",
-  "if current ~= ARGV[1] then return 'moved' end",
-  "redis.call('SET', KEYS[1], ARGV[2])",
-  "redis.call('RPUSH', KEYS[2], ARGV[2])",
-  "return 'ok'",
-].join("\n");
-
-// The atomic arena commit. KEYS = [arena pointer, lineage]; ARGV = [expectedGeneration,
-// nextArenaJson, lineageEntryJson]. Mirrors CROWN_SCRIPT, but the RPUSH is CONDITIONAL (D-E): the
-// King (arena #1) is appended to the succession lineage only when the crown changes hands, detected
-// by comparing arena #1's unique `seniority` stamp on the stored vs. the next arena (a safe scalar
-// compare — a champion-doc compare would hit cjson key-order instability). A non-crowning placement
-// (a defender entering below #1) swaps the arena but must NOT grow the lineage. The swap and any
-// append still land together in one EVAL, or not at all (the CAS returns 'moved').
+// The atomic arena commit. KEYS = [arena pointer]; ARGV = [expectedGeneration, nextArenaJson].
+// The stored generation is read out of the pointer record; ARGV[1] is the empty-string sentinel to
+// mean "expect the arena empty". On a match: set the pointer to the new arena and succeed;
+// otherwise report "moved" (a lost CAS race → 409).
 export const COMMIT_ARENA_SCRIPT = [
   "local ptr = redis.call('GET', KEYS[1])",
   "local current = ''",
   "if ptr then current = tostring(cjson.decode(ptr)['generation']) end",
   "if current ~= ARGV[1] then return 'moved' end",
-  "local append = true",
-  "if ptr then",
-  "  local prevSeniority = cjson.decode(ptr)['members'][1]['seniority']",
-  "  local nextSeniority = cjson.decode(ARGV[2])['members'][1]['seniority']",
-  "  if prevSeniority == nextSeniority then append = false end",
-  "end",
   "redis.call('SET', KEYS[1], ARGV[2])",
-  "if append then redis.call('RPUSH', KEYS[2], ARGV[3]) end",
   "return 'ok'",
 ].join("\n");
-
-// Pure: build the Upstash REST request for an atomic compareAndSwap EVAL. `expected` is
-// stringified (null ⇒ "" = "expect empty"); the next record is JSON for both the pointer
-// and its lineage entry.
-export const buildCrownRequest = (
-  config: UpstashConfig,
-  version: string,
-  expected: number | null,
-  next: ThroneRecord,
-): { url: string; init: RequestInit } => {
-  const expectedArg = expected === null ? "" : String(expected);
-
-  return restRequest(config, [
-    "EVAL",
-    CROWN_SCRIPT,
-    "2",
-    throneKey(version),
-    lineageKey(version),
-    expectedArg,
-    JSON.stringify(next),
-  ]);
-};
-
-// Pure: build the Upstash REST request to read the reigning record (a `GET` of the pointer).
-export const buildReadRequest = (
-  config: UpstashConfig,
-  version: string,
-): { url: string; init: RequestInit } =>
-  restRequest(config, ["GET", throneKey(version)]);
-
-// Pure: build the Upstash REST request for the recent lineage tail. `LRANGE key -limit -1`
-// returns the last `limit` entries of the append-only list, oldest-first within the tail
-// (Redis clamps when fewer exist), so the read is always bounded by `limit`.
-export const buildRecentRequest = (
-  config: UpstashConfig,
-  version: string,
-  limit: number,
-): { url: string; init: RequestInit } =>
-  restRequest(config, ["LRANGE", lineageKey(version), String(-limit), "-1"]);
 
 // Pure: build the Upstash REST request to read the current arena record (a `GET` of the pointer).
 export const buildReadArenaRequest = (
@@ -126,8 +58,7 @@ export const buildReadArenaRequest = (
   restRequest(config, ["GET", arenaKey(version)]);
 
 // Pure: build the Upstash REST request for an atomic arena commit EVAL. `expected` is stringified
-// (null ⇒ "" = "expect empty arena"); ARGV[2] is the next arena JSON, ARGV[3] the derived lineage
-// entry (the new King, via `lineageEntryOf`) so the arena swap and the lineage append land together.
+// (null ⇒ "" = "expect empty arena"); ARGV[2] is the next arena JSON.
 export const buildCommitArenaRequest = (
   config: UpstashConfig,
   version: string,
@@ -139,67 +70,15 @@ export const buildCommitArenaRequest = (
   return restRequest(config, [
     "EVAL",
     COMMIT_ARENA_SCRIPT,
-    "2",
+    "1",
     arenaKey(version),
-    lineageKey(version),
     expectedArg,
     JSON.stringify(next),
-    JSON.stringify(lineageEntryOf(next)),
   ]);
 };
 
 // The Upstash REST reply: exactly one of `result` (success) or `error` (failure).
 export type UpstashReply = { result: unknown } | { error: unknown };
-
-// Interpret a pointer `GET` reply: `null` ⇒ empty throne (undefined); a JSON string ⇒ the
-// stored record. An error is thrown, NEVER read as empty — a transient failure must not let
-// a challenger bootstrap-crown over a live king.
-export const interpretReadReply = (
-  reply: UpstashReply,
-): ThroneRecord | undefined => {
-  if ("error" in reply) {
-    throw new Error(`Upstash read failed: ${String(reply.error)}`);
-  }
-
-  if (reply.result === null) return undefined;
-
-  // Trust-boundary parse of a record this adapter itself wrote (round-trip of our own JSON).
-  const parsed: unknown = JSON.parse(String(reply.result));
-
-  return parsed as ThroneRecord;
-};
-
-// Interpret an `LRANGE` reply: a list of JSON record strings ⇒ the lineage tail, oldest-first
-// (each parsed back into a `ThroneRecord`); an empty list ⇒ `[]`. An error is thrown, NEVER
-// read as an empty lineage — a transient failure must not misreport an outage as "no champions".
-export const interpretRecentReply = (reply: UpstashReply): ThroneRecord[] => {
-  if ("error" in reply) {
-    throw new Error(`Upstash recent read failed: ${String(reply.error)}`);
-  }
-
-  // Trust-boundary parse of records this adapter itself wrote (round-trip of our own JSON).
-  const entries = reply.result as unknown[];
-
-  return entries.map((entry) => JSON.parse(String(entry)) as ThroneRecord);
-};
-
-// Interpret a crown `EVAL` reply: 'ok' ⇒ the crown landed (carrying the crowned record),
-// 'moved' ⇒ a lost CAS race. An error, or any other result, throws (a contract violation is
-// never silently treated as a successful crown).
-export const interpretCrownReply = (
-  reply: UpstashReply,
-  next: ThroneRecord,
-): CasResult => {
-  if ("error" in reply) {
-    throw new Error(`Upstash crown failed: ${String(reply.error)}`);
-  }
-
-  if (reply.result === "ok") return { ok: true, record: next };
-
-  if (reply.result === "moved") return { ok: false, reason: "moved" };
-
-  throw new Error(`Unexpected Upstash crown reply: ${String(reply.result)}`);
-};
 
 // Interpret an arena pointer `GET` reply: `null` ⇒ empty arena (undefined); a JSON string ⇒ the
 // stored arena. An error is thrown, NEVER read as empty — a transient failure must not let a
@@ -251,30 +130,12 @@ const post = async (
   return body as UpstashReply;
 };
 
-// The durable `ThroneStore`: the same port the in-memory fake implements, backed by
-// Upstash Redis. `read` GETs the pointer; `compareAndSwap` runs the atomic crown EVAL.
+// The durable `ThroneStore`: the same port the in-memory fake implements, backed by Upstash Redis.
+// `readArena` GETs the arena pointer; `commitArena` runs the atomic commit EVAL.
 export const upstashThroneStore = (
   config: UpstashConfig,
   fetchImpl: FetchLike = fetch,
 ): ThroneStore => ({
-  read: async (version) => {
-    const { url, init } = buildReadRequest(config, version);
-
-    return interpretReadReply(await post(fetchImpl, url, init));
-  },
-
-  recent: async (version, limit) => {
-    const { url, init } = buildRecentRequest(config, version, limit);
-
-    return interpretRecentReply(await post(fetchImpl, url, init));
-  },
-
-  compareAndSwap: async (version, expected, next) => {
-    const { url, init } = buildCrownRequest(config, version, expected, next);
-
-    return interpretCrownReply(await post(fetchImpl, url, init), next);
-  },
-
   readArena: async (version) => {
     const { url, init } = buildReadArenaRequest(config, version);
 

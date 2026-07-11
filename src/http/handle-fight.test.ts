@@ -8,7 +8,7 @@ import {
   inMemoryThroneStore,
   type ArenaMember,
   type ArenaRecord,
-  type InMemoryThroneStore,
+  type ThroneStore,
 } from "./throne-store.js";
 import { loadBotDoc } from "../cli/load.js";
 import { CANONICAL_RULES } from "../engine/rules.js";
@@ -100,12 +100,9 @@ const seatArena = (
 // (`seenAtRead`), while `commitArena` runs against `inner` — which a concurrent placement has
 // already moved on. So a commit using the stale-read generation is rejected as `moved`.
 const staleArenaStore = (
-  inner: InMemoryThroneStore,
+  inner: ThroneStore,
   seenAtRead: ArenaRecord | undefined,
 ): FightDeps["store"] => ({
-  read: inner.read,
-  recent: inner.recent,
-  compareAndSwap: inner.compareAndSwap,
   readArena: () => Promise.resolve(seenAtRead),
   commitArena: inner.commitArena,
 });
@@ -165,12 +162,12 @@ describe("handleFight — S2.1: empty-arena bootstrap crowning (N=3)", () => {
     expect(body.title?.outcome).toBe("crowned");
     expect(body.title?.rank).toBe(1);
 
-    // the champion is persisted under this version at generation 1, one lineage entry
-    const rec = await store.read("vTEST");
+    // the champion is persisted as the sole arena member at generation 1
+    const after = await store.readArena("vTEST");
 
-    expect(rec?.generation).toBe(1);
-    expect(rec?.champion).toEqual(clearer);
-    expect(store.lineage("vTEST")).toHaveLength(1);
+    expect(after?.generation).toBe(1);
+    expect(after?.members[0].champion).toEqual(clearer);
+    expect(after?.members).toHaveLength(1);
   });
 
   it("omits the incumbent from an empty-arena crown (you fought no one)", async () => {
@@ -201,8 +198,7 @@ describe("handleFight — S2.1: empty-arena bootstrap crowning (N=3)", () => {
 
     expect(body.cleared).toBe(false);
     expect(body).not.toHaveProperty("title");
-    expect(await store.read("vTEST")).toBeUndefined();
-    expect(store.lineage("vTEST")).toHaveLength(0);
+    expect(await store.readArena("vTEST")).toBeUndefined();
   });
 
   it("treats the current version arena as empty even when another version is occupied", async () => {
@@ -219,8 +215,11 @@ describe("handleFight — S2.1: empty-arena bootstrap crowning (N=3)", () => {
     const body = (await res.json()) as { title?: { outcome: string } };
 
     expect(body.title?.outcome).toBe("crowned");
-    expect((await store.read("vOTHER"))?.champion).toEqual(other);
-    expect(store.lineage("vOTHER")).toHaveLength(1);
+
+    const otherArena = await store.readArena("vOTHER");
+
+    expect(otherArena?.members[0].champion).toEqual(other);
+    expect(otherArena?.members).toHaveLength(1);
   });
 });
 
@@ -255,9 +254,6 @@ describe("handleFight — S2.1: ranked filling of a non-full arena", () => {
     ]);
     expect(arenaAfter?.generation).toBe(2);
     expect(arenaAfter?.nextSeniority).toBe(3);
-
-    // the King never changed hands, so the succession lineage did NOT grow (D-E)
-    expect(store.lineage("vTEST")).toHaveLength(1);
   });
 
   it("CROWNS a clearer that beats the lone King, keeping the deposed King as defender #2", async () => {
@@ -290,12 +286,6 @@ describe("handleFight — S2.1: ranked filling of a non-full arena", () => {
     expect(arenaAfter?.members[0].seniority).toBe(2);
     expect(arenaAfter?.generation).toBe(2);
     expect(arenaAfter?.nextSeniority).toBe(3);
-
-    // the crown changed hands, so the lineage grew, newest last
-    expect(store.lineage("vTEST").map((e) => e.champion.name)).toEqual([
-      "aggressor",
-      "berserker",
-    ]);
   });
 
   it("does NOT crown a clearer that only ties the King (exact 0.5) — it enters at #2 on seniority", async () => {
@@ -324,7 +314,6 @@ describe("handleFight — S2.1: ranked filling of a non-full arena", () => {
     expect((await store.readArena("vTEST"))?.members[0].champion.name).toBe(
       "zoner",
     ); // King held #1
-    expect(store.lineage("vTEST")).toHaveLength(1);
   });
 
   it("runs the full round-robin — a defender-vs-defender fight sets the DEFENDERS' order", async () => {
@@ -437,12 +426,6 @@ describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
     expect(after?.members[0].champion.name).toBe("berserker"); // the new King
     expect(after?.members).toHaveLength(3);
     expect(after?.members.map((m) => m.champion.name)).not.toContain("dummy");
-
-    // the crown changed hands (aggressor → berserker), so the lineage grew, newest last (D-E)
-    expect(store.lineage("vTEST").map((e) => e.champion.name)).toEqual([
-      "aggressor",
-      "berserker",
-    ]);
   });
 
   it("leaves a challenger ranked below the FULL arena UNPLACED, committing nothing", async () => {
@@ -463,9 +446,6 @@ describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
     let commits = 0;
 
     const store: FightDeps["store"] = {
-      read: inner.read,
-      recent: inner.recent,
-      compareAndSwap: inner.compareAndSwap,
       readArena: inner.readArena,
       commitArena: (v, e, n) => {
         commits += 1;
@@ -508,7 +488,6 @@ describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
     // nothing was committed — commitArena was never called and the arena is byte-identical
     expect(commits).toBe(0);
     expect(await inner.readArena("vTEST")).toEqual(before);
-    expect(inner.lineage("vTEST")).toHaveLength(1);
   });
 });
 
@@ -555,10 +534,6 @@ describe("handleFight — S2.1: concurrent placements serialize (409 throne-move
     expect((await inner.readArena("vTEST"))?.members[0].champion).toEqual(
       usurper,
     );
-    expect(inner.lineage("vTEST").map((e) => e.champion.name)).toEqual([
-      "aggressor",
-      "berserker",
-    ]);
   });
 
   it("409s a bootstrap crown when the empty arena was claimed since the read", async () => {
@@ -680,7 +655,7 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
     expect(
       ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
     ).toBe("crowned");
-    expect((await store.read("vTEST"))?.handle).toBe(handle);
+    expect((await store.readArena("vTEST"))?.members[0].handle).toBe(handle);
   });
 
   it("rejects a 65-character handle with 400 and never touches the arena", async () => {
@@ -738,7 +713,7 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
     );
 
     expect(res.status).toBe(200);
-    expect((await store.read("vTEST"))?.handle).toBe("ko ga");
+    expect((await store.readArena("vTEST"))?.members[0].handle).toBe("ko ga");
   });
 
   it("validates the handle independently of the gauntlet gate (a non-clearer still 400s)", async () => {
@@ -872,16 +847,13 @@ describe("handleFight — S2.3: mirror-reject (C4) + re-entry (D3)", () => {
   // Wrap a store so a stray commit on the reject path is caught by count, not merely inferred from
   // unchanged state (the S2.2 belt-and-braces pattern).
   const countingCommits = (
-    inner: InMemoryThroneStore,
+    inner: ThroneStore,
   ): { store: FightDeps["store"]; commits: () => number } => {
     let commits = 0;
 
     return {
       commits: () => commits,
       store: {
-        read: inner.read,
-        recent: inner.recent,
-        compareAndSwap: inner.compareAndSwap,
         readArena: inner.readArena,
         commitArena: (v, e, n) => {
           commits += 1;
@@ -924,7 +896,6 @@ describe("handleFight — S2.3: mirror-reject (C4) + re-entry (D3)", () => {
     // no benchmark, no CAS: commitArena was never called and the arena is byte-identical
     expect(commits()).toBe(0);
     expect(await inner.readArena("vTEST")).toEqual(before);
-    expect(inner.lineage("vTEST")).toHaveLength(1);
   });
 
   it("rejects the clone BEFORE the gauntlet gate (a clone of a gate-failing member still 409s)", async () => {
