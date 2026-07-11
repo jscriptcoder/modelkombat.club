@@ -6,7 +6,14 @@
 import { championIdentity } from "./champion-identity.js";
 import { problem, readValidatedBot } from "./envelope.js";
 import { buildFightReport, toTitleFightReport } from "./fight-report.js";
-import type { ThroneRecord, ThroneStore } from "./throne-store.js";
+import { rankArena } from "./rank-arena.js";
+import { lineageEntryOf } from "./throne-store.js";
+import type {
+  ArenaMember,
+  ArenaRecord,
+  ThroneRecord,
+  ThroneStore,
+} from "./throne-store.js";
 import { benchmark, type BenchmarkConfig } from "../engine/benchmark.js";
 import type { BotDoc } from "../engine/dsl.js";
 import type { Rules } from "../engine/types.js";
@@ -42,17 +49,17 @@ const json = (body: unknown): Response =>
 const THRONE_MOVED_DETAIL =
   "The throne advanced to a new champion before your crown landed; resubmit to challenge the current King.";
 
-// Attempt an atomic crown. Returns the 409 problem to surface on a lost CAS race (the
-// throne moved since `read`), or `undefined` when the crown landed and the caller should
-// proceed. The "on moved → this 409" knowledge lives here once, shared by both crown
-// sites (the empty-throne bootstrap and the title-fight dethrone).
-const crown = async (
+// Attempt an atomic arena commit. Returns the 409 problem to surface on a lost CAS race (the
+// arena moved since `readArena`), or `undefined` when the commit landed and the caller should
+// proceed. The "on moved → this 409" knowledge lives here once, shared by both commit sites
+// (the empty-arena bootstrap and a title-fight placement).
+const commit = async (
   store: ThroneStore,
   version: string,
   expected: number | null,
-  next: ThroneRecord,
+  next: ArenaRecord,
 ): Promise<Response | undefined> => {
-  const result = await store.compareAndSwap(version, expected, next);
+  const result = await store.commitArena(version, expected, next);
 
   return result.ok
     ? undefined
@@ -144,14 +151,21 @@ export const handleFight = async (
   // Failed the gate: plain gauntlet report, no title, throne untouched (S3 behaviour).
   if (!report.cleared) return json(report);
 
-  const current = await deps.store.read(deps.version);
+  const arena = await deps.store.readArena(deps.version);
 
-  // Empty throne: crown the clearer as this version's first champion (the bootstrap).
-  if (current === undefined) {
-    const moved = await crown(deps.store, deps.version, null, {
+  // Empty arena: bootstrap-crown the clearer as this version's first champion (arena #1 at
+  // generation 1, seniority 1). `commitArena` also appends it to the crowning lineage.
+  if (arena === undefined) {
+    const challenger: ArenaMember = {
       champion: parsed.doc,
-      generation: 1,
       handle,
+      seniority: 1,
+    };
+
+    const moved = await commit(deps.store, deps.version, null, {
+      members: [challenger],
+      generation: 1,
+      nextSeniority: 2,
     });
 
     return (
@@ -159,29 +173,41 @@ export const handleFight = async (
     );
   }
 
-  // Occupied throne: contest a fresh-seeded title fight against the reigning champion.
+  // Occupied arena: contest a fresh-seeded title fight against the reigning champion (arena #1).
   const seeds = deps.freshSeeds();
+  const king = arena.members[0];
 
   const titleFight = benchmark({
     bot: parsed.doc,
-    gauntlet: [current.champion],
+    gauntlet: [king.champion],
     seeds,
     maxTicks: deps.maxTicks,
     rules: deps.rules,
     match: deps.match,
   });
 
-  // Dethrone strictly on > 0.5. A level (= 0.5) or losing fight — including a mirror,
-  // which `benchmark` skips to winRate 0 — leaves the King on the throne.
-  const dethroned = titleFight.winRate > 0.5;
+  // Rank the challenger against the arena and keep the top N (N=1). It crowns iff it beat the
+  // King strictly > 0.5; a level (= 0.5) or losing fight — including a mirror `benchmark` skips
+  // to winRate 0 — retains the King. The entrant is stamped with the next seniority.
+  const challenger: ArenaMember = {
+    champion: parsed.doc,
+    handle,
+    seniority: arena.nextSeniority,
+  };
 
-  // A win crowns the challenger at the next generation. A CAS race (the throne moved since
-  // our read) surfaces as 409 throne-moved; the loser resubmits against the new King.
-  if (dethroned) {
-    const moved = await crown(deps.store, deps.version, current.generation, {
-      champion: parsed.doc,
-      generation: current.generation + 1,
-      handle,
+  const ranked = rankArena({
+    arena: arena.members,
+    challenger,
+    winRates: [titleFight.winRate],
+  });
+
+  // A placement commits the new arena at the next generation. A CAS race (the arena moved since
+  // our read) surfaces as 409 throne-moved; the loser resubmits against the new arena.
+  if (ranked.placed) {
+    const moved = await commit(deps.store, deps.version, arena.generation, {
+      members: ranked.members,
+      generation: arena.generation + 1,
+      nextSeniority: arena.nextSeniority + 1,
     });
 
     if (moved) return moved;
@@ -190,14 +216,15 @@ export const handleFight = async (
   return json({
     ...report,
     title: {
-      outcome: dethroned ? "crowned" : "king-retained",
+      outcome: ranked.placed ? "crowned" : "king-retained",
       // Full championship-bout telemetry at gauntlet fidelity (net / win-loss-draw /
       // endReasons / degrade) so a challenger can diagnose WHY it lost the crown rather
       // than guess from a lone win-rate and regress its 6/6 gauntlet clearance.
       ...toTitleFightReport(titleFight),
       seeds,
-      // Scout the King you fought (identity only, never the doc).
-      incumbent: incumbentOf(current),
+      // Scout the King you fought (identity only, never the doc) — arena #1 as a
+      // ThroneRecord (via `lineageEntryOf`) feeds the shared identity shaper.
+      incumbent: incumbentOf(lineageEntryOf(arena)),
     },
   });
 };
