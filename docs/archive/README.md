@@ -370,3 +370,35 @@ mutation** on the changed files (web presentation manual-scanned — outside the
   with **no retry button** (resubmitting the same bot just 409s again); throne-moved keeps its Resubmit button.
 
 [koth-ladder-s2-ranked-arena.md](koth-ladder-s2-ranked-arena.md)
+
+## KotH ladder — S3 the podium + `/king` show the ranked arena ✅ COMPLETE
+
+The third story of the KotH **ladder**: move the **read side** off the append-only crowning lineage and onto
+the ranked arena record S2 made real, then retire the lineage "bridge" and the prod-unused single-throne crown
+path — leaving the arena record as the single source of truth for both the write side (`/fight`) and the read
+side (`/king` + podium). Platform-layer (`src/http` + its `web/` consumer) only — **TCB untouched**, no DSL op,
+no engine change, **no `INPUT_HASH` / `BENCHMARK_VERSION` bump**. Design trail (still live for S4–S5):
+`plans/koth-ladder-{decisions,stories}.md`. Each slice TDD'd at **100% mutation** on the changed files (web
+presentation manual-scanned — outside the node-only Stryker scope).
+
+- **S3.1 — `/king` + podium read the ranked arena** (PR #257, `feat/king-arena-podium`) — `GET /king` now reads
+  `readArena`: `current` = arena[0], `recent` = arena[1..] **by rank** (identity-only via `memberIdentity`, **no
+  `generation`**). The web podium (`Podium.tsx`) renamed **"Hall of Kings" → "The Arena"**, composing
+  `[current, ...recent]` into gold/silver/bronze with the **gold step badged "King"**; `App` still owns ONE
+  `/king` fetch, feeding both the hero and the arena. Confirmed product decisions: podium = "The Arena" (King as
+  gold, hero spotlights #1 separately); **drop `generation`** from the `/king` entry contract AND the web
+  `Champion` type (the throne CAS token was never meant public; medal rank is the standing). GOTCHA: the King now
+  appears in BOTH the hero AND as gold in The Arena → App tests scope name lookups by region
+  (`within(king)`/`within(arena)`), never bare `findByText` counts.
+- **S3.2 — retire the single-throne lineage + crown path, closes S3** (PR #258, `refactor/retire-single-throne-lineage`)
+  — a pure refactor/removal (`+153 / −946`): the `ThroneStore` port shrank to **`readArena` + `commitArena`**,
+  dropping `read` / `recent` / `compareAndSwap` (port + fake + Upstash + shared contract), `lineage()`, the
+  `commitArena` lineage append + `sameKing` gate, and the dead `ThroneRecord` / `CasResult` / `lineageEntryOf` /
+  `InMemoryThroneStore` exports. Upstash: deleted `CROWN_SCRIPT` + the read/recent/crown builders & interpreters;
+  `COMMIT_ARENA_SCRIPT` simplifies to `GET → compare → SET → ok` (one key, no conditional `RPUSH`).
+  `champion-identity.ts` retired `championIdentity` + `ChampionIdentity.generation`; `handle-fight`'s incumbent
+  scout became `memberIdentity(arena.members[0])` (byte-identical). Characterization guard (the existing `/fight`
+  incumbent + S3.1 `/king` tests) + an empty-grep proof; the simplification even retired the old Lua-string
+  smoke-verified survivors → clean **100% mutation, 0 survived**.
+
+[koth-ladder-s3-podium-arena.md](koth-ladder-s3-podium-arena.md)

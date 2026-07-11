@@ -1,15 +1,15 @@
 # Plan: KotH ladder — S3 (the podium + `/king` show the ranked arena)
 
-**Branches**: `feat/king-arena-podium` (done) → `refactor/retire-single-throne-lineage`
-**Status**: Active — product decisions **confirmed 2026-07-11** (podium = **"The Arena"**, full arena with
-**King as gold**, spotlighted separately in the hero; **drop the "Gen N" card sub-label** and `generation`
-from the `/king` entry contract). **S3.1 ✅ MERGED + LIVE** (PR **#257**, `63d424d`): `/king` + podium read
-the ranked arena; mutation **100%** on `handle-king` — 26 killed; web presentation manual-scanned. **S3.2 ✅
-CODE-COMPLETE** on `refactor/retire-single-throne-lineage`: the single-throne lineage + crown path is removed
-(port/fake/Upstash/contract), `handle-fight`'s incumbent scout reads `memberIdentity(arena.members[0])`; suite
-green (node 1366 + web 189), typecheck clean, empty-grep proof of the retired symbols, and the arena path at
-**100% mutation** (207 killed, 0 survived across `throne-store` / `champion-identity` / `handle-fight` /
-`throne-store-upstash`). Awaiting commit + PR — closes S3.
+**Branches**: `feat/king-arena-podium` → `refactor/retire-single-throne-lineage`
+**Status**: ✅ **COMPLETE & ARCHIVED** — both slices merged (PR **#257** · **#258**). Product decisions
+**confirmed 2026-07-11** (podium = **"The Arena"**, full arena with **King as gold**, spotlighted separately in
+the hero; **drop the "Gen N" card sub-label** and `generation` from the `/king` entry contract). **S3.1 ✅ MERGED + LIVE**
+(PR **#257**, `63d424d`): `/king` + podium read the ranked arena; mutation **100%** on `handle-king` — 26 killed;
+web presentation manual-scanned. **S3.2 ✅ MERGED** (PR **#258**, `87c506c`): the single-throne
+lineage + crown path is removed (port/fake/Upstash/contract), `handle-fight`'s incumbent scout reads
+`memberIdentity(arena.members[0])`; the `ThroneStore` port shrank to `readArena` / `commitArena`; suite green
+(node 1366 + web 189), typecheck clean, empty-grep proof of the retired symbols, arena path at **100% mutation**
+(207 killed, 0 survived across `throne-store` / `champion-identity` / `handle-fight` / `throne-store-upstash`).
 **Story**: S3 in `plans/koth-ladder-stories.md`. **Design source of truth**: `plans/koth-ladder-decisions.md`
 (C5 — `/king` + podium semantics change; D2 — rank order; C6 — store re-arch).
 **Builds on**: S1 arena skeleton (`docs/archive/koth-ladder-s1-arena-skeleton.md`) + S2 ranked arena
