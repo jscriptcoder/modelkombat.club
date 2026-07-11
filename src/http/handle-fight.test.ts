@@ -1020,3 +1020,173 @@ describe("handleFight — S2.3: mirror-reject (C4) + re-entry (D3)", () => {
     ).toBe("unplaced");
   });
 });
+
+// S4.1 (C7): every gauntlet-clearer — crowned, entered, OR unplaced — reads back a per-defender BOARD,
+// generalizing the single-King scout (D-C) to all N defenders it fought. Each entry pairs a defender's
+// IDENTITY (never its doc) with the challenger's telemetry vs THAT defender, at gauntlet-row fidelity.
+// The board is rank-ordered on the pre-fight arena (board[0] = the reigning King). Additive this slice:
+// the flat King scout (winRate / incumbent / …) is unchanged; S4.2 retires it once the web reads board[0].
+describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
+  type BoardEntry = {
+    defender: { name: string; model: string | null; handle: string | null };
+    winRate: number;
+    net: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    bouts: number;
+    endReasons: Record<string, number>;
+    degrade: Record<string, number>;
+  };
+
+  type BoardBody = {
+    title?: {
+      outcome: string;
+      rank?: number;
+      winRate?: number;
+      incumbent?: { name: string; model: string | null; handle: string | null };
+      board?: BoardEntry[];
+    };
+  };
+
+  it("gives a crowning a board over every defender, rank-ordered with the King first", async () => {
+    const store = inMemoryThroneStore();
+
+    // A non-full arena [aggressor(#1 King), dummy(#2)]; the challenger (berserker) beats both, so it
+    // crowns. The board is over the two defenders it fought, in arena rank order (King first).
+    await seatArena(store, "vTEST", [
+      { champion: loadBot("aggressor"), handle: null, seniority: 1 },
+      { champion: dummy(), handle: null, seniority: 2 },
+    ]);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))),
+      arena("vTEST", store),
+    );
+
+    const t = ((await res.json()) as BoardBody).title;
+
+    expect(t?.outcome).toBe("crowned");
+
+    const board = t?.board ?? [];
+
+    expect(board).toHaveLength(2);
+    // board[0] is the King the challenger scouted; berserker beats aggressor 1.00 (10/10 bouts)
+    expect(board[0].defender).toEqual({
+      name: "aggressor",
+      model: null,
+      handle: null,
+    });
+    expect(board[0].winRate).toBe(1);
+    expect(board[0].wins).toBe(10);
+    expect(board[0].bouts).toBe(10);
+    // board[1] is the second defender fought (the dummy) — a DIFFERENT identity, not a repeat of #0
+    expect(board[1].defender.name).toBe("dummy");
+  });
+
+  it("gives each board entry ITS OWN matchup telemetry (board[i] ↔ defender i), not the King's", async () => {
+    const store = inMemoryThroneStore();
+
+    // Non-full arena [berserker(#1 King), dummy(#2)]. The challenger (aggressor) LOSES every bout to
+    // the King (0.00) but BEATS the idle dummy — so the two board rows must diverge sharply. A
+    // swapped-index or "board[i] = King fight" mutant would make them agree.
+    await seatArena(store, "vTEST", [
+      { champion: loadBot("berserker"), handle: null, seniority: 1 },
+      { champion: dummy(), handle: null, seniority: 2 },
+    ]);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const t = ((await res.json()) as BoardBody).title;
+
+    expect(t?.outcome).toBe("entered");
+    expect(t?.rank).toBe(2);
+
+    const board = t?.board ?? [];
+
+    expect(board).toHaveLength(2);
+    // vs the King (berserker): a clean sweep loss
+    expect(board[0].defender.name).toBe("berserker");
+    expect(board[0].winRate).toBe(0);
+    expect(board[0].wins).toBe(0);
+    expect(board[0].net).toBeLessThan(0);
+    // vs the dummy: a win — the row is the aggressor-vs-dummy fight, NOT the aggressor-vs-King fight
+    expect(board[1].defender.name).toBe("dummy");
+    expect(board[1].winRate).toBeGreaterThan(0.5);
+    expect(board[1].wins).toBeGreaterThan(0);
+    expect(board[1].net).toBeGreaterThan(0);
+  });
+
+  it("gives a NON-PLACER the full board too (parity ethos) — a whole full arena of rows", async () => {
+    const store = inMemoryThroneStore();
+    const berserker2: BotDoc = { ...loadBot("berserker"), name: "berserker-2" };
+
+    // A FULL arena of three bots that each beat aggressor 1.00. The challenger (aggressor) beats none
+    // → unplaced, arena untouched — but it still fought all three, so it reads a full 3-row board.
+    await seatArena(store, "vTEST", [
+      { champion: loadBot("berserker"), handle: null, seniority: 1 },
+      { champion: loadBot("pacer"), handle: null, seniority: 2 },
+      { champion: berserker2, handle: null, seniority: 3 },
+    ]);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const t = ((await res.json()) as BoardBody).title;
+
+    expect(t?.outcome).toBe("unplaced");
+
+    const board = t?.board ?? [];
+
+    expect(board).toHaveLength(3);
+    expect(board[0].defender.name).toBe("berserker"); // the King, first
+    expect(board.map((e) => e.winRate)).toEqual([0, 0, 0]); // lost every matchup
+    // identity ONLY — no defender document leaks into the board, even though these are real bots
+    expect(JSON.stringify(board)).not.toContain('"rules"');
+    expect(JSON.stringify(board)).not.toContain('"default"');
+  });
+
+  it("gives the empty-arena bootstrap crown an EMPTY board (it fought no defenders)", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const t = ((await res.json()) as BoardBody).title;
+
+    expect(t?.outcome).toBe("crowned");
+    expect(t?.board).toEqual([]);
+  });
+
+  it("keeps the flat King scout unchanged alongside the new board (additive this slice)", async () => {
+    const store = inMemoryThroneStore();
+
+    await seatArena(store, "vTEST", [
+      { champion: loadBot("aggressor"), handle: null, seniority: 1 },
+      { champion: dummy(), handle: null, seniority: 2 },
+    ]);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))),
+      arena("vTEST", store),
+    );
+
+    const t = ((await res.json()) as BoardBody).title;
+
+    // the pre-S4 flat scout still reports the King fight — board[0] and it agree (both the King)
+    expect(t?.winRate).toBe(1);
+    expect(t?.incumbent).toEqual({
+      name: "aggressor",
+      model: null,
+      handle: null,
+    });
+    expect(t?.board?.[0].defender).toEqual(t?.incumbent);
+  });
+});

@@ -137,7 +137,7 @@ const roundRobin = (
 ): {
   defenderStandings: Standing[];
   challengerStanding: Standing;
-  kingFight: BenchmarkResult;
+  challengerFights: BenchmarkResult[];
 } => {
   const fight = (bot: BotDoc, opp: BotDoc): BenchmarkResult =>
     benchmark({
@@ -171,7 +171,7 @@ const roundRobin = (
   return {
     defenderStandings,
     challengerStanding,
-    kingFight: challengerFights[0],
+    challengerFights,
   };
 };
 
@@ -235,7 +235,10 @@ export const handleFight = async (
       nextSeniority: 2,
     });
 
-    return moved ?? json({ ...report, title: { outcome: "crowned", rank: 1 } });
+    return (
+      moved ??
+      json({ ...report, title: { outcome: "crowned", rank: 1, board: [] } })
+    );
   }
 
   // A non-empty arena — whether it has room or is full: rank the challenger against the current
@@ -249,11 +252,8 @@ export const handleFight = async (
     seniority: arena.nextSeniority,
   };
 
-  const { defenderStandings, challengerStanding, kingFight } = roundRobin(
-    arena.members,
-    challenger,
-    deps,
-  );
+  const { defenderStandings, challengerStanding, challengerFights } =
+    roundRobin(arena.members, challenger, deps);
 
   const placement = rankArena({
     defenders: defenderStandings,
@@ -261,11 +261,21 @@ export const handleFight = async (
     n: deps.n,
   });
 
+  // The per-defender board (C7): every defender the challenger fought, in arena rank order (board[0]
+  // = the reigning King), each pairing that defender's IDENTITY (never its document — the standings
+  // are public via /king + podium) with the challenger's telemetry vs IT, at the same fidelity a
+  // gauntlet row carries. Non-placers get the full board too — diagnose why, don't guess (D-C ethos).
+  const board = arena.members.map((member, i) => ({
+    defender: memberIdentity(member),
+    ...toTitleFightReport(challengerFights[i]),
+  }));
+
   // The King-fight scout every placement carries (D-C): the challenger genuinely fought arena #1,
   // whatever the outcome, so crowned / entered / unplaced all diagnose the same way — full telemetry
   // (net / win-loss-draw / endReasons / degrade) + the scouted King (identity only, never the doc).
+  // `board[0]` now carries the same King fight; the flat scout is retired in S4.2 once the web reads it.
   const scout = {
-    ...toTitleFightReport(kingFight),
+    ...toTitleFightReport(challengerFights[0]),
     incumbent: memberIdentity(arena.members[0]),
   };
 
@@ -273,7 +283,7 @@ export const handleFight = async (
   // arena and nothing is committed (the arena keeps its own top N); the scout still diagnoses the
   // near-miss, at full parity with a placement.
   if (placement.outcome === "unplaced") {
-    return json({ ...report, title: { outcome: "unplaced", ...scout } });
+    return json({ ...report, title: { outcome: "unplaced", ...scout, board } });
   }
 
   // A placement mutates the arena at the next generation. A CAS race (the arena moved since our
@@ -292,6 +302,7 @@ export const handleFight = async (
       outcome: placement.outcome,
       rank: placement.rank,
       ...scout,
+      board,
       // The relegated defender (identity only, never the doc) — present only when a full arena shed
       // its weakest to seat this challenger; omitted while the arena still had room.
       ...(placement.displaced
