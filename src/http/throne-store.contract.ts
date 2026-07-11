@@ -220,6 +220,35 @@ export const runThroneStoreContract = (make: ThroneStoreHarness): void => {
     expect((await store.read(versionA))?.champion.name).toBe("b");
   });
 
+  it("does NOT grow the lineage when the King (arena #1) is unchanged (a non-crowning placement)", async () => {
+    const { store, versionA } = make();
+
+    await store.commitArena(versionA, null, {
+      members: [member("a", 1)],
+      generation: 1,
+      nextSeniority: 2,
+    });
+
+    // "b" enters at #2; the King ("a") is unchanged — a defender joined without a new reign.
+    const res = await store.commitArena(versionA, 1, {
+      members: [member("a", 1), member("b", 2)],
+      generation: 2,
+      nextSeniority: 3,
+    });
+
+    expect(res.ok).toBe(true);
+    // the arena record reflects both members, rank-ordered
+    expect(
+      (await store.readArena(versionA))?.members.map((m) => m.champion.name),
+    ).toEqual(["a", "b"]);
+    // but the succession lineage did NOT grow — the crown never changed hands (D-E). A blind
+    // append would duplicate the sitting King in `/king recent` (the Hall of Kings).
+    expect(
+      (await store.recent(versionA, 3)).map((e) => e.champion.name),
+    ).toEqual(["a"]);
+    expect((await store.read(versionA))?.champion.name).toBe("a");
+  });
+
   it("rejects a stale arena generation as moved and writes neither the arena nor the lineage", async () => {
     const { store, versionA } = make();
 

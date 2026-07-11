@@ -30,12 +30,11 @@ import {
 const gauntlet = loadGauntlet();
 const store = selectThroneStore(process.env);
 
-// The title fight's fresh seeds: 10 CSPRNG draws from Web Crypto. This is API-layer
-// entropy OUTSIDE the pure sim — each drawn seed still threads the engine's own
-// `mulberry32` PRNG, and the chosen seeds are echoed in the `title` block so the fight
-// replays byte-identically (invariant #1 intact).
-const freshSeeds = (): number[] =>
-  Array.from(crypto.getRandomValues(new Uint32Array(10)));
+// The frozen top-N arena cap (D4): the ladder keeps the top 3 champions; #1 is King. Frozen per
+// version — changing it requires a version bump (which starts a fresh empty ladder), so it never
+// mutates a live competition. The arena round-robin reuses the frozen gauntlet `SEEDS` (D-A: a
+// deterministic tournament graph, no fresh entropy), so a resubmission is idempotent.
+const ARENA_N = 3;
 
 export default {
   fetch(req: Request): Promise<Response> {
@@ -48,7 +47,7 @@ export default {
       match: MATCH,
       version: BENCHMARK_VERSION,
       store,
-      freshSeeds,
+      n: ARENA_N,
     });
   },
 };

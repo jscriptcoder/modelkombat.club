@@ -198,22 +198,32 @@ describe("RingPage — the /ring submit surface", () => {
         headline: /didn't clear the gauntlet/i,
       },
       {
+        // crowned with NO incumbent ⇒ the first King (D-B: distinguished by incumbent presence)
         body: reportBody({
           cleared: true,
-          title: { outcome: "throne-empty-crowned" },
+          title: { outcome: "crowned", rank: 1 },
         }),
         headline: /first King/i,
       },
       {
-        body: reportBody({ cleared: true, title: { outcome: "crowned" } }),
+        // crowned WITH an incumbent ⇒ a dethrone
+        body: reportBody({
+          cleared: true,
+          title: { outcome: "crowned", rank: 1, incumbent: INCUMBENT },
+        }),
         headline: /new champion/i,
       },
       {
         body: reportBody({
           cleared: true,
-          title: { outcome: "king-retained" },
+          title: { outcome: "entered", rank: 2, incumbent: INCUMBENT },
         }),
-        headline: /King held the throne/i,
+        // pins the rank into the headline (not just "joined the arena") — the #-branch guard
+        headline: /joined the arena at #2/i,
+      },
+      {
+        body: reportBody({ cleared: true, title: { outcome: "unplaced" } }),
+        headline: /didn't crack the top ranks/i,
       },
     ];
 
@@ -370,7 +380,9 @@ describe("RingPage — the /ring submit surface", () => {
 
     // ...but no outcome headline is claimed for an error response.
     expect(
-      ui.queryByText(/didn't clear|new champion|first King|held the throne/i),
+      ui.queryByText(
+        /didn't clear|new champion|first King|joined the arena|didn't crack/i,
+      ),
     ).toBeNull();
   });
 
@@ -481,7 +493,8 @@ describe("RingPage — the fight card", () => {
       <RingPage
         postFight={resolves({
           status: 200,
-          body: titledBody({ outcome: "throne-empty-crowned" }),
+          // a crown with NO incumbent is the first King (D-B) — the throne is yours, no one to scout
+          body: titledBody({ outcome: "crowned", rank: 1 }),
         })}
       />
     ));
@@ -537,15 +550,15 @@ describe("RingPage — the fight card", () => {
     expect(cell(region, ".ring-title-bouts")).toBe("20");
   });
 
-  it("shows the held throne's King and result, with no new-crown link", async () => {
+  it("scouts the King you fought when you ENTER the arena as a defender, with no crown link", async () => {
     const ui = render(() => (
       <RingPage
         postFight={resolves({
           status: 200,
           body: titledBody({
-            outcome: "king-retained",
+            outcome: "entered",
+            rank: 2,
             winRate: 0.45,
-            seeds: [7, 8],
             bouts: 20,
             incumbent: INCUMBENT,
           }),
@@ -557,12 +570,34 @@ describe("RingPage — the fight card", () => {
 
     const region = await ui.findByRole("region", { name: /title fight/i });
 
-    // The King held on, so the scout is shown with the losing title-fight result...
+    // You entered as a defender, so the King you fought is scouted with the title-fight result...
     expect(cell(region, ".ring-incumbent-name")).toBe("old-king");
     expect(cell(region, ".ring-title-winrate")).toBe("45%");
     expect(cell(region, ".ring-title-bouts")).toBe("20");
-    // ...but the throne didn't change hands — no new-crown link.
+    // ...but you are not King — no crown link (the ranked podium is a later slice).
     expect(within(region).queryByRole("link", { name: /throne/i })).toBeNull();
+  });
+
+  it("shows no title scout when the clearer is unplaced (a full arena, no fight)", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: titledBody({ outcome: "unplaced" }),
+        })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    // The scorecard proves the cleared result rendered...
+    await ui.findByRole("region", { name: /gauntlet scorecard/i });
+
+    // ...but an unplaced clearer fought no King in S2.1 — no title-fight scout, no throne link...
+    expect(ui.queryByRole("region", { name: /title fight/i })).toBeNull();
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
+    // ...and the headline names the miss.
+    expect(ui.getByText(/didn't crack the top ranks/i)).toBeTruthy();
   });
 
   it("omits the by-line and shows a generic mark when the King has no handle or model", async () => {
@@ -857,7 +892,9 @@ describe("RingPage — response failure states", () => {
     expect(ui.queryByText(/the ring returned an error/i)).toBeNull();
     // ...no outcome headline is claimed for an error...
     expect(
-      ui.queryByText(/didn't clear|new champion|first King|held the throne/i),
+      ui.queryByText(
+        /didn't clear|new champion|first King|joined the arena|didn't crack/i,
+      ),
     ).toBeNull();
     // ...the pasted doc is kept so the author can fix it in place...
     expect(ui.getByRole("textbox", { name: /bot document/i })).toHaveProperty(
@@ -941,7 +978,10 @@ describe("RingPage — response failure states", () => {
           })
         : Promise.resolve({
             status: 200,
-            body: reportBody({ cleared: true, title: { outcome: "crowned" } }),
+            body: reportBody({
+              cleared: true,
+              title: { outcome: "crowned", rank: 1, incumbent: INCUMBENT },
+            }),
           });
     };
 

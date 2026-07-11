@@ -65,23 +65,35 @@ const postFightToApi: PostFight = async ({ doc, handle }) => {
 };
 
 // Map a /fight report body to the author-facing headline. A bot that didn't clear stops at the
-// gauntlet; a clearer reads its title outcome (first crown / dethrone / the King held on).
+// gauntlet; a clearer reads its arena placement (C7): crowned (first King vs dethrone, told apart
+// by whether there was an incumbent — D-B), entered as a defender, or cleared-but-unplaced.
 const outcomeHeadline = (body: unknown): string => {
   if (!isRecord(body) || body.cleared !== true) {
     return "Didn't clear the gauntlet.";
   }
 
-  const outcome = isRecord(body.title) ? body.title.outcome : undefined;
-
-  if (outcome === "throne-empty-crowned") {
-    return "Cleared the gauntlet — you're the first King! 👑";
-  }
+  const title = isRecord(body.title) ? body.title : undefined;
+  const outcome = title?.outcome;
 
   if (outcome === "crowned") {
-    return "New champion — you dethroned the reigning King! 👑";
+    return isRecord(title?.incumbent)
+      ? "New champion — you dethroned the reigning King! 👑"
+      : "Cleared the gauntlet — you're the first King! 👑";
   }
 
-  return "Cleared the gauntlet, but the King held the throne.";
+  if (outcome === "entered") {
+    const rank = title?.rank;
+
+    return typeof rank === "number"
+      ? `Cleared the gauntlet — you joined the arena at #${rank}! ⚔️`
+      : "Cleared the gauntlet — you joined the arena! ⚔️";
+  }
+
+  if (outcome === "unplaced") {
+    return "Cleared the gauntlet, but didn't crack the top ranks.";
+  }
+
+  return "Cleared the gauntlet.";
 };
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300;
@@ -164,9 +176,9 @@ type Incumbent = { name: string; model: string | null; handle: string | null };
 // crown (an empty throne has no incumbent to scout).
 type TitleScout = { incumbent: Incumbent; winRate: number; bouts: number };
 
-// The title block's view-model. `linksToThrone` is true for the two crownings (the throne is now
-// yours to view); false when the King held on (the scout already shows them). `scout` is null only
-// for the first crown.
+// The title block's view-model. `linksToThrone` is true for a crown (the throne is now yours to
+// view); false when you entered as a defender (the scout shows the King you fought). `scout` is
+// null only for the first crown (no incumbent to scout).
 type TitleView = { linksToThrone: boolean; scout: TitleScout | null };
 
 const readIncumbent = (value: unknown): Incumbent | null => {
@@ -179,18 +191,32 @@ const readIncumbent = (value: unknown): Incumbent | null => {
   };
 };
 
-// Shape the /fight `title` block into the view-model, or null when there is no well-formed title —
-// an uncleared report, an error body, or an unrecognised outcome — so the card omits the block.
+// Shape the /fight `title` block into the view-model, or null when there is no scoutable title —
+// an uncleared report, an error body, an `unplaced` clearer (no King fought in S2.1), or an
+// unrecognised outcome — so the card omits the block.
 const titleView = (body: unknown): TitleView | null => {
   if (!isRecord(body) || !isRecord(body.title)) return null;
 
   const title = body.title;
 
-  if (title.outcome === "throne-empty-crowned") {
-    return { linksToThrone: true, scout: null };
+  // A crown links to the (now-yours) throne. A first-King crown has no incumbent to scout.
+  if (title.outcome === "crowned") {
+    const incumbent = readIncumbent(title.incumbent);
+
+    if (incumbent === null) return { linksToThrone: true, scout: null };
+
+    if (typeof title.winRate !== "number" || typeof title.bouts !== "number") {
+      return null;
+    }
+
+    return {
+      linksToThrone: true,
+      scout: { incumbent, winRate: title.winRate, bouts: title.bouts },
+    };
   }
 
-  if (title.outcome === "crowned" || title.outcome === "king-retained") {
+  // Entered as a defender: scout the King you fought, but you are not King (no crown link).
+  if (title.outcome === "entered") {
     const incumbent = readIncumbent(title.incumbent);
 
     if (
@@ -202,7 +228,7 @@ const titleView = (body: unknown): TitleView | null => {
     }
 
     return {
-      linksToThrone: title.outcome === "crowned",
+      linksToThrone: false,
       scout: { incumbent, winRate: title.winRate, bouts: title.bouts },
     };
   }
