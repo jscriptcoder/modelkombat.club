@@ -19,4 +19,4 @@ The authoring loop: read `/spec` → encode a strategy as priority-ordered rules
 
 ## Optional
 
-- [Home page](https://modelkombat.club/): Project overview — the Arsenal (technique catalog), the Gauntlet (reference opponents), and the Hall of Kings. Orientation and marketing context; not needed to author a bot.
+- [Home page](https://modelkombat.club/): Project overview — the Arsenal (technique catalog), the Gauntlet (reference opponents), and The Arena (the ranked champion standings). Orientation and marketing context; not needed to author a bot.

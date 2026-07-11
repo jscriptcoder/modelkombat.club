@@ -19,7 +19,6 @@ const champ = (overrides?: Partial<Champion>): Champion => ({
   name: "champion",
   model: "claude-opus-4-8",
   handle: "grandmaster",
-  generation: 1,
   ...overrides,
 });
 
@@ -194,12 +193,12 @@ describe("App (landing page)", () => {
     ).toBeTruthy();
   });
 
-  it("renders the Hall of Kings as a labelled section for the #champions anchor", () => {
+  it("renders The Arena as a labelled section for the #champions anchor", () => {
     const { getByRole } = render(() => <App />);
 
     // The heading renders regardless of fetch state (it sits outside the resource
     // Switch), so this is stable without stubbing the network.
-    const region = getByRole("region", { name: "Hall of Kings" });
+    const region = getByRole("region", { name: "The Arena" });
 
     expect(region.id).toBe("champions");
   });
@@ -286,31 +285,26 @@ describe("App — single /king fetch feeding both throne sections", () => {
       calls += 1;
 
       return Promise.resolve({
-        current: champ({ name: "reigning-king", generation: 7 }),
-        recent: [
-          champ({ name: "gold-king", generation: 6 }),
-          champ({ name: "silver-king", generation: 5 }),
-        ],
+        current: champ({ name: "reigning-king" }),
+        recent: [champ({ name: "gold-king" }), champ({ name: "silver-king" })],
       });
     };
 
-    const { findByText, getByRole } = render(() => (
-      <App fetchKing={fetchKing} />
-    ));
+    const { getByRole } = render(() => <App fetchKing={fetchKing} />);
 
     // The King section renders the reigning champion...
     const king = getByRole("region", { name: "Current King" });
 
     expect(await within(king).findByText("reigning-king")).toBeTruthy();
 
-    // ...and the Hall of Kings renders the recent succession...
-    const hall = getByRole("region", { name: "Hall of Kings" });
+    // ...and The Arena renders the ranked defenders...
+    const hall = getByRole("region", { name: "The Arena" });
 
     expect(await within(hall).findByText("gold-king")).toBeTruthy();
     expect(within(hall).getByText("silver-king")).toBeTruthy();
 
-    // ...from ONE shared request, not one fetch per section.
-    await findByText("reigning-king");
+    // ...from ONE shared request, not one fetch per section (the King now also heads The
+    // Arena as gold, so scope the section reads rather than counting bare occurrences).
     expect(calls).toBe(1);
   });
 
@@ -324,11 +318,11 @@ describe("App — single /king fetch feeding both throne sections", () => {
         ? Promise.reject(new Error("throne store unreachable"))
         : Promise.resolve({
             current: champ({ name: "recovered-king" }),
-            recent: [champ({ name: "recovered-king" })],
+            recent: [champ({ name: "recovered-defender" })],
           });
     };
 
-    const { findAllByRole, findAllByText } = render(() => (
+    const { findAllByRole, findAllByText, getByRole } = render(() => (
       <App fetchKing={flaky} />
     ));
 
@@ -342,8 +336,12 @@ describe("App — single /king fetch feeding both throne sections", () => {
 
     fireEvent.click(retry);
 
-    // One shared refetch refills BOTH the King and the Hall of Kings.
-    expect(await findAllByText("recovered-king")).toHaveLength(2);
+    // One shared refetch refills BOTH the King (hero) and The Arena (its defender).
+    const king = getByRole("region", { name: "Current King" });
+    const arena = getByRole("region", { name: "The Arena" });
+
+    expect(await within(king).findByText("recovered-king")).toBeTruthy();
+    expect(await within(arena).findByText("recovered-defender")).toBeTruthy();
     expect(calls).toBe(2);
   });
 });

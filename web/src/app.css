@@ -451,7 +451,6 @@ main,
   color: var(--accent);
 }
 
-.king-gen,
 .king-handle {
   margin: 0.25rem 0;
   color: var(--muted);
@@ -537,7 +536,15 @@ main,
   color: var(--accent);
 }
 
-.podium-gen,
+/* The reigning-King marker on the gold step — gold-tinted so it reads as the crown. */
+.podium-king-badge {
+  margin: 0.25rem 0;
+  color: #d4af37;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
 .podium-handle {
   margin: 0.25rem 0;
   color: var(--muted);
@@ -546,7 +553,6 @@ main,
 
 .podium-name,
 .podium-model,
-.podium-gen,
 .podium-handle {
   overflow: hidden;
   text-overflow: ellipsis;

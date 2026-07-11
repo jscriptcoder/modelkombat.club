@@ -1,16 +1,20 @@
 import { describe, expect, it } from "vitest";
 
 import { handleKing } from "./handle-king.js";
-import { inMemoryThroneStore, type ThroneStore } from "./throne-store.js";
+import {
+  inMemoryThroneStore,
+  type ArenaMember,
+  type ThroneStore,
+} from "./throne-store.js";
 import type { BotDoc } from "../engine/dsl.js";
 
 // The version the /king read is scoped to (a test key — the real endpoint reads
-// BENCHMARK_VERSION). Enthroning under a DIFFERENT version must read as empty.
+// BENCHMARK_VERSION). An arena seated under a DIFFERENT version must read as empty.
 const VERSION = "v-test";
 
-// A reigning champion whose document carries real `rules` (a DSL body). /king must
-// surface the champion's IDENTITY only — the rules must never leak into the response,
-// preserving the King's competitive edge (decision 5 / AC-K1 no-leak).
+// A champion whose document carries real `rules` (a DSL body). /king must surface the
+// champion's IDENTITY only — the rules must never leak into the response, preserving the
+// King's competitive edge (decision 5 / no-leak).
 const champion = (overrides?: Partial<BotDoc>): BotDoc => ({
   version: 1,
   name: "reigning-king",
@@ -38,62 +42,57 @@ const kingRequest = (method = "GET"): Request =>
 // pure ASCII (git-diffable, formatter-safe) instead of embedding raw control bytes.
 const ctrl = (code: number): string => String.fromCharCode(code);
 
-// Pre-seat a reigning champion in the fake (generation 1, expected-empty). `handle` is
-// the submitter label persisted on the record; omitted ⇒ the record has none.
-const enthrone = (
+// Build one arena member from a name (+ optional handle / doc overrides). Every member's
+// champion doc carries a real `rules` body, so each test also proves identity-only projection.
+const arenaMember = (
+  name: string,
+  opts?: { handle?: string | null; seniority?: number; doc?: Partial<BotDoc> },
+): ArenaMember => ({
+  champion: champion({ name, ...opts?.doc }),
+  handle: opts?.handle ?? null,
+  seniority: opts?.seniority ?? 1,
+});
+
+// Seat a ranked arena under a version (members already in rank order, `[0]` = King). Uses the
+// arena commit path — the single source of truth /king now reads (no more compareAndSwap seeding).
+const seatArena = (
   store: ThroneStore,
-  reigning: BotDoc,
-  opts?: { generation?: number; handle?: string | null },
+  members: ArenaMember[],
+  version = VERSION,
 ): Promise<unknown> =>
-  store.compareAndSwap(VERSION, null, {
-    champion: reigning,
-    generation: opts?.generation ?? 1,
-    handle: opts?.handle,
+  store.commitArena(version, null, {
+    members,
+    generation: 1,
+    nextSeniority: members.length + 1,
   });
 
-// Crown a whole succession under VERSION — each CAS matches the prior generation, so the
-// lineage grows a→b→c→… (oldest-first in storage). Used to exercise the `recent[]` tail.
-const crownLineage = (store: ThroneStore, names: string[]): Promise<unknown> =>
-  names.reduce<Promise<unknown>>(
-    (prior, name, i) =>
-      prior.then(() =>
-        store.compareAndSwap(VERSION, i === 0 ? null : i, {
-          champion: champion({ name }),
-          generation: i + 1,
-        }),
-      ),
-    Promise.resolve(),
-  );
-
-// A store whose reads always fail — models Upstash being unreachable (the real adapter
-// THROWS on an error reply, never silently reads empty). Drives the 503 path (AC-K3).
+// A store whose arena read fails — models Upstash being unreachable (the real adapter THROWS
+// on an error reply, never silently reads empty). Drives the 503 path.
 const failingStore = (): ThroneStore => ({
-  read: () => Promise.reject(new Error("upstash unreachable")),
-  recent: () => Promise.reject(new Error("upstash unreachable")),
+  read: () => Promise.reject(new Error("unused in /king")),
+  recent: () => Promise.reject(new Error("unused in /king")),
   compareAndSwap: () => Promise.reject(new Error("unused in /king")),
   readArena: () => Promise.reject(new Error("upstash unreachable")),
   commitArena: () => Promise.reject(new Error("unused in /king")),
 });
 
-type Champion = {
-  name: string;
-  model: string | null;
-  handle: string | null;
-  generation: number;
-};
+type Champion = { name: string; model: string | null; handle: string | null };
 
 type KingBody = {
   current: null | Champion;
   recent: Champion[];
 };
 
-const IDENTITY_KEYS = ["generation", "handle", "model", "name"] as const;
+// The public identity fields — no `generation` (the throne CAS token left the contract in S3).
+const IDENTITY_KEYS = ["handle", "model", "name"] as const;
 
-describe("GET /king — the version-scoped reigning-King read", () => {
-  it("returns the reigning champion's identity (name, model, handle, generation)", async () => {
+describe("GET /king — the version-scoped ranked-arena read", () => {
+  it("returns the King's identity (name, model, handle) — and no generation", async () => {
     const store = inMemoryThroneStore();
 
-    await enthrone(store, champion(), { generation: 3, handle: "grandmaster" });
+    await seatArena(store, [
+      arenaMember("reigning-king", { handle: "grandmaster" }),
+    ]);
 
     const res = await handleKing(kingRequest(), { store, version: VERSION });
 
@@ -108,26 +107,53 @@ describe("GET /king — the version-scoped reigning-King read", () => {
       name: "reigning-king",
       model: "claude-opus-4-8",
       handle: "grandmaster",
-      generation: 3,
     });
+    // The throne CAS token must NOT leak into the public read (dropped in S3).
+    expect(body.current).not.toHaveProperty("generation");
+  });
+
+  it("projects current = King (arena #1) and recent = defenders (arena #2..N) in RANK order", async () => {
+    const store = inMemoryThroneStore();
+
+    await seatArena(store, [
+      arenaMember("king", { handle: "a", seniority: 1 }),
+      arenaMember("silver", { handle: "b", seniority: 2 }),
+      arenaMember("bronze", { handle: "c", seniority: 3 }),
+    ]);
+
+    const res = await handleKing(kingRequest(), { store, version: VERSION });
+    const body = (await res.json()) as KingBody;
+
+    // current is arena #1 — not a defender (kills a members[1]-as-current mutant).
+    expect(body.current?.name).toBe("king");
+    // recent is the defenders below the King, in arena RANK order (not reversed, not time order).
+    expect(body.recent.map((c) => c.name)).toEqual(["silver", "bronze"]);
+    // the King never appears among the defenders (recent = slice(1), not slice(0)).
+    expect(body.recent.map((c) => c.name)).not.toContain("king");
+  });
+
+  it("returns an empty recent when the arena holds only the King", async () => {
+    const store = inMemoryThroneStore();
+
+    await seatArena(store, [arenaMember("lonely-king")]);
+
+    const res = await handleKing(kingRequest(), { store, version: VERSION });
+    const body = (await res.json()) as KingBody;
+
+    expect(body.current?.name).toBe("lonely-king");
+    expect(body.recent).toEqual([]);
   });
 
   it("never leaks the champion's DSL/rules into the response", async () => {
     const store = inMemoryThroneStore();
 
-    await enthrone(store, champion());
+    await seatArena(store, [arenaMember("reigning-king")]);
 
     const res = await handleKing(kingRequest(), { store, version: VERSION });
-
     const body = (await res.json()) as KingBody;
 
-    // Exactly the four identity fields — no `rules`, no `version`, no `default`.
-    expect(Object.keys(body.current ?? {}).sort()).toEqual([
-      "generation",
-      "handle",
-      "model",
-      "name",
-    ]);
+    // Exactly the three identity fields — no `rules`, no `version`, no `default`, no `generation`.
+    expect(Object.keys(body.current ?? {}).sort()).toEqual([...IDENTITY_KEYS]);
 
     // Defense in depth: no DSL token survives anywhere in the serialized payload.
     const raw = JSON.stringify(body);
@@ -137,90 +163,18 @@ describe("GET /king — the version-scoped reigning-King read", () => {
     expect(raw).not.toContain("default");
   });
 
-  it("defaults an absent model and handle to null (not omitted, not 'undefined')", async () => {
+  it("every recent entry is identity-only and carries no generation", async () => {
     const store = inMemoryThroneStore();
 
-    // A champion doc with no `model`, enthroned with no `handle`.
-    await enthrone(store, champion({ model: undefined }));
-
-    const res = await handleKing(kingRequest(), { store, version: VERSION });
-
-    const body = (await res.json()) as KingBody;
-
-    expect(body.current?.model).toBeNull();
-    expect(body.current?.handle).toBeNull();
-  });
-
-  it("reads empty for a version with no crowned King (a success, not an error)", async () => {
-    const store = inMemoryThroneStore();
-
-    // Crown someone under a DIFFERENT version — the scoped read must still be empty.
-    await store.compareAndSwap("other-version", null, {
-      champion: champion(),
-      generation: 1,
-    });
-
-    const res = await handleKing(kingRequest(), { store, version: VERSION });
-
-    expect(res.status).toBe(200);
-
-    const body = (await res.json()) as KingBody;
-
-    expect(body.current).toBeNull();
-  });
-
-  it("returns the recent succession newest-first, each identity-only (recent[0] == current)", async () => {
-    const store = inMemoryThroneStore();
-
-    await crownLineage(store, ["a", "b", "c"]);
+    await seatArena(store, [arenaMember("king"), arenaMember("challenger")]);
 
     const res = await handleKing(kingRequest(), { store, version: VERSION });
     const body = (await res.json()) as KingBody;
 
-    expect(res.status).toBe(200);
-    expect(body.recent.map((c) => c.name)).toEqual(["c", "b", "a"]);
-    // The newest crowning is both the current King and the head of the succession.
-    expect(body.recent[0]).toEqual(body.current);
-    // Every entry is identity-only (no rules / version / default).
+    expect(body.recent).toHaveLength(1);
     body.recent.forEach((entry) => {
       expect(Object.keys(entry).sort()).toEqual([...IDENTITY_KEYS]);
-    });
-  });
-
-  it("bounds the recent succession to the three most-recent Kings (older drop off)", async () => {
-    const store = inMemoryThroneStore();
-
-    await crownLineage(store, ["a", "b", "c", "d"]);
-
-    const res = await handleKing(kingRequest(), { store, version: VERSION });
-    const body = (await res.json()) as KingBody;
-
-    expect(body.recent.map((c) => c.name)).toEqual(["d", "c", "b"]);
-    expect(body.recent.map((c) => c.name)).not.toContain("a"); // oldest dropped
-  });
-
-  it("reads an empty recent lineage when no King is crowned", async () => {
-    const store = inMemoryThroneStore();
-
-    const res = await handleKing(kingRequest(), { store, version: VERSION });
-    const body = (await res.json()) as KingBody;
-
-    expect(body.current).toBeNull();
-    expect(body.recent).toEqual([]);
-  });
-
-  it("never leaks the champions' DSL/rules anywhere in recent[]", async () => {
-    const store = inMemoryThroneStore();
-
-    // Both champions carry a real `rules` body — the whole lineage must project identity-only.
-    await crownLineage(store, ["older-king", "newer-king"]);
-
-    const res = await handleKing(kingRequest(), { store, version: VERSION });
-    const body = (await res.json()) as KingBody;
-
-    expect(body.recent).toHaveLength(2);
-    body.recent.forEach((entry) => {
-      expect(Object.keys(entry).sort()).toEqual([...IDENTITY_KEYS]);
+      expect(entry).not.toHaveProperty("generation");
     });
 
     const rawRecent = JSON.stringify(body.recent);
@@ -230,45 +184,78 @@ describe("GET /king — the version-scoped reigning-King read", () => {
     expect(rawRecent).not.toContain("default");
   });
 
-  it("strips control characters from identity strings for current and every recent entry", async () => {
+  it("defaults an absent model and handle to null (not omitted, not 'undefined')", async () => {
     const store = inMemoryThroneStore();
 
-    // Two crownings whose name/model/handle carry C0 + DEL control characters. Boundary
-    // coverage: 0x1F is stripped while the adjacent 0x20 space survives; 0x7F (DEL) is
-    // stripped while the adjacent 0x7E "~" survives — pinning both edges of the strip range.
-    await store.compareAndSwap(VERSION, null, {
-      champion: champion({
-        name: `ka${ctrl(0x00)}ta ${ctrl(0x1f)}master`, // -> "kata master"
-        model: `claude${ctrl(0x07)}opus`, // -> "claudeopus"
-      }),
-      generation: 1,
-      handle: `gr${ctrl(0x01)}and`, // -> "grand"
-    });
-    await store.compareAndSwap(VERSION, 1, {
-      champion: champion({
-        name: `new~${ctrl(0x7f)}king`, // -> "new~king"
-        model: `opus${ctrl(0x1f)}x`, // -> "opusx"
-      }),
-      generation: 2,
-      handle: `he${ctrl(0x02)}ir`, // -> "heir"
-    });
+    // A champion doc with no `model`, seated with no `handle`.
+    await seatArena(store, [
+      arenaMember("k", { handle: null, doc: { model: undefined } }),
+    ]);
 
     const res = await handleKing(kingRequest(), { store, version: VERSION });
     const body = (await res.json()) as KingBody;
 
-    // current (the newest) is sanitized...
+    expect(body.current?.model).toBeNull();
+    expect(body.current?.handle).toBeNull();
+  });
+
+  it("reads empty for a version with no arena (a success, not an error)", async () => {
+    const store = inMemoryThroneStore();
+
+    // Seat an arena under a DIFFERENT version — the scoped read must still be empty.
+    await seatArena(store, [arenaMember("elsewhere")], "other-version");
+
+    const res = await handleKing(kingRequest(), { store, version: VERSION });
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as KingBody;
+
+    expect(body.current).toBeNull();
+    expect(body.recent).toEqual([]);
+  });
+
+  it("reads empty current + empty recent when no champion has been crowned", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleKing(kingRequest(), { store, version: VERSION });
+    const body = (await res.json()) as KingBody;
+
+    expect(body.current).toBeNull();
+    expect(body.recent).toEqual([]);
+  });
+
+  it("strips control characters from identity strings for current and every recent entry", async () => {
+    const store = inMemoryThroneStore();
+
+    // Two members whose name/model/handle carry C0 + DEL control characters. Boundary
+    // coverage: 0x1F is stripped while the adjacent 0x20 space survives; 0x7F (DEL) is
+    // stripped while the adjacent 0x7E "~" survives — pinning both edges of the strip range.
+    await seatArena(store, [
+      arenaMember(`new~${ctrl(0x7f)}king`, {
+        handle: `he${ctrl(0x02)}ir`, // -> "heir"
+        doc: { model: `opus${ctrl(0x1f)}x` }, // -> "opusx"
+      }),
+      arenaMember(`ka${ctrl(0x00)}ta ${ctrl(0x1f)}master`, {
+        handle: `gr${ctrl(0x01)}and`, // -> "grand"
+        doc: { model: `claude${ctrl(0x07)}opus` }, // -> "claudeopus"
+      }),
+    ]);
+
+    const res = await handleKing(kingRequest(), { store, version: VERSION });
+    const body = (await res.json()) as KingBody;
+
+    // The King (arena #1) is sanitized...
     expect(body.current).toEqual({
       name: "new~king",
       model: "opusx",
       handle: "heir",
-      generation: 2,
     });
-    // ...and so is the older lineage entry (every entry, not just current).
-    expect(body.recent[1]).toEqual({
+    // ...and so is the defender (every entry, not just current).
+    expect(body.recent[0]).toEqual({
       name: "kata master",
       model: "claudeopus",
       handle: "grand",
-      generation: 1,
     });
   });
 
@@ -276,16 +263,14 @@ describe("GET /king — the version-scoped reigning-King read", () => {
     const store = inMemoryThroneStore();
 
     // Spaces (0x20), `<`, `>`, `(` are all printable (≥ 0x20) — sanitization must not touch
-    // them, so the Slice-2 auto-escaping behavior (inert markup) is preserved unchanged. The
-    // embedded spaces also pin the top edge of the strip range (0x20 must survive).
-    await enthrone(
-      store,
-      champion({
-        name: "Grand Master <script>alert(1)</script>",
-        model: "claude-opus-4-8",
+    // them, so the auto-escaping behavior (inert markup) is preserved. The embedded spaces
+    // also pin the top edge of the strip range (0x20 must survive).
+    await seatArena(store, [
+      arenaMember("Grand Master <script>alert(1)</script>", {
+        handle: "kata-master",
+        doc: { model: "claude-opus-4-8" },
       }),
-      { generation: 1, handle: "kata-master" },
-    );
+    ]);
 
     const res = await handleKing(kingRequest(), { store, version: VERSION });
     const body = (await res.json()) as KingBody;
@@ -294,34 +279,10 @@ describe("GET /king — the version-scoped reigning-King read", () => {
       name: "Grand Master <script>alert(1)</script>",
       model: "claude-opus-4-8",
       handle: "kata-master",
-      generation: 1,
     });
   });
 
-  it("returns 503 when the recent lineage read fails even if the pointer read succeeds", async () => {
-    // The pointer read succeeds but the lineage read throws — a partial outage must still be
-    // a 503, never a 200 with a truncated/empty succession.
-    const readOkRecentFails: ThroneStore = {
-      read: () => Promise.resolve({ champion: champion(), generation: 1 }),
-      recent: () => Promise.reject(new Error("lineage unreachable")),
-      compareAndSwap: () => Promise.reject(new Error("unused in /king")),
-      readArena: () => Promise.reject(new Error("unused in /king")),
-      commitArena: () => Promise.reject(new Error("unused in /king")),
-    };
-
-    const res = await handleKing(kingRequest(), {
-      store: readOkRecentFails,
-      version: VERSION,
-    });
-
-    expect(res.status).toBe(503);
-
-    const body = (await res.json()) as { type: string };
-
-    expect(body.type).toBe("/problems/throne-unavailable");
-  });
-
-  it("returns 503 problem+json when the throne store is unreachable", async () => {
+  it("returns 503 problem+json when the arena store is unreachable", async () => {
     const res = await handleKing(kingRequest(), {
       store: failingStore(),
       version: VERSION,
@@ -346,7 +307,7 @@ describe("GET /king — the version-scoped reigning-King read", () => {
   it("rejects a non-GET request with 405 and an Allow: GET header", async () => {
     const store = inMemoryThroneStore();
 
-    await enthrone(store, champion());
+    await seatArena(store, [arenaMember("king")]);
 
     const res = await handleKing(kingRequest("POST"), {
       store,
@@ -368,7 +329,7 @@ describe("GET /king — the version-scoped reigning-King read", () => {
   it("caches a 200 read briefly but never caches a 503", async () => {
     const store = inMemoryThroneStore();
 
-    await enthrone(store, champion());
+    await seatArena(store, [arenaMember("king")]);
 
     const ok = await handleKing(kingRequest(), { store, version: VERSION });
 
