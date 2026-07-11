@@ -6,8 +6,8 @@ import { describe, expect, it } from "vitest";
 import { handleFight, type FightDeps } from "./handle-fight.js";
 import {
   inMemoryThroneStore,
+  type ArenaRecord,
   type InMemoryThroneStore,
-  type ThroneRecord,
 } from "./throne-store.js";
 import { loadBotDoc } from "../cli/load.js";
 import { CANONICAL_RULES } from "../engine/rules.js";
@@ -75,28 +75,33 @@ const arena = (version: string, store: FightDeps["store"]): FightDeps => ({
   freshSeeds: () => TITLE_SEEDS,
 });
 
-// Pre-seat a champion directly in the fake store (bypassing the clearing gate — this
-// King already reigns at generation 1). A challenger POSTed to `handleFight` must still
+// Pre-seat a champion in the fake store's arena (bypassing the clearing gate — this King
+// already reigns as arena #1 at generation 1). `commitArena` also appends it to the crowning
+// lineage, so `read()`/`recent()` reflect it. A challenger POSTed to `handleFight` must still
 // clear the injected idle-dummy gauntlet to earn the title shot against it.
 const enthrone = (
   store: FightDeps["store"],
   version: string,
   champion: BotDoc,
 ): Promise<unknown> =>
-  store.compareAndSwap(version, null, { champion, generation: 1 });
+  store.commitArena(version, null, {
+    members: [{ champion, handle: null, seniority: 1 }],
+    generation: 1,
+    nextSeniority: 2,
+  });
 
-// A store modelling a CAS race: `read` returns the throne as this request first SAW it
-// (`seenAtRead`), while `compareAndSwap` runs against `inner` — which a concurrent crown
-// has already moved on. So a crown attempt using the stale-read generation is rejected as
-// `moved`, exactly as a real race between two callers would resolve.
-const staleReadStore = (
+// A store modelling an arena CAS race: `readArena` returns the arena as this request first SAW
+// it (`seenAtRead`), while `commitArena` runs against `inner` — which a concurrent crown has
+// already moved on. So a commit using the stale-read generation is rejected as `moved`, exactly
+// as a real race between two callers would resolve.
+const staleArenaStore = (
   inner: InMemoryThroneStore,
-  seenAtRead: ThroneRecord | undefined,
+  seenAtRead: ArenaRecord | undefined,
 ): FightDeps["store"] => ({
-  read: () => Promise.resolve(seenAtRead),
+  read: inner.read,
   recent: inner.recent,
   compareAndSwap: inner.compareAndSwap,
-  readArena: inner.readArena,
+  readArena: () => Promise.resolve(seenAtRead),
   commitArena: inner.commitArena,
 });
 
@@ -190,10 +195,7 @@ describe("handleFight — S4 slice 1: empty-throne bootstrap crowning", () => {
     const store = inMemoryThroneStore();
     const other = loadBot("berserker");
 
-    await store.compareAndSwap("vOTHER", null, {
-      champion: other,
-      generation: 1,
-    });
+    await enthrone(store, "vOTHER", other);
 
     const clearer = loadBot("aggressor");
 
@@ -244,6 +246,16 @@ describe("handleFight — S4 slice 2: occupied-throne title fight", () => {
       "aggressor",
       "berserker",
     ]);
+
+    // the arena advanced too: the challenger takes slot #1 stamped with the King's
+    // nextSeniority (2), the record moved to generation 2, and the per-version seniority
+    // counter incremented to 3 (so the next entrant is junior to this one).
+    const arenaAfter = await store.readArena("vTEST");
+
+    expect(arenaAfter?.members[0].champion).toEqual(challenger);
+    expect(arenaAfter?.members[0].seniority).toBe(2);
+    expect(arenaAfter?.generation).toBe(2);
+    expect(arenaAfter?.nextSeniority).toBe(3);
   });
 
   it("retains the King when the clearer scores <= 0.5 (a strict loss)", async () => {
@@ -340,17 +352,23 @@ describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-mo
     const king = loadBot("aggressor");
     const usurper = loadBot("berserker"); // the concurrent challenger who crowns first
 
-    await inner.compareAndSwap("vTEST", null, {
-      champion: king,
+    await inner.commitArena("vTEST", null, {
+      members: [{ champion: king, handle: null, seniority: 1 }],
       generation: 1,
+      nextSeniority: 2,
     });
-    await inner.compareAndSwap("vTEST", 1, {
-      champion: usurper,
+    await inner.commitArena("vTEST", 1, {
+      members: [{ champion: usurper, handle: null, seniority: 2 }],
       generation: 2,
-    }); // a concurrent crown lands, moving the throne to generation 2
+      nextSeniority: 3,
+    }); // a concurrent crown lands, moving the arena to generation 2
 
-    // our request read the throne at generation 1, before that concurrent crown landed
-    const store = staleReadStore(inner, { champion: king, generation: 1 });
+    // our request read the arena at generation 1, before that concurrent crown landed
+    const store = staleArenaStore(inner, {
+      members: [{ champion: king, handle: null, seniority: 1 }],
+      generation: 1,
+      nextSeniority: 2,
+    });
 
     const res = await handleFight(
       fightRequest(JSON.stringify(loadBot("pacer"))), // pacer beats aggressor 1.00 → wins
@@ -380,14 +398,15 @@ describe("handleFight — S4 slice 3: concurrent crowns serialize (409 throne-mo
     const inner = inMemoryThroneStore();
     const usurper = loadBot("berserker");
 
-    // someone claimed the empty throne first, moving it to generation 1
-    await inner.compareAndSwap("vTEST", null, {
-      champion: usurper,
+    // someone claimed the empty arena first, moving it to generation 1
+    await inner.commitArena("vTEST", null, {
+      members: [{ champion: usurper, handle: null, seniority: 1 }],
       generation: 1,
+      nextSeniority: 2,
     });
 
-    // our request read the throne as EMPTY, before that claim landed
-    const store = staleReadStore(inner, undefined);
+    // our request read the arena as EMPTY, before that claim landed
+    const store = staleArenaStore(inner, undefined);
 
     const res = await handleFight(
       fightRequest(JSON.stringify(loadBot("aggressor"))), // clears → attempts a bootstrap crown
