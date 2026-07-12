@@ -64,6 +64,7 @@ export type UsageRow = {
 export type VarietyReport = {
   rows: UsageRow[]; // all 13 techniques, sorted share-desc then canonical order
   totalCommitments: number; // Σ counts — the histogram denominator
+  totalFights: number; // number of fights reduced — the report header's fight denominator
 };
 
 // The technique a frame's action commits to, or null when the action is not a
@@ -108,6 +109,7 @@ export const reduceUsage = (fights: readonly FightResult[]): VarietyReport => {
   return {
     rows: [...rows].sort((a, b) => b.share - a.share),
     totalCommitments,
+    totalFights: fights.length,
   };
 };
 

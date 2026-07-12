@@ -106,6 +106,16 @@ describe("reduceUsage — pooled honoured-commitment histogram", () => {
     expect(report.totalCommitments).toBe(5);
   });
 
+  it("reports totalFights = the number of fights reduced (the histogram's fight denominator)", () => {
+    const report = reduceUsage([
+      fightOf([ev(frame(attack("gyaku-zuki")), frame(IDLE))]),
+      fightOf([ev(frame(SWEEP), frame(IDLE))]),
+      fightOf([ev(frame(IDLE), frame(IDLE))]), // a fight with no commitments still counts
+    ]);
+
+    expect(report.totalFights).toBe(3);
+  });
+
   it("counts a technique committed only by fighter B (not just fighter A)", () => {
     const report = reduceUsage([
       fightOf([ev(frame(IDLE), frame(attack("mae-geri")))]),
@@ -356,6 +366,13 @@ describe("runVariety — round-robin over the population", () => {
     expect(report.totalCommitments).toBe(
       rowFor(report, "gyaku-zuki").count + rowFor(report, "mae-geri").count,
     );
+  });
+
+  it("counts every round-robin fight in totalFights (ordered distinct pairs × seeds)", () => {
+    // 2 bots ⇒ 2 ordered pairs (A-vs-B, B-vs-A); × 2 seeds = 4 fights.
+    const report = runVariety(varietyConfig());
+
+    expect(report.totalFights).toBe(4);
   });
 
   it("is deterministic — the same config reduces to an identical report", () => {
