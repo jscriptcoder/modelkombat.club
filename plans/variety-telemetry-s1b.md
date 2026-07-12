@@ -43,10 +43,10 @@ totalFights}`), `src/cli/run-telemetry.ts` (pure `renderHeader` + `renderReport`
 
 Derived from the §S1b examples + resolved decisions. Slice mapping in brackets.
 
-- [ ] **S1b-1** effective-move-count headline = `exp(Shannon entropy)` (natural log) of the
+- [x] **S1b-1** effective-move-count headline = `exp(Shannon entropy)` (natural log) of the
       pooled share distribution: uniform use of `k` techniques ⇒ exactly `k.0`; a single
       technique ⇒ `1.0`; `totalCommitments == 0` ⇒ `n/a` (no ÷0 / log-0 NaN) [Slice 1]
-- [ ] **S1b-2** `# live` (techniques with ≥1 honoured commitment) / `# dead` (0) counts +
+- [x] **S1b-2** `# live` (techniques with ≥1 honoured commitment) / `# dead` (0) counts +
       the dead-move list (names, canonical order); all-13-used ⇒ `# dead` 0 + empty list [Slice 1]
 - [ ] **S1b-3** each technique shows **adoption** = `k/N` bots that honour it ≥once (a bot
       counts once no matter how many times/fights); `0/N` for a move no bot uses, `N/N` for

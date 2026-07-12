@@ -116,6 +116,44 @@ describe("reduceUsage — pooled honoured-commitment histogram", () => {
     expect(report.totalFights).toBe(3);
   });
 
+  it("headlines effective-move-count = exp(Shannon) of the pooled distribution — uniform ⇒ the live count", () => {
+    // 3 distinct techniques, one honoured commitment each ⇒ uniform over 3 ⇒ exp(ln 3) = 3.
+    const report = reduceUsage([
+      fightOf([
+        ev(frame(attack("gyaku-zuki")), frame(attack("mae-geri"))),
+        ev(frame(SWEEP), frame(IDLE)),
+      ]),
+    ]);
+
+    expect(report.effectiveMoves).toBeCloseTo(3, 6);
+  });
+
+  it("collapses effective-move-count to 1.0 when a single technique carries everything", () => {
+    const report = reduceUsage([
+      fightOf([ev(frame(attack("gyaku-zuki")), frame(attack("gyaku-zuki")))]),
+    ]);
+
+    expect(report.effectiveMoves).toBe(1);
+  });
+
+  it("weights effective-move-count by skew, not just the live count", () => {
+    // gyaku 3, throw 1 ⇒ shares .75/.25 ⇒ exp(-(.75·ln.75 + .25·ln.25)) ≈ 1.7547.
+    const report = reduceUsage([
+      fightOf([
+        ev(frame(attack("gyaku-zuki")), frame(attack("gyaku-zuki"))),
+        ev(frame(attack("gyaku-zuki")), frame(THROW)),
+      ]),
+    ]);
+
+    expect(report.effectiveMoves).toBeCloseTo(1.7547, 3);
+  });
+
+  it("reports effective-move-count as null (never NaN) when there are no commitments", () => {
+    const report = reduceUsage([fightOf([ev(frame(IDLE), frame(IDLE))])]);
+
+    expect(report.effectiveMoves).toBe(null);
+  });
+
   it("counts a technique committed only by fighter B (not just fighter A)", () => {
     const report = reduceUsage([
       fightOf([ev(frame(IDLE), frame(attack("mae-geri")))]),

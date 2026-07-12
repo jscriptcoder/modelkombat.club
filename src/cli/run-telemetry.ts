@@ -86,11 +86,11 @@ const render = (rows: string[][]): string => {
     .join("\n");
 };
 
-// Render a variety report to the human histogram: an aligned `technique / count /
-// share` table (dominant rows flagged `⚠`), plus a threshold legend when any row is
-// flagged. Pure data → string — exact output is a stdout contract (cli-design).
-export const renderReport = (report: VarietyReport): string => {
-  const table = render([
+// Render the aligned `technique / count / share` histogram table (dominant rows flagged
+// `⚠`). The legend + diversity summary render separately so they compose as their own lines
+// below the table. Pure data → string — exact output is a stdout contract (cli-design).
+export const renderReport = (report: VarietyReport): string =>
+  render([
     ["technique", "count", "share", ""],
     ...report.rows.map((r) => [
       r.technique,
@@ -100,11 +100,27 @@ export const renderReport = (report: VarietyReport): string => {
     ]),
   ]);
 
-  const legend = report.rows.some((r) => r.dominant)
-    ? `\n\n⚠ = over ${(USAGE_FLAG_THRESHOLD * 100).toFixed(0)}% of all honoured commitments`
+// The one-line footnote naming the `⚠` threshold — present only when some row is flagged
+// (empty string otherwise, so the caller omits the line).
+export const renderLegend = (report: VarietyReport): string =>
+  report.rows.some((r) => r.dominant)
+    ? `⚠ = over ${(USAGE_FLAG_THRESHOLD * 100).toFixed(0)}% of all honoured commitments`
     : "";
 
-  return `${table}${legend}`;
+// The diversity headline: the effective-move-count (`exp(Shannon)` — "N of 13 techniques
+// effectively in rotation", `n/a` when nothing was committed) plus the live / dead split
+// and, when any are dead, the dead-move list in canonical frame-table order.
+export const renderDiversity = (report: VarietyReport): string => {
+  const dead = report.rows.filter((r) => r.count === 0);
+  const live = report.rows.length - dead.length;
+
+  const emc =
+    report.effectiveMoves === null ? "n/a" : report.effectiveMoves.toFixed(1);
+
+  const deadList =
+    dead.length === 0 ? "" : `: ${dead.map((r) => r.technique).join(", ")}`;
+
+  return `effective moves ${emc} of ${report.rows.length}   ·   live ${live} / dead ${dead.length}${deadList}`;
 };
 
 export const runTelemetryCli = (deps: TelemetryDeps): CliOutput => {
@@ -136,8 +152,14 @@ export const runTelemetryCli = (deps: TelemetryDeps): CliOutput => {
     totalCommitments: report.totalCommitments,
   });
 
+  const legend = renderLegend(report);
+
+  const body =
+    `${renderReport(report)}\n\n${renderDiversity(report)}` +
+    (legend ? `\n\n${legend}` : "");
+
   return {
-    stdout: `${header}\n\n${renderReport(report)}\n`,
+    stdout: `${header}\n\n${body}\n`,
     stderr: "",
     code: 0,
   };

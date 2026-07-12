@@ -65,6 +65,7 @@ export type VarietyReport = {
   rows: UsageRow[]; // all 13 techniques, sorted share-desc then canonical order
   totalCommitments: number; // Σ counts — the histogram denominator
   totalFights: number; // number of fights reduced — the report header's fight denominator
+  effectiveMoves: number | null; // exp(Shannon entropy) of the pooled shares (Hill q=1) — "N of 13 in rotation"; null when totalCommitments is 0
 };
 
 // The technique a frame's action commits to, or null when the action is not a
@@ -103,6 +104,17 @@ export const reduceUsage = (fights: readonly FightResult[]): VarietyReport => {
     return { technique, count, share, dominant: share > USAGE_FLAG_THRESHOLD };
   });
 
+  // Effective-move-count = exp(Shannon entropy) of the pooled distribution (Hill q=1):
+  // "how many of the 13 techniques are effectively in rotation" (even 13-way ⇒ 13, total
+  // collapse ⇒ 1). The `share > 0` guard skips the 0·ln0 term (= 0); with no commitments
+  // there is no distribution, so the count is null (not 0, not NaN).
+  const entropy = rows.reduce(
+    (h, r) => (r.share > 0 ? h - r.share * Math.log(r.share) : h),
+    0,
+  );
+
+  const effectiveMoves = totalCommitments === 0 ? null : Math.exp(entropy);
+
   // `rows` is already in canonical (frame-table) order, so a STABLE sort by share
   // descending keeps equal-share techniques in canonical order — the tie-break comes
   // for free, with no index arithmetic to get wrong.
@@ -110,6 +122,7 @@ export const reduceUsage = (fights: readonly FightResult[]): VarietyReport => {
     rows: [...rows].sort((a, b) => b.share - a.share),
     totalCommitments,
     totalFights: fights.length,
+    effectiveMoves,
   };
 };
 
