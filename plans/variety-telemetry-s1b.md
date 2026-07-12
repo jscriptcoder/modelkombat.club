@@ -48,9 +48,11 @@ Derived from the §S1b examples + resolved decisions. Slice mapping in brackets.
       technique ⇒ `1.0`; `totalCommitments == 0` ⇒ `n/a` (no ÷0 / log-0 NaN) [Slice 1]
 - [x] **S1b-2** `# live` (techniques with ≥1 honoured commitment) / `# dead` (0) counts +
       the dead-move list (names, canonical order); all-13-used ⇒ `# dead` 0 + empty list [Slice 1]
-- [ ] **S1b-3** each technique shows **adoption** = `k/N` bots that honour it ≥once (a bot
+- [x] **S1b-3** each technique shows **adoption** = `k/N` bots that honour it ≥once (a bot
       counts once no matter how many times/fights); `0/N` for a move no bot uses, `N/N` for
-      one every bot uses; degraded-only picks don't count (honoured-only, per S1a-9) [Slice 2]
+      one every bot uses; degraded-only picks don't count (honoured-only, per S1a-9); plus a
+      **mean per-bot share** column (tempo-neutral — mean over participating bots of each
+      bot's own share of the move; `n/a` when no bot committed anything) [Slice 2]
 - [ ] **S1b-4** `--json` emits the raw `VarietyReport` (rows + counts + adoption + EMC +
       live/dead) to **stdout** instead of the table; valid parseable JSON (no table / ANSI);
       stderr unaffected; exit 0; byte-identical across two runs [Slice 3]
@@ -128,14 +130,15 @@ one-bot signature?"
 (fighter A/B → `population[i]`/`[j]`), which `reduceUsage(FightResult[])` alone can't (no
 bot identity in `FightResult`). So `runVariety` accumulates a per-bot honoured-technique
 **set** (bot adopts `t` if ≥1 honoured commitment across its fights) → `adoption[t]` = |bots
-whose set ∋ t| / N → each `UsageRow` gains `adoption` → the table gains a column. _Skipped:_
-mean per-bot share (decision #3b — confirm at gate whether to include or defer). Honoured-only,
-consistent with S1a-9.
+whose set ∋ t| / N → each `UsageRow` gains `adoptingBots` + `meanShare` → the table gains an
+`adoption` (k/N) and a `mean` column. **Decision #3b RESOLVED at the gate: the mean-per-bot-
+share companion was INCLUDED, not deferred** (tempo-neutral — mean over participating bots of
+each bot's own share; `n/a`/`null` when no distribution). Honoured-only, consistent with S1a-9.
 
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 
-**Acceptance criteria** (present + confirm before code): S1b-3 (+ decide S1b-3's mean-share
-companion in/out).
+**Acceptance criteria** (present + confirm before code): S1b-3, plus the mean-per-bot-share
+companion (decision #3b — **INCLUDED** at the gate).
 
 **RED** — Key mutants:
 
@@ -253,8 +256,8 @@ per `[[archive-plans-not-delete]]`; the `-harness`/`-stories` docs then cover S2
   spacing (S3), scoring attribution (S4), committed board / web surface (S5). Grill each at
   its own planning time.
 - **Open details to confirm at the relevant slice's CONFIRM gate** (not blocking the plan):
-  mean-per-bot-share inclusion (Slice 2), `--json` envelope vs raw report (Slice 3), in-CLI
-  glob vs shell-expansion (Slice 4).
+  `--json` envelope vs raw report (Slice 3), in-CLI glob vs shell-expansion (Slice 4).
+  (mean-per-bot-share inclusion for Slice 2 was RESOLVED at its gate: **included**.)
 
 ---
 

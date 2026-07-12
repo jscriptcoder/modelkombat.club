@@ -54,18 +54,34 @@ const TECHNIQUES: readonly Technique[] = [
 // legend names the same threshold the reducer flags against — no drift.
 export const USAGE_FLAG_THRESHOLD = 0.35;
 
-export type UsageRow = {
+// A pooled (bot-identity-free) row — what reduceUsage produces from a set of fights.
+export type PooledRow = {
   technique: Technique;
   count: number; // honoured commitments of this technique, pooled over both fighters
   share: number; // count / totalCommitments (raw fraction in [0, 1]); 0 when total is 0
   dominant: boolean; // share strictly > USAGE_FLAG_THRESHOLD
 };
 
-export type VarietyReport = {
-  rows: UsageRow[]; // all 13 techniques, sorted share-desc then canonical order
+// An enriched row — a pooled row plus the per-bot attribution the driver can add once it
+// knows which bot authored each commitment (which a bare FightResult does not carry).
+export type UsageRow = PooledRow & {
+  adoptingBots: number; // distinct population bots that honoured this technique ≥once (the k in the k/N adoption)
+  meanShare: number | null; // mean, over participating bots, of each bot's own share of this technique; null when no bot committed anything
+};
+
+// The pooled histogram over a set of fights — no bot identity, so no adoption / mean share.
+export type PooledReport = {
+  rows: PooledRow[]; // all 13 techniques, sorted share-desc then canonical order
   totalCommitments: number; // Σ counts — the histogram denominator
   totalFights: number; // number of fights reduced — the report header's fight denominator
   effectiveMoves: number | null; // exp(Shannon entropy) of the pooled shares (Hill q=1) — "N of 13 in rotation"; null when totalCommitments is 0
+};
+
+// The full variety report — the pooled histogram enriched with per-bot attribution (adoption
+// + mean share on every row) and the population size (the N each row's adoption is out of).
+export type VarietyReport = Omit<PooledReport, "rows"> & {
+  rows: UsageRow[];
+  botCount: number; // population size — the denominator of every row's adoption k/N
 };
 
 // The technique a frame's action commits to, or null when the action is not a
@@ -83,7 +99,7 @@ const techniqueOf = (action: Action): Technique | null => {
 const honouredTechnique = (frame: FighterFrame): Technique | null =>
   frame.degrade === null ? techniqueOf(frame.action) : null;
 
-export const reduceUsage = (fights: readonly FightResult[]): VarietyReport => {
+export const reduceUsage = (fights: readonly FightResult[]): PooledReport => {
   // Every honoured commitment across every fight, both fighters, flattened.
   const honoured = fights.flatMap((fight) =>
     fight.events.flatMap((event) =>
@@ -138,17 +154,89 @@ export type VarietyConfig = {
   match?: FightConfig["match"];
 };
 
+// A single round-robin matchup: the two population indices that fought (`a` on side A,
+// `b` on side B) and the resulting fight. Carries the bot identity a bare `FightResult`
+// lacks, so per-bot attribution can credit each honoured commitment to the bot that made it.
+export type Matchup = {
+  a: number;
+  b: number;
+  fight: FightResult;
+};
+
+// Per-technique per-bot attribution: how many distinct bots adopted the technique, and the
+// mean — over participating bots — of each bot's own share of it.
+export type Attribution = {
+  adoptingBots: number;
+  meanShare: number | null;
+};
+
+// Reduce the bot-attributed matchups to a per-technique attribution lookup. A bot ADOPTS a
+// technique if it honoured it ≥once across all its fights — counted once, tempo-blind (a
+// spammer and a one-time user both count as one adopter). The MEAN SHARE weights every
+// participating bot equally: the mean of each bot's own fraction of its honoured commitments
+// spent on the technique. A bot that never commits has no arsenal distribution and is
+// excluded from the mean (null when nobody committed anything). Pure + honoured-only.
+export const reducePerBot = (
+  matchups: readonly Matchup[],
+  botCount: number,
+): ((technique: Technique) => Attribution) => {
+  // Every honoured commitment as (bot index, technique) — both fighters, every fight;
+  // frames that honoured nothing (technique null) drop out.
+  const commitments = matchups.flatMap(({ a, b, fight }) =>
+    fight.events.flatMap((event) =>
+      [
+        { bot: a, technique: honouredTechnique(event.a) },
+        { bot: b, technique: honouredTechnique(event.b) },
+      ].filter(
+        (c): c is { bot: number; technique: Technique } => c.technique !== null,
+      ),
+    ),
+  );
+
+  // Each bot's own honoured commitments (its arsenal distribution), indexed by position.
+  const perBot = Array.from({ length: botCount }, (_, bot) => {
+    const mine = commitments.filter((c) => c.bot === bot);
+
+    return {
+      total: mine.length,
+      countOf: (technique: Technique) =>
+        mine.filter((c) => c.technique === technique).length,
+    };
+  });
+
+  return (technique) => {
+    const adoptingBots = perBot.filter(
+      (pb) => pb.countOf(technique) > 0,
+    ).length;
+
+    const participating = perBot.filter((pb) => pb.total > 0);
+
+    const meanShare =
+      participating.length === 0
+        ? null
+        : participating.reduce(
+            (sum, pb) => sum + pb.countOf(technique) / pb.total,
+            0,
+          ) / participating.length;
+
+    return { adoptingBots, meanShare };
+  };
+};
+
 // Run the both-sides round-robin over the population — every ordered distinct-index
-// pair (`i ≠ j`, so each matchup plays with each bot on each side; a bot is never
-// fought against itself) at every seed — and reduce the resulting fights to the
-// pooled usage histogram. Pure over `runFight`: no I/O, deterministic per config.
+// pair (`a ≠ b`, so each matchup plays with each bot on each side; a bot is never
+// fought against itself) at every seed — then reduce the fights to the pooled usage
+// histogram AND attribute per-bot adoption / mean share. Pure over `runFight`: no I/O,
+// deterministic per config.
 export const runVariety = (cfg: VarietyConfig): VarietyReport => {
-  const fights = cfg.population.flatMap((botA, i) =>
-    cfg.population.flatMap((botB, j) =>
-      i === j
+  const matchups = cfg.population.flatMap((botA, a) =>
+    cfg.population.flatMap((botB, b) =>
+      a === b
         ? []
-        : cfg.seeds.map((seed) =>
-            runFight({
+        : cfg.seeds.map((seed) => ({
+            a,
+            b,
+            fight: runFight({
               rules: cfg.rules,
               botA,
               botB,
@@ -156,9 +244,16 @@ export const runVariety = (cfg: VarietyConfig): VarietyReport => {
               seed,
               match: cfg.match,
             }),
-          ),
+          })),
     ),
   );
 
-  return reduceUsage(fights);
+  const pooled = reduceUsage(matchups.map((m) => m.fight));
+  const attributionOf = reducePerBot(matchups, cfg.population.length);
+
+  return {
+    ...pooled,
+    botCount: cfg.population.length,
+    rows: pooled.rows.map((r) => ({ ...r, ...attributionOf(r.technique) })),
+  };
 };

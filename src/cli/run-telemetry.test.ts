@@ -12,6 +12,7 @@ import type { Rules } from "../engine/types.js";
 import type { BotDoc } from "../engine/dsl.js";
 import {
   runVariety,
+  type PooledReport,
   type Technique,
   type VarietyReport,
 } from "../engine/telemetry.js";
@@ -100,6 +101,14 @@ describe("runTelemetryCli", () => {
     expect(out.stdout).toContain("not discovered LLM behavior.\n\ntechnique");
   });
 
+  it("shows the per-bot adoption (k/N) and mean columns, one adopter per one-move bot", () => {
+    const out = runTelemetryCli(deps(BALANCED)); // 3 bots, each a distinct single move
+
+    expect(out.stdout).toMatch(/adoption\s+mean/); // both new columns, in order, in the header
+    expect(out.stdout).toContain("1/3"); // each live move is adopted by one of the 3 bots
+    expect(out.stdout).toContain("0/3"); // an unused technique is adopted by none
+  });
+
   it("flags a dominant technique with ⚠ and prints a legend naming the 35% threshold", () => {
     // both bots commit only gyaku-zuki ⇒ gyaku is 100% of commitments ⇒ dominant.
     const out = runTelemetryCli(
@@ -172,20 +181,51 @@ describe("runTelemetryCli", () => {
 // columns, the ⚠ flag, and the legend are pinned byte-for-byte (space runs are
 // spelled out with `" ".repeat(n)` so the alignment is reviewable). Presentation
 // logic is not reached by the node-only mutation runner via containment alone.
-const report = (rows: VarietyReport["rows"]): VarietyReport => ({
+const report = (rows: PooledReport["rows"]): PooledReport => ({
   rows,
   totalCommitments: rows.reduce((sum, r) => sum + r.count, 0),
-  totalFights: 0, // inert to renderReport (the table reads only rows); pinned for a valid report
-  effectiveMoves: null, // inert to renderReport / renderLegend; renderDiversity has its own factory
+  totalFights: 0, // inert to renderLegend / renderDiversity; pinned for a valid report
+  effectiveMoves: null, // inert to renderLegend; renderDiversity has its own factory
+});
+
+// A full (enriched) report for the renderReport table, which now shows the adoption (k/N)
+// and mean per-bot share columns — so its rows carry adoptingBots + meanShare and the
+// report carries botCount (the N in k/N).
+const usageReport = (
+  rows: VarietyReport["rows"],
+  botCount: number,
+): VarietyReport => ({
+  rows,
+  totalCommitments: rows.reduce((sum, r) => sum + r.count, 0),
+  totalFights: 0,
+  effectiveMoves: null,
+  botCount,
 });
 
 describe("renderReport — exact histogram layout (table only)", () => {
-  it("aligns the columns and flags a dominant row with ⚠ (the legend renders separately)", () => {
+  it("aligns technique / count / share / adoption / mean and flags a dominant row with ⚠", () => {
     const out = renderReport(
-      report([
-        { technique: "gyaku-zuki", count: 3, share: 0.6, dominant: true },
-        { technique: "sweep", count: 2, share: 0.4, dominant: false },
-      ]),
+      usageReport(
+        [
+          {
+            technique: "gyaku-zuki",
+            count: 3,
+            share: 0.6,
+            dominant: true,
+            adoptingBots: 2,
+            meanShare: 0.55,
+          },
+          {
+            technique: "sweep",
+            count: 2,
+            share: 0.4,
+            dominant: false,
+            adoptingBots: 1,
+            meanShare: 0.2,
+          },
+        ],
+        2,
+      ),
     );
 
     expect(out).toBe(
@@ -194,12 +234,20 @@ describe("renderReport — exact histogram layout (table only)", () => {
         "count" +
         " ".repeat(2) +
         "share" +
+        " ".repeat(2) +
+        "adoption" +
+        " ".repeat(3) +
+        "mean" +
         "\n" +
         "gyaku-zuki" +
         " ".repeat(6) +
         "3" +
         " ".repeat(2) +
         "60.0%" +
+        " ".repeat(7) +
+        "2/2" +
+        " ".repeat(2) +
+        "55.0%" +
         " ".repeat(2) +
         "⚠" +
         "\n" +
@@ -207,16 +255,29 @@ describe("renderReport — exact histogram layout (table only)", () => {
         " ".repeat(11) +
         "2" +
         " ".repeat(2) +
-        "40.0%",
+        "40.0%" +
+        " ".repeat(7) +
+        "1/2" +
+        " ".repeat(2) +
+        "20.0%",
     );
   });
 
-  it("shows shares to one decimal and omits the flag column when nothing is dominant", () => {
+  it("renders n/a in the mean column when a technique has no per-bot distribution", () => {
     const out = renderReport(
-      report([
-        { technique: "gyaku-zuki", count: 1, share: 1 / 3, dominant: false },
-        { technique: "mae-geri", count: 1, share: 1 / 3, dominant: false },
-      ]),
+      usageReport(
+        [
+          {
+            technique: "gyaku-zuki",
+            count: 0,
+            share: 0,
+            dominant: false,
+            adoptingBots: 0,
+            meanShare: null,
+          },
+        ],
+        3,
+      ),
     );
 
     expect(out).toBe(
@@ -225,18 +286,20 @@ describe("renderReport — exact histogram layout (table only)", () => {
         "count" +
         " ".repeat(2) +
         "share" +
+        " ".repeat(2) +
+        "adoption" +
+        " ".repeat(2) +
+        "mean" +
         "\n" +
         "gyaku-zuki" +
         " ".repeat(6) +
-        "1" +
-        " ".repeat(2) +
-        "33.3%" +
-        "\n" +
-        "mae-geri" +
-        " ".repeat(8) +
-        "1" +
-        " ".repeat(2) +
-        "33.3%",
+        "0" +
+        " ".repeat(3) +
+        "0.0%" +
+        " ".repeat(7) +
+        "0/3" +
+        " ".repeat(3) +
+        "n/a",
     );
   });
 });
@@ -287,7 +350,7 @@ const SEP = "   ·   "; // 3 spaces · 3 spaces — the diversity-line separator
 const diversityReport = (
   dead: readonly Technique[],
   effectiveMoves: number | null,
-): VarietyReport => {
+): PooledReport => {
   const rows = CANON.map((technique) => ({
     technique,
     count: dead.includes(technique) ? 0 : 1,

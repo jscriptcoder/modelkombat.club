@@ -12,6 +12,7 @@
 import {
   runVariety,
   USAGE_FLAG_THRESHOLD,
+  type PooledReport,
   type VarietyConfig,
   type VarietyReport,
 } from "../engine/telemetry.js";
@@ -86,31 +87,35 @@ const render = (rows: string[][]): string => {
     .join("\n");
 };
 
-// Render the aligned `technique / count / share` histogram table (dominant rows flagged
-// `⚠`). The legend + diversity summary render separately so they compose as their own lines
-// below the table. Pure data → string — exact output is a stdout contract (cli-design).
+// Render the aligned `technique / count / share / adoption / mean` histogram table
+// (dominant rows flagged `⚠`). `adoption` is k/N bots that honour the move ≥once (tempo-
+// blind reach); `mean` is the mean per-bot share (`n/a` when no bot has a distribution).
+// The legend + diversity summary render separately so they compose as their own lines below
+// the table. Pure data → string — exact output is a stdout contract (cli-design).
 export const renderReport = (report: VarietyReport): string =>
   render([
-    ["technique", "count", "share", ""],
+    ["technique", "count", "share", "adoption", "mean", ""],
     ...report.rows.map((r) => [
       r.technique,
       `${r.count}`,
       `${(r.share * 100).toFixed(1)}%`,
+      `${r.adoptingBots}/${report.botCount}`,
+      r.meanShare === null ? "n/a" : `${(r.meanShare * 100).toFixed(1)}%`,
       r.dominant ? "⚠" : "",
     ]),
   ]);
 
 // The one-line footnote naming the `⚠` threshold — present only when some row is flagged
-// (empty string otherwise, so the caller omits the line).
-export const renderLegend = (report: VarietyReport): string =>
+// (empty string otherwise, so the caller omits the line). Reads only pooled fields.
+export const renderLegend = (report: PooledReport): string =>
   report.rows.some((r) => r.dominant)
     ? `⚠ = over ${(USAGE_FLAG_THRESHOLD * 100).toFixed(0)}% of all honoured commitments`
     : "";
 
 // The diversity headline: the effective-move-count (`exp(Shannon)` — "N of 13 techniques
 // effectively in rotation", `n/a` when nothing was committed) plus the live / dead split
-// and, when any are dead, the dead-move list in canonical frame-table order.
-export const renderDiversity = (report: VarietyReport): string => {
+// and, when any are dead, the dead-move list in canonical frame-table order. Pooled-only.
+export const renderDiversity = (report: PooledReport): string => {
   const dead = report.rows.filter((r) => r.count === 0);
   const live = report.rows.length - dead.length;
 

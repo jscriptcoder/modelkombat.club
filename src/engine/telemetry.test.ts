@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
+  reducePerBot,
   reduceUsage,
   runVariety,
+  type Matchup,
+  type PooledReport,
   type Technique,
-  type UsageRow,
   type VarietyConfig,
-  type VarietyReport,
 } from "./telemetry.js";
 import type {
   DegradeReason,
@@ -79,7 +80,10 @@ const techniqueAction = (t: Technique): Action =>
 const commits = (t: Technique, n: number): FightEvent[] =>
   Array.from({ length: n }, () => ev(frame(techniqueAction(t)), frame(IDLE)));
 
-const rowFor = (report: VarietyReport, t: Technique): UsageRow => {
+const rowFor = <R extends { technique: Technique }>(
+  report: { rows: readonly R[] },
+  t: Technique,
+): R => {
   const found = report.rows.find((r) => r.technique === t);
 
   if (found === undefined) throw new Error(`no row for technique ${t}`);
@@ -87,7 +91,7 @@ const rowFor = (report: VarietyReport, t: Technique): UsageRow => {
   return found;
 };
 
-const shareSum = (report: VarietyReport): number =>
+const shareSum = (report: PooledReport): number =>
   report.rows.reduce((sum, r) => sum + r.share, 0);
 
 describe("reduceUsage — pooled honoured-commitment histogram", () => {
@@ -417,9 +421,137 @@ describe("runVariety — round-robin over the population", () => {
     expect(runVariety(varietyConfig())).toEqual(runVariety(varietyConfig()));
   });
 
+  it("attributes per-bot adoption (k/N) to each committing bot and sets botCount = population size", () => {
+    // GYAKU_BOT only ever lands gyaku-zuki, MAE_BOT only mae-geri ⇒ each move is
+    // adopted by exactly one of the two bots; every other technique by none.
+    const report = runVariety(varietyConfig());
+
+    expect(report.botCount).toBe(2);
+    expect(rowFor(report, "gyaku-zuki").adoptingBots).toBe(1);
+    expect(rowFor(report, "mae-geri").adoptingBots).toBe(1);
+    expect(rowFor(report, "throw").adoptingBots).toBe(0);
+  });
+
+  it("reports each technique's mean per-bot share, weighting every bot equally", () => {
+    // each bot spends 100% of its own honoured commitments on its one move ⇒ across the
+    // two bots the mean share of gyaku-zuki (and of mae-geri) is (1.0 + 0) / 2 = 0.5; an
+    // unused technique is 0 (not null — both bots participate).
+    const report = runVariety(varietyConfig());
+
+    expect(rowFor(report, "gyaku-zuki").meanShare).toBe(0.5);
+    expect(rowFor(report, "mae-geri").meanShare).toBe(0.5);
+    expect(rowFor(report, "throw").meanShare).toBe(0);
+  });
+
   it("plays no bot against itself — a single-bot population yields no fights", () => {
     const report = runVariety(varietyConfig({ population: [GYAKU_BOT] }));
 
     expect(report.totalCommitments).toBe(0);
+    // one bot, no fights ⇒ nobody adopts anything and there is no arsenal distribution.
+    expect(report.botCount).toBe(1);
+    expect(rowFor(report, "gyaku-zuki").adoptingBots).toBe(0);
+    expect(rowFor(report, "gyaku-zuki").meanShare).toBe(null);
+  });
+});
+
+// ─── reducePerBot: the bot-identity attribution the pooled reduceUsage can't do.
+// Fed synthetic matchups ({a, b, fight}) so a bot's side (A vs B) and its per-fight /
+// per-tick repetition are precisely controllable — the only way to isolate the
+// side-attribution and count-once behaviours a constant-default bot can't express. ──
+const matchup = (a: number, b: number, events: FightEvent[]): Matchup => ({
+  a,
+  b,
+  fight: fightOf(events),
+});
+
+describe("reducePerBot — per-bot adoption + mean share", () => {
+  it("counts a bot once for adoption no matter how many times it honours the move", () => {
+    // bot 0 lands gyaku-zuki 5× (all in one fight); bot 1 idles.
+    const attribution = reducePerBot(
+      [matchup(0, 1, commits("gyaku-zuki", 5))],
+      2,
+    );
+
+    expect(attribution("gyaku-zuki").adoptingBots).toBe(1);
+  });
+
+  it("credits both fighters — a technique only side B commits still counts its bot", () => {
+    const attribution = reducePerBot(
+      [
+        matchup(0, 1, [
+          ev(frame(attack("gyaku-zuki")), frame(attack("mae-geri"))),
+        ]),
+      ],
+      2,
+    );
+
+    expect(attribution("gyaku-zuki").adoptingBots).toBe(1); // side A ⇒ bot 0
+    expect(attribution("mae-geri").adoptingBots).toBe(1); // side B ⇒ bot 1
+  });
+
+  it("does not credit a degraded-only pick — adoption is honoured-only", () => {
+    const attribution = reducePerBot(
+      [matchup(0, 1, [ev(frame(attack("gyaku-zuki"), "inert"), frame(IDLE))])],
+      2,
+    );
+
+    expect(attribution("gyaku-zuki").adoptingBots).toBe(0);
+  });
+
+  it("reports k of N adopters — 0 for an unused move, N for a universal one", () => {
+    // bots 0 & 1 land gyaku; all three land sweep; nobody throws. (3 bots)
+    const attribution = reducePerBot(
+      [
+        matchup(0, 1, [
+          ev(frame(SWEEP), frame(SWEEP)),
+          ev(frame(attack("gyaku-zuki")), frame(attack("gyaku-zuki"))),
+        ]),
+        matchup(2, 0, [ev(frame(SWEEP), frame(IDLE))]),
+      ],
+      3,
+    );
+
+    expect(attribution("sweep").adoptingBots).toBe(3); // universal ⇒ N/N
+    expect(attribution("gyaku-zuki").adoptingBots).toBe(2); // k of N
+    expect(attribution("throw").adoptingBots).toBe(0); // none ⇒ 0/N
+  });
+
+  it("weights mean per-bot share by bot, not by tempo (a spammer doesn't dominate)", () => {
+    // bot 0 spams gyaku 10× (one fight); bot 1 splits gyaku 1 / mae 1. Pooled gyaku
+    // share ≈ 11/12 ≈ 0.917, but the per-bot mean is (10/10 + 1/2) / 2 = 0.75.
+    const attribution = reducePerBot(
+      [
+        matchup(0, 1, commits("gyaku-zuki", 10)),
+        matchup(1, 0, [
+          ev(frame(attack("gyaku-zuki")), frame(IDLE)),
+          ev(frame(attack("mae-geri")), frame(IDLE)),
+        ]),
+      ],
+      2,
+    );
+
+    expect(attribution("gyaku-zuki").meanShare).toBe(0.75);
+    expect(attribution("mae-geri").meanShare).toBe(0.25);
+    expect(attribution("throw").meanShare).toBe(0); // unused but participants exist ⇒ 0, not null
+  });
+
+  it("divides the mean by the participating bots, excluding one that never commits", () => {
+    // bot 0 lands gyaku once; bot 1 never commits (total 0) ⇒ mean over participants
+    // (just bot 0) = (1/1) / 1 = 1.0, NOT (1.0 + 0) / 2 = 0.5.
+    const attribution = reducePerBot(
+      [matchup(0, 1, [ev(frame(attack("gyaku-zuki")), frame(IDLE))])],
+      2,
+    );
+
+    expect(attribution("gyaku-zuki").meanShare).toBe(1);
+  });
+
+  it("reports mean per-bot share as null (never NaN) when no bot commits anything", () => {
+    const attribution = reducePerBot(
+      [matchup(0, 1, [ev(frame(IDLE), frame(IDLE))])],
+      2,
+    );
+
+    expect(attribution("gyaku-zuki").meanShare).toBe(null);
   });
 });
