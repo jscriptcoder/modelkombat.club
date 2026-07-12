@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  renderDiversity,
   renderHeader,
+  renderLegend,
   renderReport,
   runTelemetryCli,
   type HeaderInfo,
@@ -8,7 +10,11 @@ import {
 } from "./run-telemetry.js";
 import type { Rules } from "../engine/types.js";
 import type { BotDoc } from "../engine/dsl.js";
-import type { VarietyReport } from "../engine/telemetry.js";
+import {
+  runVariety,
+  type Technique,
+  type VarietyReport,
+} from "../engine/telemetry.js";
 
 // ─── fixtures: MOCK rules WITHOUT perception ⇒ deterministic, seed-independent
 // fights. Three attack moves with IDENTICAL timing so three distinct one-move bots
@@ -137,6 +143,29 @@ describe("runTelemetryCli", () => {
     expect(out.stdout).toBe("");
     expect(out.stderr).toContain("cannot read bot file");
   });
+
+  it("prints the diversity headline below the histogram, after a blank line", () => {
+    const out = runTelemetryCli(deps(BALANCED)); // 3 techniques used ⇒ effective ≈ 3.0
+
+    expect(out.stdout).toMatch(/\n\neffective moves \d\.\d of 13 {3}·/);
+    expect(out.stdout.indexOf("effective moves")).toBeGreaterThan(
+      out.stdout.indexOf("technique"), // below the table, not up in the header
+    );
+  });
+
+  it("ends with the diversity line — no legend appended — when nothing is dominant", () => {
+    const population = BALANCED; // three ~even moves ⇒ none dominant ⇒ no legend
+    const out = runTelemetryCli(deps(population));
+
+    const rep = runVariety({
+      population,
+      seeds: [1, 2],
+      maxTicks: 30,
+      rules: MOCK_RULES,
+    });
+
+    expect(out.stdout.endsWith(`${renderDiversity(rep)}\n`)).toBe(true);
+  });
 });
 
 // Exact-output tests over synthetic reports — stdout is a contract, so the aligned
@@ -147,10 +176,11 @@ const report = (rows: VarietyReport["rows"]): VarietyReport => ({
   rows,
   totalCommitments: rows.reduce((sum, r) => sum + r.count, 0),
   totalFights: 0, // inert to renderReport (the table reads only rows); pinned for a valid report
+  effectiveMoves: null, // inert to renderReport / renderLegend; renderDiversity has its own factory
 });
 
-describe("renderReport — exact histogram layout", () => {
-  it("aligns the columns, flags a dominant row with ⚠, and appends the threshold legend", () => {
+describe("renderReport — exact histogram layout (table only)", () => {
+  it("aligns the columns and flags a dominant row with ⚠ (the legend renders separately)", () => {
     const out = renderReport(
       report([
         { technique: "gyaku-zuki", count: 3, share: 0.6, dominant: true },
@@ -177,13 +207,11 @@ describe("renderReport — exact histogram layout", () => {
         " ".repeat(11) +
         "2" +
         " ".repeat(2) +
-        "40.0%" +
-        "\n\n" +
-        "⚠ = over 35% of all honoured commitments",
+        "40.0%",
     );
   });
 
-  it("shows shares to one decimal and omits the flag column and legend when nothing is dominant", () => {
+  it("shows shares to one decimal and omits the flag column when nothing is dominant", () => {
     const out = renderReport(
       report([
         { technique: "gyaku-zuki", count: 1, share: 1 / 3, dominant: false },
@@ -209,6 +237,96 @@ describe("renderReport — exact histogram layout", () => {
         "1" +
         " ".repeat(2) +
         "33.3%",
+    );
+  });
+});
+
+describe("renderLegend — the ⚠ threshold footnote", () => {
+  it("names the threshold when a technique is dominant", () => {
+    expect(
+      renderLegend(
+        report([
+          { technique: "gyaku-zuki", count: 5, share: 0.6, dominant: true },
+        ]),
+      ),
+    ).toBe("⚠ = over 35% of all honoured commitments");
+  });
+
+  it("is empty when nothing is dominant", () => {
+    expect(
+      renderLegend(
+        report([
+          { technique: "gyaku-zuki", count: 1, share: 0.2, dominant: false },
+        ]),
+      ),
+    ).toBe("");
+  });
+});
+
+// renderDiversity is a separate concern (a summary metric line, not the table), so it gets
+// its own full-13-technique reports. The dead list must read in canonical frame-table order;
+// effectiveMoves is computed by reduceUsage (tested there) and injected here.
+const CANON: readonly Technique[] = [
+  "sweep",
+  "kizami-zuki",
+  "gyaku-zuki",
+  "mae-geri",
+  "mawashi-geri",
+  "uraken",
+  "shuto",
+  "yoko-geri",
+  "ushiro-geri",
+  "empi",
+  "hiza-geri",
+  "tobi-geri",
+  "throw",
+];
+
+const SEP = "   ·   "; // 3 spaces · 3 spaces — the diversity-line separator
+
+const diversityReport = (
+  dead: readonly Technique[],
+  effectiveMoves: number | null,
+): VarietyReport => {
+  const rows = CANON.map((technique) => ({
+    technique,
+    count: dead.includes(technique) ? 0 : 1,
+    share: 0,
+    dominant: false,
+  }));
+
+  return {
+    rows,
+    totalCommitments: rows.filter((r) => r.count > 0).length,
+    totalFights: 0,
+    effectiveMoves,
+  };
+};
+
+describe("renderDiversity — effective-move-count + live/dead headline", () => {
+  it("shows the effective-move-count and a live/dead split with no list when all live", () => {
+    expect(renderDiversity(diversityReport([], 5.8))).toBe(
+      "effective moves 5.8 of 13" + SEP + "live 13 / dead 0",
+    );
+  });
+
+  it("lists the dead techniques in canonical frame-table order", () => {
+    expect(
+      renderDiversity(
+        diversityReport(["shuto", "yoko-geri", "ushiro-geri", "empi"], 3.2),
+      ),
+    ).toBe(
+      "effective moves 3.2 of 13" +
+        SEP +
+        "live 9 / dead 4: shuto, yoko-geri, ushiro-geri, empi",
+    );
+  });
+
+  it("shows n/a (never NaN) with every technique dead when there are no commitments", () => {
+    expect(renderDiversity(diversityReport(CANON, null))).toBe(
+      "effective moves n/a of 13" +
+        SEP +
+        "live 0 / dead 13: sweep, kizami-zuki, gyaku-zuki, mae-geri, mawashi-geri, uraken, shuto, yoko-geri, ushiro-geri, empi, hiza-geri, tobi-geri, throw",
     );
   });
 });
