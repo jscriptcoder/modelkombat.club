@@ -5,7 +5,12 @@
 // function that emits `it()`s into whichever suite invokes it.
 import { expect, it } from "vitest";
 
-import type { ArenaMember, ArenaRecord, ThroneStore } from "./throne-store.js";
+import type {
+  ArenaMember,
+  ArenaRecord,
+  ReproRecord,
+  ThroneStore,
+} from "./throne-store.js";
 import type { BotDoc } from "../engine/dsl.js";
 
 // A minimal, distinct champion document per name — the store treats it as opaque.
@@ -21,6 +26,21 @@ const member = (name: string, seniority: number): ArenaMember => ({
   champion: champ(name),
   handle: null,
   seniority,
+});
+
+// A minimal reproduction record: the challenger, the defenders it fought, the seeds, the version,
+// and its pin key (`memberSeniority` = the placer's seniority, or null for a non-placer). The store
+// treats it as opaque JSON — it round-trips it verbatim.
+const repro = (
+  name: string,
+  overrides?: Partial<ReproRecord>,
+): ReproRecord => ({
+  challenger: champ(name),
+  defenders: [champ("king")],
+  seeds: [1, 2, 3],
+  version: "v",
+  memberSeniority: null,
+  ...overrides,
 });
 
 // A harness makes a FRESH, isolated store and the two version keys the spec exercises (`versionB`
@@ -128,5 +148,93 @@ export const runThroneStoreContract = (make: ThroneStoreHarness): void => {
     });
 
     expect(await store.readArena(versionB)).toBeUndefined();
+  });
+
+  // The reproduction archive: every gauntlet-clearer's commit may carry a reproduction record that
+  // is appended ATOMICALLY with the arena swap (one gen-guarded step — land together or not at all).
+  // No read surface ships yet; `readArchive` exists for the contract + the future `/replay`.
+
+  it("reads an empty archive for an untouched version", async () => {
+    const { store, versionA } = make();
+
+    expect(await store.readArchive(versionA)).toEqual([]);
+  });
+
+  it("appends a reproduction record atomically with a commit and reads it back verbatim", async () => {
+    const { store, versionA } = make();
+
+    const record = repro("clearer", {
+      defenders: [champ("king"), champ("second")],
+      seeds: [4, 5, 6],
+      version: versionA,
+      memberSeniority: 1,
+    });
+
+    await store.commitArena(
+      versionA,
+      null,
+      { members: [member("clearer", 1)], generation: 1, nextSeniority: 2 },
+      record,
+    );
+
+    // The whole record round-trips — challenger, the exact defenders fought, seeds, version, and the
+    // pin key — so a "drop/replace a field" mutant on the append path is caught.
+    expect(await store.readArchive(versionA)).toEqual([record]);
+  });
+
+  it("does not append the record when the commit loses the CAS race (moved)", async () => {
+    const { store, versionA } = make();
+
+    await store.commitArena(versionA, null, {
+      members: [member("a", 1)],
+      generation: 1,
+      nextSeniority: 2,
+    });
+
+    // A commit expecting generation 0 has gone stale → moved. The record must NOT be appended
+    // (the append lives INSIDE the gen-guard — nothing is written on a lost race).
+    const res = await store.commitArena(
+      versionA,
+      0,
+      { members: [member("b", 2)], generation: 2, nextSeniority: 3 },
+      repro("b"),
+    );
+
+    expect(res).toEqual({ ok: false, reason: "moved" });
+    expect(await store.readArchive(versionA)).toEqual([]);
+  });
+
+  it("appends records in submission order across successive commits", async () => {
+    const { store, versionA } = make();
+
+    await store.commitArena(
+      versionA,
+      null,
+      { members: [member("a", 1)], generation: 1, nextSeniority: 2 },
+      repro("first"),
+    );
+    await store.commitArena(
+      versionA,
+      1,
+      { members: [member("b", 2)], generation: 2, nextSeniority: 3 },
+      repro("second"),
+    );
+
+    const archive = await store.readArchive(versionA);
+    expect(archive.map((r) => r.challenger.name)).toEqual(["first", "second"]);
+  });
+
+  it("appends nothing when a commit carries no reproduction record", async () => {
+    const { store, versionA } = make();
+
+    await store.commitArena(versionA, null, {
+      members: [member("a", 1)],
+      generation: 1,
+      nextSeniority: 2,
+    });
+
+    // A record-less commit (e.g. test/seed setup) swaps the arena but leaves the archive untouched —
+    // the append fires ONLY when a record is supplied.
+    expect(await store.readArchive(versionA)).toEqual([]);
   });
 };

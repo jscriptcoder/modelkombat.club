@@ -8,7 +8,12 @@ import { memberIdentity } from "./champion-identity.js";
 import { problem, readValidatedBot } from "./envelope.js";
 import { buildFightReport, toTitleFightReport } from "./fight-report.js";
 import { rankArena, type Standing } from "./rank-arena.js";
-import type { ArenaMember, ArenaRecord, ThroneStore } from "./throne-store.js";
+import type {
+  ArenaMember,
+  ArenaRecord,
+  ReproRecord,
+  ThroneStore,
+} from "./throne-store.js";
 import {
   benchmark,
   sameDoc,
@@ -48,17 +53,20 @@ const json = (body: unknown): Response =>
 const THRONE_MOVED_DETAIL =
   "The throne advanced to a new champion before your crown landed; resubmit to challenge the current King.";
 
-// Attempt an atomic arena commit. Returns the 409 problem to surface on a lost CAS race (the
-// arena moved since `readArena`), or `undefined` when the commit landed and the caller should
-// proceed. The "on moved → this 409" knowledge lives here once, shared by both commit sites
-// (the empty-arena bootstrap and a ranked placement).
+// Attempt an atomic arena commit, appending the clearer's reproduction `record` in the SAME
+// gen-guarded step (S5.1: archive raw material for the future `/replay`). Returns the 409 problem to
+// surface on a lost CAS race (the arena moved since `readArena` — nothing is written, arena OR
+// archive), or `undefined` when the commit landed and the caller should proceed. The "on moved →
+// this 409" knowledge lives here once, shared by all three commit sites (the empty-arena bootstrap,
+// a ranked placement, and a non-placer archiving its near-miss).
 const commit = async (
   store: ThroneStore,
   version: string,
   expected: number | null,
   next: ArenaRecord,
+  record: ReproRecord,
 ): Promise<Response | undefined> => {
-  const result = await store.commitArena(version, expected, next);
+  const result = await store.commitArena(version, expected, next, record);
 
   return result.ok
     ? undefined
@@ -191,6 +199,22 @@ export const handleFight = async (
 
   const { handle } = handleResult;
 
+  // Build this clearer's reproduction record (S5.1): the challenger doc + the exact defender docs it
+  // fought + the frozen seeds + version, from which any fight regenerates via `runFight` (never a
+  // tape — invariant #1). `memberSeniority` is the pin key: the seniority it was seated at when it
+  // placed, or `null` for a non-placer (never an arena member). `seeds`/`version` are constant across
+  // all three commit sites, so this closure owns that wiring once.
+  const reproRecord = (
+    defenders: readonly ArenaMember[],
+    memberSeniority: number | null,
+  ): ReproRecord => ({
+    challenger: parsed.doc,
+    defenders: defenders.map((member) => member.champion),
+    seeds: deps.seeds,
+    version: deps.version,
+    memberSeniority,
+  });
+
   // Read the arena up front — before the costly gauntlet benchmark — so a byte-identical resubmit
   // of a current member is rejected as a no-op (C4): a clone can never displace its original. The
   // same read feeds the placement below (one snapshot; the commit is still gen-guarded).
@@ -229,11 +253,15 @@ export const handleFight = async (
       seniority: 1,
     };
 
-    const moved = await commit(deps.store, deps.version, null, {
-      members: [challenger],
-      generation: 1,
-      nextSeniority: 2,
-    });
+    const moved = await commit(
+      deps.store,
+      deps.version,
+      null,
+      { members: [challenger], generation: 1, nextSeniority: 2 },
+      // Crowned King, seniority 1 — it fought no defenders (an empty arena), so its record is pinned
+      // by that seniority with an empty defender list.
+      reproRecord([], 1),
+    );
 
     return (
       moved ??
@@ -271,19 +299,38 @@ export const handleFight = async (
   }));
 
   // Unplaced: the challenger cleared but ranked below every defender of a FULL arena. It joins no
-  // arena and nothing is committed (the arena keeps its own top N); the board still diagnoses the
-  // near-miss (board[0] = the King fought), at full parity with a placement.
+  // arena slot — but it STILL commits (S5.1), gen-guarded against the arena it fought, to archive its
+  // reproduction record (memberSeniority null — it is no member). The commit leaves the arena
+  // byte-identical (same members/generation/seniority); only the archive grows. A CAS race here means
+  // the arena moved under the challenger, so its "didn't place" verdict is stale → 409, nothing
+  // written. On success the board still diagnoses the near-miss (board[0] = the King fought).
   if (placement.outcome === "unplaced") {
-    return json({ ...report, title: { outcome: "unplaced", board } });
+    const moved = await commit(
+      deps.store,
+      deps.version,
+      arena.generation,
+      arena,
+      reproRecord(arena.members, null),
+    );
+
+    return moved ?? json({ ...report, title: { outcome: "unplaced", board } });
   }
 
   // A placement mutates the arena at the next generation. A CAS race (the arena moved since our
-  // read) surfaces as 409 throne-moved; the loser resubmits against the new arena.
-  const moved = await commit(deps.store, deps.version, arena.generation, {
-    members: placement.members,
-    generation: arena.generation + 1,
-    nextSeniority: arena.nextSeniority + 1,
-  });
+  // read) surfaces as 409 throne-moved; the loser resubmits against the new arena. The same atomic
+  // commit archives the challenger's record — the defenders it fought, pinned by the seniority it was
+  // seated at (so its replay is kept for as long as it holds an arena slot).
+  const moved = await commit(
+    deps.store,
+    deps.version,
+    arena.generation,
+    {
+      members: placement.members,
+      generation: arena.generation + 1,
+      nextSeniority: arena.nextSeniority + 1,
+    },
+    reproRecord(arena.members, challenger.seniority),
+  );
 
   if (moved) return moved;
 
