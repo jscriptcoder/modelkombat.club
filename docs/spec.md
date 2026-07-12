@@ -67,6 +67,10 @@ every op clamps its result to [`-2147483648`, `2147483647`];
 `div` truncates toward zero and division by zero yields `0`. These rules make
 every evaluation bit-reproducible across platforms.
 
+Positions, distances, reach, and velocities are measured in **sub-units**
+(`1000` sub-units = one world unit). `opponent.distance` and a move's `reach`
+share this scale, so you compare them directly.
+
 **Numeric expressions** (`NumExpr`):
 
 - leaves: `const` (`{op:"const",value}`), `field` (`{op:"field",path}`), `mem` (`{op:"mem",cell}`), `rule` (`{op:"rule",path}`)
@@ -78,47 +82,52 @@ every evaluation bit-reproducible across platforms.
 
 ## State read surface (`field`)
 
-The whitelisted state leaves a bot may read via `{op:"field",path}`. Opponent
-fields are served from a latency-delayed snapshot (see the perception
-constants in the frame table); `opponent.points` is a live scoreboard read.
+The whitelisted state leaves a bot may read via `{op:"field",path}`. All reads
+return **integers**: booleans read as `0`/`1`, and enums are the small integers
+named in the *encoding* column (e.g. `opponent.attackBand` is `0` none / `1` low
+/ `2` mid / `3` high).
 
-- `self.x`
-- `self.facing`
-- `self.points`
-- `self.canAct`
-- `self.phaseRemaining`
-- `self.counterWindow`
-- `self.cancelWindow`
-- `self.finishWindow`
-- `self.stamina`
-- `self.gassed`
-- `self.penalties`
-- `self.passivityRemaining`
-- `self.senshu`
-- `self.posture`
-- `self.y`
-- `self.vy`
-- `opponent.x`
-- `opponent.y`
-- `opponent.facing`
-- `opponent.distance`
-- `opponent.attacking`
-- `opponent.attackBand`
-- `opponent.posture`
-- `opponent.throwing`
-- `opponent.knockdown`
-- `opponent.vx`
-- `opponent.predictedDistance`
-- `opponent.stamina`
-- `opponent.gassed`
-- `opponent.points`
-- `opponent.penalties`
-- `opponent.passivityRemaining`
-- `opponent.senshu`
-- `ring.width`
-- `clock.tick`
-- `clock.ticksRemaining`
-- `clock.overtime`
+**Delay.** `self.*` and the live scoreboard reads (`opponent.points` / `opponent.penalties` / `opponent.senshu`) carry no latency. The foe's *positional* reads lag `lPos` = 1 tick(s); its *action* tells lag `lAct` = 6 ticks (the master inequality — see the primer).
+
+| field | reads | encoding / unit | delay |
+| --- | --- | --- | --- |
+| `self.x` | your position in the ring | sub-units, `0`..`ring.width` | live |
+| `self.facing` | the way you face | `-1` or `1` | live |
+| `self.points` | your score | WKF points | live |
+| `self.canAct` | may you start a new action? | `0` mid-move / `1` free | live |
+| `self.phaseRemaining` | ticks left in your move's current phase | ticks | live |
+| `self.counterWindow` | post-parry counter ticks left | ticks (`0` closed) | live |
+| `self.cancelWindow` | on-contact cancel ticks left | ticks (`0` closed) | live |
+| `self.finishWindow` | okizeme finish ticks left on the downed foe | ticks (`0` can't finish) | live |
+| `self.stamina` | your conditioning meter | `0`..`stamina.max` (`0` if no meter) | live |
+| `self.gassed` | are you gassed (stamina ≤ `gasThreshold`)? | `0` no / `1` yes | live |
+| `self.penalties` | your jogai/passivity warning count | count | live |
+| `self.passivityRemaining` | ticks until your passivity foul | ticks (`0` imminent / off) | live |
+| `self.senshu` | do you hold first blood? | `0` no / `1` yes | live |
+| `self.posture` | your stance | `0` standing / `1` crouching / `2` airborne | live |
+| `self.y` | your height | sub-units (`0` grounded) | live |
+| `self.vy` | your vertical velocity | sub-units/tick (`>0` rising, `<0` falling) | live |
+| `opponent.x` | the foe's position | sub-units | `lPos` |
+| `opponent.y` | the foe's height | sub-units (`0` grounded) | `lPos` |
+| `opponent.facing` | the way the foe faces | `-1` or `1` | `lPos` |
+| `opponent.distance` | the gap between you | sub-units — compare to a move's `reach` | `lPos` |
+| `opponent.attacking` | is the foe committed to a strike? | `0` no / `1` yes | `lAct` |
+| `opponent.attackBand` | the height band of the foe's attack | `0` none / `1` low / `2` mid / `3` high | `lAct` |
+| `opponent.posture` | the foe's stance | `0` standing / `1` crouching / `2` airborne | `lAct` |
+| `opponent.throwing` | is the foe committed to a grab? | `0` no / `1` yes | `lAct` |
+| `opponent.knockdown` | is the foe knocked down? | `0` no / `1` yes | `lAct` |
+| `opponent.vx` | the foe's horizontal velocity (dead-reckoning) | sub-units/tick | `lPos` |
+| `opponent.predictedDistance` | the gap dead-reckoned over the `lPos` lag | sub-units | `lPos` |
+| `opponent.stamina` | the foe's conditioning meter | `0`..`stamina.max` | `lAct` |
+| `opponent.gassed` | is the foe gassed? | `0` no / `1` yes | `lAct` |
+| `opponent.points` | the foe's score | WKF points | live |
+| `opponent.penalties` | the foe's warning count | count | live |
+| `opponent.passivityRemaining` | ticks until the foe's passivity foul | ticks | `lAct` |
+| `opponent.senshu` | does the foe hold first blood? | `0` no / `1` yes | live |
+| `ring.width` | the ring width | sub-units | static |
+| `clock.tick` | the current tick | ticks (0-based) | live |
+| `clock.ticksRemaining` | ticks left in regulation | ticks | live |
+| `clock.overtime` | is the bout in sudden death? | `0` regulation / `1` overtime | live |
 
 ## Ruleset read surface (`rule`)
 
@@ -244,6 +253,20 @@ A bot returns exactly **one** action per tick. `dir` is relative to facing:
 - attack moves: `kizami-zuki`, `gyaku-zuki`, `mae-geri`, `mawashi-geri`, `uraken`, `shuto`, `yoko-geri`, `ushiro-geri`, `empi`, `hiza-geri`, `tobi-geri`
 - bands: `high`, `mid`, `low`
 
+**Bands are asymmetric.** You *emit* a band as the string `high` / `mid` / `low`,
+but you *read* the foe's band as an integer (`opponent.attackBand`, `0`..`3`) — so
+never compare the two directly.
+
+**Illegal-in-the-moment actions don't error — they degrade.** While `self.canAct`
+is `0` you are mid-move and any non-idle action is denied (you do nothing until the
+move ends) — so every bot leads with a `self.canAct == 0` → `idle` guard. An
+`attack` silently **degrades to `idle`** (no frames, no stamina spent) when the move
+is not configured, its `band` is not one of the move's legal `bands`, you cannot
+afford its stamina (the gassed special-lockout), or it is context-wrong (an `air`
+move like `tobi-geri` on the ground). But an attack that *starts* yet lands beyond
+`reach` still commits and **whiffs** — you pay its full `recovery`. Committing out of
+range is a punishable mistake, not a no-op.
+
 ## Frame table
 
 The authoritative numbers the platform fights on (`CANONICAL_RULES`).
@@ -268,6 +291,22 @@ cancel into a strike during the foe's `finishWindow` is the okizeme finish.
 | `empi` | 8 | 2 | 14 | 2 | 95000 | 38 | high/mid | gyaku-zuki |
 | `hiza-geri` | 9 | 2 | 16 | 0 | 110000 | 40 | mid | gyaku-zuki |
 | `tobi-geri` | 4 | 3 | 14 | 2 | 250000 | 50 | high/mid | — |
+
+Each technique's role (the numbers above are the truth; this is the intent):
+
+- `sweep` (foot sweep) — Chops the base out; scores nothing, but the okizeme finish pays three.
+- `kizami-zuki` (jab) — Fast lead-hand poke — the tempo-setter that opens the cancel chain.
+- `gyaku-zuki` (reverse punch) — The power hand and cancel hub — every combo routes through it.
+- `mae-geri` (front kick) — The straight-line body kick — a reliable waza-ari from mid range.
+- `mawashi-geri` (roundhouse kick) — Arcs to the body for two, or over the guard to the head for the ippon.
+- `uraken` (backfist) — Cheapest, shortest hand — a gas-proof jodan snap and combo starter.
+- `shuto` (knife-hand) — The longest-reaching hand, out-ranging even the reverse punch.
+- `yoko-geri` (side kick) — A beyond-neutral thrust that out-reaches even the roundhouse.
+- `ushiro-geri` (back kick) — The longest, most committed strike — a turn-away thrust you'll see coming.
+- `empi` (elbow strike) — Shortest reach in the game — a point-blank two-point payoff.
+- `hiza-geri` (knee strike) — The only standing mid-band knockdown — it sets up a three-point finish.
+- `tobi-geri` (jumping kick) — Leap in from range for a head-height ippon — the only airborne strike.
+- `throw` (throw) — Clean takedown for the instant ippon — the anti-turtle answer.
 
 ### Global constants
 
@@ -1367,13 +1406,13 @@ scored deterministically — the spec is the only input; there is no feedback lo
 - `metric` — win-rate (matches won) is primary; Σ net-points over every (opponent × seed × side) fight breaks ties.
 - `seeds` — 1..10 (10 seeds), each matchup played twice (bot as A and as B).
 - `maxTicks` — 600
-- gauntlet opponents:
-  - `jabber`
-  - `rekka`
-  - `zoner`
-  - `grappler`
-  - `sweeper`
-  - `vulture`
+- gauntlet opponents (archetypes only — you author blind, no bot documents shown):
+  - `jabber` — Death by a thousand cuts — walks you down, reads your strike's height and blocks it, then answers with the jab. (signature: `kizami-zuki`)
+  - `rekka` — Flurry artist — chains cancel into cancel, then leaps in for a jump-kick ippon. (signature: `tobi-geri`)
+  - `zoner` — Fights at the fence — picks the exact-length kick for the gap and retreats the instant you close the distance. (signature: `ushiro-geri`)
+  - `grappler` — Owns the clinch — crowd him and he throws you to the mat, then punishes the knockdown with a reverse punch. (signature: `throw`)
+  - `sweeper` — Chops your base out with a foot sweep, then cashes the knockdown for a reverse-punch finish. (signature: `sweep → gyaku-zuki`)
+  - `vulture` — Patient predator — baits the whiff, punishes it with a snap backfist, and feeds on a gassed opponent. (signature: `uraken`)
 
 ## Submitting
 

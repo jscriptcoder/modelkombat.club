@@ -28,6 +28,7 @@ import {
   NUM_OPS,
   RULE_READERS,
 } from "../engine/dsl.js";
+import type { FieldPath } from "../engine/dsl.js";
 import { CANONICAL_RULES } from "../engine/rules.js";
 import type { MoveSpec, Rules } from "../engine/types.js";
 import {
@@ -141,6 +142,10 @@ const expressionsSection = (): string =>
     "`div` truncates toward zero and division by zero yields `0`. These rules make",
     "every evaluation bit-reproducible across platforms.",
     "",
+    "Positions, distances, reach, and velocities are measured in **sub-units**",
+    "(`1000` sub-units = one world unit). `opponent.distance` and a move's `reach`",
+    "share this scale, so you compare them directly.",
+    "",
     "**Numeric expressions** (`NumExpr`):",
     "",
     `- leaves: ${code("const")} (\`{op:"const",value}\`), ${code("field")} (\`{op:"field",path}\`), ${code("mem")} (\`{op:"mem",cell}\`), ${code("rule")} (\`{op:"rule",path}\`)`,
@@ -151,16 +156,231 @@ const expressionsSection = (): string =>
     `- operators: ${BOOL_OPS.map(code).join(", ")}`,
   ].join("\n");
 
-const stateReadsSection = (): string =>
-  [
+// Per-field authoring documentation for the read surface. The engine keeps this
+// knowledge in `types.ts` comments (encodings), `dsl.ts` FIELD_READERS (the 0/1
+// boolean serialization), and `sim.ts` perceiveOpponent (the delay layer split) —
+// none machine-readable, so it is mirrored here by hand, keyed by `FieldPath` so
+// the compiler flags any field left undocumented (a drift guard). `delay` names
+// the perception layer: `live` (self + the scoreboard reads), `lPos` (the foe's
+// positional reads), `lAct` (the foe's action tells), or `static` (frame-table).
+type Delay = "live" | "lPos" | "lAct" | "static";
+type FieldDoc = { reads: string; enc: string; delay: Delay };
+
+const DELAY_LABEL: Record<Delay, string> = {
+  live: "live",
+  lPos: "`lPos`",
+  lAct: "`lAct`",
+  static: "static",
+};
+
+const FIELD_DOCS: Record<FieldPath, FieldDoc> = {
+  "self.x": {
+    reads: "your position in the ring",
+    enc: "sub-units, `0`..`ring.width`",
+    delay: "live",
+  },
+  "self.facing": {
+    reads: "the way you face",
+    enc: "`-1` or `1`",
+    delay: "live",
+  },
+  "self.points": { reads: "your score", enc: "WKF points", delay: "live" },
+  "self.canAct": {
+    reads: "may you start a new action?",
+    enc: "`0` mid-move / `1` free",
+    delay: "live",
+  },
+  "self.phaseRemaining": {
+    reads: "ticks left in your move's current phase",
+    enc: "ticks",
+    delay: "live",
+  },
+  "self.counterWindow": {
+    reads: "post-parry counter ticks left",
+    enc: "ticks (`0` closed)",
+    delay: "live",
+  },
+  "self.cancelWindow": {
+    reads: "on-contact cancel ticks left",
+    enc: "ticks (`0` closed)",
+    delay: "live",
+  },
+  "self.finishWindow": {
+    reads: "okizeme finish ticks left on the downed foe",
+    enc: "ticks (`0` can't finish)",
+    delay: "live",
+  },
+  "self.stamina": {
+    reads: "your conditioning meter",
+    enc: "`0`..`stamina.max` (`0` if no meter)",
+    delay: "live",
+  },
+  "self.gassed": {
+    reads: "are you gassed (stamina ≤ `gasThreshold`)?",
+    enc: "`0` no / `1` yes",
+    delay: "live",
+  },
+  "self.penalties": {
+    reads: "your jogai/passivity warning count",
+    enc: "count",
+    delay: "live",
+  },
+  "self.passivityRemaining": {
+    reads: "ticks until your passivity foul",
+    enc: "ticks (`0` imminent / off)",
+    delay: "live",
+  },
+  "self.senshu": {
+    reads: "do you hold first blood?",
+    enc: "`0` no / `1` yes",
+    delay: "live",
+  },
+  "self.posture": {
+    reads: "your stance",
+    enc: "`0` standing / `1` crouching / `2` airborne",
+    delay: "live",
+  },
+  "self.y": {
+    reads: "your height",
+    enc: "sub-units (`0` grounded)",
+    delay: "live",
+  },
+  "self.vy": {
+    reads: "your vertical velocity",
+    enc: "sub-units/tick (`>0` rising, `<0` falling)",
+    delay: "live",
+  },
+  "opponent.x": {
+    reads: "the foe's position",
+    enc: "sub-units",
+    delay: "lPos",
+  },
+  "opponent.y": {
+    reads: "the foe's height",
+    enc: "sub-units (`0` grounded)",
+    delay: "lPos",
+  },
+  "opponent.facing": {
+    reads: "the way the foe faces",
+    enc: "`-1` or `1`",
+    delay: "lPos",
+  },
+  "opponent.distance": {
+    reads: "the gap between you",
+    enc: "sub-units — compare to a move's `reach`",
+    delay: "lPos",
+  },
+  "opponent.attacking": {
+    reads: "is the foe committed to a strike?",
+    enc: "`0` no / `1` yes",
+    delay: "lAct",
+  },
+  "opponent.attackBand": {
+    reads: "the height band of the foe's attack",
+    enc: "`0` none / `1` low / `2` mid / `3` high",
+    delay: "lAct",
+  },
+  "opponent.posture": {
+    reads: "the foe's stance",
+    enc: "`0` standing / `1` crouching / `2` airborne",
+    delay: "lAct",
+  },
+  "opponent.throwing": {
+    reads: "is the foe committed to a grab?",
+    enc: "`0` no / `1` yes",
+    delay: "lAct",
+  },
+  "opponent.knockdown": {
+    reads: "is the foe knocked down?",
+    enc: "`0` no / `1` yes",
+    delay: "lAct",
+  },
+  "opponent.vx": {
+    reads: "the foe's horizontal velocity (dead-reckoning)",
+    enc: "sub-units/tick",
+    delay: "lPos",
+  },
+  "opponent.predictedDistance": {
+    reads: "the gap dead-reckoned over the `lPos` lag",
+    enc: "sub-units",
+    delay: "lPos",
+  },
+  "opponent.stamina": {
+    reads: "the foe's conditioning meter",
+    enc: "`0`..`stamina.max`",
+    delay: "lAct",
+  },
+  "opponent.gassed": {
+    reads: "is the foe gassed?",
+    enc: "`0` no / `1` yes",
+    delay: "lAct",
+  },
+  "opponent.points": {
+    reads: "the foe's score",
+    enc: "WKF points",
+    delay: "live",
+  },
+  "opponent.penalties": {
+    reads: "the foe's warning count",
+    enc: "count",
+    delay: "live",
+  },
+  "opponent.passivityRemaining": {
+    reads: "ticks until the foe's passivity foul",
+    enc: "ticks",
+    delay: "lAct",
+  },
+  "opponent.senshu": {
+    reads: "does the foe hold first blood?",
+    enc: "`0` no / `1` yes",
+    delay: "live",
+  },
+  "ring.width": { reads: "the ring width", enc: "sub-units", delay: "static" },
+  "clock.tick": {
+    reads: "the current tick",
+    enc: "ticks (0-based)",
+    delay: "live",
+  },
+  "clock.ticksRemaining": {
+    reads: "ticks left in regulation",
+    enc: "ticks",
+    delay: "live",
+  },
+  "clock.overtime": {
+    reads: "is the bout in sudden death?",
+    enc: "`0` regulation / `1` overtime",
+    delay: "live",
+  },
+};
+
+const stateReadsSection = (rules: Rules): string => {
+  const lPos = rules.perception?.lPos ?? 0;
+  const lAct = rules.perception?.lAct ?? 0;
+
+  const fieldRow = (path: FieldPath): string => {
+    const d = FIELD_DOCS[path];
+
+    return `| ${code(path)} | ${d.reads} | ${d.enc} | ${DELAY_LABEL[d.delay]} |`;
+  };
+
+  // Object.keys loses the key type; the record's keys ARE the FieldPath allowlist.
+  const rows = (Object.keys(FIELD_DOCS) as FieldPath[]).map(fieldRow);
+
+  return [
     "## State read surface (`field`)",
     "",
-    'The whitelisted state leaves a bot may read via `{op:"field",path}`. Opponent',
-    "fields are served from a latency-delayed snapshot (see the perception",
-    "constants in the frame table); `opponent.points` is a live scoreboard read.",
+    'The whitelisted state leaves a bot may read via `{op:"field",path}`. All reads',
+    "return **integers**: booleans read as `0`/`1`, and enums are the small integers",
+    "named in the *encoding* column (e.g. `opponent.attackBand` is `0` none / `1` low",
+    "/ `2` mid / `3` high).",
     "",
-    bullets(ALLOWED_FIELDS),
+    `**Delay.** \`self.*\` and the live scoreboard reads (\`opponent.points\` / \`opponent.penalties\` / \`opponent.senshu\`) carry no latency. The foe's *positional* reads lag \`lPos\` = ${lPos} tick(s); its *action* tells lag \`lAct\` = ${lAct} ticks (the master inequality — see the primer).`,
+    "",
+    "| field | reads | encoding / unit | delay |",
+    "| --- | --- | --- | --- |",
+    ...rows,
   ].join("\n");
+};
 
 const ruleReadsSection = (): string =>
   [
@@ -185,10 +405,91 @@ const actionGrammarSection = (): string =>
     `- ${code("attack")} takes a ${code("move")} and a ${code("band")}.`,
     `- attack moves: ${[...MOVES].map(code).join(", ")}`,
     `- bands: ${[...BANDS].map(code).join(", ")}`,
+    "",
+    "**Bands are asymmetric.** You *emit* a band as the string `high` / `mid` / `low`,",
+    "but you *read* the foe's band as an integer (`opponent.attackBand`, `0`..`3`) — so",
+    "never compare the two directly.",
+    "",
+    "**Illegal-in-the-moment actions don't error — they degrade.** While `self.canAct`",
+    "is `0` you are mid-move and any non-idle action is denied (you do nothing until the",
+    "move ends) — so every bot leads with a `self.canAct == 0` → `idle` guard. An",
+    "`attack` silently **degrades to `idle`** (no frames, no stamina spent) when the move",
+    "is not configured, its `band` is not one of the move's legal `bands`, you cannot",
+    "afford its stamina (the gassed special-lockout), or it is context-wrong (an `air`",
+    "move like `tobi-geri` on the ground). But an attack that *starts* yet lands beyond",
+    "`reach` still commits and **whiffs** — you pay its full `recovery`. Committing out of",
+    "range is a punishable mistake, not a no-op.",
   ].join("\n");
 
 const moveRow = (id: string, m: MoveSpec): string =>
   `| ${code(id)} | ${m.startup} | ${m.active} | ${m.recovery} | ${m.score} | ${m.reach} | ${m.staminaCost ?? 0} | ${(m.bands ?? []).join("/") || "—"} | ${(m.cancelInto ?? []).join(" / ") || "—"} |`;
+
+// The English gloss + strategic role of each technique — the "intent" the numeric
+// frame table can't convey (an author otherwise needs prior karate knowledge to
+// know `mawashi-geri` is the roundhouse). Mirrored VERBATIM from the public site's
+// arsenal (`web/src/pages/home/Arsenal.tsx`) so the spec and site never disagree.
+// `throw` is included (it is a technique authors use) though it lives in the global
+// constants, not the moves table.
+const MOVE_ROLES: Record<string, { gloss: string; role: string }> = {
+  "kizami-zuki": {
+    gloss: "jab",
+    role: "Fast lead-hand poke — the tempo-setter that opens the cancel chain.",
+  },
+  "gyaku-zuki": {
+    gloss: "reverse punch",
+    role: "The power hand and cancel hub — every combo routes through it.",
+  },
+  "mae-geri": {
+    gloss: "front kick",
+    role: "The straight-line body kick — a reliable waza-ari from mid range.",
+  },
+  "mawashi-geri": {
+    gloss: "roundhouse kick",
+    role: "Arcs to the body for two, or over the guard to the head for the ippon.",
+  },
+  uraken: {
+    gloss: "backfist",
+    role: "Cheapest, shortest hand — a gas-proof jodan snap and combo starter.",
+  },
+  shuto: {
+    gloss: "knife-hand",
+    role: "The longest-reaching hand, out-ranging even the reverse punch.",
+  },
+  "yoko-geri": {
+    gloss: "side kick",
+    role: "A beyond-neutral thrust that out-reaches even the roundhouse.",
+  },
+  "ushiro-geri": {
+    gloss: "back kick",
+    role: "The longest, most committed strike — a turn-away thrust you'll see coming.",
+  },
+  empi: {
+    gloss: "elbow strike",
+    role: "Shortest reach in the game — a point-blank two-point payoff.",
+  },
+  "hiza-geri": {
+    gloss: "knee strike",
+    role: "The only standing mid-band knockdown — it sets up a three-point finish.",
+  },
+  "tobi-geri": {
+    gloss: "jumping kick",
+    role: "Leap in from range for a head-height ippon — the only airborne strike.",
+  },
+  sweep: {
+    gloss: "foot sweep",
+    role: "Chops the base out; scores nothing, but the okizeme finish pays three.",
+  },
+  throw: {
+    gloss: "throw",
+    role: "Clean takedown for the instant ippon — the anti-turtle answer.",
+  },
+};
+
+const roleLine = (id: string): string => {
+  const r = MOVE_ROLES[id];
+
+  return `- ${code(id)} (${r.gloss}) — ${r.role}`;
+};
 
 const frameTableSection = (rules: Rules): string => {
   // `Object.entries` widens optional move values to `MoveSpec | undefined`, but
@@ -198,6 +499,11 @@ const frameTableSection = (rules: Rules): string => {
   // key, simply contributing no row.
   const moves = Object.entries(rules.moves) as [string, MoveSpec][];
   const rows = moves.map(([id, m]) => moveRow(id, m));
+
+  // Role lines for every CONFIGURED technique (same iteration as the table, so an
+  // unconfigured move gets neither a row nor a role), plus `throw` when configured.
+  const roles = moves.map(([id]) => roleLine(id));
+  if (rules.throw) roles.push(roleLine("throw"));
 
   const globals = Object.entries(RULE_READERS)
     .filter(([path]) => !path.startsWith("moves."))
@@ -217,6 +523,10 @@ const frameTableSection = (rules: Rules): string => {
     "| technique | startup | active | recovery | score | reach | cost | bands | cancels into |",
     "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ...rows,
+    "",
+    "Each technique's role (the numbers above are the truth; this is the intent):",
+    "",
+    ...roles,
     "",
     "### Global constants",
     "",
@@ -238,6 +548,39 @@ const errorCatalogSection = (): string =>
     "- **undeclared cell** — a `mem` read or `set` write to a cell not declared in `memory`.",
     "- **unknown numeric/boolean op** — an unrecognised expression operator.",
   ].join("\n");
+
+// One-line archetype + signature move for each frozen gauntlet opponent — so an
+// author knows WHO they fight without a bot document being revealed. Mirrored
+// VERBATIM from the public site's gauntlet roster (`web/src/pages/home/Gauntlet.tsx`),
+// whose bios are authored faithful to each bot's actual rules. Keyed by the
+// benchmark's `GAUNTLET_NAMES`.
+const GAUNTLET_ARCHETYPES: Record<string, { bio: string; signature: string }> =
+  {
+    jabber: {
+      bio: "Death by a thousand cuts — walks you down, reads your strike's height and blocks it, then answers with the jab.",
+      signature: "kizami-zuki",
+    },
+    rekka: {
+      bio: "Flurry artist — chains cancel into cancel, then leaps in for a jump-kick ippon.",
+      signature: "tobi-geri",
+    },
+    zoner: {
+      bio: "Fights at the fence — picks the exact-length kick for the gap and retreats the instant you close the distance.",
+      signature: "ushiro-geri",
+    },
+    grappler: {
+      bio: "Owns the clinch — crowd him and he throws you to the mat, then punishes the knockdown with a reverse punch.",
+      signature: "throw",
+    },
+    sweeper: {
+      bio: "Chops your base out with a foot sweep, then cashes the knockdown for a reverse-punch finish.",
+      signature: "sweep → gyaku-zuki",
+    },
+    vulture: {
+      bio: "Patient predator — baits the whiff, punishes it with a snap backfist, and feeds on a gassed opponent.",
+      signature: "uraken",
+    },
+  };
 
 const benchmarkSection = (match: Match): string =>
   [
@@ -269,8 +612,12 @@ const benchmarkSection = (match: Match): string =>
     `- ${code("metric")} — win-rate (matches won) is primary; Σ net-points over every (opponent × seed × side) fight breaks ties.`,
     `- ${code("seeds")} — ${SEEDS[0]}..${SEEDS[SEEDS.length - 1]} (${SEEDS.length} seeds), each matchup played twice (bot as A and as B).`,
     `- ${code("maxTicks")} — ${MAX_TICKS}`,
-    "- gauntlet opponents:",
-    ...GAUNTLET_NAMES.map((n) => `  - ${code(n)}`),
+    "- gauntlet opponents (archetypes only — you author blind, no bot documents shown):",
+    ...GAUNTLET_NAMES.map((n) => {
+      const a = GAUNTLET_ARCHETYPES[n];
+
+      return `  - ${code(n)} — ${a.bio} (signature: ${code(a.signature)})`;
+    }),
   ].join("\n");
 
 /**
@@ -586,7 +933,7 @@ export function generateSpec(
       limitsSection(),
       documentShapeSection(),
       expressionsSection(),
-      stateReadsSection(),
+      stateReadsSection(rules),
       ruleReadsSection(),
       actionGrammarSection(),
       frameTableSection(rules),

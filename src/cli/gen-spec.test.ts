@@ -227,8 +227,10 @@ describe("generateSpec — the factual machine-truth spec", () => {
 
       delete rulesNoSweep.moves.sweep;
       const lines = generateSpec(rulesNoSweep).split("\n");
-      const sep = lines.findIndex((l) => l.startsWith("| --- |"));
-      const body = lines.slice(sep + 1, lines.indexOf("", sep + 1));
+      // anchor on the techniques table specifically (the state-read surface is
+      // also a `| --- |` table now): its header row, then the separator, then body
+      const header = lines.findIndex((l) => l.startsWith("| technique |"));
+      const body = lines.slice(header + 2, lines.indexOf("", header + 2));
 
       // the techniques table body holds ONLY valid rows (no stray cell for the
       // dropped move), and the dropped move is absent from it
@@ -732,6 +734,232 @@ describe("generateSpec — the factual machine-truth spec", () => {
         spec.indexOf(HEADING),
       );
     });
+  });
+});
+
+describe("state read surface — per-field semantics (Tier 1)", () => {
+  const HEADING = "## State read surface (`field`)";
+
+  // The table row documenting `field` — a markdown row `| `field` | … |`.
+  const rowFor = (spec: string, field: string): string =>
+    sectionOf(spec, HEADING)
+      .split("\n")
+      .find((l) => l.startsWith(`| ${code(field)} |`)) ?? "";
+
+  it("gives every readable field its own documented row (no field left as a bare path)", () => {
+    const spec = generateSpec();
+
+    for (const f of ALLOWED_FIELDS) {
+      expect(rowFor(spec, f), `${f} row`).not.toBe("");
+    }
+  });
+
+  it("ends every row with one of the four delay markers (kills a blank delay cell)", () => {
+    const spec = generateSpec();
+
+    for (const f of ALLOWED_FIELDS) {
+      expect(rowFor(spec, f), `${f} delay`).toMatch(
+        /\| (live|`lPos`|`lAct`|static) \|$/,
+      );
+    }
+  });
+
+  it("spells out the attackBand height enum — 0 none / 1 low / 2 mid / 3 high", () => {
+    const row = rowFor(generateSpec(), "opponent.attackBand");
+
+    for (const [v, name] of [
+      [0, "none"],
+      [1, "low"],
+      [2, "mid"],
+      [3, "high"],
+    ] as const) {
+      expect(row, `${name} = ${v}`).toContain(code(String(v)));
+      expect(row.toLowerCase(), `${name}`).toContain(name);
+    }
+  });
+
+  it("spells out the posture enum — 0 standing / 1 crouching / 2 airborne", () => {
+    const row = rowFor(generateSpec(), "self.posture");
+
+    for (const name of ["standing", "crouching", "airborne"]) {
+      expect(row.toLowerCase(), name).toContain(name);
+    }
+  });
+
+  it("encodes a boolean tell as 0/1 (self.canAct)", () => {
+    const row = rowFor(generateSpec(), "self.canAct");
+    expect(row).toContain(code("0"));
+    expect(row).toContain(code("1"));
+  });
+
+  it("classifies the delay per layer — self live, foe position lPos, foe action lAct, scoreboard live", () => {
+    const spec = generateSpec();
+    expect(rowFor(spec, "self.x")).toMatch(/\| live \|$/);
+    expect(rowFor(spec, "opponent.distance")).toMatch(/\| `lPos` \|$/);
+    expect(rowFor(spec, "opponent.attackBand")).toMatch(/\| `lAct` \|$/);
+    expect(rowFor(spec, "opponent.points")).toMatch(/\| live \|$/);
+    expect(rowFor(spec, "opponent.senshu")).toMatch(/\| live \|$/);
+  });
+
+  it("names both delay layers in the intro, interpolated from the rules (not hardcoded)", () => {
+    const lPos = CANONICAL_RULES.perception?.lPos ?? 0;
+    const lAct = CANONICAL_RULES.perception?.lAct ?? 0;
+    const intro = sectionOf(generateSpec(), HEADING);
+    expect(
+      intro
+        .split("\n")
+        .find((l) => l.includes(code("lPos")) && l.includes(String(lPos))),
+      "lPos paired with its value",
+    ).toBeDefined();
+    expect(
+      intro
+        .split("\n")
+        .find((l) => l.includes(code("lAct")) && l.includes(String(lAct))),
+      "lAct paired with its value",
+    ).toBeDefined();
+
+    // interpolated: a retuned perception flows through (kills a hardcoded literal)
+    const retuned = sectionOf(
+      generateSpec({
+        ...CANONICAL_RULES,
+        perception: { lPos: 2, lAct: 9, jitter: 1 },
+      }),
+      HEADING,
+    );
+
+    expect(retuned).toContain(code("lAct"));
+    expect(retuned).toContain("9");
+    expect(retuned).not.toContain(`\`lAct\` = ${lAct}`);
+  });
+});
+
+describe("expressions — the sub-unit scale (Tier 2)", () => {
+  it("states that distance and reach share the sub-unit scale, so they compare directly", () => {
+    const expr = sectionOf(generateSpec(), "## Expressions").toLowerCase();
+    expect(expr).toContain("sub-unit");
+    expect(expr).toContain("distance");
+    expect(expr).toContain("reach");
+  });
+});
+
+describe("action grammar — degradation semantics + the band-encoding trap (Tier 2)", () => {
+  const HEADING = "## Action grammar";
+  const grammar = (): string => sectionOf(generateSpec(), HEADING);
+
+  it("teaches the commitment guard — a non-idle action while canAct is 0 is denied", () => {
+    const g = grammar();
+    expect(g).toContain(code("self.canAct"));
+    expect(g.toLowerCase()).toContain("idle");
+  });
+
+  it("lists what silently degrades an attack to idle — unconfigured move, illegal band, unaffordable stamina", () => {
+    const g = grammar().toLowerCase();
+    expect(g).toContain("degrade");
+    expect(g).toContain("band"); // out-of-band degrade
+    expect(g).toContain("stamina"); // unaffordable / gas lockout degrade
+  });
+
+  it("distinguishes a whiff (commits, pays its recovery) from a degrade (no frames spent)", () => {
+    const g = grammar().toLowerCase();
+    expect(g).toContain("reach"); // out-of-reach
+    expect(g).toContain("whiff");
+    expect(g).toContain("recovery"); // a whiff still pays recovery
+  });
+
+  it("warns that a band is READ as an integer but EMITTED as a string", () => {
+    const g = grammar();
+    expect(g).toContain(code("opponent.attackBand")); // the int read
+    for (const b of ["high", "mid", "low"]) expect(g).toContain(code(b)); // the string emit
+  });
+});
+
+describe("technique roles — glosses + intent (reused from the arsenal)", () => {
+  // A role bullet: `- `id` (gloss) — …`.
+  const roleLine = (spec: string, id: string): string =>
+    spec.split("\n").find((l) => l.startsWith(`- ${code(id)} (`)) ?? "";
+
+  it("gives every configured technique a role line with its English gloss", () => {
+    const spec = generateSpec();
+
+    for (const id of Object.keys(CANONICAL_RULES.moves)) {
+      expect(roleLine(spec, id), `${id} role`).not.toBe("");
+    }
+  });
+
+  it("names the throw's role too (the anti-guard takedown)", () => {
+    expect(roleLine(generateSpec(), "throw")).not.toBe("");
+  });
+
+  it("carries the strategic gloss for a reach-relevant move (shuto out-ranges the reverse)", () => {
+    expect(roleLine(generateSpec(), "shuto").toLowerCase()).toContain(
+      "longest-reaching",
+    );
+  });
+
+  it("places the role list under the techniques table, before the global constants", () => {
+    const spec = generateSpec();
+    const table = spec.indexOf("| technique |");
+    const roles = spec.indexOf(`- ${code("kizami-zuki")} (`);
+    const globals = spec.indexOf("### Global constants");
+    expect(table).toBeLessThan(roles);
+    expect(roles).toBeLessThan(globals);
+  });
+
+  it("omits a role line for an unconfigured technique (matches the table)", () => {
+    const rulesNoSweep: Rules = {
+      ...CANONICAL_RULES,
+      moves: { ...CANONICAL_RULES.moves },
+    };
+
+    delete rulesNoSweep.moves.sweep;
+    const spec = generateSpec(rulesNoSweep);
+    expect(
+      spec.split("\n").find((l) => l.startsWith(`- ${code("sweep")} (`)),
+    ).toBeUndefined();
+  });
+
+  it("gates the throw's role line on a configured throw (absent throw ⇒ no throw role)", () => {
+    const rulesNoThrow: Rules = { ...CANONICAL_RULES };
+
+    delete rulesNoThrow.throw;
+    const spec = generateSpec(rulesNoThrow);
+    expect(
+      spec.split("\n").find((l) => l.startsWith(`- ${code("throw")} (`)),
+    ).toBeUndefined();
+  });
+});
+
+describe("gauntlet archetypes — named with their strategy, no bot document (Tier 3)", () => {
+  // The gauntlet roster bullet for `name`: `  - `name` — …`.
+  const oppLine = (spec: string, name: string): string =>
+    spec.split("\n").find((l) => l.trim().startsWith(`- ${code(name)} —`)) ??
+    "";
+
+  it("gives every gauntlet opponent an archetype line (not a bare name)", () => {
+    const spec = generateSpec();
+
+    for (const name of GAUNTLET_NAMES) {
+      expect(oppLine(spec, name), `${name} archetype`).not.toBe("");
+    }
+  });
+
+  it("names each opponent's signature move", () => {
+    const spec = generateSpec();
+    expect(oppLine(spec, "grappler")).toContain(code("throw"));
+    expect(oppLine(spec, "zoner")).toContain(code("ushiro-geri"));
+  });
+
+  it("carries a faithful archetype descriptor (not just the name)", () => {
+    const spec = generateSpec();
+    expect(oppLine(spec, "sweeper").toLowerCase()).toContain("sweep");
+    expect(oppLine(spec, "grappler").toLowerCase()).toContain("clinch");
+  });
+
+  it("does NOT embed a bot document in the gauntlet listing (archetypes only)", () => {
+    // the gauntlet is listed in the benchmark-rules section; naming-only means
+    // that section carries no fenced code block (no revealed bot document)
+    const bench = sectionOf(generateSpec(), "## Benchmark rules");
+    expect(bench).not.toContain("```");
   });
 });
 
