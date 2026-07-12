@@ -402,3 +402,41 @@ presentation manual-scanned — outside the node-only Stryker scope).
   smoke-verified survivors → clean **100% mutation, 0 survived**.
 
 [koth-ladder-s3-podium-arena.md](koth-ladder-s3-podium-arena.md)
+
+## KotH ladder — S4 placement telemetry (the per-defender board) ✅ COMPLETE
+
+The fourth story of the KotH **ladder**: generalize PR #250's single-King title telemetry from **1 King → N
+defenders** — every gauntlet-clearer (crowned, entered, OR unplaced) reads back a rank-ordered per-defender
+**board** of `{ defender identity } + { winRate / W-L-D / net / endReasons / degrade }` (board[0] = the King),
+at the same fidelity a gauntlet row carries. Non-placers get the full board too (the #250 parity ethos:
+diagnose _why_, don't guess from a lone win-rate); defender **documents are never exposed** — identity only
+(`memberIdentity`), the standings are already public via `/king` + podium (C5). Platform-layer (`src/http` +
+its `web/` consumer) only — **TCB untouched**, no DSL op, no engine change, **no `INPUT_HASH` /
+`BENCHMARK_VERSION` bump**, no spec change. Design trail (still live for S5): `plans/koth-ladder-{decisions,stories}.md`
+(D1–D7, C1–C7 — **C7** governs the response contract, **D-C** the King-fight-doubles-as-scout). Each slice TDD'd
+at **100% mutation** on the changed `src/http` files (web presentation manual-scanned — outside the node-only
+Stryker scope). The planned "render + retire" was split at the S4.1 CONFIRM gate into S4.2 (web render) + S4.3
+(retire the flat scout), mirroring the S3.1/S3.2 add-then-retire precedent.
+
+- **S4.1 — `/fight` returns the per-defender board (additive)** (PR #260, `feat/arena-placement-telemetry`) —
+  `roundRobin` now threads out **all** `challengerFights` (was only `kingFight`); the board is built inline as
+  `arena.members.map((m, i) => ({ defender: memberIdentity(m), ...toTitleFightReport(challengerFights[i]) }))`
+  and added to the three title returns (`board: []` on the empty-arena bootstrap crown). **Additive** — the flat
+  King scout (`winRate` / `incumbent` / …) stayed so the web `/ring` consumer kept working. 100% mutation (112
+  killed); the board reuses `toTitleFightReport`, whose `losses = bouts − wins − draws` derive was already killed.
+- **S4.2 — `/ring` renders the per-defender board (additive read)** (PR #261, `feat/ring-placement-board`) — the
+  fight card swaps the single King scout block for a rank-ordered defender list (name + model mark + handle
+  by-line + win-rate + beat/lost text, board[0] tagged **King** — text markers, never colour alone); `titleView`
+  reshapes to read `title.board`, `outcomeHeadline` decides first-King vs dethrone by **board emptiness**.
+  `readBoard` (sibling of `readIncumbent`) + `beatLabel` + `.ring-defender-*` CSS. After this slice the web reads
+  **only** `board`. Verified by exhaustive exact-assertion browser tests + a manual mutator scan (web is outside
+  Stryker's node scope); the defensive malformed-entry filter is pinned by its own test.
+- **S4.3 — retire the redundant flat King scout, closes S4** (PR #262, `refactor/retire-fight-flat-scout`) — a
+  pure `src/http` cleanup (`+102 / −61`): dropped the `scout` local + both `...scout` spreads, so `/fight`'s
+  `title` simplifies to `{ outcome, rank?, board, displaced? }` — `board[0]` is now the SOLE King-fight source
+  (identity in `board[0].defender`, telemetry inline). Web-invisible (it read `board` since S4.2). The node tests
+  migrated the flat-scout reads to `board[0]` + added two "flat scout absent" guards (the RED driver);
+  `champion-identity.ts` doc comments refreshed (`incumbent` → `board[].defender`). Clean **100% mutation** (111
+  killed, one fewer than S4.1 — the retired scout expression).
+
+[koth-ladder-s4-placement-telemetry.md](koth-ladder-s4-placement-telemetry.md)
