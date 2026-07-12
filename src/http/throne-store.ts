@@ -66,7 +66,35 @@ export type ThroneStore = {
   ): Promise<ArenaCasResult>;
 };
 
-export const inMemoryThroneStore = (): ThroneStore => {
+// The default reproduction-archive bound (K) — the count of newest records kept unconditionally.
+// Tunable config: raise it to retain more replay history, lower it to spend less storage. The
+// composition root uses this default; tests inject a small K. Both the fake and the Upstash adapter
+// read the same knob, so the archive bounds identically everywhere.
+export const DEFAULT_ARCHIVE_LIMIT = 50;
+
+// The archive retained after an append: the newest `limit` records, PLUS any older record still
+// PINNED to a current arena member (its `memberSeniority` is among the committed arena's seniorities).
+// So live members' entry replays are never lost ("newest K + up to N pinned"); a record un-pins the
+// moment its member relegates (its seniority drops out of `pinnedSeniorities`) and ages out normally.
+// Pure — the single source of the bound-and-pin rule the fake applies and the adapter's Lua mirrors.
+// `pinnedSeniorities` is typed over `number | null` so a non-placer's null key can be looked up
+// directly (the real set holds only numbers, so a null never matches — no separate guard needed).
+export const retainArchive = (
+  records: readonly ReproRecord[],
+  pinnedSeniorities: ReadonlySet<number | null>,
+  limit: number,
+): ReproRecord[] => {
+  const cutoff = records.length - limit;
+
+  return records.filter(
+    (record, index) =>
+      index >= cutoff || pinnedSeniorities.has(record.memberSeniority),
+  );
+};
+
+export const inMemoryThroneStore = (
+  archiveLimit = DEFAULT_ARCHIVE_LIMIT,
+): ThroneStore => {
   const arenas = new Map<string, ArenaRecord>();
   const archives = new Map<string, ReproRecord[]>();
 
@@ -85,7 +113,10 @@ export const inMemoryThroneStore = (): ThroneStore => {
       arenas.set(version, next);
 
       if (record !== undefined) {
-        archives.set(version, [...(archives.get(version) ?? []), record]);
+        const appended = [...(archives.get(version) ?? []), record];
+        const pinned = new Set(next.members.map((member) => member.seniority));
+
+        archives.set(version, retainArchive(appended, pinned, archiveLimit));
       }
 
       return Promise.resolve({ ok: true, record: next });

@@ -47,9 +47,12 @@ describe.skipIf(!live)(
       namespaces.push(versionA, versionB);
 
       return {
-        store: upstashThroneStore(config),
+        // A small archive bound (3) so the eviction spec exercises the real Lua eviction on live
+        // Redis with a handful of commits (the default fetch; K passed as the 3rd arg).
+        store: upstashThroneStore(config, undefined, 3),
         versionA,
         versionB,
+        archiveLimit: 3,
       };
     });
 

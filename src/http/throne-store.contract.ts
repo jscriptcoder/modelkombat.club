@@ -46,10 +46,13 @@ const repro = (
 // A harness makes a FRESH, isolated store and the two version keys the spec exercises (`versionB`
 // proves isolation). The fake uses fixed keys on a fresh in-memory store; the live smoke harness
 // uses unique throwaway keys per call, so a persistent Redis stays isolated between cases.
+// `archiveLimit` is the (small) reproduction-archive bound the store was built with, so the eviction
+// spec can drive it with just a handful of commits and assert against the exact K.
 export type ThroneStoreHarness = () => {
   store: ThroneStore;
   versionA: string;
   versionB: string;
+  archiveLimit: number;
 };
 
 export const runThroneStoreContract = (make: ThroneStoreHarness): void => {
@@ -236,5 +239,128 @@ export const runThroneStoreContract = (make: ThroneStoreHarness): void => {
     // A record-less commit (e.g. test/seed setup) swaps the arena but leaves the archive untouched —
     // the append fires ONLY when a record is supplied.
     expect(await store.readArchive(versionA)).toEqual([]);
+  });
+
+  // S5.2: the archive is COUNT-bounded to the newest K, with one exemption — a record belonging to a
+  // CURRENT arena member (its `memberSeniority` is among the committed arena's member seniorities) is
+  // PINNED and never evicted, so everything live is always replayable. A member's record un-pins the
+  // moment it relegates. Effective archive = "newest K + up to N pinned." K is the harness's small
+  // `archiveLimit`; the pin set is derived from each commit's `next.members`, so the store owns it end
+  // to end (no handler change).
+
+  // Append `record` at the next generation over a constant arena — a small helper so the eviction
+  // cases read as sequences of commits rather than CAS bookkeeping.
+  const appendAt = (
+    store: ThroneStore,
+    version: string,
+    generation: number,
+    members: ArenaMember[],
+    record: ReproRecord,
+  ): Promise<unknown> =>
+    store.commitArena(
+      version,
+      generation === 1 ? null : generation - 1,
+      { members, generation, nextSeniority: 999 },
+      record,
+    );
+
+  it("bounds a pin-less archive to the newest K, evicting the oldest first", async () => {
+    const { store, versionA, archiveLimit } = make();
+    const king = [member("king", 99)]; // a stable arena member; no record is pinned to seniority 99
+
+    // Commit K+1 non-placer records (memberSeniority null ⇒ never pinned). The oldest must age out.
+    for (let i = 0; i <= archiveLimit; i += 1) {
+      await appendAt(
+        store,
+        versionA,
+        i + 1,
+        king,
+        repro(`c${i}`, { memberSeniority: null }),
+      );
+    }
+
+    const names = (await store.readArchive(versionA)).map(
+      (r) => r.challenger.name,
+    );
+    // c0 (oldest) evicted; the newest K survive, oldest-first.
+    expect(names).toEqual(
+      Array.from({ length: archiveLimit }, (_, k) => `c${k + 1}`),
+    );
+  });
+
+  it("keeps a pinned member's record beyond the newest-K window while an equally-old unpinned one is evicted", async () => {
+    const { store, versionA, archiveLimit } = make();
+    const king = [member("king", 7)]; // the arena always holds seniority 7
+
+    // A placer record pinned to seniority 7, then K+1 non-placer records — so TWO records fall out of
+    // the newest-K window: the pinned one (survives) and the oldest null `c0` (evicted).
+    await appendAt(
+      store,
+      versionA,
+      1,
+      king,
+      repro("pinned", { memberSeniority: 7 }),
+    );
+
+    for (let i = 0; i <= archiveLimit; i += 1) {
+      await appendAt(
+        store,
+        versionA,
+        i + 2,
+        king,
+        repro(`c${i}`, { memberSeniority: null }),
+      );
+    }
+
+    const names = (await store.readArchive(versionA)).map(
+      (r) => r.challenger.name,
+    );
+    expect(names).toContain("pinned"); // pinned to a live member ⇒ never evicted
+    expect(names).not.toContain("c0"); // an equally-old UNPINNED record aged out
+    expect(names).toHaveLength(archiveLimit + 1); // newest K + the 1 pinned
+  });
+
+  it("un-pins a relegated member's record, making it evictable like any other", async () => {
+    const { store, versionA, archiveLimit } = make();
+    const withSeven = [member("king", 7)];
+
+    // Pin a record to seniority 7, then fill the window while 7 stays in the arena (it survives).
+    await appendAt(
+      store,
+      versionA,
+      1,
+      withSeven,
+      repro("pinned", { memberSeniority: 7 }),
+    );
+
+    for (let i = 0; i <= archiveLimit; i += 1) {
+      await appendAt(
+        store,
+        versionA,
+        i + 2,
+        withSeven,
+        repro(`c${i}`, { memberSeniority: null }),
+      );
+    }
+
+    expect(
+      (await store.readArchive(versionA)).map((r) => r.challenger.name),
+    ).toContain("pinned"); // still pinned here
+
+    // Now a commit whose arena DROPS seniority 7 (relegated) and seats seniority 8. Seniority 7's
+    // record un-pins → it is outside the newest-K window → evicted on this pass.
+    await appendAt(
+      store,
+      versionA,
+      archiveLimit + 3,
+      [member("newking", 8)],
+      repro("relegator", { memberSeniority: 8 }),
+    );
+
+    const names = (await store.readArchive(versionA)).map(
+      (r) => r.challenger.name,
+    );
+    expect(names).not.toContain("pinned"); // un-pinned ⇒ evicted
+    expect(names).toContain("relegator");
   });
 };
