@@ -478,3 +478,40 @@ exception" — every real Redis op is keyword-pinned).
 `koth-ladder-stories.md` (the story split) — was kept live in `plans/` across S1–S5 and is now archived here
 alongside the slice plans. Remaining ladder-adjacent roadmap items (`/replay` endpoint + Pixi viewer, real
 seasons) are separate, out of the ladder feature's scope.
+
+## Variety telemetry — S1a (pooled move-usage histogram) ✅ COMPLETE
+
+The first shipped capability of the **variety-telemetry harness** — the instrument `DESIGN §P7`
+calls for, to tune move balance ("no move > ~35% usage") from measurement instead of guesswork.
+`npm run telemetry` runs the frozen 6-bot gauntlet as a both-sides, all-seeds round-robin and prints
+a pooled **honoured-commitment** histogram over the **13 techniques** (11 attack moves + `throw` +
+`sweep`): dominant moves (raw share > 35%) flagged `⚠`, dead moves visible as explicit `0.0%`. A
+**pure read-only reduction** over existing `runFight` output — `FightResult.events[].{a,b}` already
+carry `action` + `degrade`, so there is **no** engine/TCB change, **no** `INPUT_HASH` /
+`BENCHMARK_VERSION` bump, and `npm run fight` stays byte-identical. Mirrors the benchmark trio:
+`src/engine/telemetry.ts` (pure core) + `src/cli/run-telemetry.ts` (pure CLI) + `src/cli/telemetry.ts`
+(thin fs shell). Both slices TDD'd at **100% mutation**.
+
+- **Slice 1 — pooled usage histogram + dominance flag** (PR #270, `feat/variety-telemetry-s1a`) —
+  `reduceUsage(fights)` pools every honoured commitment (`action.type ∈ {attack,throw,sweep}` AND
+  `degrade === null`) over both fighters into a per-technique count/share, flagging
+  `share > USAGE_FLAG_THRESHOLD` (0.35); `runVariety` drives the `i ≠ j` round-robin keeping `events`.
+  Rows sort share-desc with the canonical frame-table order as a **stable-sort** tie-break — the
+  `indexOf` arithmetic was dropped, its `-`→`+` mutant being unkillable because rows are built
+  already-canonical. CLI presentation mutants are killed by exact-`toBe` render tests (space runs
+  spelled `" ".repeat(n)`).
+- **Slice 2 — provenance header + small-sample caveat** (PR #271,
+  `feat/variety-telemetry-header-caveat`) — the report opens with a header (mirroring
+  `run-benchmark.ts`'s block): version / population roster / `N bots · S seeds · round-robin = F
+fights · C honoured commitments`, plus a caveat line when `population.length < SMALL_POPULATION`
+  (30) so low-N reference-roster figures aren't misread as discovered LLM behavior. Added `totalFights`
+  to `VarietyReport` (the drift-proof fight denominator) + a pure `renderHeader`. The
+  `SMALL_POPULATION` literal + comparison-operator mutants need a **hardcoded-29/30** boundary test —
+  deriving the sizes from the imported constant leaves the value mutant alive.
+
+[variety-telemetry-s1a.md](variety-telemetry-s1a.md)
+
+**S1a complete; harness ongoing.** The sibling scoping + story-split docs — `variety-telemetry-harness.md`
+(grill-me: 8 resolved decisions) + `variety-telemetry-stories.md` (story split S1a–S5c) — stay live in
+`plans/` as the trail for the next slice **S1b** (effective-move-count + adoption + `--json` + population
+override) and beyond.
