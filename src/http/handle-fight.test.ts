@@ -104,6 +104,7 @@ const staleArenaStore = (
   seenAtRead: ArenaRecord | undefined,
 ): FightDeps["store"] => ({
   readArena: () => Promise.resolve(seenAtRead),
+  readArchive: inner.readArchive,
   commitArena: inner.commitArena,
 });
 
@@ -454,10 +455,11 @@ describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
 
     const store: FightDeps["store"] = {
       readArena: inner.readArena,
-      commitArena: (v, e, n) => {
+      readArchive: inner.readArchive,
+      commitArena: (v, e, n, r) => {
         commits += 1;
 
-        return inner.commitArena(v, e, n);
+        return inner.commitArena(v, e, n, r);
       },
     };
 
@@ -498,9 +500,22 @@ describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
     expect(body.title).not.toHaveProperty("winRate");
     expect(body.title).not.toHaveProperty("bouts");
 
-    // nothing was committed — commitArena was never called and the arena is byte-identical
-    expect(commits).toBe(0);
+    // S5.1: a non-placer now COMMITS once — to archive its reproduction record, gen-guarded against
+    // the arena it fought — but leaves the arena byte-identical (it entered no slot).
+    expect(commits).toBe(1);
     expect(await inner.readArena("vTEST")).toEqual(before);
+
+    // its record is archived: the challenger, the three defenders it fought, and memberSeniority null
+    // (a non-placer is never an arena member, so its record is unpinnable).
+    const archive = await inner.readArchive("vTEST");
+    expect(archive).toHaveLength(1);
+    expect(archive[0].challenger.name).toBe("aggressor");
+    expect(archive[0].defenders.map((d) => d.name)).toEqual([
+      "berserker",
+      "pacer",
+      "berserker-2",
+    ]);
+    expect(archive[0].memberSeniority).toBeNull();
   });
 });
 
@@ -547,6 +562,8 @@ describe("handleFight — S2.1: concurrent placements serialize (409 throne-move
     expect((await inner.readArena("vTEST"))?.members[0].champion).toEqual(
       usurper,
     );
+    // S5.1: nothing tears on a lost race — the loser's reproduction record is NOT archived either
+    expect(await inner.readArchive("vTEST")).toEqual([]);
   });
 
   it("409s a bootstrap crown when the empty arena was claimed since the read", async () => {
@@ -574,6 +591,8 @@ describe("handleFight — S2.1: concurrent placements serialize (409 throne-move
     expect((await inner.readArena("vTEST"))?.members[0].champion).toEqual(
       usurper,
     );
+    // S5.1: the bootstrap loser archived nothing on the lost race
+    expect(await inner.readArchive("vTEST")).toEqual([]);
   });
 });
 
@@ -883,10 +902,11 @@ describe("handleFight — S2.3: mirror-reject (C4) + re-entry (D3)", () => {
       commits: () => commits,
       store: {
         readArena: inner.readArena,
-        commitArena: (v, e, n) => {
+        readArchive: inner.readArchive,
+        commitArena: (v, e, n, r) => {
           commits += 1;
 
-          return inner.commitArena(v, e, n);
+          return inner.commitArena(v, e, n, r);
         },
       },
     };
@@ -1228,5 +1248,65 @@ describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
     ]) {
       expect(t).not.toHaveProperty(key);
     }
+  });
+});
+
+// S5.1: every gauntlet-clearer's fight is archived as replay raw material — its reproduction record
+// {challenger doc, defender docs, seeds, version, memberSeniority} is appended ATOMICALLY with the
+// arena commit. A placer/King pins by its seniority; a non-placer archives too (memberSeniority null,
+// covered by the S2.2 unplaced test above). Nothing is archived when the gauntlet gate fails.
+describe("handleFight — S5.1: reproduction archive", () => {
+  it("archives the bootstrap champion's record — empty defenders, pinned by seniority 1", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    expect(
+      ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
+    ).toBe("crowned");
+
+    const archive = await store.readArchive("vTEST");
+    expect(archive).toHaveLength(1);
+    expect(archive[0].challenger.name).toBe("aggressor");
+    expect(archive[0].defenders).toEqual([]); // an empty arena → no defenders fought
+    expect(archive[0].seeds).toEqual([1, 2, 3, 4, 5]);
+    expect(archive[0].version).toBe("vTEST");
+    expect(archive[0].memberSeniority).toBe(1); // the King's pin key
+  });
+
+  it("archives a placing challenger's record — the defenders it fought, pinned by its seniority", async () => {
+    const store = inMemoryThroneStore();
+    await enthrone(store, "vTEST", loadBot("aggressor")); // King=aggressor, seniority 1, nextSeniority 2
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker"))), // berserker beats aggressor 1.00 → crowns #1
+      arena("vTEST", store),
+    );
+
+    expect(
+      ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
+    ).toBe("crowned");
+
+    const archive = await store.readArchive("vTEST");
+    expect(archive).toHaveLength(1);
+    expect(archive[0].challenger.name).toBe("berserker");
+    expect(archive[0].defenders.map((d) => d.name)).toEqual(["aggressor"]);
+    expect(archive[0].memberSeniority).toBe(2); // its assigned seniority (the arena's nextSeniority)
+  });
+
+  it("archives nothing when the submission fails the gauntlet gate", async () => {
+    const store = inMemoryThroneStore();
+    await enthrone(store, "vTEST", loadBot("aggressor")); // a King reigns
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(mover())), // only walks → cannot clear the idle dummy → no title shot
+      arena("vTEST", store),
+    );
+
+    expect(((await res.json()) as { title?: unknown }).title).toBeUndefined();
+    expect(await store.readArchive("vTEST")).toEqual([]); // no clear ⇒ no archive entry
   });
 });

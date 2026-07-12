@@ -5,6 +5,7 @@
 import type {
   ArenaCasResult,
   ArenaRecord,
+  ReproRecord,
   ThroneStore,
 } from "./throne-store.js";
 
@@ -20,6 +21,7 @@ export type FetchLike = (
 export type UpstashConfig = { url: string; token: string };
 
 const arenaKey = (version: string): string => `arena:${version}`;
+const archiveKey = (version: string): string => `archive:${version}`;
 
 // The shape of every Upstash REST call: POST the command array as JSON with bearer auth.
 const restRequest = (
@@ -37,16 +39,19 @@ const restRequest = (
   },
 });
 
-// The atomic arena commit. KEYS = [arena pointer]; ARGV = [expectedGeneration, nextArenaJson].
-// The stored generation is read out of the pointer record; ARGV[1] is the empty-string sentinel to
-// mean "expect the arena empty". On a match: set the pointer to the new arena and succeed;
-// otherwise report "moved" (a lost CAS race → 409).
+// The atomic arena commit + archive append. KEYS = [arena pointer, archive list]; ARGV =
+// [expectedGeneration, nextArenaJson, reproRecordJson]. The stored generation is read out of the
+// pointer record; ARGV[1] is the empty-string sentinel to mean "expect the arena empty". On a
+// generation match: set the pointer to the new arena, append the reproduction record to the archive
+// list when one is supplied (ARGV[3] non-empty), and succeed — one indivisible step. On a mismatch,
+// report "moved" (a lost CAS race → 409) BEFORE any write, so nothing (arena or archive) tears.
 export const COMMIT_ARENA_SCRIPT = [
   "local ptr = redis.call('GET', KEYS[1])",
   "local current = ''",
   "if ptr then current = tostring(cjson.decode(ptr)['generation']) end",
   "if current ~= ARGV[1] then return 'moved' end",
   "redis.call('SET', KEYS[1], ARGV[2])",
+  "if ARGV[3] ~= '' then redis.call('RPUSH', KEYS[2], ARGV[3]) end",
   "return 'ok'",
 ].join("\n");
 
@@ -57,23 +62,36 @@ export const buildReadArenaRequest = (
 ): { url: string; init: RequestInit } =>
   restRequest(config, ["GET", arenaKey(version)]);
 
-// Pure: build the Upstash REST request for an atomic arena commit EVAL. `expected` is stringified
-// (null ⇒ "" = "expect empty arena"); ARGV[2] is the next arena JSON.
+// Pure: build the Upstash REST request to read the whole reproduction archive (an `LRANGE 0 -1` of
+// the version's archive list, oldest first). A missing list LRANGEs to an empty array.
+export const buildReadArchiveRequest = (
+  config: UpstashConfig,
+  version: string,
+): { url: string; init: RequestInit } =>
+  restRequest(config, ["LRANGE", archiveKey(version), "0", "-1"]);
+
+// Pure: build the Upstash REST request for an atomic arena-swap + archive-append EVAL. `expected` is
+// stringified (null ⇒ "" = "expect empty arena"); ARGV[2] is the next arena JSON; ARGV[3] is the
+// reproduction record JSON, or "" (the sentinel that skips the RPUSH) when no record is supplied.
 export const buildCommitArenaRequest = (
   config: UpstashConfig,
   version: string,
   expected: number | null,
   next: ArenaRecord,
+  record?: ReproRecord,
 ): { url: string; init: RequestInit } => {
   const expectedArg = expected === null ? "" : String(expected);
+  const recordArg = record === undefined ? "" : JSON.stringify(record);
 
   return restRequest(config, [
     "EVAL",
     COMMIT_ARENA_SCRIPT,
-    "1",
+    "2",
     arenaKey(version),
+    archiveKey(version),
     expectedArg,
     JSON.stringify(next),
+    recordArg,
   ]);
 };
 
@@ -96,6 +114,22 @@ export const interpretReadArenaReply = (
   const parsed: unknown = JSON.parse(String(reply.result));
 
   return parsed as ArenaRecord;
+};
+
+// Interpret an archive `LRANGE` reply: each element is a stored record JSON string, parsed back into
+// a `ReproRecord`, oldest first. A missing list LRANGEs to `[]`. An error is thrown, NEVER read as an
+// empty archive — a transient failure must not masquerade as "no history."
+export const interpretReadArchiveReply = (
+  reply: UpstashReply,
+): ReproRecord[] => {
+  if ("error" in reply) {
+    throw new Error(`Upstash archive read failed: ${String(reply.error)}`);
+  }
+
+  // Trust-boundary parse of records this adapter itself wrote (round-trip of our own JSON).
+  const rows = reply.result as unknown[];
+
+  return rows.map((row) => JSON.parse(String(row)) as ReproRecord);
 };
 
 // Interpret an arena commit `EVAL` reply: 'ok' ⇒ the commit landed (carrying the committed arena),
@@ -131,7 +165,8 @@ const post = async (
 };
 
 // The durable `ThroneStore`: the same port the in-memory fake implements, backed by Upstash Redis.
-// `readArena` GETs the arena pointer; `commitArena` runs the atomic commit EVAL.
+// `readArena` GETs the arena pointer; `readArchive` LRANGEs the archive list; `commitArena` runs the
+// atomic swap-arena + append-record EVAL.
 export const upstashThroneStore = (
   config: UpstashConfig,
   fetchImpl: FetchLike = fetch,
@@ -142,12 +177,19 @@ export const upstashThroneStore = (
     return interpretReadArenaReply(await post(fetchImpl, url, init));
   },
 
-  commitArena: async (version, expected, next) => {
+  readArchive: async (version) => {
+    const { url, init } = buildReadArchiveRequest(config, version);
+
+    return interpretReadArchiveReply(await post(fetchImpl, url, init));
+  },
+
+  commitArena: async (version, expected, next, record) => {
     const { url, init } = buildCommitArenaRequest(
       config,
       version,
       expected,
       next,
+      record,
     );
 
     return interpretCommitArenaReply(await post(fetchImpl, url, init), next);

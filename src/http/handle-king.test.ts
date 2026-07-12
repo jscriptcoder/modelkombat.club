@@ -70,6 +70,7 @@ const seatArena = (
 // on an error reply, never silently reads empty). Drives the 503 path.
 const failingStore = (): ThroneStore => ({
   readArena: () => Promise.reject(new Error("upstash unreachable")),
+  readArchive: () => Promise.reject(new Error("unused in /king")),
   commitArena: () => Promise.reject(new Error("unused in /king")),
 });
 

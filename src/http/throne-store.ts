@@ -34,26 +34,48 @@ export type ArenaCasResult =
   | { ok: true; record: ArenaRecord }
   | { ok: false; reason: "moved" };
 
+// A reproduction record: a gauntlet-clearer's fight captured as REPLAY RAW MATERIAL — the challenger
+// document, the exact defender documents it fought, the frozen seeds, and the version (from which any
+// fight is regenerated via `runFight`, never a tape — invariant #1). `memberSeniority` is the pin key:
+// a placer's assigned seniority (so its record is kept while it sits in the arena), or `null` for a
+// non-placer (never an arena member). Docs are private raw material — never surfaced (doc-privacy);
+// the future `/replay` renders behavior only. K-bounding + pinning arrive with S5.2.
+export type ReproRecord = {
+  challenger: BotDoc;
+  defenders: BotDoc[];
+  seeds: readonly number[];
+  version: string;
+  memberSeniority: number | null;
+};
+
 export type ThroneStore = {
   // The current ranked arena for a version, or `undefined` when no champion has been crowned.
   readArena(version: string): Promise<ArenaRecord | undefined>;
+  // The version's reproduction archive in append order (empty for an untouched version). No HTTP
+  // surface consumes it yet — it exists for the store contract + the future `/replay`.
+  readArchive(version: string): Promise<ReproRecord[]>;
   // Commit `next` iff the stored arena generation still equals `expected` (`null` = "expected
-  // empty arena"). One atomic step: swap the arena record at the new generation, or report a lost
-  // CAS race (`moved`).
+  // empty arena"). One atomic step: swap the arena record at the new generation AND — when a
+  // reproduction `record` is supplied — append it to the archive, together or not at all; or report
+  // a lost CAS race (`moved`), writing nothing.
   commitArena(
     version: string,
     expected: number | null,
     next: ArenaRecord,
+    record?: ReproRecord,
   ): Promise<ArenaCasResult>;
 };
 
 export const inMemoryThroneStore = (): ThroneStore => {
   const arenas = new Map<string, ArenaRecord>();
+  const archives = new Map<string, ReproRecord[]>();
 
   return {
     readArena: (version) => Promise.resolve(arenas.get(version)),
 
-    commitArena: (version, expected, next) => {
+    readArchive: (version) => Promise.resolve(archives.get(version) ?? []),
+
+    commitArena: (version, expected, next, record) => {
       const current = arenas.get(version);
 
       if ((current?.generation ?? null) !== expected) {
@@ -61,6 +83,10 @@ export const inMemoryThroneStore = (): ThroneStore => {
       }
 
       arenas.set(version, next);
+
+      if (record !== undefined) {
+        archives.set(version, [...(archives.get(version) ?? []), record]);
+      }
 
       return Promise.resolve({ ok: true, record: next });
     },

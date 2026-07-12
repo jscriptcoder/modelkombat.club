@@ -55,7 +55,7 @@ describe.skipIf(!live)(
 
     afterAll(async () => {
       for (const version of namespaces) {
-        await rest(["DEL", `arena:${version}`]);
+        await rest(["DEL", `arena:${version}`, `archive:${version}`]);
       }
     });
   },
