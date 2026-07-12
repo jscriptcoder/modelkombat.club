@@ -96,9 +96,7 @@ describe("SpecPage", () => {
   it("disambiguates repeated headings so ids stay unique", () => {
     const dupes = "## Frame table\n\nfirst\n\n## Frame table\n\nsecond";
 
-    const { getAllByRole, container } = render(() => (
-      <SpecPage spec={dupes} />
-    ));
+    const { getAllByRole, container } = render(() => <SpecPage spec={dupes} />);
 
     expect(getAllByRole("heading", { name: "Frame table" })).toHaveLength(2);
     // The first keeps the clean slug; the second is suffixed — both ids exist.

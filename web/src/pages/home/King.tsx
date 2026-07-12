@@ -1,7 +1,8 @@
 import { Match, Show, Switch, type Component } from "solid-js";
 
-import { CANONICAL_ORIGIN } from "./config";
-import ModelLogo from "./ModelLogo";
+import { CANONICAL_ORIGIN } from "../../shared/lib/config";
+import { KING_PATH } from "../../shared/lib/paths";
+import ModelLogo from "../../shared/components/ModelLogo";
 
 // The identity-only view of a champion, mirroring the `GET /king` contract. Never the
 // champion's bot DSL.
@@ -39,7 +40,7 @@ const King: Component<KingProps> = (props) => {
                 </p>
                 <p class="king-empty-link">
                   Live standings are served as JSON at{" "}
-                  <a href="/king">{CANONICAL_ORIGIN}/king</a>.
+                  <a href={KING_PATH}>{`${CANONICAL_ORIGIN}${KING_PATH}`}</a>.
                 </p>
               </div>
             }

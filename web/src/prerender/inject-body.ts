@@ -59,7 +59,9 @@ const SCRIPT = /<script\b[\s\S]*?<\/script>\s*/g;
 
 export const stripScripts = (template: string): string => {
   if (!/<script\b/.test(template)) {
-    throw new Error("prerender: no <script> found to strip from the HTML shell");
+    throw new Error(
+      "prerender: no <script> found to strip from the HTML shell",
+    );
   }
 
   return template.replace(SCRIPT, "");

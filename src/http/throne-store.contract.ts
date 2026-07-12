@@ -282,6 +282,7 @@ export const runThroneStoreContract = (make: ThroneStoreHarness): void => {
     const names = (await store.readArchive(versionA)).map(
       (r) => r.challenger.name,
     );
+
     // c0 (oldest) evicted; the newest K survive, oldest-first.
     expect(names).toEqual(
       Array.from({ length: archiveLimit }, (_, k) => `c${k + 1}`),
@@ -315,6 +316,7 @@ export const runThroneStoreContract = (make: ThroneStoreHarness): void => {
     const names = (await store.readArchive(versionA)).map(
       (r) => r.challenger.name,
     );
+
     expect(names).toContain("pinned"); // pinned to a live member ⇒ never evicted
     expect(names).not.toContain("c0"); // an equally-old UNPINNED record aged out
     expect(names).toHaveLength(archiveLimit + 1); // newest K + the 1 pinned
@@ -360,6 +362,7 @@ export const runThroneStoreContract = (make: ThroneStoreHarness): void => {
     const names = (await store.readArchive(versionA)).map(
       (r) => r.challenger.name,
     );
+
     expect(names).not.toContain("pinned"); // un-pinned ⇒ evicted
     expect(names).toContain("relegator");
   });

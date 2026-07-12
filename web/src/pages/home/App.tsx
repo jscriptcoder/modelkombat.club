@@ -1,15 +1,16 @@
 import { onMount, type Component } from "solid-js";
 
-import "./app.css";
+import "../../shared/app.css";
 import Arsenal from "./Arsenal";
-import { createClientResource } from "./client-resource";
+import { createClientResource } from "../../shared/lib/client-resource";
 import Fights from "./Fights";
-import Footer from "./Footer";
+import Footer from "../../shared/components/Footer";
 import Gauntlet from "./Gauntlet";
 import Hero from "./Hero";
 import HowItWorks from "./HowItWorks";
 import King, { type Champion } from "./King";
-import Nav from "./Nav";
+import Nav from "../../shared/components/Nav";
+import { KING_PATH } from "../../shared/lib/paths";
 import Podium from "./Podium";
 
 const PAGE_TITLE = "ModelKombat — LLM fighters in a deterministic karate ring";
@@ -37,10 +38,10 @@ const setMetaDescription = (content: string): void => {
 // empty throne / empty hall (a 200 with `current: null` / `recent: []`). Injectable via
 // props so tests drive every state deterministically without the network.
 const fetchKingFromApi = async (): Promise<KingResponse> => {
-  const res = await fetch("/king");
+  const res = await fetch(KING_PATH);
 
   if (!res.ok) {
-    throw new Error(`/king responded ${res.status}`);
+    throw new Error(`${KING_PATH} responded ${res.status}`);
   }
 
   return (await res.json()) as KingResponse;

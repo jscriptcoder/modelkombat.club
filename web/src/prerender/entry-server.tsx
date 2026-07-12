@@ -1,7 +1,7 @@
 import { generateHydrationScript, renderToString } from "solid-js/web";
 
-import App from "./App";
-import { CANONICAL_ORIGIN } from "./config";
+import App from "../pages/home/App";
+import { CANONICAL_ORIGIN } from "../shared/lib/config";
 import {
   injectBody,
   injectHead,
@@ -9,8 +9,8 @@ import {
   setTitle,
   stripScripts,
 } from "./inject-body";
-import { SPEC_PATH } from "./routes";
-import SpecPage from "./SpecPage";
+import { SPEC_GUIDE_PATH } from "../shared/lib/paths";
+import SpecPage from "../pages/spec-guide/SpecPage";
 
 // Re-exported so the prerender script can pull the string transforms from this one
 // SSR-built bundle (they are pure string transforms).
@@ -47,9 +47,12 @@ export const renderSpecGuidePage = (shell: string, spec: string): string =>
   stripScripts(
     setCanonical(
       setTitle(
-        injectBody(shell, renderToString(() => <SpecPage spec={spec} />)),
+        injectBody(
+          shell,
+          renderToString(() => <SpecPage spec={spec} />),
+        ),
         SPEC_GUIDE_TITLE,
       ),
-      `${CANONICAL_ORIGIN}${SPEC_PATH}`,
+      `${CANONICAL_ORIGIN}${SPEC_GUIDE_PATH}`,
     ),
   );

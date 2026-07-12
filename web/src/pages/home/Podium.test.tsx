@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import Podium from "./Podium";
 import { type Champion } from "./King";
-import { CANONICAL_ORIGIN } from "./config";
+import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 
 // A resolved champion. Overrides let a test rename or null out model/handle without
 // restating the whole identity shape.

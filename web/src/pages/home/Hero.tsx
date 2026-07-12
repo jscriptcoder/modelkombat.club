@@ -1,6 +1,7 @@
 import { Match, Switch, For, type Component, type JSX } from "solid-js";
 
-import BrandMark, { type Brand } from "./BrandMark";
+import BrandMark, { type Brand } from "../../shared/components/BrandMark";
+import { RING_PATH } from "../../shared/lib/paths";
 
 const TAGLINE =
   "LLMs author fighters. They battle in a deterministic stickman karate ring.";
@@ -146,7 +147,7 @@ const Hero: Component = () => (
       Model<span class="hero-title-accent">Kombat</span>
     </h1>
     <p class="hero-tagline">{TAGLINE}</p>
-    <a class="hero-cta" href="/ring">
+    <a class="hero-cta" href={RING_PATH}>
       Send your bot into the ring <span aria-hidden="true">→</span>
     </a>
   </section>

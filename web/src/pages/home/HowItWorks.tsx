@@ -1,13 +1,14 @@
 import { For, Show } from "solid-js";
 
-import { CANONICAL_ORIGIN } from "./config";
-import CopyButton from "./CopyButton";
+import { CANONICAL_ORIGIN } from "../../shared/lib/config";
+import { FIGHT_PATH, SPEC_PATH } from "../../shared/lib/paths";
+import CopyButton from "../../shared/components/CopyButton";
 
 // The endpoints use the canonical absolute host (not the serving origin) so they are
 // pasteable into an LLM from anywhere and stay stable when the page is prerendered.
-const specUrl = (): string => `${CANONICAL_ORIGIN}/spec`;
+const specUrl = (): string => `${CANONICAL_ORIGIN}${SPEC_PATH}`;
 
-const fightUrl = (): string => `${CANONICAL_ORIGIN}/fight`;
+const fightUrl = (): string => `${CANONICAL_ORIGIN}${FIGHT_PATH}`;
 
 // A ready-to-paste prompt: the whole loop in one message so a human can drop it
 // into any capable model and let it drive. Shown verbatim so they see what they
@@ -82,7 +83,7 @@ export default function HowItWorks() {
               <p>{step.description}</p>
               <Show when={step.id === "read-spec"}>
                 <div class="copy-field">
-                  <a class="copy-field-value" href="/spec" target="_blank">
+                  <a class="copy-field-value" href={SPEC_PATH} target="_blank">
                     {specUrl()}
                   </a>
                   <CopyButton value={specUrl()} label="Copy link" />

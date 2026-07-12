@@ -1,7 +1,7 @@
 import { render } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
-import "./app.css";
+import "../../shared/app.css";
 import Hero from "./Hero";
 
 // The composed face-off (left → right): OpenAI throws a reverse punch toward the centre,

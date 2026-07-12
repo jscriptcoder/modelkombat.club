@@ -1,7 +1,7 @@
 import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
-import { CANONICAL_ORIGIN } from "./config";
+import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 import HowItWorks from "./HowItWorks";
 
 // The spec/fight URLs are the canonical absolute host so they are pasteable into an
