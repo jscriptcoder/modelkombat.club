@@ -99,6 +99,14 @@ describe("buildCommitArenaRequest — the atomic arena-swap + archive-append EVA
     expect(cmd[7]).toBe(""); // no record ⇒ the script skips the RPUSH
   });
 
+  it("passes the archive bound K as ARGV[4]", () => {
+    const cmd = command(
+      buildCommitArenaRequest(config, "v19", 1, arena(), repro("c"), 7).init,
+    );
+
+    expect(cmd[8]).toBe("7"); // the eviction limit, stringified
+  });
+
   it("scopes both keys to the requested version", () => {
     const cmd = command(
       buildCommitArenaRequest(config, "v20", 1, arena()).init,
@@ -124,6 +132,20 @@ describe("buildCommitArenaRequest — the atomic arena-swap + archive-append EVA
     expect(COMMIT_ARENA_SCRIPT).toContain("\n");
     // The RPUSH is guarded by a non-empty ARGV[3] so a record-less commit appends nothing.
     expect(COMMIT_ARENA_SCRIPT).toContain("ARGV[3]");
+  });
+
+  it("carries the K-bounded, pin-aware eviction operations", () => {
+    // After the RPUSH the script re-reads the list (LRANGE), keeps the newest K (ARGV[4]) plus any
+    // record still pinned to a committed arena member (its `memberSeniority` ∈ the decoded
+    // `next.members`), and rewrites the list (DEL + RPUSH). Behavior is proven end-to-end by the live
+    // smoke test; here we pin each op so a refactor can't silently drop the bound or the pin.
+    expect(COMMIT_ARENA_SCRIPT).toContain("LRANGE");
+    expect(COMMIT_ARENA_SCRIPT).toContain("tonumber(ARGV[4])");
+    expect(COMMIT_ARENA_SCRIPT).toContain("memberSeniority");
+    expect(COMMIT_ARENA_SCRIPT).toContain("pinned");
+    expect(COMMIT_ARENA_SCRIPT).toContain("DEL");
+    // The survivors MUST be written back after the DEL — otherwise eviction clears the whole archive.
+    expect(COMMIT_ARENA_SCRIPT).toContain("unpack(keep)");
   });
 });
 
@@ -313,6 +335,19 @@ describe("upstashThroneStore — the adapter over Upstash REST", () => {
     );
 
     expect(res).toEqual({ ok: false, reason: "moved" });
+  });
+
+  it("rides the store's configured archive bound K into the commit EVAL", async () => {
+    const { fetchImpl, calls } = stubFetch({ result: "ok" });
+
+    await upstashThroneStore(config, fetchImpl, 9).commitArena(
+      "v19",
+      null,
+      arena({ generation: 1 }),
+      repro("c"),
+    );
+
+    expect(calls[0].command[8]).toBe("9"); // the constructed K reaches ARGV[4]
   });
 
   it("reads the reproduction archive by LRANGEing the version's archive key", async () => {

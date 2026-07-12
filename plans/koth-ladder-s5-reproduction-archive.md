@@ -1,7 +1,7 @@
 # Plan: KotH ladder — S5 (fights are reproducible — the last-K reproduction archive)
 
-**Branch**: feat/reproduction-archive (S5.1) · feat/archive-eviction-pinning (S5.2)
-**Status**: Active — **S5.1 ✅ code-complete (awaiting commit approval)**; S5.2 next.
+**Branch**: feat/reproduction-archive (S5.1 ✅ merged #264) · feat/archive-eviction-pinning (S5.2)
+**Status**: **S5.1 ✅ merged · S5.2 ✅ code-complete (awaiting commit approval) → closes S5 + the ladder.**
 **Feature**: the LAST KotH ladder slice. S1✅ · S2✅ · S3✅ · S4✅ → **S5** closes the ladder.
 
 ## Goal
@@ -50,10 +50,10 @@ version}` **atomically with the arena commit** — a **placer** (arena swaps + r
 - [x] A submission that **fails the gauntlet** (no title shot) archives **nothing**. _(S5.1)_
 - [x] The record stores **documents + seeds, never a tape** (invariant #1); no read surface exposes any
       document (doc-privacy — enforced by there being no read surface in this slice). _(S5.1)_
-- [ ] Beyond **K** records, appending one evicts the **oldest non-pinned** record. _(S5.2)_
-- [ ] A record belonging to a **current arena member** (King + the N−1 defenders) is **pinned** — never
+- [x] Beyond **K** records, appending one evicts the **oldest non-pinned** record. _(S5.2)_
+- [x] A record belonging to a **current arena member** (King + the N−1 defenders) is **pinned** — never
       evicted, however long that member reigns. _(S5.2)_
-- [ ] When a member **relegates**, its record **un-pins** and becomes evictable like any other. _(S5.2)_
+- [x] When a member **relegates**, its record **un-pins** and becomes evictable like any other. _(S5.2)_
 - [x] The in-memory **fake**, the **Upstash adapter**, and the shared **contract** all satisfy the above
       identically (store parity). _(S5.1 for append/read; S5.2 extends for eviction)_
 
@@ -155,6 +155,23 @@ member's seniority leaves the arena → its record un-pins → evictable on this
   pin+bound knowledge).
   **Done when**: all S5.2 AC met, mutation report reviewed, human approves commit — **closes S5 and the
   KotH ladder feature**.
+
+  **✅ S5.2 OUTCOME (code-complete):** RED landed as 3 contract eviction cases (evict-oldest-non-pinned,
+  pin-survives-past-K-while-equally-old-unpinned-evicted, un-pin-on-relegation) driven by a small
+  harness K=3. GREEN: a pure `retainArchive(records, pinnedSeniorities, limit)` ("newest K + up to N
+  pinned") + `DEFAULT_ARCHIVE_LIMIT=50` in `throne-store.ts`; the fake applies it (pin set derived from
+  `next.members`); the Upstash adapter's EVAL grew a Lua eviction (LRANGE → filter → DEL → RPUSH
+  survivors, pin table from the decoded `next.members`, K as ARGV[4]); `buildCommitArenaRequest` +
+  `upstashThroneStore` thread K; the contract harness + smoke harness build with K=3 (smoke DELs both
+  keys). **handle-fight UNTOUCHED** — S5.2 is store-only (the store owns the pin set from the committed
+  arena). **REFACTOR:** widened `retainArchive`'s pin-set param to `ReadonlySet<number | null>`,
+  dropping a redundant TS-only null guard → eliminated the sole equivalent mutant. **MUTATE:**
+  `throne-store.ts` **100%** (36 killed); `throne-store-upstash.ts` 85.9% — the 14 survivors are ALL
+  `COMMIT_ARENA_SCRIPT` Lua-glue strings (bare `end`s / loop headers / local decls / multi-occurrence
+  tokens); every real Redis op is keyword-pinned (incl. `unpack(keep)` guarding the rewrite) and the
+  eviction+pinning BEHAVIOR is verified end-to-end by the live smoke test — the documented
+  "Lua-string survivors = smoke-verified exception." `handle-fight.ts` stays 100%. Node suite 1393
+  pass; typecheck/lint/format clean; `npm run fight` deterministic (WINNER B 7-15 seed=1).
 
 ## Slice sizing (a planning decision for the human)
 
