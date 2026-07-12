@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import App, { type KingResponse } from "./App";
 import { type Champion } from "./King";
-import { CANONICAL_ORIGIN } from "./config";
+import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 
 const isDark = (color: string): boolean => {
   const channels = color.match(/\d+/g)?.map(Number) ?? [];

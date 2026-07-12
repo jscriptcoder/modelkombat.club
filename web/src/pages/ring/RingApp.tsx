@@ -1,6 +1,6 @@
-import "./app.css";
-import Footer from "./Footer";
-import Nav from "./Nav";
+import "../../shared/app.css";
+import Footer from "../../shared/components/Footer";
+import Nav from "../../shared/components/Nav";
 import RingPage from "./RingPage";
 
 // The /ring page shell — the ring's analog of App (the home-page shell). It wraps the submit

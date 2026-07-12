@@ -1,4 +1,4 @@
-import { SPEC_PATH } from "./routes";
+import { RING_PATH, SPEC_GUIDE_PATH } from "../lib/paths";
 
 // The ModelKombat badge — the same karate high-kick stickman as the browser-tab
 // favicon, inlined so it stays CSP-safe. Purely decorative: the "ModelKombat"
@@ -61,12 +61,12 @@ export default function Nav(props: NavProps) {
         <a href="/#champions">Champions</a>
         <a href="/#fights">Fights</a>
         <a
-          href="/ring"
+          href={RING_PATH}
           aria-current={props.current === "ring" ? "page" : undefined}
         >
           Ring
         </a>
-        <a href={SPEC_PATH} target="_blank">
+        <a href={SPEC_GUIDE_PATH} target="_blank">
           Spec <span aria-hidden="true">↗</span>
         </a>
       </div>

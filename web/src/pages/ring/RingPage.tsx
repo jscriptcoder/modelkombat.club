@@ -1,15 +1,16 @@
 import { createSignal, For, Show, type Component } from "solid-js";
 
-import "./app.css";
+import "../../shared/app.css";
 import "./ring.css";
-import CopyButton from "./CopyButton";
-import ModelLogo from "./ModelLogo";
+import CopyButton from "../../shared/components/CopyButton";
+import ModelLogo from "../../shared/components/ModelLogo";
 import {
   fightError,
   type FightError,
   type ValidationIssue,
 } from "./ring-fight-error";
 import { validateHandle } from "./ring-handle";
+import { FIGHT_PATH } from "../../shared/lib/paths";
 
 // The result of a POST /fight: the HTTP status plus the parsed JSON body. `body` is `unknown`
 // because a non-2xx carries a problem+json, not a report — the human still sees and copies it.
@@ -46,7 +47,7 @@ const postFightToApi: PostFight = async ({ doc, handle }) => {
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
   try {
-    const response = await fetch("/fight", {
+    const response = await fetch(FIGHT_PATH, {
       method: "POST",
       headers: {
         "content-type": "application/json",

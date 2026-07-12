@@ -2,7 +2,7 @@ import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
 import King, { type Champion } from "./King";
-import { CANONICAL_ORIGIN } from "./config";
+import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 
 // A resolved champion. Overrides let a test null out `model`/`handle` or inject a
 // hostile `name` without restating the whole identity shape.

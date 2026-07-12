@@ -1,11 +1,7 @@
 import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
-import {
-  renderApp,
-  renderHomePage,
-  renderSpecGuidePage,
-} from "./entry-server";
+import { renderApp, renderHomePage, renderSpecGuidePage } from "./entry-server";
 import {
   injectBody,
   injectHead,
@@ -13,10 +9,10 @@ import {
   setTitle,
   stripScripts,
 } from "./inject-body";
-import { CANONICAL_ORIGIN } from "./config";
-import King from "./King";
-import Podium from "./Podium";
-import SpecPage from "./SpecPage";
+import { CANONICAL_ORIGIN } from "../shared/lib/config";
+import King from "../pages/home/King";
+import Podium from "../pages/home/Podium";
+import SpecPage from "../pages/spec-guide/SpecPage";
 
 // When the page is prerendered at build time there is no browser and no network. The
 // two dynamic sections must therefore server-render their *empty* fallback — the empty

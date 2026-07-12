@@ -1,5 +1,7 @@
 import { For } from "solid-js";
 
+import { SPEC_GUIDE_PATH } from "../../shared/lib/paths";
+
 // A score badge: the numeric glyph the eye reads, plus the label a screen
 // reader announces (so "2·3" isn't voiced as "two middot three"). WKF scoring
 // is 1 yuko / 2 waza-ari / 3 ippon.
@@ -202,7 +204,7 @@ export default function Arsenal() {
         )}
       </For>
       <p class="arsenal-spec">
-        <a href="/spec-guide#frame-table" target="_blank">
+        <a href={`${SPEC_GUIDE_PATH}#frame-table`} target="_blank">
           Reach, frames, stamina, cancels — see the full frame table{" "}
           <span aria-hidden="true">↗</span>
         </a>

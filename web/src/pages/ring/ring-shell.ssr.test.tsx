@@ -6,7 +6,10 @@ import { describe, expect, it } from "vitest";
 // browser sees a real <title> + canonical, and a no-JS visitor is told how to reach the ring by
 // hand (POST /fight with an X-Author-Handle header — see /spec). Asserting the authored source
 // needs no browser, so it lives in the node SSR project.
-const ringHtml = readFileSync(new URL("../ring.html", import.meta.url), "utf8");
+const ringHtml = readFileSync(
+  new URL("../../../ring.html", import.meta.url),
+  "utf8",
+);
 
 describe("ring.html shell", () => {
   it("names the page and points its canonical at /ring", () => {
@@ -29,6 +32,6 @@ describe("ring.html shell", () => {
   });
 
   it("boots the client from the ring entry module", () => {
-    expect(ringHtml).toContain('src="/src/ring.tsx"');
+    expect(ringHtml).toContain('src="/src/pages/ring/ring.tsx"');
   });
 });

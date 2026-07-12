@@ -1,8 +1,9 @@
 import { For, Match, Show, Switch, type Component } from "solid-js";
 
-import { CANONICAL_ORIGIN } from "./config";
+import { CANONICAL_ORIGIN } from "../../shared/lib/config";
+import { KING_PATH } from "../../shared/lib/paths";
 import { type Champion } from "./King";
-import ModelLogo from "./ModelLogo";
+import ModelLogo from "../../shared/components/ModelLogo";
 
 // The three podium ranks, gold → bronze. A slot is filled from the ranked arena, or shown
 // as a dimmed placeholder when the arena is smaller (never a fabricated champion).
@@ -52,7 +53,7 @@ const Podium: Component<PodiumProps> = (props) => {
                 </p>
                 <p class="podium-empty-link">
                   Live standings are served as JSON at{" "}
-                  <a href="/king">{CANONICAL_ORIGIN}/king</a>.
+                  <a href={KING_PATH}>{`${CANONICAL_ORIGIN}${KING_PATH}`}</a>.
                 </p>
               </>
             }
