@@ -440,3 +440,41 @@ Stryker scope). The planned "render + retire" was split at the S4.1 CONFIRM gate
   killed, one fewer than S4.1 — the retired scout expression).
 
 [koth-ladder-s4-placement-telemetry.md](koth-ladder-s4-placement-telemetry.md)
+
+## KotH ladder — S5 reproduction archive (last-K + pinned) ✅ COMPLETE — closes the ladder
+
+The **fifth and final** story of the KotH **ladder**: every gauntlet-clearing fight becomes replayable raw
+material. Each clearer's **reproduction record** — `{ challenger doc, defender docs, seeds, version,
+memberSeniority }`, **docs + seeds, never a tape** (invariant #1 — fights regenerate via `runFight`) — is
+archived **atomically with the arena commit** (C3's one gen-guarded `{swap arena if placed} + {append + evict}`
+unit), **count-bounded to the newest K** with current arena members' records **pinned** so everything _live_ is
+always replayable, un-pinning the instant a member relegates (D6). **No HTTP read surface ships** — that's the
+parked `/replay` + Pixi viewer; this slice only guarantees the docs+seeds exist. Platform-layer (`src/http`)
+only — **TCB untouched**, no DSL op, no engine change, **no `INPUT_HASH` / `BENCHMARK_VERSION` bump**. Both
+slices TDD'd; `handle-fight.ts` + `throne-store.ts` at **100% mutation**; the Upstash adapter's atomic-commit
+Lua is verified by the env-gated **live smoke test** (the documented "Lua-string survivors = smoke-verified
+exception" — every real Redis op is keyword-pinned).
+
+- **S5.1 — archive every clearer's record atomically (walking skeleton, unbounded)** (PR #264,
+  `feat/reproduction-archive`) — the `ThroneStore` port grows `readArchive` + an optional `record` arg on
+  `commitArena` (append INSIDE the gen-guard, so a lost CAS race writes nothing — arena OR archive). The
+  in-memory fake, the Upstash adapter (2-key EVAL: `SET` arena + guarded `RPUSH` record; `LRANGE` read), and the
+  shared `runThroneStoreContract` (inherited by the live smoke test — cleanup DELs the `archive:` key too) all
+  extend together. `handle-fight` builds the record via one `reproRecord` closure and commits it at all three
+  sites — bootstrap (defenders `[]`, seniority 1), placement (defenders fought, its seniority), and the
+  **non-placer, which now commits** (arena byte-identical, `memberSeniority` null; the S2.2 `commits 0→1` flip
+  drove this). 100% mutation (223 killed / 0 survived).
+- **S5.2 — bound to newest-K with pinned members, closes S5** (PR #265, `feat/archive-eviction-pinning`) — a pure
+  `retainArchive(records, pinnedSeniorities, limit)` ("newest K + up to N pinned") + `DEFAULT_ARCHIVE_LIMIT` (50,
+  tunable) in `throne-store.ts`; the fake applies it (pin set from the committed `next.members`); the adapter's
+  EVAL grew a Lua eviction (`LRANGE → filter → DEL → RPUSH survivors`; pin table from the decoded next arena; K as
+  `ARGV[4]`). **`handle-fight` untouched** — the store owns the pin set, so relegation un-pins with no handler
+  change. The REFACTOR widened the pin-set param to `ReadonlySet<number | null>`, dropping a redundant TS-only
+  null guard → eliminated the sole equivalent mutant (`throne-store.ts` 100%).
+
+[koth-ladder-s5-reproduction-archive.md](koth-ladder-s5-reproduction-archive.md)
+
+**Ladder complete (S1–S5).** The KotH ladder design trail — `koth-ladder-decisions.md` (D1–D7, C1–C7) +
+`koth-ladder-stories.md` (the story split) — was kept live in `plans/` across S1–S5 and is now archived here
+alongside the slice plans. Remaining ladder-adjacent roadmap items (`/replay` endpoint + Pixi viewer, real
+seasons) are separate, out of the ladder feature's scope.
