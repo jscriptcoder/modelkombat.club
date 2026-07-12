@@ -270,20 +270,11 @@ export const handleFight = async (
     ...toTitleFightReport(challengerFights[i]),
   }));
 
-  // The King-fight scout every placement carries (D-C): the challenger genuinely fought arena #1,
-  // whatever the outcome, so crowned / entered / unplaced all diagnose the same way — full telemetry
-  // (net / win-loss-draw / endReasons / degrade) + the scouted King (identity only, never the doc).
-  // `board[0]` now carries the same King fight; the flat scout is retired in S4.2 once the web reads it.
-  const scout = {
-    ...toTitleFightReport(challengerFights[0]),
-    incumbent: memberIdentity(arena.members[0]),
-  };
-
   // Unplaced: the challenger cleared but ranked below every defender of a FULL arena. It joins no
-  // arena and nothing is committed (the arena keeps its own top N); the scout still diagnoses the
-  // near-miss, at full parity with a placement.
+  // arena and nothing is committed (the arena keeps its own top N); the board still diagnoses the
+  // near-miss (board[0] = the King fought), at full parity with a placement.
   if (placement.outcome === "unplaced") {
-    return json({ ...report, title: { outcome: "unplaced", ...scout, board } });
+    return json({ ...report, title: { outcome: "unplaced", board } });
   }
 
   // A placement mutates the arena at the next generation. A CAS race (the arena moved since our
@@ -301,7 +292,6 @@ export const handleFight = async (
     title: {
       outcome: placement.outcome,
       rank: placement.rank,
-      ...scout,
       board,
       // The relegated defender (identity only, never the doc) — present only when a full arena shed
       // its weakest to seat this challenger; omitted while the arena still had room.

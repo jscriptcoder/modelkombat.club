@@ -133,11 +133,18 @@ const modelChamp = (model: string): BotDoc => ({
   default: { type: "idle" },
 });
 
+// The reigning King's identity now rides in `board[0].defender` (S4.3 retired the flat
+// `title.incumbent`) — board[0] is always the King, since the board is arena rank order.
+type KingIdentity = {
+  name: string;
+  model: string | null;
+  handle: string | null;
+};
 type IncumbentBody = {
   title?: {
     outcome: string;
     rank?: number;
-    incumbent?: { name: string; model: string | null; handle: string | null };
+    board?: { defender: KingIdentity }[];
   };
 };
 
@@ -305,10 +312,10 @@ describe("handleFight — S2.1: ranked filling of a non-full arena", () => {
     );
 
     const body = (await res.json()) as {
-      title?: { outcome: string; rank: number; winRate: number };
+      title?: { outcome: string; rank: number; board?: { winRate: number }[] };
     };
 
-    expect(body.title?.winRate).toBe(0.5);
+    expect(body.title?.board?.[0].winRate).toBe(0.5);
     expect(body.title?.outcome).toBe("entered"); // NOT crowned
     expect(body.title?.rank).toBe(2);
     expect((await store.readArena("vTEST"))?.members[0].champion.name).toBe(
@@ -463,27 +470,33 @@ describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
       title?: {
         outcome: string;
         rank?: number;
-        winRate: number;
-        bouts: number;
-        incumbent?: {
-          name: string;
-          model: string | null;
-          handle: string | null;
-        };
+        board?: {
+          defender: {
+            name: string;
+            model: string | null;
+            handle: string | null;
+          };
+          winRate: number;
+          bouts: number;
+        }[];
       };
     };
 
     expect(body.title?.outcome).toBe("unplaced");
     expect(body.title).not.toHaveProperty("rank");
-    // full parity: the unplaced clearer still fought the #1 King, so it reads the same scout —
-    // telemetry + incumbent — as an `entered` placement (D-C diagnose-don't-guess).
-    expect(body.title?.incumbent).toEqual({
+    // full parity: the unplaced clearer still fought the #1 King, so board[0] diagnoses that fight
+    // at the same fidelity as an `entered` placement (D-C diagnose-don't-guess).
+    expect(body.title?.board?.[0].defender).toEqual({
       name: "berserker",
       model: null,
       handle: null,
     });
-    expect(body.title?.bouts).toBe(10);
-    expect(body.title?.winRate).toBe(0); // lost all ten to the King
+    expect(body.title?.board?.[0].bouts).toBe(10);
+    expect(body.title?.board?.[0].winRate).toBe(0); // lost all ten to the King
+    // S4.3: the flat King scout is retired — the King fight is read from board[0], never a top-level key
+    expect(body.title).not.toHaveProperty("incumbent");
+    expect(body.title).not.toHaveProperty("winRate");
+    expect(body.title).not.toHaveProperty("bouts");
 
     // nothing was committed — commitArena was never called and the arena is byte-identical
     expect(commits).toBe(0);
@@ -579,12 +592,12 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
     const body = (await res.json()) as IncumbentBody;
 
     expect(body.title?.outcome).toBe("entered");
-    expect(body.title?.incumbent).toEqual({
+    expect(body.title?.board?.[0].defender).toEqual({
       name: "berserker",
       model: null,
       handle: null,
     });
-    // the incumbent's bot DOCUMENT never leaks into the response
+    // the King's bot DOCUMENT never leaks into the response
     expect(JSON.stringify(body.title)).not.toContain('"rules"');
     expect(JSON.stringify(body.title)).not.toContain('"default"');
   });
@@ -607,7 +620,7 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
     const body = (await res.json()) as IncumbentBody;
 
     expect(body.title?.outcome).toBe("crowned");
-    expect(body.title?.incumbent?.handle).toBe("koga");
+    expect(body.title?.board?.[0].defender.handle).toBe("koga");
   });
 
   it("surfaces the incumbent's model when its document declares one", async () => {
@@ -622,7 +635,7 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
 
     const body = (await res.json()) as IncumbentBody;
 
-    expect(body.title?.incumbent?.model).toBe("claude-opus-4-8");
+    expect(body.title?.board?.[0].defender.model).toBe("claude-opus-4-8");
   });
 
   it("reports the incumbent's model as null when its document omits one", async () => {
@@ -637,7 +650,7 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
 
     const body = (await res.json()) as IncumbentBody;
 
-    expect(body.title?.incumbent?.model).toBeNull();
+    expect(body.title?.board?.[0].defender.model).toBeNull();
   });
 
   it("accepts a 64-character handle (the length boundary) and persists it on a crown", async () => {
@@ -771,8 +784,9 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
 // same net / win-loss-draw / endReasons / degrade telemetry the gauntlet gate prints — but now for
 // the reigning-King fight (D-C). The full per-defender board over all N is S4.
 describe("handleFight — S2.1: King-fight telemetry parity (D-C)", () => {
+  // The King fight is read from board[0] post-S4.3 — a per-defender telemetry entry (no `outcome`;
+  // that lives on the title). Full fidelity: net / W-L-D / endReasons / degrade, as a gauntlet row.
   type TitleStats = {
-    outcome: string;
     winRate: number;
     net: number;
     wins: number;
@@ -796,9 +810,16 @@ describe("handleFight — S2.1: King-fight telemetry parity (D-C)", () => {
       arena("vTEST", store),
     );
 
-    const t = ((await res.json()) as { title?: TitleStats }).title;
+    const title = (
+      (await res.json()) as {
+        title?: { outcome: string; board?: TitleStats[] };
+      }
+    ).title;
 
-    expect(t?.outcome).toBe("crowned");
+    expect(title?.outcome).toBe("crowned");
+
+    const t = title?.board?.[0]; // the King fight
+
     // 5 seeds × both sides = 10 bouts (D-A: arena fights reuse the frozen `seeds`)
     expect(t?.bouts).toBe(10);
     expect(t?.wins).toBe(10);
@@ -828,9 +849,16 @@ describe("handleFight — S2.1: King-fight telemetry parity (D-C)", () => {
       arena("vTEST", store),
     );
 
-    const t = ((await res.json()) as { title?: TitleStats }).title;
+    const title = (
+      (await res.json()) as {
+        title?: { outcome: string; board?: TitleStats[] };
+      }
+    ).title;
 
-    expect(t?.outcome).toBe("entered");
+    expect(title?.outcome).toBe("entered");
+
+    const t = title?.board?.[0]; // the King fight
+
     expect(t?.wins).toBe(0);
     expect(t?.net).toBeLessThan(0);
     expect(t!.wins + t!.losses + t!.draws).toBe(t?.bouts);
@@ -1024,8 +1052,8 @@ describe("handleFight — S2.3: mirror-reject (C4) + re-entry (D3)", () => {
 // S4.1 (C7): every gauntlet-clearer — crowned, entered, OR unplaced — reads back a per-defender BOARD,
 // generalizing the single-King scout (D-C) to all N defenders it fought. Each entry pairs a defender's
 // IDENTITY (never its doc) with the challenger's telemetry vs THAT defender, at gauntlet-row fidelity.
-// The board is rank-ordered on the pre-fight arena (board[0] = the reigning King). Additive this slice:
-// the flat King scout (winRate / incumbent / …) is unchanged; S4.2 retires it once the web reads board[0].
+// The board is rank-ordered on the pre-fight arena (board[0] = the reigning King). The redundant flat
+// King scout (winRate / incumbent / …) was retired in S4.3 — board[0] is now the SOLE King-fight source.
 describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
   type BoardEntry = {
     defender: { name: string; model: string | null; handle: string | null };
@@ -1043,8 +1071,6 @@ describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
     title?: {
       outcome: string;
       rank?: number;
-      winRate?: number;
-      incumbent?: { name: string; model: string | null; handle: string | null };
       board?: BoardEntry[];
     };
   };
@@ -1165,7 +1191,7 @@ describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
     expect(t?.board).toEqual([]);
   });
 
-  it("keeps the flat King scout unchanged alongside the new board (additive this slice)", async () => {
+  it("retires the flat King scout — the King fight is read only from board[0] (S4.3)", async () => {
     const store = inMemoryThroneStore();
 
     await seatArena(store, "vTEST", [
@@ -1180,13 +1206,27 @@ describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
 
     const t = ((await res.json()) as BoardBody).title;
 
-    // the pre-S4 flat scout still reports the King fight — board[0] and it agree (both the King)
-    expect(t?.winRate).toBe(1);
-    expect(t?.incumbent).toEqual({
+    // board[0] carries the King fight at full fidelity — nothing lost, only de-duplicated
+    expect(t?.board?.[0].defender).toEqual({
       name: "aggressor",
       model: null,
       handle: null,
     });
-    expect(t?.board?.[0].defender).toEqual(t?.incumbent);
+    expect(t?.board?.[0].winRate).toBe(1);
+
+    // the redundant flat scout is GONE: NONE of its keys survive at the top level of `title`
+    for (const key of [
+      "incumbent",
+      "winRate",
+      "net",
+      "wins",
+      "losses",
+      "draws",
+      "bouts",
+      "endReasons",
+      "degrade",
+    ]) {
+      expect(t).not.toHaveProperty(key);
+    }
   });
 });
