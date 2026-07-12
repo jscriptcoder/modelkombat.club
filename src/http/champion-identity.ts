@@ -1,8 +1,8 @@
 // A champion's PUBLIC identity — the only projection of an arena member exposed over HTTP. Identity
 // fields ONLY: the champion's bot document (its `rules` DSL) is never surfaced, preserving the
 // King's competitive edge (decision 5). This is the shared shaper behind `GET /king`'s entries and
-// `/fight`'s title `incumbent` / `displaced` blocks, so the "never leak the doc, default provenance
-// to null" knowledge lives in exactly one place.
+// `/fight`'s title `board[].defender` / `displaced` blocks, so the "never leak the doc, default
+// provenance to null" knowledge lives in exactly one place.
 import type { ArenaMember } from "./throne-store.js";
 
 export type ChampionIdentity = {
@@ -31,8 +31,8 @@ const sanitize = (value: string): string =>
     .join("");
 
 // The public identity of an arena member — the sanitized name + provenance, NEVER the bot document.
-// Surfaced as `/king`'s entries and the `incumbent` (scouted King) / `displaced` (relegated
-// defender) blocks on a `/fight` placement.
+// Surfaced as `/king`'s entries and each `board[].defender` (the scouted defenders, board[0] = King)
+// / `displaced` (relegated defender) block on a `/fight` placement.
 export const memberIdentity = (member: ArenaMember): ChampionIdentity => ({
   name: sanitize(member.champion.name),
   model: member.champion.model == null ? null : sanitize(member.champion.model),

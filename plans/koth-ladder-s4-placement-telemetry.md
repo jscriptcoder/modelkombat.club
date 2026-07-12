@@ -1,9 +1,11 @@
 # Plan: KotH ladder — S4 (placement telemetry — the per-defender board)
 
-**Branches**: `feat/arena-placement-telemetry` (S4.1) → S4.2 branch TBD at the slice
-**Status**: Active. **S4.1 ✅ MERGED** (PR #260 — board on `/fight`, additive). **S4.2 code-complete**
-(`/ring` renders the per-defender board; web reads only `board`; TDD + manual mutator scan), awaiting
-commit approval. **S4.3** (retire the flat scout from `/fight`) next. Slicing split confirmed 2026-07-12.
+**Branches**: `feat/arena-placement-telemetry` (S4.1) → `feat/ring-placement-board` (S4.2) →
+`refactor/retire-fight-flat-scout` (S4.3)
+**Status**: Active. **S4.1 ✅ MERGED** (PR #260 — board on `/fight`, additive). **S4.2 ✅ MERGED**
+(PR #261 — `/ring` renders the per-defender board; web reads only `board`; TDD + manual mutator scan).
+**S4.3** ✅ code-complete (retire the flat scout from `/fight`, pure `src/http`; TDD + Stryker 100%),
+awaiting commit approval — closes S4. Slicing split confirmed 2026-07-12.
 **Story**: S4 in `plans/koth-ladder-stories.md`. **Design source of truth**: `plans/koth-ladder-decisions.md`
 — **C7** (response contract: an arena-placement report at gauntlet fidelity), **D2** (rank key), **D-C**
 (the King fight doubles as the title scout).
@@ -147,7 +149,7 @@ filter are each killed by an exact-assertion test; `readBoard`'s redundant `isRe
 **KILL MUTANTS** ✅ — added the malformed-entry-filter test to demand + pin the defensive drop.
 **REFACTOR** — none: the new helpers mirror existing siblings; no duplication.
 **Done when**: all ACs met ✅, manual scan reviewed ✅, node + web suites green (**1589**) ✅,
-typecheck/lint clean ✅ — **awaiting commit approval**.
+typecheck/lint clean ✅ — **✅ MERGED** (PR #261, `afb2ba7`).
 
 ### Slice S4.3: retire the redundant flat King scout from `/fight` (pure `src/http`)
 
@@ -166,11 +168,20 @@ blocks, the unplaced test) to read `board[0]`. Pure platform-layer; no web chang
   degrade + identity) — nothing is lost, only de-duplicated.
 - Given the empty-arena bootstrap crown, then `title` is `{ outcome: "crowned", rank: 1, board: [] }`.
 
-**RED**: migrate the node `handle-fight` telemetry/incumbent assertions to `board[0]`; add an assertion
-that the flat scout keys are absent. **GREEN**: remove the `scout` spread from the two returns.
-**MUTATE**: Stryker over `handle-fight.ts` (node) — expect 100%. **REFACTOR**: assess whether the
-`scout` local + `toTitleFightReport(challengerFights[0])` call fully retire. **Done when**: ACs met,
-mutation 100%, suites green, human approves commit.
+**RED** ✅ — migrated the node incumbent/telemetry reads to `board[0]` (the S2.1 incumbent-identity ×4,
+the tie/telemetry-parity ×3, the S2.2 unplaced test) and added two "flat scout is absent" guards (the
+unplaced path + a loop over all nine scout keys `incumbent`/`winRate`/`net`/`wins`/`losses`/`draws`/
+`bouts`/`endReasons`/`degrade` on a crowning). Exactly those 2 new guards failed (scout still present);
+all 35 migrated reads passed.
+**GREEN** ✅ — dropped the `scout` local + both `...scout` spreads; `title` is now
+`{ outcome, rank?, board, displaced? }`. `memberIdentity`/`toTitleFightReport` still feed `board`.
+**MUTATE** ✅ — Stryker over `handle-fight.ts`: **100%** (111 killed, 0 survived, 0 no-cover — one fewer
+mutant than S4.1's 112, the retired scout expression). **KILL MUTANTS** ✅ — none survived.
+**REFACTOR** ✅ — the `scout` local + its `toTitleFightReport(challengerFights[0])` call fully retired;
+the two returns are simpler, no duplication. Also refreshed `champion-identity.ts`'s doc comments
+(`incumbent` → `board[].defender`).
+**Done when**: all ACs met ✅, mutation 100% ✅, node (1371) + web (RingPage 63) suites green ✅,
+typecheck/lint/format clean ✅, `npm run fight` deterministic ✅ — **awaiting commit approval**.
 
 ## Pre-PR quality gate (each slice)
 
