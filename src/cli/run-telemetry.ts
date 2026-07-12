@@ -29,6 +29,43 @@ export type TelemetryDeps = {
 
 export type CliOutput = { stdout: string; stderr: string; code: number };
 
+// A population at or above this size is treated as large enough that its figures
+// reflect discovered behavior; below it, the header carries a caveat that the numbers
+// describe a small hand-authored REFERENCE roster (the 6-bot gauntlet, the 15 example
+// bots) rather than real LLM submissions. A single retunable named constant — raise it
+// as the post-launch submission corpus grows.
+const SMALL_POPULATION = 30;
+
+// The provenance a report header carries: which version / population / seed-set / fight
+// count / commitment total the numbers below describe. Rendered from the CLI's own run
+// parameters + the produced report — so a reader never misreads whose meta this is.
+export type HeaderInfo = {
+  version: string;
+  population: readonly string[]; // the population's bot names, in load order
+  seedCount: number;
+  totalFights: number;
+  totalCommitments: number;
+};
+
+// Render the provenance header: the tool/version line, the population roster, and a
+// counts line (population size · seeds · round-robin fights · honoured commitments),
+// mirroring `run-benchmark.ts`'s header block. A small population appends a caveat line
+// so low-N reference-roster figures are never mistaken for discovered LLM behavior.
+export const renderHeader = (info: HeaderInfo): string => {
+  const lines = [
+    `ModelKombat variety telemetry ${info.version}`,
+    `population: ${info.population.join(", ")}`,
+    `${info.population.length} bots · ${info.seedCount} seeds · round-robin = ${info.totalFights} fights · ${info.totalCommitments} honoured commitments`,
+  ];
+
+  const caveat =
+    info.population.length < SMALL_POPULATION
+      ? "\nnote: small hand-authored reference population — shares reflect authored style, not discovered LLM behavior."
+      : "";
+
+  return lines.join("\n") + caveat;
+};
+
 // A table whose first column (technique) is left-aligned and the rest right-aligned,
 // each column padded to its widest cell (the run-benchmark.ts column helper). The
 // flag column can be empty, so each row is right-trimmed — no trailing whitespace.
@@ -91,5 +128,17 @@ export const runTelemetryCli = (deps: TelemetryDeps): CliOutput => {
     match: deps.match,
   });
 
-  return { stdout: renderReport(report) + "\n", stderr: "", code: 0 };
+  const header = renderHeader({
+    version: deps.version,
+    population: population.map((bot) => bot.name),
+    seedCount: deps.seeds.length,
+    totalFights: report.totalFights,
+    totalCommitments: report.totalCommitments,
+  });
+
+  return {
+    stdout: `${header}\n\n${renderReport(report)}\n`,
+    stderr: "",
+    code: 0,
+  };
 };

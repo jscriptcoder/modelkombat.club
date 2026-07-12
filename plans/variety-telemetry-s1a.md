@@ -44,8 +44,8 @@ Verbatim IDs from `variety-telemetry-stories.md`. Slice mapping in brackets.
 - [x] **S1a-7** rows sorted share-desc, ties broken by canonical frame-table order (stable sort over canonically-built rows) [Slice 1]
 - [x] **S1a-8** a `⚠` present ⇒ a one-line legend explains it [Slice 1]
 - [x] **S1a-9** a chosen-but-always-degraded move contributes 0 (honoured-only) + cross-ref S3a [Slice 1]
-- [ ] **S1a-10** provenance header: version / population / seeds / fights / totalCommitments [Slice 2]
-- [ ] **S1a-11** small-sample caveat when population < `SMALL_POPULATION` [Slice 2]
+- [x] **S1a-10** provenance header: version / population / seeds / fights / totalCommitments [Slice 2]
+- [x] **S1a-11** small-sample caveat when population < `SMALL_POPULATION` (= 30) [Slice 2]
 - [x] **S1a-12** CLI contract: exit 0 on report; fail-fast non-zero on load failure; user-bot errors deferred to S1b [Slice 1]
 
 ## Slices

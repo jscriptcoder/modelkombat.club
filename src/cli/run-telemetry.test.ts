@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  renderHeader,
   renderReport,
   runTelemetryCli,
+  type HeaderInfo,
   type TelemetryDeps,
 } from "./run-telemetry.js";
 import type { Rules } from "../engine/types.js";
@@ -78,6 +80,20 @@ describe("runTelemetryCli", () => {
     expect(out.stdout).toContain("0.0%"); // an unfired technique still prints 0.0%
   });
 
+  it("opens with the provenance header (version / population / counts) above the histogram", () => {
+    const out = runTelemetryCli(deps(BALANCED)); // version "test", 3 bots, 2 seeds
+
+    expect(out.stdout.startsWith("ModelKombat variety telemetry test\n")).toBe(
+      true,
+    );
+    expect(out.stdout).toContain("population: g, m, w");
+    expect(out.stdout).toMatch(
+      /3 bots · 2 seeds · round-robin = \d+ fights · \d+ honoured commitments/,
+    );
+    // caveat (3 < SMALL_POPULATION), a blank line, THEN the table.
+    expect(out.stdout).toContain("not discovered LLM behavior.\n\ntechnique");
+  });
+
   it("flags a dominant technique with ⚠ and prints a legend naming the 35% threshold", () => {
     // both bots commit only gyaku-zuki ⇒ gyaku is 100% of commitments ⇒ dominant.
     const out = runTelemetryCli(
@@ -130,6 +146,7 @@ describe("runTelemetryCli", () => {
 const report = (rows: VarietyReport["rows"]): VarietyReport => ({
   rows,
   totalCommitments: rows.reduce((sum, r) => sum + r.count, 0),
+  totalFights: 0, // inert to renderReport (the table reads only rows); pinned for a valid report
 });
 
 describe("renderReport — exact histogram layout", () => {
@@ -193,5 +210,52 @@ describe("renderReport — exact histogram layout", () => {
         " ".repeat(2) +
         "33.3%",
     );
+  });
+});
+
+// The provenance header is a stdout contract too — every field (version, population
+// names, count, seeds, fights, honoured commitments) is pinned byte-for-byte, and the
+// small-sample caveat is gated on the population size threshold.
+const headerInfo = (o: Partial<HeaderInfo> = {}): HeaderInfo => ({
+  version: "v19",
+  population: ["jabber", "rekka", "zoner"],
+  seedCount: 10,
+  totalFights: 300,
+  totalCommitments: 4210,
+  ...o,
+});
+
+const names = (n: number): string[] =>
+  Array.from({ length: n }, (_, i) => `bot${i}`);
+
+describe("renderHeader — provenance header + small-sample caveat", () => {
+  it("renders every provenance field and the small-sample caveat for a small population", () => {
+    const out = renderHeader(headerInfo());
+
+    expect(out).toBe(
+      "ModelKombat variety telemetry v19\n" +
+        "population: jabber, rekka, zoner\n" +
+        "3 bots · 10 seeds · round-robin = 300 fights · 4210 honoured commitments\n" +
+        "note: small hand-authored reference population — shares reflect authored style, not discovered LLM behavior.",
+    );
+  });
+
+  it("omits the caveat once the population reaches the SMALL_POPULATION threshold", () => {
+    const out = renderHeader(headerInfo({ population: names(30) }));
+
+    expect(out).toBe(
+      "ModelKombat variety telemetry v19\n" +
+        `population: ${names(30).join(", ")}\n` +
+        "30 bots · 10 seeds · round-robin = 300 fights · 4210 honoured commitments",
+    );
+    expect(out).not.toContain("note:");
+  });
+
+  it("prints the caveat just below the threshold and omits it exactly at it", () => {
+    const below = renderHeader(headerInfo({ population: names(29) }));
+    const at = renderHeader(headerInfo({ population: names(30) }));
+
+    expect(below).toContain("note: small hand-authored reference population");
+    expect(at).not.toContain("note:");
   });
 });
