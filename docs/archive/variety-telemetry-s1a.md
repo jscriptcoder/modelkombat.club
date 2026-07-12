@@ -1,7 +1,7 @@
 # Plan: Variety telemetry — S1a (pooled usage histogram)
 
-**Branch**: feat/variety-telemetry-s1a
-**Status**: Active
+**Branches**: feat/variety-telemetry-s1a (Slice 1) · feat/variety-telemetry-header-caveat (Slice 2)
+**Status**: ✅ COMPLETE — Slice 1 (PR #270) + Slice 2 (PR #271), 2026-07-12; archived on close.
 
 ## Goal
 
@@ -17,7 +17,7 @@ or collapsing, and is anything dead-on-arrival?" — as a pure read-only reducti
 - Locked design decisions: `plans/variety-telemetry-harness.md` (§Resolved decisions).
 - Architecture to mirror: `src/engine/benchmark.ts` (pure aggregator that runs
   `runFight` internally) + `src/cli/run-benchmark.ts` (pure CLI logic → `{stdout,
-  stderr, code}`) + `src/cli/benchmark.ts` (thin fs/manifest shell + `process.exit`).
+stderr, code}`) + `src/cli/benchmark.ts` (thin fs/manifest shell + `process.exit`).
 - Key seam (already emitted, nothing to instrument): `FightResult.events[].{a,b}` carry
   `action` + `degrade` (`sim.ts:77`, `:1321`). A **honoured commitment** = a frame where
   `action.type ∈ {attack, throw, sweep}` AND `degrade === null` (grill #1).
@@ -66,7 +66,7 @@ gauntlet bots through the validator gate (reusing `loadBotDoc`, like `benchmark.
 index pairs (`i≠j`) × `SEEDS`, calling `runFight` and **keeping `events`** → pure
 reducer counts honoured commitments per technique for both fighters → `VarietyReport`
 → `src/cli/run-telemetry.ts` renders the ordered, flagged table to **stdout**; exit 0.
-*Intentionally skipped this slice:* provenance header + caveat (Slice 2), adoption /
+_Intentionally skipped this slice:_ provenance header + caveat (Slice 2), adoption /
 diversity scalar / `--json` / population override (S1b), degrade-rate + spacing (S3),
 scoring attribution (S4).
 
@@ -79,25 +79,26 @@ S1a-4, S1a-5, S1a-6, S1a-7, S1a-8, S1a-9, S1a-12.
 **RED** — failing behavioral tests over synthetic `FightResult` fixtures (factory
 functions, the `benchmark.test.ts` pattern), plus a small real-gauntlet integration
 test. Cover the mutants the `mutator-rules.md` will spawn:
-- *Honoured-commitment predicate* (`degrade === null`): a fixture with a degraded
+
+- _Honoured-commitment predicate_ (`degrade === null`): a fixture with a degraded
   attack frame must NOT count (kills `!== null` / removed-check mutants) — S1a-9.
-- *Technique extraction* (attack→`move`, throw→`throw`, sweep→`sweep`, else none):
+- _Technique extraction_ (attack→`move`, throw→`throw`, sweep→`sweep`, else none):
   a fixture per action type; an `idle`/`move`/`block` frame contributes nothing.
-- *Both fighters counted*: a fixture where only the `b` frame commits ⇒ b's move
+- _Both fighters counted_: a fixture where only the `b` frame commits ⇒ b's move
   appears (kills "count only a").
-- *Share math* `count/total`: known counts ⇒ known shares (kills `total/count`,
-  operator swaps); *raw shares sum to 1.0* on a multi-move fixture — S1a-2.
-- *Zero-total guard*: an all-idle fixture ⇒ all shares 0.0, no NaN in shares — S1a-4
+- _Share math_ `count/total`: known counts ⇒ known shares (kills `total/count`,
+  operator swaps); _raw shares sum to 1.0_ on a multi-move fixture — S1a-2.
+- _Zero-total guard_: an all-idle fixture ⇒ all shares 0.0, no NaN in shares — S1a-4
   (EMC deferred to S1b).
-- *Dead technique present*: a fixture missing one technique ⇒ it still renders 0 /
+- _Dead technique present_: a fixture missing one technique ⇒ it still renders 0 /
   0.0% (kills "omit zero rows") — S1a-3.
-- *Sort order*: a fixture with a share tie between two techniques ⇒ assert the EXACT
+- _Sort order_: a fixture with a share tie between two techniques ⇒ assert the EXACT
   row sequence (share-desc, canonical tie-break) — kills ascending + wrong-tie-break
   mutants — S1a-7.
-- *Flag threshold* strict `> 0.35`: a move at exactly 35.0% NOT flagged, at >35% IS —
+- _Flag threshold_ strict `> 0.35`: a move at exactly 35.0% NOT flagged, at >35% IS —
   kills `>=` / `<` / boundary mutants — S1a-5; legend present iff a `⚠` exists — S1a-8.
-- *Determinism*: run the real round-robin twice ⇒ byte-identical stdout — S1a-6.
-- *CLI contract*: report path ⇒ exit 0; an injected load failure ⇒ non-zero exit,
+- _Determinism_: run the real round-robin twice ⇒ byte-identical stdout — S1a-6.
+- _CLI contract_: report path ⇒ exit 0; an injected load failure ⇒ non-zero exit,
   message on stderr (reuse the `run-benchmark.ts` loader-throws pattern) — S1a-12.
 
 **GREEN** — minimum code: `techniqueOfAction`, the round-robin driver, the usage
@@ -130,7 +131,7 @@ reflect a small hand-authored reference population rather than discovered LLM be
 **Path**: `run-telemetry.ts` renderer prepends a header (mirroring `benchmark.ts`'s
 `formatReport` header) reading `BENCHMARK_VERSION`, the population names/count, seed
 count, total fights, and `report.totalCommitments`; when `population.length <
-SMALL_POPULATION` it appends the caveat line. *Skipped:* everything already skipped in
+SMALL_POPULATION` it appends the caveat line. _Skipped:_ everything already skipped in
 Slice 1.
 
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
@@ -138,6 +139,7 @@ Slice 1.
 **Acceptance criteria** (present + confirm before code): S1a-10, S1a-11.
 
 **RED**:
+
 - Header includes each field with the value from the config/report (fixtures with
   known version/population/seeds/fights/totalCommitments) — kills dropped-field mutants.
 - Caveat present when `population.length < SMALL_POPULATION`, absent at/above it —
@@ -158,7 +160,7 @@ human approves commit.
 2. `refactoring` — assess (only refactor if it adds value).
 3. `npm run typecheck` + `npm run lint` + `npm run format:check` pass.
 4. Confirm the invariant: `git diff` touches **no** `src/engine/{sim,dsl,types,prng,
-   rules}.ts`, no `benchmark-config.ts` `INPUT_HASH`/`BENCHMARK_VERSION`; `npm run fight`
+rules}.ts`, no `benchmark-config.ts` `INPUT_HASH`/`BENCHMARK_VERSION`; `npm run fight`
    remains byte-identical (determinism/replay suite green).
 
 ## Notes
@@ -174,4 +176,5 @@ human approves commit.
   **archived** under `docs/archive/` with a README entry on close-out — not deleted.
 
 ---
-*Feeds the S1a PR chain. On feature close, archive (do not delete) per project convention.*
+
+_Feeds the S1a PR chain. On feature close, archive (do not delete) per project convention._
