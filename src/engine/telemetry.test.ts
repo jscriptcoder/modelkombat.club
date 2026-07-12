@@ -1,0 +1,370 @@
+import { describe, it, expect } from "vitest";
+import {
+  reduceUsage,
+  runVariety,
+  type Technique,
+  type UsageRow,
+  type VarietyConfig,
+  type VarietyReport,
+} from "./telemetry.js";
+import type {
+  DegradeReason,
+  FightEvent,
+  FighterFrame,
+  FightResult,
+} from "./sim.js";
+import type { Action, MoveId, Rules } from "./types.js";
+import type { BotDoc } from "./dsl.js";
+
+// ─── factories (real engine types, never redefined) ──────────────────────────
+// A single fighter's per-tick frame: only `action` + `degrade` drive the usage
+// tally, but the factory returns a COMPLETE FighterFrame so the fixture is valid.
+const frame = (
+  action: Action,
+  degrade: DegradeReason | null = null,
+): FighterFrame => ({ x: 0, y: 0, action, points: 0, stamina: 0, degrade });
+
+const ev = (a: FighterFrame, b: FighterFrame): FightEvent => ({
+  tick: 0,
+  a,
+  b,
+});
+
+// A complete FightResult carrying the given events; the non-event fields are inert
+// to the reducer but present so the fixture is a real FightResult.
+const fightOf = (events: FightEvent[]): FightResult => ({
+  winner: "draw",
+  ticks: events.length,
+  scores: { a: 0, b: 0 },
+  events,
+  endReason: "time",
+  fouls: { a: { jogai: 0, passivity: 0 }, b: { jogai: 0, passivity: 0 } },
+});
+
+const IDLE: Action = { type: "idle" };
+
+const attack = (move: MoveId): Action => ({
+  type: "attack",
+  move,
+  band: "mid",
+});
+
+const THROW: Action = { type: "throw" };
+const SWEEP: Action = { type: "sweep" };
+
+// The 13 canonical techniques in frame-table order (sweep, the 11 attacks, then
+// throw) — the documented contract the report's rows and tie-break follow.
+const CANONICAL: readonly Technique[] = [
+  "sweep",
+  "kizami-zuki",
+  "gyaku-zuki",
+  "mae-geri",
+  "mawashi-geri",
+  "uraken",
+  "shuto",
+  "yoko-geri",
+  "ushiro-geri",
+  "empi",
+  "hiza-geri",
+  "tobi-geri",
+  "throw",
+];
+
+// The action that commits a given technique — lets a fixture exercise any technique
+// by name (throw / sweep are their own actions; the rest are attacks).
+const techniqueAction = (t: Technique): Action =>
+  t === "throw" ? THROW : t === "sweep" ? SWEEP : attack(t);
+
+// `n` honoured commitments of technique `t` (fighter A commits, fighter B idles).
+const commits = (t: Technique, n: number): FightEvent[] =>
+  Array.from({ length: n }, () => ev(frame(techniqueAction(t)), frame(IDLE)));
+
+const rowFor = (report: VarietyReport, t: Technique): UsageRow => {
+  const found = report.rows.find((r) => r.technique === t);
+
+  if (found === undefined) throw new Error(`no row for technique ${t}`);
+
+  return found;
+};
+
+const shareSum = (report: VarietyReport): number =>
+  report.rows.reduce((sum, r) => sum + r.share, 0);
+
+describe("reduceUsage — pooled honoured-commitment histogram", () => {
+  it("counts each committed technique, pooling both fighters across all fights", () => {
+    const report = reduceUsage([
+      fightOf([
+        ev(frame(attack("gyaku-zuki")), frame(THROW)),
+        ev(frame(attack("gyaku-zuki")), frame(IDLE)),
+      ]),
+      fightOf([ev(frame(SWEEP), frame(attack("gyaku-zuki")))]),
+    ]);
+
+    expect(rowFor(report, "gyaku-zuki").count).toBe(3); // 2 on side a + 1 on side b
+    expect(rowFor(report, "throw").count).toBe(1);
+    expect(rowFor(report, "sweep").count).toBe(1);
+    expect(report.totalCommitments).toBe(5);
+  });
+
+  it("counts a technique committed only by fighter B (not just fighter A)", () => {
+    const report = reduceUsage([
+      fightOf([ev(frame(IDLE), frame(attack("mae-geri")))]),
+    ]);
+
+    expect(rowFor(report, "mae-geri").count).toBe(1);
+    expect(report.totalCommitments).toBe(1);
+  });
+
+  it("excludes a degraded commitment — only honoured frames count", () => {
+    // fighter A throws a gyaku that DEGRADES (never took effect); fighter B lands a
+    // clean throw. Honoured-only ⇒ gyaku 0, throw 1.
+    const report = reduceUsage([
+      fightOf([ev(frame(attack("gyaku-zuki"), "inert"), frame(THROW))]),
+    ]);
+
+    expect(rowFor(report, "gyaku-zuki").count).toBe(0);
+    expect(rowFor(report, "throw").count).toBe(1);
+    expect(report.totalCommitments).toBe(1);
+  });
+
+  it("ignores non-committing actions (idle / move / block / crouch / jump / throw-break)", () => {
+    const report = reduceUsage([
+      fightOf([
+        ev(
+          frame({ type: "move", dir: 1 }),
+          frame({ type: "block", band: "high" }),
+        ),
+        ev(frame({ type: "crouch" }), frame({ type: "jump", dir: 0 })),
+        ev(frame(IDLE), frame({ type: "throw-break" })),
+      ]),
+    ]);
+
+    expect(report.totalCommitments).toBe(0);
+    expect(shareSum(report)).toBe(0);
+  });
+
+  it("computes each share as count / totalCommitments; raw shares sum to 1.0", () => {
+    // 3 gyaku + 1 throw ⇒ total 4 ⇒ shares 0.75 / 0.25 (exact binary fractions).
+    const report = reduceUsage([
+      fightOf([
+        ev(frame(attack("gyaku-zuki")), frame(attack("gyaku-zuki"))),
+        ev(frame(attack("gyaku-zuki")), frame(THROW)),
+      ]),
+    ]);
+
+    expect(rowFor(report, "gyaku-zuki").share).toBe(0.75);
+    expect(rowFor(report, "throw").share).toBe(0.25);
+    expect(shareSum(report)).toBe(1);
+  });
+
+  it("always renders all 13 techniques — a never-committed one is 0 count / 0 share, never omitted", () => {
+    const report = reduceUsage([
+      fightOf([ev(frame(attack("gyaku-zuki")), frame(attack("gyaku-zuki")))]),
+    ]);
+
+    expect(report.rows).toHaveLength(13);
+    expect(
+      report.rows
+        .map((r) => r.technique)
+        .slice()
+        .sort(),
+    ).toEqual(CANONICAL.slice().sort());
+    // ushiro-geri never fired ⇒ present but empty.
+    expect(rowFor(report, "ushiro-geri").count).toBe(0);
+    expect(rowFor(report, "ushiro-geri").share).toBe(0);
+  });
+
+  it("guards the zero-total case: every share is 0 (never NaN) and no technique is dominant", () => {
+    const report = reduceUsage([fightOf([ev(frame(IDLE), frame(IDLE))])]);
+
+    expect(report.totalCommitments).toBe(0);
+
+    for (const r of report.rows) {
+      expect(r.share).toBe(0);
+      expect(Number.isNaN(r.share)).toBe(false);
+      expect(r.dominant).toBe(false);
+    }
+  });
+
+  it("does not flag a technique at EXACTLY the 0.35 share boundary", () => {
+    // total 20 ⇒ 7/20 = 0.35 exactly for both gyaku and throw, 6/20 for sweep.
+    const gyaku = Array.from({ length: 7 }, () =>
+      ev(frame(attack("gyaku-zuki")), frame(IDLE)),
+    );
+
+    const thrown = Array.from({ length: 7 }, () =>
+      ev(frame(THROW), frame(IDLE)),
+    );
+
+    const swept = Array.from({ length: 6 }, () =>
+      ev(frame(SWEEP), frame(IDLE)),
+    );
+
+    const report = reduceUsage([fightOf([...gyaku, ...thrown, ...swept])]);
+
+    expect(rowFor(report, "gyaku-zuki").share).toBe(0.35);
+    expect(rowFor(report, "gyaku-zuki").dominant).toBe(false);
+    expect(rowFor(report, "throw").dominant).toBe(false);
+  });
+
+  it("flags a technique whose raw share is strictly above 0.35 as dominant", () => {
+    // total 20 ⇒ 8/20 = 0.40 for gyaku (dominant), 6/20 each for throw + sweep.
+    const gyaku = Array.from({ length: 8 }, () =>
+      ev(frame(attack("gyaku-zuki")), frame(IDLE)),
+    );
+
+    const thrown = Array.from({ length: 6 }, () =>
+      ev(frame(THROW), frame(IDLE)),
+    );
+
+    const swept = Array.from({ length: 6 }, () =>
+      ev(frame(SWEEP), frame(IDLE)),
+    );
+
+    const report = reduceUsage([fightOf([...gyaku, ...thrown, ...swept])]);
+
+    expect(rowFor(report, "gyaku-zuki").share).toBe(0.4);
+    expect(rowFor(report, "gyaku-zuki").dominant).toBe(true);
+    expect(rowFor(report, "throw").dominant).toBe(false);
+  });
+
+  it("sorts rows by share descending, breaking ties by canonical frame-table order", () => {
+    // sweep 2, gyaku 2 (tie at 0.4), mae-geri 1 (0.2); the rest 0. Among the tie,
+    // sweep (canonical index 0) precedes gyaku (index 2); zero-count techniques
+    // follow in canonical order.
+    const report = reduceUsage([
+      fightOf([
+        ev(frame(SWEEP), frame(SWEEP)),
+        ev(frame(attack("gyaku-zuki")), frame(attack("gyaku-zuki"))),
+        ev(frame(attack("mae-geri")), frame(IDLE)),
+      ]),
+    ]);
+
+    expect(report.rows.map((r) => r.technique)).toEqual([
+      "sweep",
+      "gyaku-zuki",
+      "mae-geri",
+      "kizami-zuki",
+      "mawashi-geri",
+      "uraken",
+      "shuto",
+      "yoko-geri",
+      "ushiro-geri",
+      "empi",
+      "hiza-geri",
+      "tobi-geri",
+      "throw",
+    ]);
+  });
+
+  it("breaks a lone share-tie by canonical order even when every other technique has a distinct share", () => {
+    // 11 techniques get strictly-decreasing distinct counts; only tobi-geri and
+    // throw tie (1 each). With a single clean tie (no zero-share ties to muddy the
+    // sort), tobi-geri (canonical index 11) must precede throw (index 12).
+    const ranked: [Technique, number][] = [
+      ["gyaku-zuki", 12],
+      ["mawashi-geri", 11],
+      ["kizami-zuki", 10],
+      ["sweep", 9],
+      ["uraken", 8],
+      ["shuto", 7],
+      ["yoko-geri", 6],
+      ["ushiro-geri", 5],
+      ["empi", 4],
+      ["hiza-geri", 3],
+      ["mae-geri", 2],
+      ["tobi-geri", 1],
+      ["throw", 1],
+    ];
+
+    const report = reduceUsage([
+      fightOf(ranked.flatMap(([t, n]) => commits(t, n))),
+    ]);
+
+    expect(report.rows.map((r) => r.technique)).toEqual([
+      "gyaku-zuki",
+      "mawashi-geri",
+      "kizami-zuki",
+      "sweep",
+      "uraken",
+      "shuto",
+      "yoko-geri",
+      "ushiro-geri",
+      "empi",
+      "hiza-geri",
+      "mae-geri",
+      "tobi-geri",
+      "throw",
+    ]);
+  });
+});
+
+// ─── driver fixtures: MOCK rules WITHOUT perception ⇒ no PRNG draws ⇒ each fight is
+// seed-independent AND deterministic (the benchmark.test.ts pattern). Two attack
+// moves configured so distinct bots commit distinct techniques. ────────────────
+const MOCK_RULES: Rules = {
+  tickRate: 60,
+  walkSpeed: 4000,
+  ring: { width: 600000 },
+  startGap: 200000,
+  moves: {
+    "gyaku-zuki": {
+      startup: 4,
+      active: 2,
+      recovery: 6,
+      score: 1,
+      reach: 250000,
+    },
+    "mae-geri": { startup: 4, active: 2, recovery: 6, score: 2, reach: 250000 },
+  },
+};
+
+const bot = (name: string, dflt: Action): BotDoc => ({
+  version: 1,
+  name,
+  rules: [],
+  default: dflt,
+});
+
+const GYAKU_BOT = bot("gyaku-bot", {
+  type: "attack",
+  move: "gyaku-zuki",
+  band: "mid",
+});
+
+const MAE_BOT = bot("mae-bot", {
+  type: "attack",
+  move: "mae-geri",
+  band: "mid",
+});
+
+const varietyConfig = (o: Partial<VarietyConfig> = {}): VarietyConfig => ({
+  population: [GYAKU_BOT, MAE_BOT],
+  seeds: [1, 2],
+  maxTicks: 30,
+  rules: MOCK_RULES,
+  ...o,
+});
+
+describe("runVariety — round-robin over the population", () => {
+  it("pools honoured commitments from every bot across the both-sides round-robin", () => {
+    const report = runVariety(varietyConfig());
+
+    expect(rowFor(report, "gyaku-zuki").count).toBeGreaterThan(0);
+    expect(rowFor(report, "mae-geri").count).toBeGreaterThan(0);
+    // exactly those two techniques fire — nothing else leaks into the tally.
+    expect(report.totalCommitments).toBe(
+      rowFor(report, "gyaku-zuki").count + rowFor(report, "mae-geri").count,
+    );
+  });
+
+  it("is deterministic — the same config reduces to an identical report", () => {
+    expect(runVariety(varietyConfig())).toEqual(runVariety(varietyConfig()));
+  });
+
+  it("plays no bot against itself — a single-bot population yields no fights", () => {
+    const report = runVariety(varietyConfig({ population: [GYAKU_BOT] }));
+
+    expect(report.totalCommitments).toBe(0);
+  });
+});

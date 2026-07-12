@@ -19,6 +19,7 @@
     "lint:fix": "eslint . --fix",
     "fight": "tsx src/cli/fight.ts",
     "benchmark": "tsx src/cli/benchmark.ts",
+    "telemetry": "tsx src/cli/telemetry.ts",
     "gen:spec": "tsx src/cli/write-spec.ts"
   },
   "devDependencies": {
