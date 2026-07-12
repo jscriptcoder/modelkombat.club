@@ -65,28 +65,18 @@ describe("SpecPage", () => {
     expect(queryByText(/^\| technique \| score \|/)).toBeNull();
   });
 
-  it("keeps the shared site footer on the page", () => {
-    const { getByText } = render(() => <SpecPage spec={SPEC_FIXTURE} />);
+  it("is a bare document — no nav header and no footer, just the spec to read and close", () => {
+    const { container, queryByRole, queryByText } = render(() => (
+      <SpecPage spec={SPEC_FIXTURE} />
+    ));
 
-    expect(getByText(/deterministic karate ring/i)).toBeTruthy();
-  });
-
-  it("heads the page with a brand that links home", () => {
-    const { getByRole } = render(() => <SpecPage spec={SPEC_FIXTURE} />);
-
-    const brand = getByRole("link", { name: "ModelKombat" });
-
-    expect(brand.getAttribute("href")).toBe("/");
-  });
-
-  it("offers the raw markdown for machine consumers, opening in a new tab", () => {
-    const { getByRole } = render(() => <SpecPage spec={SPEC_FIXTURE} />);
-
-    const raw = getByRole("link", { name: /raw markdown/i });
-
-    // The LLM/curl version stays reachable straight from the human page.
-    expect(raw.getAttribute("href")).toBe("/spec");
-    expect(raw.getAttribute("target")).toBe("_blank");
+    // No nav header: no brand link home, no raw-markdown escape hatch.
+    expect(container.querySelector("nav")).toBeNull();
+    expect(queryByRole("link", { name: "ModelKombat" })).toBeNull();
+    expect(queryByRole("link", { name: /raw markdown/i })).toBeNull();
+    // No shared site footer either.
+    expect(container.querySelector("footer")).toBeNull();
+    expect(queryByText(/deterministic karate ring/i)).toBeNull();
   });
 
   it("gives every section heading its own slug id, so any section is deep-linkable", () => {

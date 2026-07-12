@@ -1,9 +1,6 @@
 import { Marked, type Renderer, type Tokens } from "marked";
 import { type Component } from "solid-js";
 
-import Footer from "./Footer";
-import { NavLogo } from "./Nav";
-
 // The human-readable spec page. It is PURELY PRESENTATIONAL: it is handed the spec
 // markdown as a prop and renders it as an HTML document synchronously. The markdown
 // is the SAME text the LLM reads from GET /spec — the build-time prerender passes in
@@ -12,6 +9,10 @@ import { NavLogo } from "./Nav";
 // loading/error state, no Retry, and no client-side title/scroll effect: the static
 // <head> owns the tab title, and the browser handles `#section` deep-links natively
 // because the content is present in the initial HTML.
+//
+// It carries NO site chrome — no nav header, no footer. It opens in its own tab as a
+// bare reference document the reader consults and closes, so there is nothing to
+// navigate to and back from.
 
 // The spec is our own generated, same-origin markdown (trusted), so marked's HTML
 // is injected directly — there is no untrusted author to sanitise against. If this
@@ -52,23 +53,9 @@ const renderMarkdown = (markdown: string): string => {
 };
 
 const SpecPage: Component<{ spec: string }> = (props) => (
-  <>
-    <nav class="nav" aria-label="Spec">
-      <a class="nav-brand" href="/">
-        <NavLogo />
-        <span>ModelKombat</span>
-      </a>
-      <div class="nav-links">
-        <a href="/spec" target="_blank">
-          Raw markdown <span aria-hidden="true">↗</span>
-        </a>
-      </div>
-    </nav>
-    <main>
-      <article class="spec-doc" innerHTML={renderMarkdown(props.spec)} />
-    </main>
-    <Footer />
-  </>
+  <main>
+    <article class="spec-doc" innerHTML={renderMarkdown(props.spec)} />
+  </main>
 );
 
 export default SpecPage;
