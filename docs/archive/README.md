@@ -561,7 +561,40 @@ sameDoc` had an equivalent `false || sameDoc` (self-pairs are byte-identical too
 
 [variety-telemetry-s1b.md](variety-telemetry-s1b.md)
 
-**S1a + S1b complete; harness ongoing.** The sibling scoping + story-split docs —
+## Variety telemetry — S2 (opener win-rate + sample-gated §P7 flag) ✅ COMPLETE
+
+The second child story: the opener win-rate readout — `DESIGN §P7`'s **second** balance dial ("no
+opener > ~60% win") — beneath the S1 usage histogram. Each fighter's **opener** (its first honoured
+commitment) is joined to that fighter's `FightResult.winner` outcome; `winRate = wins/opens` with **draws
+in the denominator** (matching `benchmark.ts`'s `wins/bouts`), and over-winning openers are flagged `⚠`
+**gated by a sample floor** so a small hand-authored population doesn't false-alarm. **Two PR-slices**,
+each a **pure read-only reduction** over `runFight` (no engine/TCB change, no `INPUT_HASH` /
+`BENCHMARK_VERSION` bump, `npm run fight` byte-identical), extending the same trio. Each slice TDD'd at
+**100% mutation** on the two changed pure-logic files. Design hardened via find-gaps (S2-1…S2-8).
+
+- **Slice 1 — opener win-rate table** (PR #279, `feat/variety-telemetry-s2-openers`) — a pure
+  `reduceOpeners(matchups)` (sibling of `reduceUsage` / `reducePerBot`, reusing the S1b `Matchup{a,b,fight}`
+  - `honouredTechnique`): `openerOf` = each side's FIRST honoured commitment, joined via `outcomeFor` to
+    `FightResult.winner` (win/loss/draw); `winRate = wins/opens` with a ÷0 guard; rows sorted **win% desc →
+    opens desc → canonical**, never-opened (`—`) techniques last. `VarietyReport` gains `openers` +
+    `nullOpeners`; `renderOpeners` prints the 2nd section (+ the null-opener line); `--json` carries it for
+    free. Two survivor-kills via the "refactor to make mutants observable" pattern: a redundant `opened`
+    pre-filter (the per-technique filter already excludes nulls) deleted, and the branchy null-comparator
+    (V8's insertion sort can't decisively exercise it) replaced with a **two-list sort** (live openers
+    sorted, then dead appended) so row count + order are load-bearing → 100%, 0 survivors.
+- **Slice 2 — sample-gated §P7 flag** (PR #280, `feat/variety-telemetry-s2-flag`) — `OPENER_FLAG_THRESHOLD`
+  (0.60) + `MIN_OPENER_SAMPLE` (10) exported named constants; `OpenerRow` gains `dominant = opens >=
+MIN_OPENER_SAMPLE AND wins/opens > OPENER_FLAG_THRESHOLD` (the sample floor short-circuits the divide —
+  no ÷0, no null test). An opener above 60% but below the floor shows its N + win% but earns **no** flag
+  (kills the 1-open-100% noise). `renderOpeners` gains a `⚠` column; `renderOpenerLegend` prints the
+  footnote iff ≥1 opener is dominant. GOTCHA: the natural `winRate !== null && …` guard is a **runtime
+  equivalent** (opens≥10 ⇒ non-null) — computing `dominant` from `wins / opens` directly (short-circuit-
+  guarded) removes it → 100%, 0 survivors. Hardcoded boundary tests (opens = 10 vs 9, exactly-60%) pin
+  the literals.
+
+[variety-telemetry-s2.md](variety-telemetry-s2.md)
+
+**S1a–S2 complete; harness ongoing.** The sibling scoping + story-split docs —
 `variety-telemetry-harness.md` (grill-me: 8 resolved decisions) + `variety-telemetry-stories.md` (story
-split S1a–S5c) — stay live in `plans/` as the trail for the remaining stories **S2–S5** (opener win-rate,
-degrade-rate + spacing, scoring attribution, committed board / web surface).
+split S1a–S5c) — stay live in `plans/` as the trail for the remaining stories **S3–S5** (degrade-rate +
+spacing, scoring attribution, committed board / web surface).

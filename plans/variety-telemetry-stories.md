@@ -5,12 +5,14 @@ S1a now carries 12 testable acceptance examples (see §Gaps closed). Decisions l
 the sibling scoping doc `variety-telemetry-harness.md` (§Resolved decisions). Feeds
 `planning`, one selected child story at a time.
 
-**Shipped:** **S1a** (PRs #270–#272, archived) + **S1b** (PRs #273–#276, plan archived
-at `docs/archive/variety-telemetry-s1b.md` via #277) are both complete + live. The
-`telemetry` CLI now emits the pooled usage histogram, per-bot adoption (k/N) + mean
-share, the effective-move-count diversity headline + live/dead list, `--json`, and a
-`-- <path…>` population override with fail-fast load. **Next un-planned story: S2**
-(opener win-rate).
+**Shipped:** **S1a** (PRs #270–#272, archived) + **S1b** (PRs #273–#276, archived via
+#277) + **S2** (PRs #278–#280, plan archived at `docs/archive/variety-telemetry-s2.md`)
+are complete + live. The `telemetry` CLI now emits the pooled usage histogram, per-bot
+adoption (k/N) + mean share, the effective-move-count diversity headline + live/dead
+list, `--json`, a `-- <path…>` population override with fail-fast load, and the **opener
+win-rate table** with the sample-gated §P7 `⚠` flag — so **both** DESIGN §P7 balance
+dials (usage > 35%, opener > 60%) are now measured. **Next un-planned story: S3a**
+(per-move degrade-rate).
 
 ## Parent
 
@@ -271,13 +273,14 @@ high-win% low-N opener floats up but wears no `⚠`; its `opens` column tells th
 
 ## Next step
 
-**S1a + S1b are shipped and archived. S2 is now PLANNED** —
-`plans/variety-telemetry-s2.md` (find-gaps'd + sliced into 2 PR-sized TDD slices:
-① opener win-rate table, ② the sample-gated §P7 flag). Ready for implementation: each
-slice loads `tdd`, `testing`, `mutation-testing`, `refactoring` and completes
-RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins (the harness's pure
-reduction core is ideal for factory-driven behavioral tests over synthetic
-`FightResult` fixtures — the `benchmark.ts` test pattern).
+**S1a + S1b + S2 are shipped and archived** (S2 plan at
+`docs/archive/variety-telemetry-s2.md`). Both DESIGN §P7 balance dials are now measured.
+The next un-planned child story is **S3a** (per-move degrade-rate) — load `planning` for
+it (no open grills; straight to planning, optionally hardened with `find-gaps` on its
+one acceptance example first). Each planned slice loads `tdd`, `testing`,
+`mutation-testing`, `refactoring` and completes RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR
+before the next begins (the harness's pure reduction core is ideal for factory-driven
+behavioral tests over synthetic `FightResult` fixtures — the `benchmark.ts` test pattern).
 
 Remaining un-planned stories (each independently valuable, each needs its own planning
 pass): **S3a** (per-move degrade-rate), **S3b** (distance-occupancy histogram — *grill*
