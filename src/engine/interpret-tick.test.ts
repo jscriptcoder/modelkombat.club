@@ -25,6 +25,7 @@ const bot = (
 ): BotDoc => ({
   version: 1,
   name: "interp-test",
+  model: "test",
   rules,
   default: dflt,
 });

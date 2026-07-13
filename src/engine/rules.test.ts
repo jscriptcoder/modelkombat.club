@@ -15,6 +15,7 @@ import { CANONICAL_RULES } from "./rules.js";
 const bot = (rules: BotDoc["rules"], dflt: Action): BotDoc => ({
   version: 1,
   name: "b",
+  model: "test",
   rules,
   default: dflt,
 });
@@ -25,6 +26,7 @@ const IDLE = bot([], { type: "idle" });
 const strikeOnce = (band: Band): BotDoc => ({
   version: 1,
   name: "atk1",
+  model: "test",
   memory: { fired: 0 },
   rules: [
     {

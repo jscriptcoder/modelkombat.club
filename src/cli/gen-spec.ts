@@ -119,7 +119,7 @@ const documentShapeSection = (): string =>
     "{",
     '  "version": 1,',
     '  "name": "string (1..64 chars)",   // the fighter name shown on the ladder — not your author handle (that goes in the X-Author-Handle header)',
-    '  "model": "string (1..64 chars)",  // the model and reasoning effort that authored this bot (e.g. "Claude Opus 4.8 (high)") — provenance, never affects a fight',
+    '  "model": "string (1..64 chars)",  // REQUIRED: the model + reasoning effort that authored this bot (e.g. "Claude Opus 4.8 (high)") — provenance for the leaderboard, never affects a fight',
     '  "memory": { "cellName": 0 },      // optional: declared int cells, persist across ticks within a fight',
     '  "rules": [ <Rule>, ... ],         // priority-ordered; first matching `do` wins',
     '  "default": <Action>               // taken when no rule fires',
@@ -656,11 +656,11 @@ export function botDocSchema(): Record<string, unknown> {
     definitions: {
       BotDoc: {
         type: "object",
-        required: ["version", "name", "rules", "default"],
+        required: ["version", "name", "model", "rules", "default"],
         properties: {
           version: { const: 1 },
           name: { type: "string", minLength: 1, maxLength: 64 },
-          model: { type: "string", maxLength: 64 },
+          model: { type: "string", minLength: 1, maxLength: 64 },
           memory: {
             type: "object",
             maxProperties: LIMITS.maxCells,

@@ -26,6 +26,7 @@ const MOCK_RULES: Rules = {
 const named = (name: string, dflt: Action): BotDoc => ({
   version: 1,
   name,
+  model: "test",
   rules: [],
   default: dflt,
 });
@@ -75,6 +76,7 @@ const oppHasScored: BoolExpr = {
 const SCORER: BotDoc = {
   version: 1,
   name: "scorer",
+  model: "test",
   rules: [{ when: selfHasScored, do: { type: "idle" } }],
   default: ATTACK_MID,
 };
@@ -85,6 +87,7 @@ const SCORER: BotDoc = {
 const DELAYED: BotDoc = {
   version: 1,
   name: "delayed",
+  model: "test",
   rules: [
     { when: selfHasScored, do: { type: "idle" } },
     { when: oppHasScored, do: ATTACK_MID },

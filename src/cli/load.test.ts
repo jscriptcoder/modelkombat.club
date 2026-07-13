@@ -5,6 +5,7 @@ import { ValidationError } from "../engine/dsl.js";
 const VALID = JSON.stringify({
   version: 1,
   name: "x",
+  model: "test",
   rules: [],
   default: { type: "idle" },
 });

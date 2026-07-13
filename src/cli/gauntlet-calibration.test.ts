@@ -88,6 +88,7 @@ describe("gauntlet calibration lock — the certified measuring instrument", () 
       const pushover: BotDoc = {
         version: 1,
         name: "pushover",
+        model: "test",
         rules: [],
         default: { type: "idle" },
       };
@@ -304,6 +305,7 @@ describe("jogai adoption lock — exercised on the v15 board (fires + field-read
       const midRing: BotDoc = {
         version: 1,
         name: "mid-ring",
+        model: "test",
         rules: [
           {
             when: {
@@ -468,6 +470,7 @@ describe("passivity adoption lock — exercised on the v16 board (exercised + fi
       const otherReader: BotDoc = {
         version: 1,
         name: "other-reader",
+        model: "test",
         rules: [
           {
             when: {
@@ -589,6 +592,7 @@ describe("overtime adoption lock — fires on the v17 board (fires + field-read)
       const otherReader: BotDoc = {
         version: 1,
         name: "other-reader",
+        model: "test",
         rules: [
           {
             when: {
@@ -763,6 +767,7 @@ describe("tobi-geri adoption lock — exercised on the v19 board (connects + fie
       const otherReader: BotDoc = {
         version: 1,
         name: "other-reader",
+        model: "test",
         rules: [
           {
             when: {

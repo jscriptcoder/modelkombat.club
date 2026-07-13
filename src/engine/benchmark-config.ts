@@ -7,10 +7,13 @@
 //
 // A benchmark score is comparable ONLY against another score carrying the same
 // BENCHMARK_VERSION. INPUT_HASH pins the serialized CANONICAL_RULES + this
-// manifest + the verbatim gauntlet bot files; the guard test fails CI if any of
-// those drift without a matching version bump. Policy: also bump on any change to
-// the engine outcome path (sim.ts / the dsl.ts interpreter), which the existing
-// determinism/replay tests catch.
+// manifest + each gauntlet bot's SCORING content (its document minus the inert
+// `model` provenance field — see the exclusion guard in benchmark-config.test.ts);
+// the guard test fails CI if any of those drift without a matching version bump.
+// Policy: also bump on any change to the engine outcome path (sim.ts / the dsl.ts
+// interpreter), which the existing determinism/replay tests catch. Adding or
+// renaming a bot's `model` is NOT a scoring change — it moves neither the hash nor
+// the version.
 // ============================================================================
 
 export const BENCHMARK_VERSION = "v19"; // Aerial exercise: rekka's reachable-but-dormant `tobi-geri` jump-in is weaponized (its gate `opponent.distance > 300000`, which the ~286k opening gap never cleared, is lowered to > 250000) so the gauntlet actually EXERCISES aerial combat — rekka jumps off the opening gap and connects for a jodan ippon, all 6 members stay ∈ [25,75]. Only the rekka bot text changes (one INPUT_HASH flip); CANONICAL_RULES + the spec's move table are unchanged
@@ -64,11 +67,12 @@ export const GAUNTLET_NAMES: readonly string[] = [
   "vulture",
 ];
 
-// sha256 of { rules: CANONICAL_RULES, seeds, maxTicks, match, gauntlet: [<file text>] }.
-// The gauntlet file texts are hashed with LF line endings, pinned by `.gitattributes`
-// (`bots/*.json text eol=lf`) so the digest is byte-stable on every platform. Recompute
-// and bump (with BENCHMARK_VERSION) whenever a scoring input changes — the guard test in
-// benchmark-config.test.ts prints the expected value on drift. (Computed over all-LF bot
-// texts, pinned by `.gitattributes`, so the digest is byte-stable on every platform.)
+// sha256 of { rules: CANONICAL_RULES, seeds, maxTicks, match, gauntlet: [<scoring content>] },
+// where each gauntlet bot's scoring content is its PARSED document minus the inert `model`
+// field (never read by the interpreter, so it cannot move a score). Parsing normalises
+// formatting away, so the digest is byte-stable across platforms without depending on line
+// endings. Recompute + re-pin whenever the guard test in benchmark-config.test.ts fails (it
+// prints the expected value on drift); bump BENCHMARK_VERSION only when a TRUE scoring input
+// changes — adding or renaming a `model` does neither, so it never resets the ladder.
 export const INPUT_HASH =
-  "4764cdd7a51fbded720070f52e1cc34e5b7486d173b4fd5772583fc6e75f8926";
+  "9eb2897d10a02acd78ef3b9ff0c1e0f23383f3cedf24b840513ed8ff6569b989";

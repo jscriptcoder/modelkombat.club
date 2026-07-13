@@ -1,6 +1,7 @@
 {
   "version": 1,
   "name": "aggressor",
+  "model": "house",
   "rules": [
     {
       "when": {

@@ -13,6 +13,7 @@ import {
 const getMockBotDoc = (overrides?: Partial<BotDoc>): BotDoc => ({
   version: 1,
   name: "test-bot",
+  model: "test-author",
   memory: { hits: 0 },
   rules: [
     {
@@ -68,12 +69,14 @@ describe("validate — bot intake gate", () => {
       );
     });
 
-    // `model` — an OPTIONAL, purely descriptive record of what authored the
-    // fighter (e.g. "Claude Opus 4.8", "human"). Mirrors `name`'s 1..64 cap when
-    // present; the interpreter never reads it (see the determinism guard in the
-    // runFight suite). Invalid cases spread onto a plain object so validate's
-    // `unknown` parameter accepts the extra key without a type assertion.
-    describe("model provenance field (optional, descriptive)", () => {
+    // `model` — a REQUIRED, purely descriptive record of what authored the
+    // fighter (e.g. "Claude Opus 4.8", "house"). Provenance is the whole point of
+    // the ladder — every fighter must declare its author, so an LLM cannot omit
+    // which model it is. Mirrors `name`'s 1..64 cap; the interpreter never reads
+    // it (see the determinism guard in the runFight suite). Invalid cases spread
+    // onto a plain object so validate's `unknown` parameter accepts the extra key
+    // (or its absence) without a type assertion.
+    describe("model provenance field (required, descriptive)", () => {
       it("accepts a bot declaring model (what authored the fighter)", () => {
         const result = validate({
           ...getMockBotDoc(),
@@ -83,8 +86,13 @@ describe("validate — bot intake gate", () => {
         expect(result.ok).toBe(true);
       });
 
-      it("accepts a bot with no model — the field is optional (the factory declares none)", () => {
-        expect(validate(getMockBotDoc()).ok).toBe(true);
+      it("rejects a bot with no model — the field is required", () => {
+        const { model: _omit, ...noModel } = getMockBotDoc();
+        const result = validate(noModel);
+        expect(result.ok).toBe(false);
+        expect(result.issues).toContainEqual(
+          expect.objectContaining({ path: "model" }),
+        );
       });
 
       it("accepts a single-character model", () => {

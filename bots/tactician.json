@@ -1,6 +1,7 @@
 {
   "version": 1,
   "name": "tactician",
+  "model": "house",
   "memory": { "combo": 0 },
   "rules": [
     {

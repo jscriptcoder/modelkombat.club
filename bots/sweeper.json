@@ -1,6 +1,7 @@
 {
   "version": 1,
   "name": "sweeper",
+  "model": "gauntlet",
   "rules": [
     {
       "when": {

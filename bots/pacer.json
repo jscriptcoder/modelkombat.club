@@ -1,6 +1,7 @@
 {
   "version": 1,
   "name": "pacer",
+  "model": "house",
   "rules": [
     {
       "when": {

@@ -1,6 +1,7 @@
 {
   "version": 1,
   "name": "turtle",
+  "model": "house",
   "rules": [],
   "default": { "type": "block", "band": "mid" }
 }

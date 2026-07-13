@@ -45,6 +45,7 @@ type OneMove = "gyaku-zuki" | "mae-geri" | "mawashi-geri";
 const bot = (name: string, move: OneMove): BotDoc => ({
   version: 1,
   name,
+  model: "test",
   rules: [],
   default: { type: "attack", move, band: "mid" },
 });
