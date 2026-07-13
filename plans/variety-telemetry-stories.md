@@ -5,6 +5,13 @@ S1a now carries 12 testable acceptance examples (see §Gaps closed). Decisions l
 the sibling scoping doc `variety-telemetry-harness.md` (§Resolved decisions). Feeds
 `planning`, one selected child story at a time.
 
+**Shipped:** **S1a** (PRs #270–#272, archived) + **S1b** (PRs #273–#276, plan archived
+at `docs/archive/variety-telemetry-s1b.md` via #277) are both complete + live. The
+`telemetry` CLI now emits the pooled usage histogram, per-bot adoption (k/N) + mean
+share, the effective-move-count diversity headline + live/dead list, `--json`, and a
+`-- <path…>` population override with fail-fast load. **Next un-planned story: S2**
+(opener win-rate).
+
 ## Parent
 
 **Actor:** the roster designer (deciding whether to add / cut / buff a move — the
@@ -126,11 +133,67 @@ delete-a-follow-up property is why it leads.
 
 ### S2 — acceptance examples
 
-- Given the round-robin, Then each opener move shows its win-rate = (a fighter opened
-  with it and won) / (opened with it); draws counted separately, never as wins.
-- Given an opener whose win-rate exceeds 60%, Then it is flagged `⚠` (exit 0).
-- Given a fighter that never commits a technique in a fight, Then it contributes a
-  **null opener** (excluded from win-rates, shown as a count).
+_Hardened via find-gaps (2026-07-13) — 3 loose bullets → testable examples. Opener
+design locked in scoping decision #5; these pin the win-rate base, low-N handling,
+render, and `--json`._
+
+- **S2-1 (opener → outcome join).** Given the round-robin, When a fight runs, Then each
+  fighter's **opener** = its FIRST honoured technique commitment in that fight
+  (`honouredTechnique` over the same 13-technique key space as S1 — opening with `throw`
+  or `sweep` is valid), joined to THAT fighter's fight outcome from `FightResult.winner`
+  (`"A"|"B"|"draw"` → win / loss / draw for the side that fighter played). Each fight
+  yields up to **2 opener observations** (one per fighter, both orderings), over the
+  distinct-pair both-sides all-seeds round-robin (self-mirrors already skipped via
+  `sameDoc`).
+- **S2-2 (win-rate base — draws in the denominator).** Given per-opener tallies, Then
+  each opener's **win-rate = wins / opens**, where `opens = wins + losses + draws` (all
+  observations that opened with that move). A **draw is never a win** but stays in the
+  denominator (dragging the rate below 0.5 for an even opener), matching `benchmark.ts`'s
+  `wins/bouts` convention. Wins, losses, and **draws are each shown as their own column**
+  alongside the rate, so a reader can see the split behind the percentage.
+- **S2-3 (dominance flag — sample-gated).** Given an opener whose **raw** win-rate is
+  **strictly greater than** a named `OPENER_FLAG_THRESHOLD` (= `0.60`, tracking
+  `DESIGN §P7`'s ~60% target; exactly 60.0% is NOT flagged — mirrors S1a's strict-`>`
+  `USAGE_FLAG_THRESHOLD`) **AND** whose `opens ≥ MIN_OPENER_SAMPLE` (a named constant,
+  default ~10, retunable), Then its row is flagged `⚠` and the process still **exits 0**
+  (no gate — decision #8). An opener above 60% but below the sample floor shows its N +
+  win% but earns **no** `⚠` (kills the 1-open-100% false alarm over the 6-bot reference
+  population). A one-line legend explains the glyph (mirrors S1a-8). Both `⚠` thresholds
+  are single named constants, not magic literals.
+- **S2-4 (null opener).** Given a fighter that never honours a technique in a fight
+  (pure turtle), Then that (fighter, fight) observation contributes a **null opener** —
+  excluded from every opener's win-rate, and surfaced as a **null-opener count** at the
+  same (fighter, fight) granularity as the opener observations (never silently dropped,
+  so a reader sees how much of the field turtled).
+- **S2-5 (render + row order).** Given the report, Then the opener win-rates render as a
+  **second section** beneath the S1 usage histogram in the same `telemetry` report (one
+  report, additive readout — per the split's anti-salami guard), with columns
+  `opener · opens · W · L · D · win% · ⚠`. Rows are sorted by **win-rate descending**,
+  ties broken by **opens descending** (better-sampled first), then the **canonical
+  frame-table order** (the same total order as S1a-7) — so the highest (potentially
+  oppressive) openers surface at top while equal rows hold a stable, reproducible slot
+  (the determinism inherited from S1a-6 depends on this total order).
+- **S2-6 (zero-open guard + all-13).** Given a technique that **no** fighter ever opens
+  with (`opens == 0`, a `0/0` rate), Then it still appears — opens `0`, W/L/D `0`, win%
+  rendered as `—` (the ÷0 guard, mirroring S1a-4's `n/a`) — never omitted (mirrors
+  S1a-3), so "dead as an opener" (a move nobody ever leads with) is a visible design
+  datum. The opener table thus always lists all 13 techniques. Under S2-5's win%-desc
+  order these `—` (0-open) rows sort **to the bottom** (an undefined rate ranks below
+  every numeric win%), broken among themselves by canonical order — so real openers
+  always lead and dead openers cluster at the tail.
+- **S2-7 (`--json` additive).** Given `--json`, Then the opener data rides in the SAME
+  versioned envelope S1b shipped (`{version, population, report}`) as **additive fields
+  on `VarietyReport`** (`openers: OpenerRow[]` + a `nullOpeners` count) — no new
+  top-level key, no envelope reshape. The envelope `version` (= `BENCHMARK_VERSION`)
+  is **unchanged**: S2 is a pure read-only reduction (no scoring-input touch ⇒ the
+  invariant forbids a version bump), and an added field is a non-breaking JSON change
+  (cli-design) — a consumer pinned to the S1b shape still parses; a new one reads
+  `report.openers`. `--json` round-trips (`JSON.parse` re-`toEqual`s `runVariety()`),
+  mirroring the S1b Slice-3 test.
+- **S2-8 (determinism, inherited).** Given fixed seeds + rules, When run twice, Then the
+  opener section is byte-identical — a pure reduction over `runFight` (no `INPUT_HASH` /
+  `BENCHMARK_VERSION` impact), the same non-negotiable as S1a-6, depending on the S2-5
+  total row order.
 
 ## Parking lot
 
@@ -185,11 +248,40 @@ Should-addresses closed; both Nice-to-haves folded in; nothing parked.
 Contradiction caught + fixed during recap: S1a-2's sum-to-1.0 invariant vs S1a-4's
 zero-total all-0.0 → invariant now guarded with `when totalCommitments > 0`.
 
+## Gaps closed — find-gaps session, 2026-07-13
+
+Focus: **S2** acceptance examples (3 loose → 8 testable, S2-1…S2-8). Opener *design* was
+already locked in scoping decision #5, so the gaps were presentation + edge-case +
+measurability. All closed; two S1a mirrors folded; nothing parked.
+
+```
+[Should → S2-2]      Win-rate base: wins/opens, draws IN the denominator + own column
+                     (matches benchmark.ts wins/bouts; sets what ">60%" measures)
+[Should → S2-3]      Low-N false-alarm: show N always, ⚠ gated on opens ≥ MIN_OPENER_SAMPLE
+[Should → S2-5/6]    Render: 2nd section, cols, sort win%↓→opens↓→canonical; all 13,
+                     0-open "—" sinks to the bottom (÷0 guard)
+[Should → S2-7]      --json additive (openers + nullOpeners on VarietyReport); envelope
+                     version unchanged (invariant forbids a bump; additive is non-breaking)
+[Mirror→ S2-1/3]     OPENER_FLAG_THRESHOLD strict > + legend (S1a-8); 13-technique keys (S1a)
+[Inherit→ S2-8]      Determinism byte-identical (S1a-6), depends on the S2-5 total order
+```
+
+Consistency check passed: the N-gate (S2-3) and win%↓ sort (S2-5) interact cleanly — a
+high-win% low-N opener floats up but wears no `⚠`; its `opens` column tells the story.
+
 ## Next step
 
-Load `planning` for **S1a** to turn it into PR-sized implementation slices. Each
-planned slice must load `tdd`, `testing`, `mutation-testing`, and `refactoring` and
-complete RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins (the harness's
-pure reduction core is ideal for factory-driven behavioral tests over synthetic
-`FightResult` fixtures — the `benchmark.ts` test pattern). Optionally run `find-gaps`
-on this split first to harden the S1a acceptance examples.
+**S1a + S1b are shipped and archived. S2 is now PLANNED** —
+`plans/variety-telemetry-s2.md` (find-gaps'd + sliced into 2 PR-sized TDD slices:
+① opener win-rate table, ② the sample-gated §P7 flag). Ready for implementation: each
+slice loads `tdd`, `testing`, `mutation-testing`, `refactoring` and completes
+RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins (the harness's pure
+reduction core is ideal for factory-driven behavioral tests over synthetic
+`FightResult` fixtures — the `benchmark.ts` test pattern).
+
+Remaining un-planned stories (each independently valuable, each needs its own planning
+pass): **S3a** (per-move degrade-rate), **S3b** (distance-occupancy histogram — *grill*
+the distance bucketing first), **S4** (scoring attribution — *grill first*: the
+commitment-reconstruction window + rekka disambiguation; an engine survey answering both
+is already captured in the session scratchpad `s4-scoring-attribution-engine-research.md`
+for when S4 is picked up). S5a/b/c are post-launch / far-future.
