@@ -5,6 +5,7 @@ import {
   reduceOccupancy,
   reduceOpeners,
   reducePerBot,
+  reduceScoring,
   reduceUsage,
   runVariety,
   type Matchup,
@@ -1198,5 +1199,447 @@ describe("reduceOccupancy — reach-zone occupancy over inter-fighter distance",
       "poke",
       "out",
     ]);
+  });
+});
+
+// ─── reduceScoring (S4): scoring attribution. Joins each positive scoreboard delta
+// (frame[i].points − frame[i−1].points > 0, per fighter side) to the honoured-start
+// whose absolute [i+startup, i+startup+active−1] window covers the delta index — one
+// event per tick means the array index IS the tick, so windows are index ranges. A
+// covered delta is that move's `pts` (counter bonuses ride inside the whole delta); an
+// UNCOVERED positive delta is a jogai/passivity penalty (+1 to the opponent), summed
+// into `excludedPenaltyPts`. Reads only .action/.degrade/.points + per-technique
+// startup/active from `rules` — NO fouls read (reconciliation is a test-level cross-
+// check between the delta-derived excluded total and FightResult.fouls). ───────────────
+
+// A frame carrying an explicit scoreboard `points` (the S4 attribution axis) — the usage
+// `frame` factory pins points to 0, so scoring needs its own. Honoured by default.
+const pf = (
+  action: Action,
+  points: number,
+  degrade: DegradeReason | null = null,
+): FighterFrame => ({ x: 0, y: 0, action, points, stamina: 0, degrade });
+
+// Zip equal-length per-side frame arrays into a fight, tick == array index (the engine
+// records one event per tick from 0), carrying explicit final scores + fouls. The
+// reducer's window axis is the array index, so tick == index keeps the fixture faithful.
+const scoringFight = (
+  aFrames: FighterFrame[],
+  bFrames: FighterFrame[],
+  scores: { a: number; b: number },
+  fouls: FightResult["fouls"] = {
+    a: { jogai: 0, passivity: 0 },
+    b: { jogai: 0, passivity: 0 },
+  },
+): FightResult => ({
+  winner: "draw",
+  ticks: aFrames.length,
+  scores,
+  events: aFrames.map((a, i) => ({ tick: i, a, b: bFrames[i] })),
+  endReason: "time",
+  fouls,
+});
+
+// Fixture rules for scoring: mae-geri carries a WIDE window (startup 9, active 3 ⇒ a
+// start at index 0 covers [9, 11]) to pin the window off-by-one; every other move is a
+// unit window (startup 1, active 1 ⇒ a start at index i covers [i+1]) so `startScoring`
+// can compose arbitrary (starts, pts). The reducer reads only startup/active from here
+// (knockdownClass is a fixed named set — sweep + hiza-geri — not read off the spec).
+const SW = { startup: 1, active: 1, recovery: 1, reach: 250000 };
+
+const SCORING_RULES: Rules = {
+  tickRate: 60,
+  walkSpeed: 4000,
+  ring: { width: 600000 },
+  startGap: 200000,
+  moves: {
+    "gyaku-zuki": { ...SW, score: 1 },
+    "kizami-zuki": { ...SW, score: 1 },
+    "mae-geri": { startup: 9, active: 3, recovery: 6, score: 2, reach: 250000 },
+    "mawashi-geri": { ...SW, score: 2 },
+    uraken: { ...SW, score: 1 },
+    shuto: { ...SW, score: 1 },
+    "yoko-geri": { ...SW, score: 2 },
+    "ushiro-geri": { ...SW, score: 2 },
+    empi: { ...SW, score: 2 },
+    "hiza-geri": { ...SW, score: 0, knockdown: true },
+    "tobi-geri": { ...SW, score: 1, air: true },
+    sweep: { ...SW, score: 0, knockdown: true },
+  },
+  throw: { ...SW, score: 3 },
+};
+
+// One fight: side A honour-starts unit-window `t` at index 0 and scores `pts` at index 1
+// (its window [1, 1]); `pts === 0` ⇒ a whiff (a start that never lands). Side B idles.
+// Points reset per fight, so pooling many composes arbitrary (starts, pts). NOT for
+// mae-geri (its window is [9, 11], not [1, 1]).
+const startScoring = (t: Technique, pts: number): FightResult =>
+  scoringFight(
+    [pf(techniqueAction(t), 0), pf(IDLE, pts)],
+    [pf(IDLE, 0), pf(IDLE, 0)],
+    { a: pts, b: 0 },
+  );
+
+// The penalty points a fight awards = Σ over fighters of max(0, foulCount − 1) (each
+// jogai/passivity foul beyond the first gives the OPPONENT +1). The reconciliation target
+// for excludedPenaltyPts — derived from FightResult.fouls, a source the reducer never reads.
+const foulPts = (r: FightResult): number =>
+  Math.max(0, r.fouls.a.jogai + r.fouls.a.passivity - 1) +
+  Math.max(0, r.fouls.b.jogai + r.fouls.b.passivity - 1);
+
+describe("reduceScoring — per-technique scoring attribution (window join)", () => {
+  it("attributes points only inside the move's [startup, startup+active−1] window (both bounds load-bearing)", () => {
+    // mae-geri (startup 9, active 3) starts at index 0 ⇒ window [9, 11]. Points gain +1 at
+    // index 8 (BEFORE), +2 at index 9 (at lo), +3 at index 11 (at hi), +1 at index 12 (AFTER).
+    // Only the +2 and +3 are mae's (pts 5); a ±1 slip of EITHER bound adds an adjacent +1 or
+    // drops an edge gain — changing 5 — so startup AND active are both pinned.
+    const aPoints = [0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 3, 6, 7];
+
+    const fight = scoringFight(
+      aPoints.map((p, i) =>
+        pf(i === 0 ? techniqueAction("mae-geri") : IDLE, p),
+      ),
+      aPoints.map(() => pf(IDLE, 0)),
+      { a: 7, b: 0 },
+    );
+
+    const mae = rowFor(reduceScoring([fight], SCORING_RULES), "mae-geri");
+
+    expect(mae.starts).toBe(1);
+    expect(mae.land).toBe(1);
+    expect(mae.pts).toBe(5); // the +2 (at lo) and +3 (at hi); not the before/after +1s
+  });
+
+  it("does not count a zero delta in the window as a land (strict > 0, not >= 0)", () => {
+    // gyaku starts at index 0 (window [1, 1]) but points stay flat ⇒ delta 0 at index 1.
+    const gyaku = rowFor(
+      reduceScoring([startScoring("gyaku-zuki", 0)], SCORING_RULES),
+      "gyaku-zuki",
+    );
+
+    expect(gyaku.starts).toBe(1);
+    expect(gyaku.land).toBe(0);
+    expect(gyaku.pts).toBe(0);
+  });
+
+  it("counts a landing start once (binary land) while summing its points", () => {
+    // one gyaku start, one +2 delta in its window ⇒ land 1 (not 2), pts 2 — distinguishes
+    // `land += 1` from `land += delta` / `land = pts`.
+    const gyaku = rowFor(
+      reduceScoring([startScoring("gyaku-zuki", 2)], SCORING_RULES),
+      "gyaku-zuki",
+    );
+
+    expect(gyaku.land).toBe(1);
+    expect(gyaku.pts).toBe(2);
+  });
+
+  it("credits an attributed delta to the committing move on EITHER side (not just side A)", () => {
+    // side B honour-starts gyaku at index 0 (window [1, 1]) and scores +1 at index 1.
+    const fight = scoringFight(
+      [pf(IDLE, 0), pf(IDLE, 0)],
+      [pf(techniqueAction("gyaku-zuki"), 0), pf(IDLE, 1)],
+      { a: 0, b: 1 },
+    );
+
+    const gyaku = rowFor(reduceScoring([fight], SCORING_RULES), "gyaku-zuki");
+
+    expect(gyaku.starts).toBe(1);
+    expect(gyaku.land).toBe(1);
+    expect(gyaku.pts).toBe(1);
+  });
+
+  it("attributes points to a throw start's window (throw reads rules.throw, not moves)", () => {
+    // throw honour-starts at index 0 ⇒ window [1, 1] (SCORING_RULES.throw startup 1 active 1);
+    // +3 lands at index 1. A moves[...] lookup would find no throw window ⇒ throw would score 0.
+    const fight = scoringFight(
+      [pf(THROW, 0), pf(IDLE, 3)],
+      [pf(IDLE, 0), pf(IDLE, 0)],
+      {
+        a: 3,
+        b: 0,
+      },
+    );
+
+    const thrown = rowFor(reduceScoring([fight], SCORING_RULES), "throw");
+
+    expect(thrown.starts).toBe(1);
+    expect(thrown.land).toBe(1);
+    expect(thrown.pts).toBe(3);
+  });
+
+  it("catches a point on the commit tick itself for a startup-0 move (window opens at frame 0)", () => {
+    // A startup-0, active-1 move committed at index 0 has window [0, 0]; a point scored on that
+    // tick (points[0] = 1) is its gain from the pre-fight scoreboard baseline (0). Pins the
+    // baseline read at the very first frame.
+    const rules0: Rules = {
+      ...SCORING_RULES,
+      moves: {
+        ...SCORING_RULES.moves,
+        uraken: { startup: 0, active: 1, recovery: 1, score: 1, reach: 250000 },
+      },
+    };
+
+    const fight = scoringFight(
+      [pf(techniqueAction("uraken"), 1)],
+      [pf(IDLE, 0)],
+      {
+        a: 1,
+        b: 0,
+      },
+    );
+
+    const uraken = rowFor(reduceScoring([fight], rules0), "uraken");
+
+    expect(uraken.starts).toBe(1);
+    expect(uraken.land).toBe(1);
+    expect(uraken.pts).toBe(1);
+  });
+
+  it("is safe when a start's window runs past the final frame (no out-of-bounds points read)", () => {
+    // gyaku (startup 1 active 1) honour-starts at the ONLY frame of a 1-frame fight, so its
+    // window [1, 1] lies beyond the recorded frames. The scoreboard is flat after the fight
+    // ends ⇒ the window catches 0 — pts stays a real number, never NaN from an OOB read.
+    const fight = scoringFight(
+      [pf(techniqueAction("gyaku-zuki"), 0)],
+      [pf(IDLE, 0)],
+      {
+        a: 0,
+        b: 0,
+      },
+    );
+
+    const gyaku = rowFor(reduceScoring([fight], SCORING_RULES), "gyaku-zuki");
+
+    expect(gyaku.starts).toBe(1);
+    expect(gyaku.pts).toBe(0);
+    expect(Number.isNaN(gyaku.pts)).toBe(false);
+  });
+
+  it("guards a fight with no recorded frames (empty events) — a real number total, never NaN", () => {
+    const scoring = reduceScoring(
+      [scoringFight([], [], { a: 0, b: 0 })],
+      SCORING_RULES,
+    );
+
+    expect(scoring.excludedPenaltyPts).toBe(0);
+    expect(Number.isNaN(scoring.excludedPenaltyPts)).toBe(false);
+  });
+
+  it("still counts a honoured start whose technique the rules don't configure (reconciles with usage), but it never lands", () => {
+    // An engine-impossible frame (an unconfigured pick degrades to `inert`, never honoured) —
+    // but the reducer stays well-defined: the start counts (so `starts` tracks the usage count)
+    // yet has no window, so it catches nothing and its point falls to the penalty residual
+    // rather than being fabricated onto the move.
+    const noEmpi: Rules = {
+      ...SCORING_RULES,
+      moves: { ...SCORING_RULES.moves, empi: undefined },
+    };
+
+    const fight = scoringFight(
+      [pf(techniqueAction("empi"), 0), pf(IDLE, 1)],
+      [pf(IDLE, 0), pf(IDLE, 0)],
+      { a: 1, b: 0 },
+    );
+
+    const scoring = reduceScoring([fight], noEmpi);
+    const empi = rowFor(scoring, "empi");
+
+    expect(empi.starts).toBe(1); // counted, matching the usage predicate
+    expect(empi.land).toBe(0); // no window ⇒ never lands
+    expect(empi.pts).toBe(0);
+    expect(scoring.excludedPenaltyPts).toBe(1); // the point falls to the residual, not onto empi
+  });
+
+  it("reports `starts` identical to the S1a usage count (same honoured-start predicate)", () => {
+    // gyaku honoured 2× + degraded 1× (inert, never honoured), mae honoured 1×.
+    const fights = [
+      scoringFight(
+        [
+          pf(techniqueAction("gyaku-zuki"), 0),
+          pf(techniqueAction("gyaku-zuki"), 0),
+          pf(techniqueAction("gyaku-zuki"), 0, "inert"),
+          pf(techniqueAction("mae-geri"), 0),
+        ],
+        [pf(IDLE, 0), pf(IDLE, 0), pf(IDLE, 0), pf(IDLE, 0)],
+        { a: 0, b: 0 },
+      ),
+    ];
+
+    const scoring = reduceScoring(fights, SCORING_RULES);
+    const usage = reduceUsage(fights);
+
+    expect(rowFor(scoring, "gyaku-zuki").starts).toBe(
+      rowFor(usage, "gyaku-zuki").count,
+    );
+    expect(rowFor(scoring, "gyaku-zuki").starts).toBe(2);
+    expect(rowFor(scoring, "mae-geri").starts).toBe(
+      rowFor(usage, "mae-geri").count,
+    );
+  });
+
+  it("lists all 13 techniques; a never-started move is present with null rates (÷0 guard)", () => {
+    const scoring = reduceScoring(
+      [startScoring("gyaku-zuki", 1)],
+      SCORING_RULES,
+    );
+
+    expect(scoring.rows).toHaveLength(13);
+    expect(
+      scoring.rows
+        .map((r) => r.technique)
+        .slice()
+        .sort(),
+    ).toEqual(CANONICAL.slice().sort());
+
+    const ushiro = rowFor(scoring, "ushiro-geri");
+
+    expect(ushiro.starts).toBe(0);
+    expect(ushiro.land).toBe(0);
+    expect(ushiro.pts).toBe(0);
+    expect(ushiro.landRate).toBe(null);
+    expect(ushiro.ptsPerStart).toBe(null);
+    expect(ushiro.knockdownClass).toBe(false);
+  });
+
+  it("computes landRate = land/starts and ptsPerStart = pts/starts for a live move", () => {
+    // gyaku starts 4: 3 land 1 pt each, 1 whiffs ⇒ land 3, pts 3 ⇒ landRate 0.75, pts/start 0.75.
+    const scoring = reduceScoring(
+      [
+        startScoring("gyaku-zuki", 1),
+        startScoring("gyaku-zuki", 1),
+        startScoring("gyaku-zuki", 1),
+        startScoring("gyaku-zuki", 0),
+      ],
+      SCORING_RULES,
+    );
+
+    const gyaku = rowFor(scoring, "gyaku-zuki");
+
+    expect(gyaku.starts).toBe(4);
+    expect(gyaku.land).toBe(3);
+    expect(gyaku.pts).toBe(3);
+    expect(gyaku.landRate).toBe(0.75);
+    expect(gyaku.ptsPerStart).toBe(0.75);
+  });
+
+  it("guards the zero-total case: every rate null (never NaN), no excluded points", () => {
+    const scoring = reduceScoring(
+      [scoringFight([pf(IDLE, 0)], [pf(IDLE, 0)], { a: 0, b: 0 })],
+      SCORING_RULES,
+    );
+
+    for (const r of scoring.rows) {
+      expect(r.landRate).toBe(null);
+      expect(r.ptsPerStart).toBe(null);
+      expect(Number.isNaN(r.landRate as unknown as number)).toBe(false);
+    }
+
+    expect(scoring.excludedPenaltyPts).toBe(0);
+  });
+
+  it("sorts rows by pts desc → starts desc → canonical order", () => {
+    // uraken 4pts (top). Then a 2-pt cluster: mawashi (starts 4), kizami (starts 2), gyaku
+    // (starts 2). starts-desc floats mawashi (idx 4) above kizami/gyaku — OPPOSITE canonical
+    // — isolating the starts tie-break; kizami & gyaku tie on pts AND starts ⇒ canonical
+    // breaks them (kizami idx 1 before gyaku idx 2). The pts-0 tail is canonical order.
+    const scoring = reduceScoring(
+      [
+        ...Array.from({ length: 4 }, () => startScoring("uraken", 1)),
+        ...Array.from({ length: 2 }, () => startScoring("mawashi-geri", 1)),
+        ...Array.from({ length: 2 }, () => startScoring("mawashi-geri", 0)),
+        ...Array.from({ length: 2 }, () => startScoring("kizami-zuki", 1)),
+        ...Array.from({ length: 2 }, () => startScoring("gyaku-zuki", 1)),
+      ],
+      SCORING_RULES,
+    );
+
+    expect(scoring.rows.map((r) => r.technique)).toEqual([
+      "uraken",
+      "mawashi-geri",
+      "kizami-zuki",
+      "gyaku-zuki",
+      "sweep",
+      "mae-geri",
+      "shuto",
+      "yoko-geri",
+      "ushiro-geri",
+      "empi",
+      "hiza-geri",
+      "tobi-geri",
+      "throw",
+    ]);
+  });
+});
+
+describe("reduceScoring — score-0 knockdown moves (okizeme finish, S4-3)", () => {
+  it("flags sweep + hiza-geri as knockdownClass and keeps the finish points on the finisher", () => {
+    // sweep starts at index 0 (its own window [1, 1] catches nothing — sweep scores 0, it
+    // DOWNS). The gyaku okizeme finisher starts at index 2 (window [3, 3]) and scores +3.
+    const fight = scoringFight(
+      [
+        pf(techniqueAction("sweep"), 0),
+        pf(IDLE, 0),
+        pf(techniqueAction("gyaku-zuki"), 0),
+        pf(IDLE, 3),
+      ],
+      [pf(IDLE, 0), pf(IDLE, 0), pf(IDLE, 0), pf(IDLE, 0)],
+      { a: 3, b: 0 },
+    );
+
+    const scoring = reduceScoring([fight], SCORING_RULES);
+    const sweep = rowFor(scoring, "sweep");
+    const gyaku = rowFor(scoring, "gyaku-zuki");
+
+    expect(sweep.knockdownClass).toBe(true);
+    expect(sweep.starts).toBe(1);
+    expect(sweep.pts).toBe(0); // scores via the finisher, not directly
+    expect(gyaku.pts).toBe(3); // the okizeme 3 lands on gyaku, not sweep
+    expect(gyaku.knockdownClass).toBe(false);
+
+    // hiza-geri is knockdown-class even unused here; tobi-geri (a scoring air move) and throw
+    // (which scores its grab directly) are NOT — only the two okizeme setups blank to "—".
+    expect(rowFor(scoring, "hiza-geri").knockdownClass).toBe(true);
+    expect(rowFor(scoring, "tobi-geri").knockdownClass).toBe(false);
+    expect(rowFor(scoring, "throw").knockdownClass).toBe(false);
+  });
+});
+
+describe("reduceScoring — penalty exclusion + reconciliation (S4-4/S4-5)", () => {
+  // A lands 2 gyaku (index-0 start → +1 at index 1; index-2 start → +1 at index 3); B never
+  // commits but gains +1 at index 4 — a jogai penalty (A fouled twice ⇒ opponent +1). The
+  // penalty delta is uncovered by any honoured-start ⇒ excluded, never mis-attributed.
+  const penaltyFight = scoringFight(
+    [
+      pf(techniqueAction("gyaku-zuki"), 0),
+      pf(IDLE, 1),
+      pf(techniqueAction("gyaku-zuki"), 1),
+      pf(IDLE, 2),
+      pf(IDLE, 2),
+    ],
+    [pf(IDLE, 0), pf(IDLE, 0), pf(IDLE, 0), pf(IDLE, 0), pf(IDLE, 1)],
+    { a: 2, b: 1 },
+    { a: { jogai: 2, passivity: 0 }, b: { jogai: 0, passivity: 0 } },
+  );
+
+  it("excludes the uncovered penalty delta from every technique and reconciles it to the fouls", () => {
+    const scoring = reduceScoring([penaltyFight], SCORING_RULES);
+
+    expect(rowFor(scoring, "gyaku-zuki").pts).toBe(2); // both combat lands, not the +1 penalty
+    expect(rowFor(scoring, "gyaku-zuki").land).toBe(2);
+    // no technique absorbs the penalty ⇒ Σ pts is exactly the combat points.
+    expect(scoring.rows.reduce((sum, r) => sum + r.pts, 0)).toBe(2);
+    // the excluded total equals Σ max(0, foulCount − 1) — the independent fouls-derived target.
+    expect(scoring.excludedPenaltyPts).toBe(1);
+    expect(scoring.excludedPenaltyPts).toBe(foulPts(penaltyFight));
+  });
+
+  it("upholds the master sum invariant: Σ pts + excluded == Σ final scores", () => {
+    const scoring = reduceScoring([penaltyFight], SCORING_RULES);
+    const attributed = scoring.rows.reduce((sum, r) => sum + r.pts, 0);
+
+    expect(attributed + scoring.excludedPenaltyPts).toBe(
+      penaltyFight.scores.a + penaltyFight.scores.b,
+    );
   });
 });

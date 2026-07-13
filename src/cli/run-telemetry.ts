@@ -297,6 +297,39 @@ export const renderOccupancy = (report: VarietyReport): string => {
   return `${table}\n\nnote: one |a.x - b.x| sample per tick, bucketed by the reach ladder; poke = the >300k zoning pokes`;
 };
 
+// Render the scoring-attribution table (S4 — Metric 7): per technique, the honoured-starts
+// `starts`, how many LANDED a point (`land`) and at what rate, the points scored `pts` and
+// per start — answering "which moves actually score vs whiff?". Rows arrive already sorted
+// (pts desc → starts desc → canonical). A knockdown-class move (sweep, hiza-geri) scores 0
+// on its own hit — its points land on the okizeme finisher — so its land / land% / pts-per-
+// start blank to `—`; a never-started move shows land 0 but blanks its rates to `—` (the ÷0
+// guard). The excluded-penalty total (jogai/passivity points, off the attribution) is the
+// trailing line, so `Σ pts + excluded == Σ scores` is visible. NO ⚠ flag — a diagnostic
+// effectiveness readout, not a §P7 balance dial. Pure data → string; the exact output is a
+// stdout contract (cli-design).
+export const renderScoring = (report: VarietyReport): string => {
+  const table = render([
+    ["move", "starts", "land", "land%", "pts", "pts/start"],
+    ...report.scoring.map((r) => [
+      r.technique,
+      `${r.starts}`,
+      r.knockdownClass ? "—" : `${r.land}`,
+      r.knockdownClass || r.landRate === null
+        ? "—"
+        : `${(r.landRate * 100).toFixed(1)}%`,
+      `${r.pts}`,
+      r.knockdownClass || r.ptsPerStart === null
+        ? "—"
+        : r.ptsPerStart.toFixed(1),
+    ]),
+  ]);
+
+  return (
+    `${table}\n\nexcluded penalty points: ${report.excludedPenaltyPts}` +
+    `\n\nnote: pts joins each score to the move whose active window caught it; knockdown setups (sweep, hiza-geri) score via the okizeme finisher, shown —`
+  );
+};
+
 export const runTelemetryCli = (
   argv: string[],
   deps: TelemetryDeps,
@@ -351,7 +384,8 @@ export const runTelemetryCli = (
     `\n\n${renderOpeners(report)}` +
     (openerLegend ? `\n\n${openerLegend}` : "") +
     `\n\n${renderDegrades(report)}` +
-    `\n\n${renderOccupancy(report)}`;
+    `\n\n${renderOccupancy(report)}` +
+    `\n\n${renderScoring(report)}`;
 
   return {
     stdout: `${header}\n\n${body}\n`,
