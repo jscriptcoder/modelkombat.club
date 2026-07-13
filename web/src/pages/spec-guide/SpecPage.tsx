@@ -1,5 +1,6 @@
-import { Marked, type Renderer, type Tokens } from "marked";
 import { type Component } from "solid-js";
+
+import { renderMarkdown } from "../../shared/lib/render-markdown";
 
 // The human-readable spec page. It is PURELY PRESENTATIONAL: it is handed the spec
 // markdown as a prop and renders it as an HTML document synchronously. The markdown
@@ -12,45 +13,8 @@ import { type Component } from "solid-js";
 //
 // It carries NO site chrome — no nav header, no footer. It opens in its own tab as a
 // bare reference document the reader consults and closes, so there is nothing to
-// navigate to and back from.
-
-// The spec is our own generated, same-origin markdown (trusted), so marked's HTML
-// is injected directly — there is no untrusted author to sanitise against. If this
-// ever renders third-party markdown, run the output through DOMPurify first.
-//
-// Every heading is given a URL-safe slug id so ANY section is deep-linkable as
-// `/spec-guide#slug` (the browser scrolls to it natively). The mechanism is generic,
-// not tied to one section. A per-render counter disambiguates repeated heading text
-// so ids stay unique.
-const renderMarkdown = (markdown: string): string => {
-  const seen = new Map<string, number>();
-
-  const slugify = (text: string): string => {
-    const base = text
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, "")
-      .replace(/\s+/g, "-");
-
-    const count = seen.get(base) ?? 0;
-
-    seen.set(base, count + 1);
-
-    return count === 0 ? base : `${base}-${count}`;
-  };
-
-  const md = new Marked({
-    renderer: {
-      heading(this: Renderer, token: Tokens.Heading): string {
-        const inner = this.parser.parseInline(token.tokens);
-
-        return `<h${token.depth} id="${slugify(token.text)}">${inner}</h${token.depth}>\n`;
-      },
-    },
-  });
-
-  return md.parse(markdown, { async: false });
-};
+// navigate to and back from. The markdown→HTML transform (with slug-anchored headings)
+// is the shared `renderMarkdown`, reused by the variety board page too.
 
 const SpecPage: Component<{ spec: string }> = (props) => (
   <main>

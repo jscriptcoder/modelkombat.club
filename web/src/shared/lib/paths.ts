@@ -19,6 +19,10 @@ export const RING_PATH = "/ring";
 // /spec endpoint below: this is the one a person opens and reads; /spec is the machine copy.
 export const SPEC_GUIDE_PATH = "/spec-guide";
 
+// The human-readable move-variety board (prerendered static HTML). Renders the same board
+// committed to docs/variety.md — the frozen gauntlet's move-usage meta, regenerated at build.
+export const VARIETY_PATH = "/variety";
+
 // --- API endpoints the UI calls ---
 
 // The raw spec markdown, served by the api/spec function (and the static /spec.md fallback)

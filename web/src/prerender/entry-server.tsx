@@ -9,8 +9,9 @@ import {
   setTitle,
   stripScripts,
 } from "./inject-body";
-import { SPEC_GUIDE_PATH } from "../shared/lib/paths";
+import { SPEC_GUIDE_PATH, VARIETY_PATH } from "../shared/lib/paths";
 import SpecPage from "../pages/spec-guide/SpecPage";
+import VarietyPage from "../pages/variety/VarietyPage";
 
 // Re-exported so the prerender script can pull the string transforms from this one
 // SSR-built bundle (they are pure string transforms).
@@ -24,6 +25,9 @@ export {
 
 // The spec page's own tab title — distinct from the home title the shell ships with.
 const SPEC_GUIDE_TITLE = "ModelKombat — Bot authoring spec";
+
+// The variety board page's own tab title — likewise distinct from the home title.
+const VARIETY_TITLE = "ModelKombat — Variety board";
 
 // The build-time prerender entry. Renders the home page to a body string that the
 // prerender script injects into the built HTML shell's `#root`, so a no-JS fetch
@@ -54,5 +58,23 @@ export const renderSpecGuidePage = (shell: string, spec: string): string =>
         SPEC_GUIDE_TITLE,
       ),
       `${CANONICAL_ORIGIN}${SPEC_GUIDE_PATH}`,
+    ),
+  );
+
+// Assemble the fully-static variety board page — the same static-doc shape as the spec
+// page: the board markdown rendered to HTML in `#root`, a distinct `<head>` (own title +
+// canonical), and NO client JS. There is deliberately no hydration script; nothing
+// hydrates a page that ships no JS, so `/variety` is inert, readable static HTML.
+export const renderVarietyPage = (shell: string, board: string): string =>
+  stripScripts(
+    setCanonical(
+      setTitle(
+        injectBody(
+          shell,
+          renderToString(() => <VarietyPage board={board} />),
+        ),
+        VARIETY_TITLE,
+      ),
+      `${CANONICAL_ORIGIN}${VARIETY_PATH}`,
     ),
   );
