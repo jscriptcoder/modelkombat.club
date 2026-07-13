@@ -59,9 +59,9 @@ Derived from the §S1b examples + resolved decisions. Slice mapping in brackets.
       version+roster, and `--json` drops it, so the envelope preserves that provenance); valid
       parseable JSON (no table / ANSI / `⚠`); stderr unaffected; exit 0; byte-identical across
       two runs [Slice 3]
-- [ ] **S1b-5** `npm run telemetry -- <path…>` runs the round-robin over the **supplied**
+- [x] **S1b-5** `npm run telemetry -- <path…>` runs the round-robin over the **supplied**
       bots instead of the frozen gauntlet; no args ⇒ gauntlet (S1a behaviour unchanged) [Slice 4]
-- [ ] **S1b-6** a supplied bot that fails to load/validate ⇒ a structured error on **stderr** + **non-zero exit** (never a silent partial population); the driver skips byte-identical
+- [x] **S1b-6** a supplied bot that fails to load/validate ⇒ a structured error on **stderr** + **non-zero exit** (never a silent partial population); the driver skips byte-identical
       self-mirrors (`sameDoc`) so a dup in the supplied set doesn't fight its own clone [Slice 4]
 
 ## Slices
@@ -260,9 +260,12 @@ per `[[archive-plans-not-delete]]`; the `-harness`/`-stories` docs then cover S2
 - **Deferred beyond S1b** (do NOT pull forward): opener win-rate (S2), degrade-rate +
   spacing (S3), scoring attribution (S4), committed board / web surface (S5). Grill each at
   its own planning time.
-- **Open details to confirm at the relevant slice's CONFIRM gate** (not blocking the plan):
-  in-CLI glob vs shell-expansion (Slice 4). (RESOLVED at their gates: Slice 2 mean-per-bot-share
-  **included**; Slice 3 `--json` shape = **versioned envelope** `{version, population, report}`.)
+- **Open details** — all RESOLVED at their gates: Slice 2 mean-per-bot-share **included**;
+  Slice 3 `--json` shape = **versioned envelope** `{version, population, report}`; Slice 4 path
+  input = **shell-expansion only** (dep-free; positional argv paths are the population, no
+  in-CLI glob — non-expanding shells pass explicit paths). Slice 4 also simplified the pairing
+  guard to just `sameDoc(botA, botB)` (subsumes the self-pair `a === b`, which is redundant since
+  a bot's doc trivially equals its own) and made the override loader a fail-fast `reduce`.
 
 ---
 

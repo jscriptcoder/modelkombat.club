@@ -25,6 +25,7 @@ import {
   type FighterFrame,
 } from "./sim.js";
 import type { BotDoc } from "./dsl.js";
+import { sameDoc } from "./benchmark.js";
 
 // A committed technique: one of the 11 attack moves, or a throw / sweep.
 export type Technique = MoveId | "throw" | "sweep";
@@ -223,15 +224,19 @@ export const reducePerBot = (
   };
 };
 
-// Run the both-sides round-robin over the population — every ordered distinct-index
-// pair (`a ≠ b`, so each matchup plays with each bot on each side; a bot is never
-// fought against itself) at every seed — then reduce the fights to the pooled usage
-// histogram AND attribute per-bot adoption / mean share. Pure over `runFight`: no I/O,
-// deterministic per config.
+// Run the both-sides round-robin over the population — each ordered pair of NON-mirror
+// bots plays with each on each side, at every seed — then reduce the fights to the pooled
+// usage histogram AND attribute per-bot adoption / mean share. Pure over `runFight`: no
+// I/O, deterministic per config.
+//
+// A pairing is skipped when the two docs are byte-identical (`sameDoc`): that subsumes a
+// bot against itself (a doc trivially equals its own) AND against any duplicate a supplied
+// population might hold — a clone-vs-clone bout is a meaningless mirror that only pads the
+// histogram, so a dup fights every NON-clone opponent but never a byte-identical twin.
 export const runVariety = (cfg: VarietyConfig): VarietyReport => {
   const matchups = cfg.population.flatMap((botA, a) =>
     cfg.population.flatMap((botB, b) =>
-      a === b
+      sameDoc(botA, botB)
         ? []
         : cfg.seeds.map((seed) => ({
             a,
