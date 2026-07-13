@@ -1,7 +1,12 @@
 import { renderToString } from "solid-js/web";
 import { describe, expect, it } from "vitest";
 
-import { renderApp, renderHomePage, renderSpecGuidePage } from "./entry-server";
+import {
+  renderApp,
+  renderHomePage,
+  renderSpecGuidePage,
+  renderVarietyPage,
+} from "./entry-server";
 import {
   injectBody,
   injectHead,
@@ -264,5 +269,44 @@ describe("renderSpecGuidePage", () => {
       '<link rel="canonical" href="https://modelkombat.club/spec-guide"',
     );
     expect(html).not.toContain("<script");
+  });
+});
+
+// The full static variety page: the rendered board in #root, a distinct <head> (own
+// title + canonical), and NO client JS — the same static-doc shape as spec-guide, so
+// LLMs/crawlers read the whole move-variety board and it can never diverge from the
+// generateVariety() board it is built from.
+describe("renderVarietyPage", () => {
+  const shell =
+    "<!doctype html><html><head><title>Home</title>" +
+    '<link rel="canonical" href="https://modelkombat.club/" />' +
+    '<script type="application/ld+json">{}</script></head>' +
+    '<body><div id="root"></div>' +
+    '<script type="module" src="/assets/x.js"></script></body></html>';
+
+  const board = "# Variety board — v19\n\n_provenance_\n\n```\nreport\n```\n";
+
+  it("renders the board into #root as static HTML", () => {
+    const html = renderVarietyPage(shell, board);
+
+    expect(html).toContain("Variety board");
+    // #root is filled — a no-op injection would leave it empty.
+    expect(html).not.toContain('<div id="root"></div>');
+  });
+
+  it("gives the page its own <title> and canonical, and ships no client JS", () => {
+    const html = renderVarietyPage(shell, board);
+
+    expect(html).toContain("<title>ModelKombat — Variety board</title>");
+    expect(html).toContain(
+      '<link rel="canonical" href="https://modelkombat.club/variety"',
+    );
+    expect(html).not.toContain("<script");
+  });
+
+  it("is a pure transform over its board arg — identical input yields identical output", () => {
+    expect(renderVarietyPage(shell, board)).toBe(
+      renderVarietyPage(shell, board),
+    );
   });
 });
