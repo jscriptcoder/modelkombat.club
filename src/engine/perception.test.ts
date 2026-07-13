@@ -7,6 +7,7 @@ import type { Rules, Action, Band } from "./types.js";
 const bot = (rules: BotDoc["rules"], dflt: Action): BotDoc => ({
   version: 1,
   name: "b",
+  model: "test",
   rules,
   default: dflt,
 });
@@ -96,6 +97,7 @@ describe("perception latency — delayed opponent position (L_pos)", () => {
 const ATTACK_ONCE: BotDoc = {
   version: 1,
   name: "atk",
+  model: "test",
   memory: { fired: 0 },
   rules: [
     {
@@ -372,6 +374,7 @@ describe("perception latency — seeded clamped jitter on L", () => {
 const strikeOnce = (band: Band): BotDoc => ({
   version: 1,
   name: "atk1",
+  model: "test",
   memory: { fired: 0 },
   rules: [
     {
@@ -904,6 +907,7 @@ describe("perception latency — delayed incoming throw (L_act)", () => {
   const THROW_ONCE: BotDoc = {
     version: 1,
     name: "thr1",
+    model: "test",
     memory: { fired: 0 },
     rules: [
       {
@@ -1170,6 +1174,7 @@ describe("perception latency — delayed opponent stamina (L_act)", () => {
   const SPEND_ONCE: BotDoc = {
     version: 1,
     name: "spend1",
+    model: "test",
     memory: { fired: 0 },
     rules: [
       {
@@ -1316,6 +1321,7 @@ describe("perception latency — delayed opponent gassed (L_act)", () => {
   const SPEND_ONCE: BotDoc = {
     version: 1,
     name: "spend1",
+    model: "test",
     memory: { fired: 0 },
     rules: [
       {

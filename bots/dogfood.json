@@ -1,6 +1,7 @@
 {
   "version": 1,
   "name": "dogfood",
+  "model": "house",
   "rules": [
     {
       "when": {

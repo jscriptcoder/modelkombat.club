@@ -14,6 +14,7 @@ import {
 const validBot = (): BotDoc => ({
   version: 1,
   name: "candidate",
+  model: "Claude Opus 4.8",
   rules: [
     {
       when: {

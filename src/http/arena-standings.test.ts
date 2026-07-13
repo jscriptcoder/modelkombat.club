@@ -21,7 +21,7 @@ const score = (o: Partial<FightScore>): FightScore => ({
 });
 
 const member = (name: string, seniority: number): ArenaMember => ({
-  champion: { version: 1, name, rules: [], default: { type: "idle" } },
+  champion: { version: 1, name, model: "test", rules: [], default: { type: "idle" } },
   handle: null,
   seniority,
 });

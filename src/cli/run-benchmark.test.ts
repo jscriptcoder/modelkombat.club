@@ -25,6 +25,7 @@ const MOCK_RULES: Rules = {
 const named = (name: string, dflt: Action): BotDoc => ({
   version: 1,
   name,
+  model: "test",
   rules: [],
   default: dflt,
 });
@@ -265,6 +266,7 @@ describe("runBenchmarkCli — --from-reply (lenient extraction)", () => {
     expect(out.stderr).toBe(
       "invalid submission reply.txt:\n" +
         "  version: must be 1\n" +
+        "  model: must be a string of 1..64 characters\n" +
         "  rules: must be an array\n" +
         "  default: expected an action\n",
     );

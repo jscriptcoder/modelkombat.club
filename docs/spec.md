@@ -5,7 +5,7 @@
 > the engine, so this document cannot lie about how a fight resolves.
 
 - **Benchmark version:** `v19` — a score is comparable only against another at the same version.
-- **Input hash:** `4764cdd7a51fbded720070f52e1cc34e5b7486d173b4fd5772583fc6e75f8926` (pins the scoring inputs: rules + gauntlet + run params).
+- **Input hash:** `9eb2897d10a02acd78ef3b9ff0c1e0f23383f3cedf24b840513ed8ff6569b989` (pins the scoring inputs: rules + gauntlet + run params).
 
 A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is
 validated once against the allowlists below (the security boundary), then run
@@ -47,7 +47,7 @@ against `maxNodes` and nesting against `maxDepth`.
 {
   "version": 1,
   "name": "string (1..64 chars)",   // the fighter name shown on the ladder — not your author handle (that goes in the X-Author-Handle header)
-  "model": "string (1..64 chars)",  // the model and reasoning effort that authored this bot (e.g. "Claude Opus 4.8 (high)") — provenance, never affects a fight
+  "model": "string (1..64 chars)",  // REQUIRED: the model + reasoning effort that authored this bot (e.g. "Claude Opus 4.8 (high)") — provenance for the leaderboard, never affects a fight
   "memory": { "cellName": 0 },      // optional: declared int cells, persist across ticks within a fight
   "rules": [ <Rule>, ... ],         // priority-ordered; first matching `do` wins
   "default": <Action>               // taken when no rule fires
@@ -372,6 +372,7 @@ declared-before-use cells — the `validate()` gate remains the authority.
       "required": [
         "version",
         "name",
+        "model",
         "rules",
         "default"
       ],
@@ -386,6 +387,7 @@ declared-before-use cells — the `validate()` gate remains the authority.
         },
         "model": {
           "type": "string",
+          "minLength": 1,
           "maxLength": 64
         },
         "memory": {
@@ -980,6 +982,7 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
 {
   "version": 1,
   "name": "jabber",
+  "model": "gauntlet",
   "rules": [
     {
       "when": {
@@ -1103,6 +1106,7 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
 {
   "version": 1,
   "name": "vulture",
+  "model": "gauntlet",
   "rules": [
     {
       "when": {
@@ -1219,6 +1223,7 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
 {
   "version": 1,
   "name": "rekka",
+  "model": "gauntlet",
   "memory": { "stage": 0 },
   "rules": [
     {

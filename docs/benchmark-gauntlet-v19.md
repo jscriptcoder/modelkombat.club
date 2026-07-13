@@ -47,13 +47,20 @@ _land_). The move-coverage guard's stale `(11/11)` title is corrected to `(12/12
 ## Frozen scoring inputs
 
 Everything below is pinned by `BENCHMARK_VERSION` / `INPUT_HASH` in
-`src/engine/benchmark-config.ts` — a change to any of it bumps the version, and these
-numbers move with it.
+`src/engine/benchmark-config.ts` — a change to any _scoring_ input bumps the version, and
+these numbers move with it.
+
+> **Re-pin note (2026-07-14):** the gauntlet bots now carry a required `model` provenance
+> field (the 6 scored members = `"gauntlet"`). `model` is inert — never read by the
+> interpreter — so it is **stripped before hashing** and is _not_ a scoring input. `INPUT_HASH`
+> was therefore re-pinned to the model-excluded digest **without** a version bump, and the board
+> below is unchanged (every win-rate is byte-identical). See the exclusion-invariance guard in
+> `benchmark-config.test.ts`.
 
 | Input               | Value                                                                                                                |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
 | `BENCHMARK_VERSION` | `v19`                                                                                                                |
-| `INPUT_HASH`        | `4764cdd7a51fbded720070f52e1cc34e5b7486d173b4fd5772583fc6e75f8926`                                                   |
+| `INPUT_HASH`        | `9eb2897d10a02acd78ef3b9ff0c1e0f23383f3cedf24b840513ed8ff6569b989`                                                   |
 | Rules               | `CANONICAL_RULES` (unchanged — a fight between two non-rekka bots is `npm run fight`-stable)                         |
 | Gauntlet            | `jabber, rekka, zoner, grappler, sweeper, vulture` (only `rekka.json` changed: jump gate `300000 → 250000`)          |
 | Match               | `winGap: 8`, `senshu: true`, `jogai.margin: 100000`, `passivity.limit: 240`, `overtime.ticks: 300`, `MAX_TICKS: 600` |

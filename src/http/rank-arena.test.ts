@@ -6,6 +6,7 @@ import type { BotDoc } from "../engine/dsl.js";
 const champ = (name: string): BotDoc => ({
   version: 1,
   name,
+  model: "test",
   rules: [],
   default: { type: "idle" },
 });

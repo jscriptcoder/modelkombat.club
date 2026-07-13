@@ -7,6 +7,7 @@ import type { Rules, Action, Band, MoveId, MoveSpec } from "./types.js";
 const bot = (rules: BotDoc["rules"], dflt: Action): BotDoc => ({
   version: 1,
   name: "b",
+  model: "test",
   rules,
   default: dflt,
 });
@@ -85,20 +86,20 @@ describe("runFight — determinism and replay", () => {
     }
   });
 
-  it("ignores the descriptive `model` field — a fight is byte-identical with vs without it", () => {
+  it("ignores the descriptive `model` field — a fight is byte-identical regardless of its value", () => {
     // `model` (who/what authored the bot) is inert: the interpreter never reads
     // it, so it cannot perturb a single outcome-path byte. Same seed, same bot,
     // only `model` differs ⇒ identical event logs.
     const cfg = getMockConfig({ maxTicks: 25 });
-    const without = runFight(cfg);
+    const baseline = runFight(cfg);
 
-    const withModel = runFight({
+    const remodeled = runFight({
       ...cfg,
       botA: { ...AGGRESSOR, model: "Claude Opus 4.8" },
     });
 
-    expect(JSON.stringify(withModel.events)).toBe(
-      JSON.stringify(without.events),
+    expect(JSON.stringify(remodeled.events)).toBe(
+      JSON.stringify(baseline.events),
     );
   });
 });
@@ -183,6 +184,7 @@ describe("runFight — view wiring and memory", () => {
     const armed: BotDoc = {
       version: 1,
       name: "armed",
+      model: "test",
       memory: { go: 1 },
       rules: [
         {
@@ -6844,6 +6846,7 @@ describe("runFight — yame (match-mode exchange resets)", () => {
   const SCORE_ONCE: BotDoc = {
     version: 1,
     name: "score-once",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -8530,6 +8533,7 @@ describe("runFight — senshu first-blood tiebreak (story C1a)", () => {
   const scoreOnce = (move: MoveId): BotDoc => ({
     version: 1,
     name: "score-once",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -8733,6 +8737,7 @@ describe("runFight — senshu revocation on jogai foul (story C1b)", () => {
   const scoreOnce = (move: MoveId): BotDoc => ({
     version: 1,
     name: "score-once",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -8765,6 +8770,7 @@ describe("runFight — senshu revocation on jogai foul (story C1b)", () => {
   const scoreThenRetreat = (move: MoveId, stopAt: number): BotDoc => ({
     version: 1,
     name: "score-then-retreat",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -8807,6 +8813,7 @@ describe("runFight — senshu revocation on jogai foul (story C1b)", () => {
   const foulThenScore = (move: MoveId): BotDoc => ({
     version: 1,
     name: "foul-then-score",
+    model: "test",
     memory: { done: 0 },
     rules: [
       {
@@ -9015,6 +9022,7 @@ describe("runFight — senshu revocation on passivity foul (story C1b)", () => {
   const scoreOnce = (move: MoveId): BotDoc => ({
     version: 1,
     name: "score-once",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -9062,6 +9070,7 @@ describe("runFight — senshu revocation on passivity foul (story C1b)", () => {
   const scoreThenBlock = (move: MoveId): BotDoc => ({
     version: 1,
     name: "score-then-block",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -9189,6 +9198,7 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
   const scoreOnce = (move: MoveId): BotDoc => ({
     version: 1,
     name: "score-once",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -9362,6 +9372,7 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
   const scoreThenOneInOT = (move: MoveId, otStart: number): BotDoc => ({
     version: 1,
     name: "score-then-one-in-ot",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -9402,6 +9413,7 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
   const attackAtOTStart = (move: MoveId, otStart: number): BotDoc => ({
     version: 1,
     name: "attack-at-ot-start",
+    model: "test",
     rules: [
       {
         when: {
@@ -9489,6 +9501,7 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
   ): BotDoc => ({
     version: 1,
     name: "score-then-retreat-until",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -9631,6 +9644,7 @@ describe("runFight — sudden-death overtime (story C2a, officiating skeleton)",
   const scoreThenBlock = (move: MoveId): BotDoc => ({
     version: 1,
     name: "score-then-block",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -9702,6 +9716,7 @@ describe("runFight — sudden-death overtime perception (story C2b: clock.overti
   const attackOnceWhenOvertime = (move: MoveId): BotDoc => ({
     version: 1,
     name: "attack-once-when-overtime",
+    model: "test",
     memory: { fought: 0 },
     rules: [
       {
@@ -9784,6 +9799,7 @@ describe("runFight — sudden-death overtime perception (story C2b: clock.overti
   const attackWhenRemainingEq = (move: MoveId, target: number): BotDoc => ({
     version: 1,
     name: "attack-when-remaining-eq",
+    model: "test",
     rules: [
       {
         when: {
@@ -9823,6 +9839,7 @@ describe("runFight — sudden-death overtime perception (story C2b: clock.overti
   const attackWhenRemainingNonPositive = (move: MoveId): BotDoc => ({
     version: 1,
     name: "attack-when-remaining-nonpositive",
+    model: "test",
     rules: [
       {
         when: {
@@ -9883,6 +9900,7 @@ describe("runFight — senshu perception (story C3: self.senshu / opponent.sensh
   const idleWhenSelfSenshu = (move: MoveId): BotDoc => ({
     version: 1,
     name: "idle-when-self-senshu",
+    model: "test",
     rules: [{ when: eqField("self.senshu", 1), do: { type: "idle" } }],
     default: { type: "attack", move, band: "mid" },
   });
@@ -9893,6 +9911,7 @@ describe("runFight — senshu perception (story C3: self.senshu / opponent.sensh
   const attackWhenOppSenshu = (move: MoveId): BotDoc => ({
     version: 1,
     name: "attack-when-opp-senshu",
+    model: "test",
     rules: [
       {
         when: eqField("opponent.senshu", 1),
@@ -9975,6 +9994,7 @@ describe("runFight — senshu perception (story C3: self.senshu / opponent.sensh
     const lagDetector: BotDoc = {
       version: 1,
       name: "senshu-lag-detector",
+      model: "test",
       rules: [
         {
           when: {
@@ -10075,6 +10095,7 @@ describe("runFight — senshu perception (story C3: self.senshu / opponent.sensh
   const retreatWhenSelfSenshu = (move: MoveId): BotDoc => ({
     version: 1,
     name: "retreat-when-self-senshu",
+    model: "test",
     rules: [{ when: eqField("self.senshu", 1), do: { type: "move", dir: -1 } }],
     default: { type: "attack", move, band: "mid" },
   });
@@ -10103,6 +10124,7 @@ describe("runFight — senshu perception (story C3: self.senshu / opponent.sensh
     const penaltyProbe: BotDoc = {
       version: 1,
       name: "penalty-senshu-probe",
+      model: "test",
       rules: [
         {
           when: {

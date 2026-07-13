@@ -380,6 +380,7 @@ const MOCK_RULES: Rules = {
 const bot = (name: string, dflt: Action): BotDoc => ({
   version: 1,
   name,
+  model: "test",
   rules: [],
   default: dflt,
 });

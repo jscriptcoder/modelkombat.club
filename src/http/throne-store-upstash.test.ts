@@ -22,6 +22,7 @@ const config = {
 const champ = (name: string): BotDoc => ({
   version: 1,
   name,
+  model: "test",
   rules: [],
   default: { type: "idle" },
 });

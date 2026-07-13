@@ -760,7 +760,13 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   when present) — validated like `name`, **never read by the interpreter** (determinism-safe,
   invariant #1) and adding **no DSL op** (TCB untouched, invariant #2). 1232 tests; mutation 100% on
   changed regions; every spec change keeps `INPUT_HASH` / `BENCHMARK_VERSION` unchanged (the spec is
-  not a scoring input, and the 6 frozen `bots/*.json` stay without `model`). **S1 (`GET /spec`) is
+  not a scoring input, and the 6 frozen `bots/*.json` stay without `model`).
+  **(Superseded 2026-07-14: `model` is now REQUIRED — an LLM must declare which model
+  authored the bot, since the whole point of the ladder is showing which model wins. Every
+  gauntlet bot carries it (the 6 scored members = `"gauntlet"`, the dev/test fixtures =
+  `"house"`), and `model` is now STRIPPED from `INPUT_HASH` — inert provenance never trips
+  the scoring guard, so it forces no `BENCHMARK_VERSION` bump and never resets the ladder.)**
+  **S1 (`GET /spec`) is
   COMPLETE.** Design source of truth: `plans/platform-http-api-{decisions,stories}.md`; the finished
   S1 plan is archived at `docs/archive/platform-http-api-s1-spec.md`. Remaining platform work: **S2
   `POST /validate`**, **S3 `POST /fight`** (gauntlet gate → title fight vs the version-scoped KotH

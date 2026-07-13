@@ -31,6 +31,7 @@ const loadBot = (name: string): BotDoc =>
 const dummy = (): BotDoc => ({
   version: 1,
   name: "dummy",
+  model: "test",
   rules: [],
   default: { type: "idle" },
 });
@@ -40,6 +41,7 @@ const dummy = (): BotDoc => ({
 const mover = (): BotDoc => ({
   version: 1,
   name: "mover",
+  model: "test",
   rules: [
     {
       when: {
@@ -133,6 +135,16 @@ const modelChamp = (model: string): BotDoc => ({
   rules: [],
   default: { type: "idle" },
 });
+
+// A champion whose stored document OMITS `model` — models a King crowned BEFORE
+// model became mandatory (legacy throne data). The BotDoc type now requires
+// `model`, so we deliberately drop it to exercise the API's null-defaulting on
+// pre-gate persisted records (the justified assertion is the point of the test).
+const modellessChamp = (): BotDoc => {
+  const { model: _drop, ...doc } = modelChamp("unused");
+
+  return doc as BotDoc;
+};
 
 // The reigning King's identity now rides in `board[0].defender` (S4.3 retired the flat
 // `title.incumbent`) — board[0] is always the King, since the board is arena rank order.
@@ -388,7 +400,7 @@ describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
     // the relegated defender is surfaced by IDENTITY only — never its bot document
     expect(body.title?.displaced).toEqual({
       name: "dummy",
-      model: null,
+      model: "test",
       handle: null,
     });
     expect(JSON.stringify(body.title?.displaced)).not.toContain('"rules"');
@@ -490,7 +502,7 @@ describe("handleFight — S2.2: a FULL arena relegates its weakest", () => {
     // at the same fidelity as an `entered` placement (D-C diagnose-don't-guess).
     expect(body.title?.board?.[0].defender).toEqual({
       name: "berserker",
-      model: null,
+      model: "house",
       handle: null,
     });
     expect(body.title?.board?.[0].bouts).toBe(10);
@@ -613,7 +625,7 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
     expect(body.title?.outcome).toBe("entered");
     expect(body.title?.board?.[0].defender).toEqual({
       name: "berserker",
-      model: null,
+      model: "house",
       handle: null,
     });
     // the King's bot DOCUMENT never leaks into the response
@@ -660,7 +672,7 @@ describe("handleFight — S2.1: incumbent identity + author handle", () => {
   it("reports the incumbent's model as null when its document omits one", async () => {
     const store = inMemoryThroneStore();
 
-    await enthrone(store, "vTEST", loadBot("berserker")); // no model field
+    await enthrone(store, "vTEST", modellessChamp()); // document omits `model` (legacy record)
 
     const res = await handleFight(
       fightRequest(JSON.stringify(loadBot("aggressor"))),
@@ -1120,7 +1132,7 @@ describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
     // board[0] is the King the challenger scouted; berserker beats aggressor 1.00 (10/10 bouts)
     expect(board[0].defender).toEqual({
       name: "aggressor",
-      model: null,
+      model: "house",
       handle: null,
     });
     expect(board[0].winRate).toBe(1);
@@ -1229,7 +1241,7 @@ describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
     // board[0] carries the King fight at full fidelity — nothing lost, only de-duplicated
     expect(t?.board?.[0].defender).toEqual({
       name: "aggressor",
-      model: null,
+      model: "house",
       handle: null,
     });
     expect(t?.board?.[0].winRate).toBe(1);

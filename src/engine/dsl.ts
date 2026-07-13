@@ -86,7 +86,7 @@ export type Rule = {
 export type BotDoc = {
   version: 1;
   name: string;
-  model?: string; // optional, descriptive: what authored the fighter — never read by the interpreter
+  model: string; // required, descriptive: what authored the fighter — never read by the interpreter
   memory?: Record<string, number>;
   rules: Rule[];
   default: Action;
@@ -424,12 +424,14 @@ export function validate(doc: unknown): ValidationResult {
     fail("name", "must be a string of 1..64 characters");
   }
 
-  // `model` is OPTIONAL provenance (what authored the fighter). Absent ⇒ nothing
-  // to check; present ⇒ same 1..64 cap as `name`. It is purely descriptive — the
-  // interpreter never reads it, so it cannot affect a fight (determinism-safe).
+  // `model` is REQUIRED provenance (what authored the fighter) — every fighter on
+  // the ladder must declare its author, so an LLM cannot omit which model it is.
+  // Same 1..64 cap as `name`. It is purely descriptive — the interpreter never
+  // reads it, so it cannot affect a fight (determinism-safe).
   if (
-    d.model != null &&
-    (typeof d.model !== "string" || d.model.length < 1 || d.model.length > 64)
+    typeof d.model !== "string" ||
+    d.model.length < 1 ||
+    d.model.length > 64
   ) {
     fail("model", "must be a string of 1..64 characters");
   }

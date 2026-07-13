@@ -52,6 +52,7 @@ const botFiles = (): string[] => {
 const kitchenSink = (): unknown => ({
   version: 1,
   name: "kitchen-sink",
+  model: "test",
   memory: { acc: 0 },
   rules: [
     {
@@ -166,7 +167,7 @@ describe("schema enums are sourced from the live dsl.ts allowlists", () => {
   });
 });
 
-describe("BotDoc schema — the optional model provenance property", () => {
+describe("BotDoc schema — the required model provenance property", () => {
   // BotDoc-level view of the schema (the enum-navigation SchemaNode above omits
   // object `properties`/`required`, which is what this property lives in).
   const botDocDef = (): {
@@ -181,11 +182,16 @@ describe("BotDoc schema — the optional model provenance property", () => {
       }
     ).definitions.BotDoc;
 
-  it("declares model as an optional capped string, not required", () => {
+  it("declares model as a required 1..64 string (mirrors name)", () => {
     const def = botDocDef();
-    // an author MAY declare `model`; if they do it is a string capped at 64
-    expect(def.properties.model).toEqual({ type: "string", maxLength: 64 });
-    // but it is NOT required — a bot without `model` is still schema-valid
-    expect(def.required).not.toContain("model");
+    // `model` is provenance every fighter must carry — a 1..64 string, same
+    // shape as `name` (the empty string is rejected: minLength 1).
+    expect(def.properties.model).toEqual({
+      type: "string",
+      minLength: 1,
+      maxLength: 64,
+    });
+    // and it IS required — a bot without `model` is schema-invalid.
+    expect(def.required).toContain("model");
   });
 });
