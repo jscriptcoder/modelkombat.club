@@ -2,8 +2,9 @@
 
 **Status:** SCOPING — **grill-me complete (2026-07-12)**; the 5 open questions + 3
 surfaced decision-tree branches are resolved (see §Resolved decisions), plus the
-per-slice grills for S3b (spacing buckets, decision #9) and **S4 (scoring attribution,
-decision #10 — grill-me 2026-07-13)**. Ready for `story-splitting` → `planning`. Not a
+per-slice grills for S3b (spacing buckets, decision #9), **S4 (scoring attribution,
+decision #10 — grill-me 2026-07-13)**, and **S5b (the committed variety board,
+decision #11 — grill-me 2026-07-13)**. Ready for `story-splitting` → `planning`. Not a
 plan; no code implied.
 
 ## The question it answers
@@ -262,11 +263,40 @@ Three pieces, all in the existing style:
     needs parry-event reconstruction), subtract-fouls-at-the-end (mis-attributes the +1s to
     whatever move is in-window). Full acceptance shape in `variety-telemetry-stories.md`
     §S4 (S4-1…S4-11).
+11. **Variety board (S5b) — generated + drift-tested, evergreen `docs/variety.md`**
+    (grill-me, 2026-07-13, for S5b). The committed board follows the **`docs/spec.md`
+    precedent, NOT the hand-written gauntlet boards** (`docs/benchmark-gauntlet-*.md`
+    have no generator and no byte-match test — they drift silently): a pure
+    `generateVariety()` → `write-variety.ts` (`gen:variety` script) → a `toBe` drift
+    test → `.prettierignore` + `.gitattributes eol=lf` pins (mirroring `gen-spec.ts` /
+    `write-spec.ts` / `gen-spec.test.ts:966`). Its body **reuses
+    `runTelemetryCli([], deps).stdout` verbatim** inside a fenced block (all five
+    shipped `render*` sections + the provenance header — no second markdown-table
+    renderer), wrapped in a thin scaffold: an H1 with the interpolated
+    `BENCHMARK_VERSION`, a manifest-sourced provenance line, and a **static** §P7
+    orientation note (soft targets usage ≤ 35% / opener win ≤ 60%; "scan for ⚠") — the
+    actual pass/fail stays only in the fenced inline `⚠` flags (no second computed
+    verdict). **Evergreen single file** `docs/variety.md` (version embedded inside,
+    history in git; a `BENCHMARK_VERSION` bump regenerates the same path with the same
+    drift test — mirrors `docs/spec.md`, not `docs/spec-v19.md`). Population = the
+    frozen 6-bot gauntlet only (a committed byte-match needs a fixed population;
+    decision #6's `-- bots/*.json` override is a live-use tool, not a committed
+    artifact). Same **read-only** non-negotiable as S1a–S4 (reuses
+    `runVariety` / `runTelemetryCli`; no scoring-input touch ⇒ no `INPUT_HASH` /
+    `BENCHMARK_VERSION` change; `npm run fight` byte-identical). *Rejected:*
+    hand-written narrative board (drifts silently, no CI guard — the gauntlet-board
+    precedent the S5b story text mistakenly named), native markdown-table re-renderers
+    (duplicate every section's layout in a parallel format), version-stamped
+    `docs/variety-v19.md` (an un-guarded file per bump, redundant with git history for
+    a regenerated artifact), a computed §P7 verdict headline (asserts §P7 status in a
+    second place that must stay in sync with the inline flags). Full plan:
+    `plans/variety-telemetry-s5b.md`.
 
 ### Still open (later grills, not blocking)
 
-- _(none — S4 scoring-attribution internals RESOLVED via grill-me 2026-07-13; see
-  decision #10 above. All five open questions + S3a/S3b/S4 grills are closed.)_
+- _(none — S4 scoring-attribution internals RESOLVED via grill-me 2026-07-13 (decision
+  #10), and the S5b committed-board design RESOLVED via grill-me 2026-07-13 (decision
+  #11). All five open questions + the S3a/S3b/S4/S5b grills are closed.)_
 
 ## Cost estimate
 
