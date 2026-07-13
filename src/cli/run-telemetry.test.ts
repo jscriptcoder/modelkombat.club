@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  renderDegrades,
   renderDiversity,
   renderHeader,
   renderLegend,
@@ -176,7 +177,7 @@ describe("runTelemetryCli", () => {
     );
   });
 
-  it("ends with the opener table (below the diversity line, no legend) when nothing is dominant", () => {
+  it("ends with the start-failure table (the final section, below the openers) when nothing is dominant", () => {
     const population = BALANCED; // three ~even moves ⇒ none dominant ⇒ no usage legend
     const out = runTelemetryCli([], deps(population));
 
@@ -187,8 +188,10 @@ describe("runTelemetryCli", () => {
       rules: MOCK_RULES,
     });
 
-    // the opener section is the LAST block; the diversity line precedes it, with no legend.
-    expect(out.stdout.endsWith(`${renderOpeners(rep)}\n`)).toBe(true);
+    // the degrade section is now the LAST block; the opener table + diversity precede it,
+    // and (nothing dominant) no legend appears anywhere.
+    expect(out.stdout.endsWith(`${renderDegrades(rep)}\n`)).toBe(true);
+    expect(out.stdout).toContain(`${renderOpeners(rep)}\n\n`);
     expect(out.stdout).toContain(`${renderDiversity(rep)}\n\n`);
     expect(out.stdout).not.toContain("⚠");
   });
@@ -204,10 +207,10 @@ describe("runTelemetryCli", () => {
     );
   });
 
-  it("appends the opener legend as the final line when an opener is dominant", () => {
+  it("keeps the opener legend above the final start-failure table when an opener is dominant", () => {
     // mawashi-geri (score 2) beats gyaku-zuki (score 1) in the seed-independent mock fight,
     // so the mawashi-opener wins 100% over 20 opens (2 orderings × 10 seeds) ⇒ ≥ 10 samples
-    // and > 60% ⇒ dominant, which surfaces the ⚠ + the trailing legend.
+    // and > 60% ⇒ dominant, which surfaces the ⚠ + the opener legend.
     const population = [bot("s", "mawashi-geri"), bot("w", "gyaku-zuki")];
     const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
     const out = runTelemetryCli([], { ...deps(population), seeds });
@@ -221,7 +224,9 @@ describe("runTelemetryCli", () => {
 
     expect(renderOpenerLegend(rep)).not.toBe(""); // guard: the scenario really is dominant
     expect(out.stdout).toContain("⚠");
-    expect(out.stdout.endsWith(`${renderOpenerLegend(rep)}\n`)).toBe(true);
+    // the opener legend is present but NO LONGER the last line — the degrade section follows it.
+    expect(out.stdout).toContain(`${renderOpenerLegend(rep)}\n\n`);
+    expect(out.stdout.endsWith(`${renderDegrades(rep)}\n`)).toBe(true);
   });
 });
 
@@ -427,6 +432,7 @@ const usageReport = (
   botCount,
   openers: [],
   nullOpeners: 0,
+  degrades: [],
 });
 
 // A report carrying only the opener fields renderOpeners reads (the usage side is inert).
@@ -441,6 +447,20 @@ const openerReport = (
   botCount: 0,
   openers,
   nullOpeners,
+  degrades: [],
+});
+
+// A report carrying only the degrade rows renderDegrades reads (the usage + opener sides
+// are inert). Lets a fixture pin the start-failure section's exact columns in isolation.
+const degradeReport = (degrades: VarietyReport["degrades"]): VarietyReport => ({
+  rows: [],
+  totalCommitments: 0,
+  totalFights: 0,
+  effectiveMoves: null,
+  botCount: 0,
+  openers: [],
+  nullOpeners: 0,
+  degrades,
 });
 
 describe("renderReport — exact histogram layout (table only)", () => {
@@ -647,6 +667,93 @@ describe("renderOpeners — exact opener win-rate table (table + null-opener lin
     expect(gyakuLine.endsWith("⚠")).toBe(true); // the dominant row carries the flag
     expect(sweepLine.endsWith("⚠")).toBe(false); // the non-dominant row does not
     expect(sweepLine.endsWith("50.0%")).toBe(true); // and ends at win% (no trailing flag pad)
+  });
+});
+
+describe("renderDegrades — exact start-failure table (columns + — + no flag)", () => {
+  it("aligns move / N / fail / rate / the 4 reason counts, renders — for a 0-attempt row, and NEVER flags", () => {
+    const out = renderDegrades(
+      degradeReport([
+        {
+          technique: "gyaku-zuki",
+          attempts: 10,
+          failedStarts: 10,
+          rate: 1, // 100% — a purely diagnostic reading, never flagged (S3a-6)
+          reasons: {
+            "out-of-band": 1,
+            unaffordable: 2,
+            "wrong-context": 3,
+            inert: 4,
+          }, // distinct values pin each reason to its own column (no swap)
+        },
+        {
+          technique: "sweep",
+          attempts: 0,
+          failedStarts: 0,
+          rate: null, // 0 start attempts ⇒ — (the ÷0 guard, S3a-3)
+          reasons: {
+            "out-of-band": 0,
+            unaffordable: 0,
+            "wrong-context": 0,
+            inert: 0,
+          },
+        },
+      ]),
+    );
+
+    expect(out).toBe(
+      "move" +
+        " ".repeat(9) +
+        "N" +
+        " ".repeat(2) +
+        "fail" +
+        " ".repeat(4) +
+        "rate" +
+        " ".repeat(2) +
+        "out-of-band" +
+        " ".repeat(2) +
+        "unaffordable" +
+        " ".repeat(2) +
+        "wrong-context" +
+        " ".repeat(2) +
+        "inert" +
+        "\n" +
+        "gyaku-zuki" +
+        " ".repeat(2) +
+        "10" +
+        " ".repeat(4) +
+        "10" +
+        " ".repeat(2) +
+        "100.0%" +
+        " ".repeat(12) +
+        "1" +
+        " ".repeat(13) +
+        "2" +
+        " ".repeat(14) +
+        "3" +
+        " ".repeat(6) +
+        "4" +
+        "\n" +
+        "sweep" +
+        " ".repeat(8) +
+        "0" +
+        " ".repeat(5) +
+        "0" +
+        " ".repeat(7) +
+        "—" +
+        " ".repeat(12) +
+        "0" +
+        " ".repeat(13) +
+        "0" +
+        " ".repeat(14) +
+        "0" +
+        " ".repeat(6) +
+        "0" +
+        "\n\nnote: N = honoured + failed starts (locked excluded); a technique with 0 usage but failures here was chosen but never executed",
+    );
+    // S3a-6: no §P7 dial ⇒ no ⚠ column, even for a 100% row (the exact match above already
+    // proves it; this is the explicit guard against a stray flag being re-introduced).
+    expect(out).not.toContain("⚠");
   });
 });
 

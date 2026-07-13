@@ -20,6 +20,7 @@
 import type { Action, MoveId, Rules } from "./types.js";
 import {
   runFight,
+  type DegradeReason,
   type FightConfig,
   type FightResult,
   type FighterFrame,
@@ -86,6 +87,7 @@ export type VarietyReport = Omit<PooledReport, "rows"> & {
   botCount: number; // population size — the denominator of every row's adoption k/N
   openers: OpenerRow[]; // per-opener win-rates, sorted win% desc → opens desc → canonical
   nullOpeners: number; // (fighter, fight) observations that opened with no honoured commitment
+  degrades: DegradeRow[]; // per-technique start-failure rates, sorted rate desc → attempts desc → canonical
 };
 
 // The technique a frame's action commits to, or null when the action is not a
@@ -326,6 +328,94 @@ export const reduceOpeners = (matchups: readonly Matchup[]): OpenerReport => {
   return { rows: [...live, ...dead], nullOpeners };
 };
 
+// The four DegradeReasons that count as a START FAILURE — a neutral fighter chose a
+// technique but a legality / affordability / context gate refused it (`sim.ts:508` — the
+// move never starts, degrading to idle). `locked` is deliberately NOT here: it is a busy
+// fighter's ignored input while committed to an already-honoured move (`sim.ts:512`), not
+// a failed pick, so it is excluded from the whole rate. `satisfies` keeps the tuple honest
+// — if `sim.ts` adds a reason, it surfaces as a compile error to classify (gate-failure vs
+// commitment-artifact), never a silent drop. The tuple order is the report's column order.
+export const FAILURE_REASONS = [
+  "out-of-band",
+  "unaffordable",
+  "wrong-context",
+  "inert",
+] as const satisfies readonly DegradeReason[];
+
+export type FailureReason = (typeof FAILURE_REASONS)[number];
+
+// A per-technique start-failure row: how often choosing the move as a neutral START
+// bounced off a gate, and via which gate. `attempts = honoured + failedStarts` (both
+// exclude `locked`); `honoured` equals reduceUsage's count, so the two sections reconcile.
+export type DegradeRow = {
+  technique: Technique;
+  attempts: number; // honoured(X) + failedStarts(X); `locked` frames excluded
+  failedStarts: number; // frames X chosen & gate-failed with a FailureReason
+  rate: number | null; // failedStarts / attempts (raw fraction in [0, 1]); null when attempts === 0
+  reasons: Record<FailureReason, number>; // per-reason failedStarts; sums to failedStarts
+};
+
+// Reduce a set of fights to per-technique start-failure rows. For each technique, a START
+// attempt is a frame that CHOSE it and was not `locked` (a busy fighter's ignored input —
+// excluded from BOTH numerator and denominator); a non-null degrade on such a frame is a
+// gate FAILURE (keyed by reason). Filtering per technique (rather than an intermediate
+// observation list) keeps both guards load-bearing on the counts: `techniqueOf === X`
+// naturally drops non-committing frames, and `!== "locked"` directly moves `attempts`.
+// Pure — no bot identity or outcome needed.
+export const reduceDegrades = (
+  fights: readonly FightResult[],
+): DegradeRow[] => {
+  const frames = fights.flatMap((fight) =>
+    fight.events.flatMap((event) => [event.a, event.b]),
+  );
+
+  const rows = TECHNIQUES.map((technique) => {
+    // Frames that CHOSE this technique and were not `locked` — the start attempts.
+    const attemptFrames = frames.filter(
+      (f) => techniqueOf(f.action) === technique && f.degrade !== "locked",
+    );
+
+    const attempts = attemptFrames.length;
+
+    // A gate FAILURE is a non-null degrade (`locked` already excluded above). Counted
+    // independently of the per-reason split, so the "sums to failedStarts" invariant is a
+    // real cross-check (a dropped reason bucket breaks it).
+    const failedStarts = attemptFrames.filter((f) => f.degrade !== null).length;
+
+    const count = (r: FailureReason) =>
+      attemptFrames.filter((f) => f.degrade === r).length;
+
+    const reasons: Record<FailureReason, number> = {
+      "out-of-band": count("out-of-band"),
+      unaffordable: count("unaffordable"),
+      "wrong-context": count("wrong-context"),
+      inert: count("inert"),
+    };
+
+    return {
+      technique,
+      attempts,
+      failedStarts,
+      rate: attempts === 0 ? null : failedStarts / attempts,
+      reasons,
+    };
+  });
+
+  // Row order (mirrors reduceOpeners): the LIVE rows (a real rate — attempts > 0) first,
+  // rate descending, ties broken by attempts descending (better-sampled first), then
+  // canonical order (the filter keeps TECHNIQUES order and the sort is stable). Then the
+  // never-attempted techniques (`rate null`) in canonical order. Splitting live from dead
+  // keeps every branch load-bearing (row count + order pin it) with no null sentinel in
+  // the comparator.
+  const live = rows
+    .filter((r): r is DegradeRow & { rate: number } => r.rate !== null)
+    .sort((a, b) => b.rate - a.rate || b.attempts - a.attempts);
+
+  const dead = rows.filter((r) => r.rate === null);
+
+  return [...live, ...dead];
+};
+
 // Run the both-sides round-robin over the population — each ordered pair of NON-mirror
 // bots plays with each on each side, at every seed — then reduce the fights to the pooled
 // usage histogram AND attribute per-bot adoption / mean share. Pure over `runFight`: no
@@ -355,7 +445,8 @@ export const runVariety = (cfg: VarietyConfig): VarietyReport => {
     ),
   );
 
-  const pooled = reduceUsage(matchups.map((m) => m.fight));
+  const fights = matchups.map((m) => m.fight);
+  const pooled = reduceUsage(fights);
   const attributionOf = reducePerBot(matchups, cfg.population.length);
   const openers = reduceOpeners(matchups);
 
@@ -365,5 +456,6 @@ export const runVariety = (cfg: VarietyConfig): VarietyReport => {
     rows: pooled.rows.map((r) => ({ ...r, ...attributionOf(r.technique) })),
     openers: openers.rows,
     nullOpeners: openers.nullOpeners,
+    degrades: reduceDegrades(fights),
   };
 };
