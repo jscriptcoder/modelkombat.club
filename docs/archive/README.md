@@ -689,7 +689,36 @@ PR (#288) merged before the slice.
 
 [variety-telemetry-s4.md](variety-telemetry-s4.md)
 
-**S1a–S4 complete; harness ongoing.** The sibling scoping + story-split docs —
-`variety-telemetry-harness.md` (grill-me: 10 resolved decisions) + `variety-telemetry-stories.md` (story
-split S1a–S5c) — stay live in `plans/` as the trail for the remaining story **S5** (the web board / public
-surface).
+## Variety telemetry — S5b (committed drift-guarded board) ✅ COMPLETE
+
+The last child story with any build: a committed, always-current snapshot at `docs/variety.md` that can
+never silently lie. A grill-me pass (decision #11) resolved that the S5b story text named **two
+incompatible precedents** — "like `docs/benchmark-gauntlet-v19.md`" (hand-written, no generator, no drift
+test) and "regenerates deterministically" (the `docs/spec.md` property) — and picked the **`docs/spec.md`
+trio**: a pure `generateVariety()` → `write-variety.ts` (`gen:variety` script) → a byte-match drift test →
+`.prettierignore` + `.gitattributes eol=lf` pins. A **pure read-only reduction** over the shipped harness
+(no engine/TCB change, no `INPUT_HASH` / `BENCHMARK_VERSION` bump, `npm run fight` byte-identical). The
+plan landed in its own `docs(plan)` PR (#291) merged before the slice.
+
+- **Slice 1 — the committed board + drift guard** (PR #292, `feat/variety-board`) — `generateVariety()`
+  (`gen-variety.ts`) is a thin markdown scaffold (H1 with `BENCHMARK_VERSION`, a manifest-sourced
+  provenance line, a static §P7 orientation note) wrapping the **exact** `runTelemetryCli([], deps).stdout`
+  (all five readouts) verbatim in a fenced block — so the board can never diverge from what
+  `npm run telemetry` prints; the fenced inline `⚠` flags stay the single source of §P7 pass/fail.
+  `docs/variety.md` is committed (evergreen — version embedded inside, history in git) and pinned by a
+  drift test (`committed toBe generateVariety()`), mirroring `gen-spec.test.ts`. The shared frozen-gauntlet
+  loader was extracted into `telemetry-deps.ts` (`gauntletDeps()`), now used by both the telemetry runner
+  and the board generator (`telemetry.ts` deduped to its wiring). **`gen-variety.ts` 100% mutation** (7/7);
+  `telemetry-deps.ts` 90.91% (1 documented equivalent — the `readFileSync` encoding arg, inert under
+  `JSON.parse`'s utf8 coercion; shell I/O moved verbatim from the previously-uncovered `telemetry.ts`),
+  with a loader fail-fast test killing the error-path mutants. Full suite 1760 green. Real-gauntlet board:
+  `gyaku-zuki` 86.1% land / 3723 pts (the workhorse), `uraken` 269 starts / 0 land (the "chosen but
+  bounces" signal), `sweep`/`hiza-geri` `—` (okizeme), `excluded penalty points: 282`.
+
+[variety-telemetry-s5b.md](variety-telemetry-s5b.md)
+
+**S1a–S5b complete; the internal-CLI variety arc is done.** The sibling scoping + story-split docs —
+`variety-telemetry-harness.md` (grill-me: 11 resolved decisions) + `variety-telemetry-stories.md` (story
+split S1a–S5c) — stay live in `plans/` as the trail for the remaining post-launch stories **S5a** (an
+external submission corpus — no build, just the S1b `-- <path…>` override on a submissions dir) and
+**S5c** (the public web meta-report surface).
