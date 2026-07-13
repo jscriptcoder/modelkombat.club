@@ -128,7 +128,10 @@ export const renderDiversity = (report: PooledReport): string => {
   return `effective moves ${emc} of ${report.rows.length}   ·   live ${live} / dead ${dead.length}${deadList}`;
 };
 
-export const runTelemetryCli = (deps: TelemetryDeps): CliOutput => {
+export const runTelemetryCli = (
+  argv: string[],
+  deps: TelemetryDeps,
+): CliOutput => {
   let population: BotDoc[];
 
   try {
@@ -148,6 +151,19 @@ export const runTelemetryCli = (deps: TelemetryDeps): CliOutput => {
     rules: deps.rules,
     match: deps.match,
   });
+
+  // `--json`: the report AS DATA — a versioned envelope (`{version, population, report}`)
+  // carrying the provenance the human header would, so a machine consumer / run-to-run diff
+  // knows which engine version + roster produced the numbers. stdout is pure JSON, nothing else.
+  if (argv.includes("--json")) {
+    const envelope = {
+      version: deps.version,
+      population: population.map((bot) => bot.name),
+      report,
+    };
+
+    return { stdout: `${JSON.stringify(envelope)}\n`, stderr: "", code: 0 };
+  }
 
   const header = renderHeader({
     version: deps.version,

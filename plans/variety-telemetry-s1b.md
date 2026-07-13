@@ -53,9 +53,12 @@ Derived from the §S1b examples + resolved decisions. Slice mapping in brackets.
       one every bot uses; degraded-only picks don't count (honoured-only, per S1a-9); plus a
       **mean per-bot share** column (tempo-neutral — mean over participating bots of each
       bot's own share of the move; `n/a` when no bot committed anything) [Slice 2]
-- [ ] **S1b-4** `--json` emits the raw `VarietyReport` (rows + counts + adoption + EMC +
-      live/dead) to **stdout** instead of the table; valid parseable JSON (no table / ANSI);
-      stderr unaffected; exit 0; byte-identical across two runs [Slice 3]
+- [x] **S1b-4** `--json` emits the enriched `VarietyReport` (rows + counts + adoption + mean +
+      EMC + botCount) to **stdout** instead of the table, wrapped in a versioned envelope
+      `{version, population, report}` (decision #7 refined at gate — the human header carries
+      version+roster, and `--json` drops it, so the envelope preserves that provenance); valid
+      parseable JSON (no table / ANSI / `⚠`); stderr unaffected; exit 0; byte-identical across
+      two runs [Slice 3]
 - [ ] **S1b-5** `npm run telemetry -- <path…>` runs the round-robin over the **supplied**
       bots instead of the frozen gauntlet; no args ⇒ gauntlet (S1a behaviour unchanged) [Slice 4]
 - [ ] **S1b-6** a supplied bot that fails to load/validate ⇒ a structured error on **stderr** + **non-zero exit** (never a silent partial population); the driver skips byte-identical
@@ -167,11 +170,13 @@ report (histogram + adoption + diversity).
 **Value/Actor**: designer / tooling · **Trigger**: `npm run telemetry --json` · **Observable**:
 stdout is valid JSON that `JSON.parse`s to the `VarietyReport`; no table, no ANSI.
 
-**Path**: `runTelemetryCli` grows an `argv` param (mirroring `runBenchmarkCli(argv, deps)`);
-`--json` ⇒ `JSON.stringify` the report to stdout instead of `renderHeader`+`renderReport`;
-stderr unaffected; exit 0. The thin shell passes `process.argv.slice(2)`. _Confirm at gate:_
-raw `VarietyReport` vs a minimal `{version, report}` envelope (cli-design favours a versioned
-envelope; decision #7 says "raw `VarietyReport`") — lean raw report + `version` alongside.
+**Path**: `runTelemetryCli` grows an `argv` FIRST param (mirroring `runBenchmarkCli(argv, deps)`);
+`--json` ⇒ `JSON.stringify` a versioned envelope to stdout instead of `renderHeader`+`renderReport`;
+stderr unaffected; exit 0. The thin shell passes `process.argv.slice(2)`. **RESOLVED at gate:** a
+versioned envelope `{version, population, report}` (NOT the bare report) — cli-design favours a
+versioned envelope, and since `--json` drops the human header that carried version+roster, the
+envelope preserves that provenance for run-to-run diffs. This refines locked decision #7 ("raw
+`VarietyReport`") — the `report` field IS the raw enriched report, just wrapped with provenance.
 
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`,
 `cli-design`.
@@ -256,8 +261,8 @@ per `[[archive-plans-not-delete]]`; the `-harness`/`-stories` docs then cover S2
   spacing (S3), scoring attribution (S4), committed board / web surface (S5). Grill each at
   its own planning time.
 - **Open details to confirm at the relevant slice's CONFIRM gate** (not blocking the plan):
-  `--json` envelope vs raw report (Slice 3), in-CLI glob vs shell-expansion (Slice 4).
-  (mean-per-bot-share inclusion for Slice 2 was RESOLVED at its gate: **included**.)
+  in-CLI glob vs shell-expansion (Slice 4). (RESOLVED at their gates: Slice 2 mean-per-bot-share
+  **included**; Slice 3 `--json` shape = **versioned envelope** `{version, population, report}`.)
 
 ---
 

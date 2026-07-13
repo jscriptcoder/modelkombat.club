@@ -76,7 +76,7 @@ const ALL_TECHNIQUES = [
 
 describe("runTelemetryCli", () => {
   it("renders every technique with a one-decimal share and exits 0 with a clean stderr", () => {
-    const out = runTelemetryCli(deps(BALANCED));
+    const out = runTelemetryCli([], deps(BALANCED));
 
     expect(out.code).toBe(0);
     expect(out.stderr).toBe("");
@@ -88,7 +88,7 @@ describe("runTelemetryCli", () => {
   });
 
   it("opens with the provenance header (version / population / counts) above the histogram", () => {
-    const out = runTelemetryCli(deps(BALANCED)); // version "test", 3 bots, 2 seeds
+    const out = runTelemetryCli([], deps(BALANCED)); // version "test", 3 bots, 2 seeds
 
     expect(out.stdout.startsWith("ModelKombat variety telemetry test\n")).toBe(
       true,
@@ -102,7 +102,7 @@ describe("runTelemetryCli", () => {
   });
 
   it("shows the per-bot adoption (k/N) and mean columns, one adopter per one-move bot", () => {
-    const out = runTelemetryCli(deps(BALANCED)); // 3 bots, each a distinct single move
+    const out = runTelemetryCli([], deps(BALANCED)); // 3 bots, each a distinct single move
 
     expect(out.stdout).toMatch(/adoption\s+mean/); // both new columns, in order, in the header
     expect(out.stdout).toContain("1/3"); // each live move is adopted by one of the 3 bots
@@ -112,6 +112,7 @@ describe("runTelemetryCli", () => {
   it("flags a dominant technique with ⚠ and prints a legend naming the 35% threshold", () => {
     // both bots commit only gyaku-zuki ⇒ gyaku is 100% of commitments ⇒ dominant.
     const out = runTelemetryCli(
+      [],
       deps([bot("g1", "gyaku-zuki"), bot("g2", "gyaku-zuki")]),
     );
 
@@ -122,7 +123,7 @@ describe("runTelemetryCli", () => {
 
   it("prints no ⚠ (and no legend) when no technique crosses the threshold", () => {
     // three moves at ~33.3% each — all below 35%.
-    const out = runTelemetryCli(deps(BALANCED));
+    const out = runTelemetryCli([], deps(BALANCED));
 
     expect(out.stdout).not.toContain("⚠");
     expect(out.stdout).not.toContain("35%");
@@ -130,10 +131,12 @@ describe("runTelemetryCli", () => {
 
   it("is deterministic — two runs produce byte-identical stdout", () => {
     const first = runTelemetryCli(
+      [],
       deps([bot("g", "gyaku-zuki"), bot("m", "mae-geri")]),
     );
 
     const second = runTelemetryCli(
+      [],
       deps([bot("g", "gyaku-zuki"), bot("m", "mae-geri")]),
     );
 
@@ -141,7 +144,7 @@ describe("runTelemetryCli", () => {
   });
 
   it("fails fast — non-zero exit, empty stdout, and a stderr message — when the population can't load", () => {
-    const out = runTelemetryCli({
+    const out = runTelemetryCli([], {
       ...deps([]),
       loadPopulation: () => {
         throw new Error("cannot read bot file: bots/jabber.json");
@@ -154,7 +157,7 @@ describe("runTelemetryCli", () => {
   });
 
   it("prints the diversity headline below the histogram, after a blank line", () => {
-    const out = runTelemetryCli(deps(BALANCED)); // 3 techniques used ⇒ effective ≈ 3.0
+    const out = runTelemetryCli([], deps(BALANCED)); // 3 techniques used ⇒ effective ≈ 3.0
 
     expect(out.stdout).toMatch(/\n\neffective moves \d\.\d of 13 {3}·/);
     expect(out.stdout.indexOf("effective moves")).toBeGreaterThan(
@@ -164,7 +167,7 @@ describe("runTelemetryCli", () => {
 
   it("ends with the diversity line — no legend appended — when nothing is dominant", () => {
     const population = BALANCED; // three ~even moves ⇒ none dominant ⇒ no legend
-    const out = runTelemetryCli(deps(population));
+    const out = runTelemetryCli([], deps(population));
 
     const rep = runVariety({
       population,
@@ -174,6 +177,62 @@ describe("runTelemetryCli", () => {
     });
 
     expect(out.stdout.endsWith(`${renderDiversity(rep)}\n`)).toBe(true);
+  });
+});
+
+describe("runTelemetryCli --json", () => {
+  it("emits the enriched report as a versioned JSON envelope, not the human table", () => {
+    const population = BALANCED; // version "test", 3 bots
+    const out = runTelemetryCli(["--json"], deps(population));
+
+    expect(out.code).toBe(0);
+    expect(out.stderr).toBe("");
+    expect(out.stdout.startsWith("{")).toBe(true); // a JSON object, not the "ModelKombat" header
+    expect(out.stdout).not.toContain("ModelKombat variety telemetry"); // no human header
+    expect(out.stdout.endsWith("\n")).toBe(true); // trailing newline (POSIX text)
+
+    const parsed = JSON.parse(out.stdout) as {
+      version: string;
+      population: string[];
+      report: VarietyReport;
+    };
+
+    expect(parsed.version).toBe("test");
+    expect(parsed.population).toEqual(["g", "m", "w"]);
+    // the full enriched report (rows + adoption + mean + EMC + botCount) round-trips.
+    expect(parsed.report).toEqual(
+      runVariety({
+        population,
+        seeds: [1, 2],
+        maxTicks: 30,
+        rules: MOCK_RULES,
+      }),
+    );
+  });
+
+  it("never leaks the ⚠ flag or the table into --json stdout", () => {
+    // both bots commit only gyaku ⇒ the HUMAN table would flag ⚠; --json must not.
+    const out = runTelemetryCli(
+      ["--json"],
+      deps([bot("g1", "gyaku-zuki"), bot("g2", "gyaku-zuki")]),
+    );
+
+    expect(out.stdout).not.toContain("⚠");
+    expect(() => JSON.parse(out.stdout)).not.toThrow();
+  });
+
+  it("renders the human table (not JSON) when --json is absent", () => {
+    const out = runTelemetryCli([], deps(BALANCED));
+
+    expect(out.stdout.startsWith("ModelKombat variety telemetry")).toBe(true);
+    expect(out.stdout.startsWith("{")).toBe(false);
+  });
+
+  it("is deterministic — two --json runs are byte-identical", () => {
+    const first = runTelemetryCli(["--json"], deps(BALANCED));
+    const second = runTelemetryCli(["--json"], deps(BALANCED));
+
+    expect(first.stdout).toBe(second.stdout);
   });
 });
 
