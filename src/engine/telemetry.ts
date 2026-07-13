@@ -79,10 +79,13 @@ export type PooledReport = {
 };
 
 // The full variety report — the pooled histogram enriched with per-bot attribution (adoption
-// + mean share on every row) and the population size (the N each row's adoption is out of).
+// + mean share on every row) and the population size (the N each row's adoption is out of),
+// plus the opener win-rates (the second DESIGN §P7 dial) and the null-opener count.
 export type VarietyReport = Omit<PooledReport, "rows"> & {
   rows: UsageRow[];
   botCount: number; // population size — the denominator of every row's adoption k/N
+  openers: OpenerRow[]; // per-opener win-rates, sorted win% desc → opens desc → canonical
+  nullOpeners: number; // (fighter, fight) observations that opened with no honoured commitment
 };
 
 // The technique a frame's action commits to, or null when the action is not a
@@ -224,6 +227,89 @@ export const reducePerBot = (
   };
 };
 
+// A per-opener row: the win/loss/draw split of the fights a technique OPENED (was a
+// fighter's first honoured commitment in), and the resulting win-rate.
+export type OpenerRow = {
+  technique: Technique;
+  opens: number; // (fighter, fight) observations that opened with this technique
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number | null; // wins / opens (raw fraction in [0, 1]); null when opens === 0 (÷0 guard)
+};
+
+// The opener reduction: the per-technique rows (all 13, sorted) + the count of
+// (fighter, fight) observations that had no opener at all (a pure turtle).
+export type OpenerReport = {
+  rows: OpenerRow[];
+  nullOpeners: number;
+};
+
+type Outcome = "win" | "loss" | "draw";
+
+// The outcome for the fighter on `side` of a fight: win when it is the winner, draw when
+// the bout was level, else loss — the per-fighter view of `FightResult.winner`.
+const outcomeFor = (winner: FightResult["winner"], side: "A" | "B"): Outcome =>
+  winner === "draw" ? "draw" : winner === side ? "win" : "loss";
+
+// The technique a fighter OPENED a fight with: its FIRST honoured commitment across the
+// fight's frames, or null when it never honoured one (a pure turtle — no opener).
+const openerOf = (frames: readonly FighterFrame[]): Technique | null =>
+  frames.map(honouredTechnique).find((t) => t !== null) ?? null;
+
+// Reduce the bot-attributed matchups to per-opener win-rates. Each fight yields two
+// observations — one per fighter — pairing that fighter's opener (its first honoured
+// commitment, `openerOf`) with its outcome (`outcomeFor`). Turtles that honour nothing
+// have a NULL opener: excluded from every row, counted in `nullOpeners`. A draw is never
+// a win but stays in each opener's denominator. Pure + honoured-only.
+export const reduceOpeners = (matchups: readonly Matchup[]): OpenerReport => {
+  const observations = matchups.flatMap(({ fight }) => [
+    {
+      opener: openerOf(fight.events.map((e) => e.a)),
+      outcome: outcomeFor(fight.winner, "A"),
+    },
+    {
+      opener: openerOf(fight.events.map((e) => e.b)),
+      outcome: outcomeFor(fight.winner, "B"),
+    },
+  ]);
+
+  const nullOpeners = observations.filter((o) => o.opener === null).length;
+
+  // One row per technique, in canonical order. A null-opener observation matches no
+  // technique here (its opener is null), so it is excluded from every row and lives only
+  // in `nullOpeners` above — no separate pre-filter needed.
+  const rows = TECHNIQUES.map((technique) => {
+    const mine = observations.filter((o) => o.opener === technique);
+    const opens = mine.length;
+    const wins = mine.filter((o) => o.outcome === "win").length;
+    const losses = mine.filter((o) => o.outcome === "loss").length;
+    const draws = mine.filter((o) => o.outcome === "draw").length;
+
+    return {
+      technique,
+      opens,
+      wins,
+      losses,
+      draws,
+      winRate: opens === 0 ? null : wins / opens,
+    };
+  });
+
+  // Row order: the LIVE openers (a real win-rate) first — win-rate descending, ties broken
+  // by opens descending (better-sampled first), then canonical order (the filter keeps
+  // TECHNIQUES order and the sort is stable). Then the never-opened techniques (`winRate
+  // null`, opens 0) in canonical order. Splitting live from dead keeps every branch load-
+  // bearing (the row count + order pin it) and needs no null sentinel in the comparator.
+  const live = rows
+    .filter((r): r is OpenerRow & { winRate: number } => r.winRate !== null)
+    .sort((a, b) => b.winRate - a.winRate || b.opens - a.opens);
+
+  const dead = rows.filter((r) => r.winRate === null);
+
+  return { rows: [...live, ...dead], nullOpeners };
+};
+
 // Run the both-sides round-robin over the population — each ordered pair of NON-mirror
 // bots plays with each on each side, at every seed — then reduce the fights to the pooled
 // usage histogram AND attribute per-bot adoption / mean share. Pure over `runFight`: no
@@ -255,10 +341,13 @@ export const runVariety = (cfg: VarietyConfig): VarietyReport => {
 
   const pooled = reduceUsage(matchups.map((m) => m.fight));
   const attributionOf = reducePerBot(matchups, cfg.population.length);
+  const openers = reduceOpeners(matchups);
 
   return {
     ...pooled,
     botCount: cfg.population.length,
     rows: pooled.rows.map((r) => ({ ...r, ...attributionOf(r.technique) })),
+    openers: openers.rows,
+    nullOpeners: openers.nullOpeners,
   };
 };

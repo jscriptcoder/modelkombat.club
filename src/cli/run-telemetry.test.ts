@@ -3,6 +3,7 @@ import {
   renderDiversity,
   renderHeader,
   renderLegend,
+  renderOpeners,
   renderReport,
   runTelemetryCli,
   type HeaderInfo,
@@ -174,8 +175,8 @@ describe("runTelemetryCli", () => {
     );
   });
 
-  it("ends with the diversity line — no legend appended — when nothing is dominant", () => {
-    const population = BALANCED; // three ~even moves ⇒ none dominant ⇒ no legend
+  it("ends with the opener table (below the diversity line, no legend) when nothing is dominant", () => {
+    const population = BALANCED; // three ~even moves ⇒ none dominant ⇒ no usage legend
     const out = runTelemetryCli([], deps(population));
 
     const rep = runVariety({
@@ -185,7 +186,21 @@ describe("runTelemetryCli", () => {
       rules: MOCK_RULES,
     });
 
-    expect(out.stdout.endsWith(`${renderDiversity(rep)}\n`)).toBe(true);
+    // the opener section is the LAST block; the diversity line precedes it, with no legend.
+    expect(out.stdout.endsWith(`${renderOpeners(rep)}\n`)).toBe(true);
+    expect(out.stdout).toContain(`${renderDiversity(rep)}\n\n`);
+    expect(out.stdout).not.toContain("⚠");
+  });
+
+  it("appends the opener win-rate table below the diversity headline", () => {
+    const out = runTelemetryCli([], deps(BALANCED));
+
+    expect(out.stdout).toContain("win%"); // the opener table's rate column
+    expect(out.stdout).toContain("null openers (turtled):");
+    // the opener table renders AFTER the diversity line, not up in the usage histogram.
+    expect(out.stdout.indexOf("opener")).toBeGreaterThan(
+      out.stdout.indexOf("effective moves"),
+    );
   });
 });
 
@@ -389,6 +404,22 @@ const usageReport = (
   totalFights: 0,
   effectiveMoves: null,
   botCount,
+  openers: [],
+  nullOpeners: 0,
+});
+
+// A report carrying only the opener fields renderOpeners reads (the usage side is inert).
+const openerReport = (
+  openers: VarietyReport["openers"],
+  nullOpeners: number,
+): VarietyReport => ({
+  rows: [],
+  totalCommitments: 0,
+  totalFights: 0,
+  effectiveMoves: null,
+  botCount: 0,
+  openers,
+  nullOpeners,
 });
 
 describe("renderReport — exact histogram layout (table only)", () => {
@@ -489,6 +520,73 @@ describe("renderReport — exact histogram layout (table only)", () => {
         "0/3" +
         " ".repeat(3) +
         "n/a",
+    );
+  });
+});
+
+describe("renderOpeners — exact opener win-rate table (table + null-opener line)", () => {
+  it("aligns opener / opens / W / L / D / win%, renders — for a 0-open technique, and appends the null-opener count", () => {
+    const out = renderOpeners(
+      openerReport(
+        [
+          {
+            technique: "gyaku-zuki",
+            opens: 4,
+            wins: 2,
+            losses: 1,
+            draws: 1,
+            winRate: 0.5,
+          },
+          {
+            technique: "sweep",
+            opens: 0,
+            wins: 0,
+            losses: 0,
+            draws: 0,
+            winRate: null,
+          },
+        ],
+        3,
+      ),
+    );
+
+    expect(out).toBe(
+      "opener" +
+        " ".repeat(6) +
+        "opens" +
+        " ".repeat(2) +
+        "W" +
+        " ".repeat(2) +
+        "L" +
+        " ".repeat(2) +
+        "D" +
+        " ".repeat(3) +
+        "win%" +
+        "\n" +
+        "gyaku-zuki" +
+        " ".repeat(6) +
+        "4" +
+        " ".repeat(2) +
+        "2" +
+        " ".repeat(2) +
+        "1" +
+        " ".repeat(2) +
+        "1" +
+        " ".repeat(2) +
+        "50.0%" +
+        "\n" +
+        "sweep" +
+        " ".repeat(11) +
+        "0" +
+        " ".repeat(2) +
+        "0" +
+        " ".repeat(2) +
+        "0" +
+        " ".repeat(2) +
+        "0" +
+        " ".repeat(6) +
+        "—" +
+        "\n\nnull openers (turtled): 3",
     );
   });
 });
