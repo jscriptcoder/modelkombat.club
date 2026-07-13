@@ -2,6 +2,7 @@ import { render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
 import Arsenal from "./Arsenal";
+import { VARIETY_PATH } from "../../shared/lib/paths";
 
 // The expected roster is hardcoded here — deliberately NOT imported from the
 // component — so a renamed, dropped, or reordered move-id/gloss in production
@@ -271,5 +272,28 @@ describe("Arsenal section", () => {
     expect(specLink.getAttribute("href")).toBe("/spec-guide#frame-table");
     // Opens in a new tab, matching the nav + CTA spec links.
     expect(specLink.getAttribute("target")).toBe("_blank");
+  });
+
+  it("hands off to the move-variety board with a single labelled link", () => {
+    const { getByRole } = render(() => <Arsenal />);
+
+    const region = getByRole("region", { name: "The Arsenal" });
+
+    // Exactly one variety hand-off link in the whole section — no per-card links.
+    const varietyLinks = within(region)
+      .getAllByRole("link")
+      .filter((link) => link.getAttribute("href") === VARIETY_PATH);
+
+    expect(varietyLinks).toHaveLength(1);
+
+    // Framed around move usage; the decorative ↗ affordance must not leak into the
+    // accessible name (exact-name match asserts it is aria-hidden).
+    const varietyLink = within(region).getByRole("link", {
+      name: "How often each move actually gets used — see the variety board",
+    });
+
+    expect(varietyLink.getAttribute("href")).toBe(VARIETY_PATH);
+    // Opens in a new tab, matching the spec hand-off (a bare reference doc).
+    expect(varietyLink.getAttribute("target")).toBe("_blank");
   });
 });

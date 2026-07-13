@@ -655,8 +655,10 @@ main,
   line-height: 1.4;
 }
 
-/* End-of-section hand-off to the full frame table on /spec. */
-.arsenal-spec {
+/* End-of-section hand-offs — to the full frame table on /spec-guide and to the
+   move-variety board on /variety. */
+.arsenal-spec,
+.arsenal-variety {
   margin-top: 1.5rem;
   font-size: 0.9rem;
 }

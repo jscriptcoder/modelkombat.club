@@ -2,6 +2,7 @@ import { render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
 import Nav from "./Nav";
+import { VARIETY_PATH } from "../lib/paths";
 
 describe("Nav", () => {
   it("brands the header with the site name linking back to the home page top", () => {
@@ -91,5 +92,18 @@ describe("Nav", () => {
     expect(
       getByRole("link", { name: "Ring" }).getAttribute("aria-current"),
     ).toBe("page");
+  });
+
+  it("keeps the move-variety board out of the primary nav (a caveated diagnostic, not a primary destination)", () => {
+    const { getByRole } = render(() => <Nav />);
+
+    const hrefs = within(getByRole("navigation"))
+      .getAllByRole("link")
+      .map((link) => link.getAttribute("href"));
+
+    // /variety is deliberately NOT top-level site IA — its discoverability is sitemap +
+    // llms.txt + the Arsenal hand-off, so a reference-population diagnostic never reads as
+    // a first-class destination. This absence is a decision, asserted as one.
+    expect(hrefs).not.toContain(VARIETY_PATH);
   });
 });
