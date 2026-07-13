@@ -3,6 +3,10 @@
 # out as CRLF on Windows while generateSpec() emits LF, failing the test.
 docs/spec.md text eol=lf
 
+# The generated variety board is byte-pinned to generateVariety() by its drift test;
+# keep it LF in the working tree on every platform so the byte-match holds (as spec.md).
+docs/variety.md text eol=lf
+
 # The gauntlet bot documents are frozen scoring inputs: benchmark-config's
 # INPUT_HASH is the sha256 of their (LF) file text. Pin them to LF so the hash
 # guard holds on every platform — else core.autocrlf=true checks them out as
