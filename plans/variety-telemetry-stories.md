@@ -1,7 +1,8 @@
 # Variety-telemetry harness — child stories
 
 **Status:** story-splitting complete; **S1a, S2, and S3a each hardened via find-gaps**
-(S1a 2026-07-12 → 12 examples; S2 + S3a 2026-07-13 → 8 examples each; see §Gaps closed).
+(S1a 2026-07-12 → 12 examples; S2 + S3a 2026-07-13 → 8 examples each; see §Gaps closed);
+**S3b resolved via a grill-me pass** (2026-07-13 → 9 examples, S3b-1…S3b-9).
 Decisions locked in the sibling scoping doc `variety-telemetry-harness.md`
 (§Resolved decisions). Feeds `planning`, one selected child story at a time.
 
@@ -13,8 +14,9 @@ adoption (k/N) + mean share, the effective-move-count diversity headline + live/
 list, `--json`, a `-- <path…>` population override with fail-fast load, the **opener
 win-rate table** with the sample-gated §P7 `⚠` flag — so **both** DESIGN §P7 balance
 dials (usage > 35%, opener > 60%) are now measured — and the **per-move start-failure
-rate** (`locked`-excluded, full per-reason split). **Next un-planned story: S3b**
-(distance/spacing-occupancy histogram — *grill the distance bucketing first*).
+rate** (`locked`-excluded, full per-reason split). **S3b** (distance/spacing-occupancy
+histogram) is now **grilled + planned** (`plans/variety-telemetry-s3b.md`, one slice); the
+distance bucketing — the roadmap's named blocker — resolved to **5 coarse reach tiers**.
 
 ## Parent
 
@@ -60,7 +62,7 @@ delete-a-follow-up property is why it leads.
 | **S1b** | "How broadly is the kit adopted, and how much of the arsenal is live?" | Per-bot adoption column; effective-move-count headline + live/dead list; `--json`; population override arg (`-- bots/*.json`) | — | see below | internal CLI; shippable |
 | **S2** | "Does any *opener* over-win?" | Opener = first honoured commitment → fight outcome; per-opener win-rate; `⚠` on >60%; null-opener count | — | see below | internal CLI; shippable |
 | **S3a** | "Which moves are *chosen but keep failing to execute*?" | Per-move **start-failure rate** (`locked`-excluded: gate-failed starts / start attempts) + full per-reason split | — | see below (hardened via find-gaps 2026-07-13, S3a-1…S3a-8) | internal CLI; shippable |
-| **S3b** | "Which reach zones do fights actually happen in?" | Inter-fighter distance occupancy histogram, bucketed by the reach ladder | — | Given the round-robin, Then a distance histogram shows whether the >300k pokes' range is ever occupied | internal CLI; shippable |
+| **S3b** | "Which reach zones do fights actually happen in?" | Inter-fighter distance occupancy histogram over 5 coarse reach tiers (clinch/hand/kick/poke/out) | — | see below (resolved via grill-me 2026-07-13, S3b-1…S3b-9) | internal CLI; shippable |
 | **S4** | "Which moves actually *score* vs whiff (effectiveness, not just choice)?" | Scoring attribution: `points[t]` delta → most-recent honoured commitment in its `startup+active` window; whiff-vs-land + points-per-move | — | Given a scoring exchange, Then the point is attributed to the committing move; rekka-chain disambiguation covered | internal CLI; shippable — *modeling nuance, grill first* |
 | **S5a** | "What does the *live* meta look like?" (post-launch) | *Mostly enabled by S1b's override arg* — point the CLI at a submission dir. Real content = having submissions | — | Given a dir of submitted bots, Then the same report runs over them | internal; **valuable only post-launch** |
 | **S5b** | "Can the team review a versioned variety snapshot?" | Committed `docs/variety-<version>.md` board (like `docs/benchmark-gauntlet-v19.md`) | — | Given `npm run telemetry`, Then a committed board regenerates deterministically | repo artifact; shippable once metrics stable |
@@ -273,6 +275,74 @@ S1a/S2 render + edge-case shape. Grounded in `sim.ts:70` (the 5 `DegradeReason`s
   no `INPUT_HASH` / `BENCHMARK_VERSION` impact — the same non-negotiable as S1a-6 / S2-8,
   depending on the S3a-4 total row order.
 
+### S3b — acceptance examples
+
+_Resolved via a grill-me pass (2026-07-13) — the roadmap's named pre-plan blocker (distance
+bucketing) plus the render + edge-case shape (1 loose table bullet → 9 testable examples).
+Grounded in the engine: distance = `|a.x − b.x|` (the sim's own horizontal reach gate,
+`sim.ts:745`); `x` is on every `FighterFrame`, pushed every tick (`sim.ts:1322`, dense);
+`ring.width = 600000`, `startGap = 300000` (`rules.ts:29-30`). The bot API exposes no named
+distance zones (`opponent.distance` is a raw sub-unit int), so the tiers are S3b's own,
+keyed to the reach ladder._
+
+- **S3b-1 (metric — per-tick reach-tier occupancy).** Given the round-robin, Then for each
+  tick of each fight the inter-fighter distance `d = |a.x − b.x|` is placed in one of 5
+  half-open **reach tiers**: `clinch [0,120k)`, `hand [120k,240k)`, `kick [240k,300k)`,
+  `poke [300k,330k)`, `out [330k,600k]`. `occupancy(zone) = framesIn(zone) / totalFrames`.
+  Distance is **symmetric ⇒ exactly ONE sample per tick** (NOT per-fighter like
+  usage/openers/degrades, which count `[a, b]`), so `totalFrames = Σ ticks over all fights`
+  and the denominator is total ticks, **never 2×**. **All frames counted, no exclusions**
+  (yame-reset re-approach and okizeme clinch are genuine spacing — grill-resolved). The
+  boundaries are reach-ladder breakpoints: throw-floor 120k, reverse-punch 240k,
+  roundhouse/startGap 300k, longest-reach (ushiro) 330k.
+- **S3b-2 (render — fourth section, natural distance order).** Given the report, Then the
+  occupancy histogram renders as a **fourth section** beneath usage (S1) / opener (S2) /
+  degrade (S3a) in the same `telemetry` report (one report, additive readout — the
+  anti-salami guard), with columns `zone · distance · frames · share%`. Rows are in **fixed
+  natural distance order** (clinch → hand → kick → poke → out), **NOT** share-descending —
+  the distance axis is intrinsically ordered, so the reader sees the spatial distribution
+  shape (where mass concentrates, whether the poke tail is empty). Share to **1 decimal
+  place** (matching S1a / `benchmark.ts` `.toFixed(1)`). All 5 tiers always present. *(Exact
+  column widths / any static in-range-move annotation pinned by the render tests + CONFIRM,
+  S3a-2-style, not pre-specified here.)*
+- **S3b-3 (zero-guard — empty zone).** Given a tier that no tick occupies (e.g. the poke
+  range never entered — exactly the motivating "is the >300k poke zone ever occupied?"),
+  Then it still appears with `frames 0`, `share 0.0%`, never omitted (a visible
+  "spacing-dead zone" datum, mirroring S1a-3's dead move) — so an unoccupied reach niche is
+  a first-class reading.
+- **S3b-4 (zero-total guard).** Given a population that produces no frames at all
+  (`totalFrames == 0` — an empty population / no fights), Then every tier's share is `n/a`
+  (the ÷0 guard, mirroring S1a-4's `n/a`). Never occurs for the frozen gauntlet; a required
+  guard for the override population and test fixtures.
+- **S3b-5 (partition sum invariant).** Given `totalFrames > 0`, Then the 5 **raw** shares
+  **sum to exactly 1.0** by construction — every tick lands in exactly one tier (the
+  half-open tiers are contiguous and exhaustive over `[0, ring.width]`: no gap, no overlap).
+  Asserted on the raw shares, NOT the rounded display (which may read 99.9%/100.1%),
+  mirroring S1a-2.
+- **S3b-6 (boundary convention).** Given a distance exactly on a tier boundary, Then the
+  half-open `[lo,hi)` rule places it in the **higher** tier (a gap of exactly `120000` is
+  `hand`, not `clinch`), and the ring ceiling (`d == 600000`, fighters at opposite walls)
+  lands in the top `out` tier (inclusive of the max) — so no tick is lost or double-counted
+  at a seam. These exact placements are what pin the `<`-vs-`<=` boundary mutants.
+- **S3b-7 (no flag — diagnostic only).** Given any run, Then — like S3a and unlike S1a
+  (>35%) / S2 (>60%) — the occupancy histogram carries **no §P7 dial and no `⚠`**: it is
+  purely diagnostic (spacing is descriptive; there is no balance target for where fights
+  happen). The process **exits 0**, prints **no legend**, applies **no sample gate** — a
+  low-`totalFrames` reading self-caveats via the visible `frames` column plus the header's
+  global small-sample caveat (S1a-11).
+- **S3b-8 (`--json` additive).** Given `--json`, Then the occupancy data rides in the SAME
+  versioned envelope S1b shipped (`{version, population, report}`) as an **additive field on
+  `VarietyReport`** (`occupancy: OccupancyRow[]`) — no new top-level key, no envelope
+  reshape. The envelope `version` (= `BENCHMARK_VERSION`) is **unchanged** (S3b is a pure
+  read-only reduction — no scoring-input touch ⇒ the invariant forbids a bump; an added
+  field is a non-breaking JSON change per cli-design). `--json` round-trips
+  (`JSON.parse(stdout).report` `toEqual` `runVariety()`), mirroring S1b Slice 3 / S2-7 /
+  S3a-7.
+- **S3b-9 (determinism, inherited).** Given fixed seeds + rules, When run twice, Then the
+  occupancy section is byte-identical — a pure reduction over `runFight` reading only `.x`
+  (already emitted every tick), no `INPUT_HASH` / `BENCHMARK_VERSION` impact — the same
+  non-negotiable as S1a-6 / S2-8 / S3a-8, depending on the S3b-2 fixed row order.
+
 ## Parking lot
 
 - **S5a is (mostly) not a build.** Grill decision #6 already puts a population
@@ -285,7 +355,8 @@ S1a/S2 render + edge-case shape. Grounded in `sim.ts:70` (the 5 `DegradeReason`s
 - **S3a + S3b are separable** (degrade vs spacing) and kept apart deliberately —
   distinct questions, either can be dropped. The scoping doc bundled them as "S3."
 - **Still-open grills (from scoping):** S4's commitment-reconstruction window + rekka
-  disambiguation; S3b's exact distance bucketing. Grill each when its story is planned.
+  disambiguation. (S3b's distance bucketing — RESOLVED via grill-me 2026-07-13: 5 coarse
+  reach tiers; see §S3b acceptance examples.) Grill S4 when its story is planned.
 
 ## Warnings
 
@@ -376,22 +447,53 @@ usage count, so the two sections reconcile as `attempts = usage + failedStarts`.
 (S3a-6) means no `MIN_*` sample gate is needed (contrast S2-3), so low-N is handled by the
 visible `N` column alone.
 
+## Gaps closed — grill session, 2026-07-13 (S3b)
+
+Focus: **S3b** distance bucketing — the roadmap's named pre-plan blocker — plus the render
++ edge-case shape (1 loose table bullet → 9 testable examples, S3b-1…S3b-9). Grounded in
+the engine (distance = `|a.x − b.x|`, the sim's own reach gate `sim.ts:745`; `x` dense on
+every frame `sim.ts:1322`; `ring.width 600k` / `startGap 300k`). The bot API exposes NO
+named distance zones (`opponent.distance` is a raw int), so the tiers are S3b's invention,
+keyed to the reach ladder. All forks resolved; nothing parked.
+
+```
+[Blocker  → S3b-1]   Bucket scheme: 5 COARSE reach tiers (not 14 fine rungs, not
+                     fixed-width) at 120k/240k/300k/330k — readable + isolates the >300k
+                     poke zone. Rejected: fine rungs (noisy, fiddly labels), per-technique
+                     cumulative (not a partition), fixed-width (loses the ladder meaning)
+[Resolved → S3b-1]   Frame inclusion: ALL frames, no exclusions (reset re-approach +
+                     okizeme clinch are real spacing; no per-frame 'invalid' signal exists)
+[Resolved → S3b-1]   Sample: ONE distance per TICK (symmetric) ⇒ denom = total ticks, NOT
+                     2× — the key divergence from usage/opener/degrade (which count [a,b])
+[Resolved → S3b-2]   Row order: FIXED natural distance order (clinch→out), NOT share-desc —
+                     the axis is intrinsically ordered (a divergence from S1a/S2/S3a)
+[Resolved → S3b-7]   No ⚠ flag — diagnostic only (mirror S3a): no §P7 dial, no legend, no
+                     sample gate, exit 0
+[Mirror   → 3/4/5/6] Zero-zone 0.0% (S1a-3), zero-total n/a (S1a-4), partition sums to 1.0
+                     (S1a-2), half-open [lo,hi) boundary + ceiling → top tier
+[Mirror   → S3b-8/9] --json additive (occupancy on VarietyReport, version unchanged);
+                     determinism byte-identical, depends on the S3b-2 fixed order
+```
+
+Consistency check passed: the partition (S3b-5) + half-open boundary (S3b-6) agree —
+contiguous exhaustive tiers over `[0, 600k]` mean every tick lands in exactly one, so the
+raw shares sum to 1.0. The single-sample-per-tick denominator (S3b-1) is what makes
+"frames = ticks" hold — a copy-pasted per-fighter `[a,b]` double-count would still sum to
+1.0 but mislabel the denominator, so the tests pin `frames === ticks`, not `2×`.
+
 ## Next step
 
-**S1a + S1b + S2 + S3a are shipped and archived** (S2 plan at
-`docs/archive/variety-telemetry-s2.md`, S3a plan at
-`docs/archive/variety-telemetry-s3a.md`). Both DESIGN §P7 balance dials plus the per-move
-start-failure rate are now measured. The next un-planned child story is **S3b**
-(distance/spacing-occupancy histogram) — **grill the distance bucketing first** (scoping
-default: bucket inter-fighter distance by the reach-ladder rungs `empi 95k … ushiro 330k`),
-then `find-gaps` → `planning`. Each planned slice loads `tdd`, `testing`,
-`mutation-testing`, `refactoring` and completes RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR
-before the next begins (the harness's pure reduction core is ideal for factory-driven
-behavioral tests over synthetic `FightResult` fixtures — the `benchmark.ts` test pattern).
+**S1a + S1b + S2 + S3a are shipped and archived; S3b is grilled + planned.** Both DESIGN
+§P7 balance dials plus the per-move start-failure rate are measured, and S3b's distance
+bucketing (the roadmap's named blocker) is resolved to **5 coarse reach tiers**, hardened
+into S3b-1…S3b-9 and sequenced into a single-slice plan `plans/variety-telemetry-s3b.md`.
+Next is to **land that plan as its own `docs(plan)` PR** (the S2 "no plan on main" lesson),
+then implement the slice: load `tdd`, `testing`, `mutation-testing`, `refactoring` and
+complete RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR (the harness's pure reduction core is ideal
+for factory-driven behavioral tests over synthetic `FightResult` fixtures — the
+`benchmark.ts` pattern).
 
-Remaining un-planned stories (each independently valuable, each needs its own planning
-pass): **S3b** (distance-occupancy histogram — *grill* the distance bucketing first),
-**S4** (scoring attribution — *grill first*: the commitment-reconstruction window + rekka
-disambiguation; an engine survey answering both is already captured in the session
-scratchpad `s4-scoring-attribution-engine-research.md` for when S4 is picked up). S5a/b/c
-are post-launch / far-future.
+Remaining un-planned story after S3b: **S4** (scoring attribution — *grill first*: the
+commitment-reconstruction window + rekka disambiguation; an engine survey answering both is
+already captured in the session scratchpad `s4-scoring-attribution-engine-research.md` for
+when S4 is picked up). S5a/b/c are post-launch / far-future.
