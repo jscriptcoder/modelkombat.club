@@ -2,25 +2,29 @@
 
 **Status:** story-splitting complete; **S1a, S2, and S3a each hardened via find-gaps**
 (S1a 2026-07-12 → 12 examples; S2 + S3a 2026-07-13 → 8 examples each; see §Gaps closed);
-**S3b + S4 each resolved via a grill-me pass** (2026-07-13 → S3b 9 examples, S3b-1…S3b-9;
-S4 11 examples, S4-1…S4-11). Decisions locked in the sibling scoping doc
-`variety-telemetry-harness.md` (§Resolved decisions #1–#10). Feeds `planning`, one
-selected child story at a time.
+**S3b, S4, and S5b each resolved via a grill-me pass** (2026-07-13 → S3b 9 examples,
+S3b-1…S3b-9; S4 11 examples, S4-1…S4-11; S5b board design, decision #11). Decisions
+locked in the sibling scoping doc `variety-telemetry-harness.md` (§Resolved decisions
+#1–#11). Feeds `planning`, one selected child story at a time.
 
 **Shipped:** **S1a** (PRs #270–#272, archived) + **S1b** (PRs #273–#276, archived via
 #277) + **S2** (PRs #278–#280, plan archived at `docs/archive/variety-telemetry-s2.md`) +
 **S3a** (plan #282 / slice #283, plan archived at `docs/archive/variety-telemetry-s3a.md`) +
-**S3b** (plan #285 / slice #286, plan archived at `docs/archive/variety-telemetry-s3b.md`)
+**S3b** (plan #285 / slice #286, plan archived at `docs/archive/variety-telemetry-s3b.md`) +
+**S4** (plan #288 / slice #289, plan archived at `docs/archive/variety-telemetry-s4.md`)
 are complete + live. The `telemetry` CLI now emits the pooled usage histogram, per-bot
 adoption (k/N) + mean share, the effective-move-count diversity headline + live/dead
 list, `--json`, a `-- <path…>` population override with fail-fast load, the **opener
 win-rate table** with the sample-gated §P7 `⚠` flag — so **both** DESIGN §P7 balance
 dials (usage > 35%, opener > 60%) are now measured — the **per-move start-failure
-rate** (`locked`-excluded, full per-reason split), and the **reach-zone occupancy
+rate** (`locked`-excluded, full per-reason split), the **reach-zone occupancy
 histogram** (5 coarse reach tiers, one distance sample per tick, diagnostic-only) — so
-DESIGN §P7 Metric 6 is measured too. **S4** (scoring attribution — effectiveness /
-whiff-vs-land) is now **grilled + planned** (scoping decision #10; plan at
-`plans/variety-telemetry-s4.md`); its TDD slice is the immediate next build.
+DESIGN §P7 Metric 6 is measured too — and the **scoring-attribution table**
+(`starts · land · land% · pts · pts/start`, penalty-reconciled, knockdown-class `—`),
+the effectiveness / whiff-vs-land readout — so the entire internal-CLI variety arc is
+complete. **S5b** (the committed, drift-guarded variety board `docs/variety.md`) is now
+**grilled + planned** (scoping decision #11; plan at `plans/variety-telemetry-s5b.md`);
+its TDD slice is the immediate next build.
 
 ## Parent
 
@@ -69,7 +73,7 @@ delete-a-follow-up property is why it leads.
 | **S3b** | "Which reach zones do fights actually happen in?" | Inter-fighter distance occupancy histogram over 5 coarse reach tiers (clinch/hand/kick/poke/out) | — | see below (resolved via grill-me 2026-07-13, S3b-1…S3b-9) | internal CLI; shippable |
 | **S4** | "Which moves actually *score* vs whiff (effectiveness, not just choice)?" | Scoring attribution: `points[t]` delta → most-recent honoured commitment in its `[startup, startup+active−1]` window; `starts · land · land% · pts · pts/start`; penalty deltas excluded + reconciled | — | see below (resolved via grill-me 2026-07-13, S4-1…S4-11) | internal CLI; shippable |
 | **S5a** | "What does the *live* meta look like?" (post-launch) | *Mostly enabled by S1b's override arg* — point the CLI at a submission dir. Real content = having submissions | — | Given a dir of submitted bots, Then the same report runs over them | internal; **valuable only post-launch** |
-| **S5b** | "Can the team review a versioned variety snapshot?" | Committed `docs/variety-<version>.md` board (like `docs/benchmark-gauntlet-v19.md`) | — | Given `npm run telemetry`, Then a committed board regenerates deterministically | repo artifact; shippable once metrics stable |
+| **S5b** | "Can the team review a variety snapshot?" | **GRILLED + PLANNED** (decision #11, `plans/variety-telemetry-s5b.md`): evergreen committed `docs/variety.md`, **generated + byte-match-drift-tested** (the `docs/spec.md` trio, NOT the hand-written gauntlet boards), body = verbatim `npm run telemetry` output fenced in a thin scaffold | — | drift test asserts committed `docs/variety.md` `toBe` `generateVariety()`; `npm run gen:variety` reproduces it byte-for-byte | repo artifact; **shippable now** (metrics stable) |
 | **S5c** | "Can the community see the meta?" | Public web meta-report surface | — | (defer — separate UX surface) | public; far-future |
 
 ### S1a — acceptance examples
@@ -615,12 +619,16 @@ error. And `starts(X)` == the S1a usage count, so S4 reconciles with S1 the way 
 
 ## Next step
 
-**S1a + S1b + S2 + S3a + S3b are shipped and archived**; **S4 is now grilled + planned**
-(plan at `plans/variety-telemetry-s4.md`, decisions in scoping #10). Both DESIGN §P7
-balance dials, the per-move start-failure rate, AND the reach-zone occupancy histogram are
-already measured over the frozen gauntlet; S4 adds the effectiveness readout (which moves
-actually *score* vs whiff). The immediate next action is the **S4 TDD slice(s)** once this
-`docs(plan)` PR merges (the S2/S3a "no plan on main" lesson) — `planning` → TDD,
-PR-per-slice, each completing RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins.
+**S1a + S1b + S2 + S3a + S3b + S4 are shipped and archived** — the entire internal-CLI
+variety arc (all five readouts: usage · opener · degrade · occupancy · scoring) is
+complete over the frozen gauntlet. **S5b (the committed, drift-guarded variety board
+`docs/variety.md`) is now grilled + planned** (plan at `plans/variety-telemetry-s5b.md`,
+decisions in scoping #11): a generated + byte-match-drift-tested board mirroring the
+`docs/spec.md` trio, its body the verbatim `npm run telemetry` output fenced in a thin
+scaffold. The immediate next action is the **S5b TDD slice** once this `docs(plan)` PR
+merges (the S2/S3a "no plan on main" lesson) — `planning` → TDD, one PR completing
+RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR.
 
-S5a/b/c (external corpus / committed board / web surface) are post-launch / far-future.
+S5a (external submission corpus — no build, just the S1b `-- <path…>` override on a
+submissions dir) and S5c (public web meta-report surface) remain post-launch /
+far-future.
