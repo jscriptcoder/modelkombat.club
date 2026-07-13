@@ -223,6 +223,41 @@ export const renderOpenerLegend = (report: VarietyReport): string =>
     ? `⚠ = opener win-rate over ${(OPENER_FLAG_THRESHOLD * 100).toFixed(0)}% (≥${MIN_OPENER_SAMPLE} opens)`
     : "";
 
+// Render the start-failure table (S3a — Metric 5): per technique, the start attempts `N`
+// (honoured + gate-failed, `locked` excluded), the failed-start count + rate, and the
+// per-reason split (out-of-band / unaffordable / wrong-context / inert). Rows arrive already
+// sorted (rate desc → attempts desc → canonical); a 0-attempt technique shows `—` (the ÷0
+// guard). NO ⚠ flag — a purely diagnostic usability readout, not a §P7 balance dial. A
+// trailing note cross-references the usage histogram so a usage-0 technique with failures
+// here is not misread as "never attempted". Pure data → string; the exact output is a
+// stdout contract (cli-design).
+export const renderDegrades = (report: VarietyReport): string => {
+  const table = render([
+    [
+      "move",
+      "N",
+      "fail",
+      "rate",
+      "out-of-band",
+      "unaffordable",
+      "wrong-context",
+      "inert",
+    ],
+    ...report.degrades.map((r) => [
+      r.technique,
+      `${r.attempts}`,
+      `${r.failedStarts}`,
+      r.rate === null ? "—" : `${(r.rate * 100).toFixed(1)}%`,
+      `${r.reasons["out-of-band"]}`,
+      `${r.reasons.unaffordable}`,
+      `${r.reasons["wrong-context"]}`,
+      `${r.reasons.inert}`,
+    ]),
+  ]);
+
+  return `${table}\n\nnote: N = honoured + failed starts (locked excluded); a technique with 0 usage but failures here was chosen but never executed`;
+};
+
 export const runTelemetryCli = (
   argv: string[],
   deps: TelemetryDeps,
@@ -275,7 +310,8 @@ export const runTelemetryCli = (
     `${renderReport(report)}\n\n${renderDiversity(report)}` +
     (legend ? `\n\n${legend}` : "") +
     `\n\n${renderOpeners(report)}` +
-    (openerLegend ? `\n\n${openerLegend}` : "");
+    (openerLegend ? `\n\n${openerLegend}` : "") +
+    `\n\n${renderDegrades(report)}`;
 
   return {
     stdout: `${header}\n\n${body}\n`,

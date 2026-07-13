@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  FAILURE_REASONS,
+  reduceDegrades,
   reduceOpeners,
   reducePerBot,
   reduceUsage,
@@ -437,6 +439,21 @@ describe("runVariety — round-robin over the population", () => {
     expect(report.nullOpeners).toBe(0);
   });
 
+  it("carries per-technique start-failure rows from the round-robin", () => {
+    // MOCK_RULES has no band / stamina / air gate, so every mid attack is honoured ⇒ both
+    // bots' moves have start attempts but zero gate failures ⇒ a real 0.0 rate (not null).
+    const report = runVariety(varietyConfig());
+
+    expect(report.degrades).toHaveLength(13);
+    expect(
+      rowFor({ rows: report.degrades }, "gyaku-zuki").attempts,
+    ).toBeGreaterThan(0);
+    expect(rowFor({ rows: report.degrades }, "gyaku-zuki").failedStarts).toBe(
+      0,
+    );
+    expect(rowFor({ rows: report.degrades }, "gyaku-zuki").rate).toBe(0);
+  });
+
   it("attributes per-bot adoption (k/N) to each committing bot and sets botCount = population size", () => {
     // GYAKU_BOT only ever lands gyaku-zuki, MAE_BOT only mae-geri ⇒ each move is
     // adopted by exactly one of the two bots; every other technique by none.
@@ -829,5 +846,196 @@ describe("reduceOpeners — sample-gated dominance flag (§P7 opener guard)", ()
 
     expect(rowFor({ rows }, "throw").winRate).toBe(null);
     expect(rowFor({ rows }, "throw").dominant).toBe(false);
+  });
+});
+
+// A frame where side A CHOOSES technique `t` with degrade `d` (null = honoured), B idles.
+// `started(t, null)` = an honoured start; `started(t, "out-of-band")` = a gate failure;
+// `started(t, "locked")` = a busy-fighter frame (excluded from the rate).
+const started = (t: Technique, d: DegradeReason | null): FightEvent =>
+  ev(frame(techniqueAction(t), d), frame(IDLE));
+
+// ─── reduceDegrades: per-technique START-FAILURE rate. Over every frame, a chosen
+// technique that was honoured OR gate-failed (out-of-band / unaffordable / wrong-context
+// / inert) is a start attempt; the gate-failures are the numerator. A `locked` frame — a
+// busy fighter's ignored input while committed to an already-honoured move — is dropped
+// from BOTH numerator and denominator. Fed plain fights (no bot identity needed). ───────
+describe("reduceDegrades — per-technique start-failure rate", () => {
+  it("counts honoured and gate-failed frames as start attempts, but excludes locked", () => {
+    // mae-geri chosen 5×: 3 honoured, 1 out-of-band (a failed start), 1 locked (busy on an
+    // already-honoured move ⇒ excluded from BOTH the numerator and the denominator).
+    const rows = reduceDegrades([
+      fightOf([
+        ev(frame(attack("mae-geri")), frame(IDLE)),
+        ev(frame(attack("mae-geri")), frame(IDLE)),
+        ev(frame(attack("mae-geri")), frame(IDLE)),
+        ev(frame(attack("mae-geri"), "out-of-band"), frame(IDLE)),
+        ev(frame(attack("mae-geri"), "locked"), frame(IDLE)),
+      ]),
+    ]);
+
+    const mae = rowFor({ rows }, "mae-geri");
+
+    expect(mae.attempts).toBe(4); // 3 honoured + 1 out-of-band; the locked frame is excluded
+    expect(mae.failedStarts).toBe(1); // the out-of-band frame only
+    expect(mae.rate).toBe(0.25); // 1 / 4
+    expect(mae.reasons["out-of-band"]).toBe(1);
+  });
+
+  it("splits failedStarts across all four reasons in their own buckets, summing to failedStarts", () => {
+    // gyaku fails via each gate a DISTINCT number of times (oob 1, unaff 2, wctx 3, inert 4)
+    // plus 2 honoured ⇒ attempts 12, fail 10. Distinct counts pin each reason to its own
+    // bucket (a swapped or dropped bucket, or a mis-keyed count, changes an assertion).
+    const rows = reduceDegrades([
+      fightOf([
+        started("gyaku-zuki", null),
+        started("gyaku-zuki", null),
+        started("gyaku-zuki", "out-of-band"),
+        started("gyaku-zuki", "unaffordable"),
+        started("gyaku-zuki", "unaffordable"),
+        started("gyaku-zuki", "wrong-context"),
+        started("gyaku-zuki", "wrong-context"),
+        started("gyaku-zuki", "wrong-context"),
+        started("gyaku-zuki", "inert"),
+        started("gyaku-zuki", "inert"),
+        started("gyaku-zuki", "inert"),
+        started("gyaku-zuki", "inert"),
+      ]),
+    ]);
+
+    const gyaku = rowFor({ rows }, "gyaku-zuki");
+
+    expect(gyaku.attempts).toBe(12);
+    expect(gyaku.failedStarts).toBe(10);
+    expect(gyaku.rate).toBeCloseTo(10 / 12, 10); // 0.8333…
+    expect(gyaku.reasons["out-of-band"]).toBe(1);
+    expect(gyaku.reasons.unaffordable).toBe(2);
+    expect(gyaku.reasons["wrong-context"]).toBe(3);
+    expect(gyaku.reasons.inert).toBe(4);
+    // the per-reason buckets sum to failedStarts (a dropped bucket breaks this).
+    expect(FAILURE_REASONS.reduce((s, r) => s + gyaku.reasons[r], 0)).toBe(10);
+  });
+
+  it("counts a failed start on either fighter — side B, not just side A", () => {
+    const rows = reduceDegrades([
+      fightOf([ev(frame(IDLE), frame(attack("mae-geri"), "out-of-band"))]),
+    ]);
+
+    const mae = rowFor({ rows }, "mae-geri");
+
+    expect(mae.attempts).toBe(1);
+    expect(mae.failedStarts).toBe(1);
+  });
+
+  it("guards attempts == 0 — a never-chosen OR locked-only technique reads rate null, all-0", () => {
+    // gyaku appears ONLY while locked (busy) ⇒ 0 start attempts; ushiro never appears.
+    const rows = reduceDegrades([
+      fightOf([
+        started("gyaku-zuki", "locked"),
+        started("gyaku-zuki", "locked"),
+      ]),
+    ]);
+
+    const gyaku = rowFor({ rows }, "gyaku-zuki");
+
+    expect(gyaku.attempts).toBe(0); // locked frames are not start attempts
+    expect(gyaku.failedStarts).toBe(0);
+    expect(gyaku.rate).toBe(null); // ÷0 guard, never NaN
+    expect(Number.isNaN(gyaku.rate as unknown as number)).toBe(false);
+    expect(gyaku.reasons["out-of-band"]).toBe(0);
+
+    const ushiro = rowFor({ rows }, "ushiro-geri");
+
+    expect(ushiro.attempts).toBe(0);
+    expect(ushiro.rate).toBe(null);
+  });
+
+  it("always lists all 13 techniques, even ones never chosen", () => {
+    const rows = reduceDegrades([
+      fightOf([started("gyaku-zuki", "out-of-band")]),
+    ]);
+
+    expect(rows).toHaveLength(13);
+    expect(
+      rows
+        .map((r) => r.technique)
+        .slice()
+        .sort(),
+    ).toEqual(CANONICAL.slice().sort());
+  });
+
+  it("reconciles with the usage histogram: honoured (attempts − failedStarts) = the usage count", () => {
+    // 2 honoured gyaku + 1 out-of-band gyaku ⇒ degrade attempts 3, fail 1 ⇒ honoured 2;
+    // reduceUsage counts only the 2 honoured. The two sections agree on `honoured`.
+    const fights = [
+      fightOf([
+        started("gyaku-zuki", null),
+        started("gyaku-zuki", null),
+        started("gyaku-zuki", "out-of-band"),
+      ]),
+    ];
+
+    const gyaku = rowFor({ rows: reduceDegrades(fights) }, "gyaku-zuki");
+
+    expect(gyaku.attempts - gyaku.failedStarts).toBe(
+      rowFor(reduceUsage(fights), "gyaku-zuki").count,
+    );
+    expect(rowFor(reduceUsage(fights), "gyaku-zuki").count).toBe(2);
+  });
+
+  it("reads a chosen-but-always-fails move as 100% here yet 0 in the usage histogram", () => {
+    // gyaku chosen twice, both out-of-band, never honoured ⇒ rate 1.0 / usage 0 — the
+    // S1a-9 payoff: a usage-0 means "attempted but never executed", explained here.
+    const fights = [
+      fightOf([
+        started("gyaku-zuki", "out-of-band"),
+        started("gyaku-zuki", "out-of-band"),
+      ]),
+    ];
+
+    const gyaku = rowFor({ rows: reduceDegrades(fights) }, "gyaku-zuki");
+
+    expect(gyaku.attempts).toBe(2);
+    expect(gyaku.rate).toBe(1);
+    expect(rowFor(reduceUsage(fights), "gyaku-zuki").count).toBe(0);
+  });
+
+  it("sorts rows by rate desc → attempts desc → canonical, with 0-attempt (—) rows last", () => {
+    // kizami 1/1 = 1.0 (top). Then a 0.5 cluster: gyaku 2/4 (attempts 4), sweep 1/2 and
+    // mae 1/2 (attempts 2 each). attempts-desc floats gyaku above sweep/mae — the OPPOSITE
+    // of canonical (sweep idx 0 < gyaku idx 2) — isolating the attempts tie-break; sweep &
+    // mae tie on rate AND attempts ⇒ canonical breaks them (sweep idx 0 before mae idx 3).
+    // Every other technique has 0 attempts ⇒ rate null ⇒ sinks to the bottom, canonical.
+    const rows = reduceDegrades([
+      fightOf([
+        started("kizami-zuki", "out-of-band"), // 1/1 = 1.0
+        started("gyaku-zuki", null),
+        started("gyaku-zuki", null),
+        started("gyaku-zuki", "out-of-band"),
+        started("gyaku-zuki", "out-of-band"), // 2/4 = 0.5
+        started("sweep", null),
+        started("sweep", "out-of-band"), // 1/2 = 0.5
+        started("mae-geri", null),
+        started("mae-geri", "out-of-band"), // 1/2 = 0.5
+      ]),
+    ]);
+
+    expect(rows.map((r) => r.technique)).toEqual([
+      "kizami-zuki",
+      "gyaku-zuki",
+      "sweep",
+      "mae-geri",
+      "mawashi-geri",
+      "uraken",
+      "shuto",
+      "yoko-geri",
+      "ushiro-geri",
+      "empi",
+      "hiza-geri",
+      "tobi-geri",
+      "throw",
+    ]);
+    // the tail is genuinely the null (0-attempt) rows.
+    expect(rowFor({ rows }, "throw").rate).toBe(null);
   });
 });
