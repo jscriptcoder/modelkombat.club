@@ -1,9 +1,9 @@
 # Variety-telemetry harness — child stories
 
-**Status:** story-splitting complete + **S1a hardened via find-gaps (2026-07-12)** —
-S1a now carries 12 testable acceptance examples (see §Gaps closed). Decisions locked in
-the sibling scoping doc `variety-telemetry-harness.md` (§Resolved decisions). Feeds
-`planning`, one selected child story at a time.
+**Status:** story-splitting complete; **S1a, S2, and S3a each hardened via find-gaps**
+(S1a 2026-07-12 → 12 examples; S2 + S3a 2026-07-13 → 8 examples each; see §Gaps closed).
+Decisions locked in the sibling scoping doc `variety-telemetry-harness.md`
+(§Resolved decisions). Feeds `planning`, one selected child story at a time.
 
 **Shipped:** **S1a** (PRs #270–#272, archived) + **S1b** (PRs #273–#276, archived via
 #277) + **S2** (PRs #278–#280, plan archived at `docs/archive/variety-telemetry-s2.md`)
@@ -11,8 +11,9 @@ are complete + live. The `telemetry` CLI now emits the pooled usage histogram, p
 adoption (k/N) + mean share, the effective-move-count diversity headline + live/dead
 list, `--json`, a `-- <path…>` population override with fail-fast load, and the **opener
 win-rate table** with the sample-gated §P7 `⚠` flag — so **both** DESIGN §P7 balance
-dials (usage > 35%, opener > 60%) are now measured. **Next un-planned story: S3a**
-(per-move degrade-rate).
+dials (usage > 35%, opener > 60%) are now measured. **Next story: S3a**
+(per-move degrade-rate) — **hardened via find-gaps (2026-07-13, S3a-1…S3a-8), ready for
+`planning`**; not yet planned/built.
 
 ## Parent
 
@@ -57,7 +58,7 @@ delete-a-follow-up property is why it leads.
 | **S1a** *(first)* | "Is one move dominating? Is anything dead?" | Round-robin driver (keeps `events`); pooled usage histogram over 13 techniques; `⚠` on pooled share >35%; stdout | adoption, diversity scalar, json, opener | see below | internal CLI tool; shippable |
 | **S1b** | "How broadly is the kit adopted, and how much of the arsenal is live?" | Per-bot adoption column; effective-move-count headline + live/dead list; `--json`; population override arg (`-- bots/*.json`) | — | see below | internal CLI; shippable |
 | **S2** | "Does any *opener* over-win?" | Opener = first honoured commitment → fight outcome; per-opener win-rate; `⚠` on >60%; null-opener count | — | see below | internal CLI; shippable |
-| **S3a** | "Which moves are *chosen but keep failing to execute*?" | Per-move degrade-rate (chosen vs honoured, split by `DegradeReason`) | — | Given a move a bot picks out-of-band, Then its degrade-rate + reason show in the report | internal CLI; shippable |
+| **S3a** | "Which moves are *chosen but keep failing to execute*?" | Per-move **start-failure rate** (`locked`-excluded: gate-failed starts / start attempts) + full per-reason split | — | see below (hardened via find-gaps 2026-07-13, S3a-1…S3a-8) | internal CLI; shippable |
 | **S3b** | "Which reach zones do fights actually happen in?" | Inter-fighter distance occupancy histogram, bucketed by the reach ladder | — | Given the round-robin, Then a distance histogram shows whether the >300k pokes' range is ever occupied | internal CLI; shippable |
 | **S4** | "Which moves actually *score* vs whiff (effectiveness, not just choice)?" | Scoring attribution: `points[t]` delta → most-recent honoured commitment in its `startup+active` window; whiff-vs-land + points-per-move | — | Given a scoring exchange, Then the point is attributed to the committing move; rekka-chain disambiguation covered | internal CLI; shippable — *modeling nuance, grill first* |
 | **S5a** | "What does the *live* meta look like?" (post-launch) | *Mostly enabled by S1b's override arg* — point the CLI at a submission dir. Real content = having submissions | — | Given a dir of submitted bots, Then the same report runs over them | internal; **valuable only post-launch** |
@@ -197,6 +198,80 @@ render, and `--json`._
   `BENCHMARK_VERSION` impact), the same non-negotiable as S1a-6, depending on the S2-5
   total row order.
 
+### S3a — acceptance examples
+
+_Hardened via find-gaps (2026-07-13) — 1 loose bullet → 8 testable examples. The
+metric definition was the only real Blocker (`locked` semantics); the rest mirror the
+S1a/S2 render + edge-case shape. Grounded in `sim.ts:70` (the 5 `DegradeReason`s) +
+`sim.ts:1321` (every frame records the bot's RETURNED action + honour result)._
+
+- **S3a-1 (metric — start-failure rate, `locked` excluded).** Given the round-robin,
+  Then for each technique X: `startAttempts(X)` = frames where a fighter chose X and the
+  frame was **honoured** (`degrade === null`) **or** degraded with reason ∈
+  {`out-of-band`, `unaffordable`, `wrong-context`, `inert`}; `failedStarts(X)` = those
+  four-reason frames; **`degradeRate(X) = failedStarts(X) / startAttempts(X)`**. A
+  **`locked`** frame is dropped from BOTH numerator and denominator — it is a busy
+  fighter's ignored input while committed to an already-honoured move (`sim.ts:512-513`),
+  not a failed pick, so counting it would make every slow-but-fine move read ~100%
+  degraded. The rate answers *"when a neutral fighter tries to START X, how often does it
+  bounce off a legality/affordability gate?"* (matches scoping Metric 5's
+  "out-of-band / unaffordable" framing; the still-open S4 window/rekka grill does not
+  touch S3a — degrade is a per-frame fact, no reconstruction needed).
+- **S3a-2 (render — per-reason columns, third section).** Given the report, Then the
+  degrade-rate renders as a **third section** beneath the S1 usage histogram and the S2
+  opener table in the same `telemetry` report (one report, additive readout — the
+  anti-salami guard), with columns `move · N · fail · rate% · out-of-band ·
+  unaffordable · wrong-context · inert`, where `N` = `startAttempts`, `fail` =
+  `failedStarts`, and the four reason columns are the per-reason `failedStarts` counts
+  (which **sum to `fail`**). Rate is shown to **1 decimal place** (matching S1a /
+  `benchmark.ts` `.toFixed(1)`). All four reason columns are ALWAYS present — a `0`
+  column is a visible datum (like a dead move, S1a-3), and the override population
+  (`-- bots/*.json`) or a future bot can make `wrong-context` / `inert` nonzero (both are
+  structurally ~0 for validated bots on `CANONICAL_RULES`, but the report must be
+  population-stable). *(Exact column widths/spacing pinned by the render tests, S1b-style,
+  not pre-specified here.)*
+- **S3a-3 (zero-guard — never-attempted moves).** Given a technique with `startAttempts
+  == 0` (never chosen as a neutral start — either never picked, or only ever emitted
+  while `locked`), Then it still appears (all 13 always listed, mirroring S1a-3 / S2-6) —
+  `N` `0`, `fail` `0`, every reason count `0`, and `rate` rendered **`—`** (the ÷0 guard,
+  mirroring S1a-4's `n/a` and S2-6's `—`) — never omitted, so "never even attempted" is a
+  visible datum.
+- **S3a-4 (sort + row order).** Given the report, Then rows sort by **`rate` descending**
+  (hardest-to-execute moves at the top), ties broken by **`N` (startAttempts) descending**
+  (better-sampled first), then the **canonical frame-table order** (the same total order
+  as S1a-7). The **`—` (zero-attempt) rows sort to the bottom** (an undefined rate ranks
+  below every numeric rate, mirroring S2-6), broken among themselves by canonical order —
+  so real degraders lead and never-attempted moves cluster at the tail. This total order
+  is what the S3a-8 byte-identical determinism depends on.
+- **S3a-5 (chosen-but-always-fails ↔ S1a cross-ref).** Given a move a bot chooses
+  repeatedly that **always** gate-fails (`honoured(X) == 0`, `failedStarts(X) > 0`), Then
+  it reads **`rate 100.0%`, `N = failedStarts`** in this section while contributing **`0`**
+  to the S1a usage histogram (0 honoured commitments). Because **`honoured(X)` here IS the
+  S1a usage count** (`attempts = usage-count + failedStarts`), the two sections reconcile
+  numerically. This is the payoff of the S1a-9 cross-reference: a usage `0` means
+  "attempted but never executed," and THIS section says *which gate* — so a usage-`0` is
+  never misread as "never attempted." The report cross-references the two.
+- **S3a-6 (no flag — diagnostic only).** Given any run, Then unlike S1a (usage > 35%) and
+  S2 (opener > 60%), the degrade-rate carries **no §P7 dial and no `⚠` flag** — it is a
+  purely diagnostic usability readout (high degrade-rate is a "hard to use / mis-targeted"
+  signal for the roster designer or bot author, not a balance breach). The process
+  **exits 0**, prints **no legend**, and applies **no sample gate** — a low-`N` high rate
+  is self-caveating via the visible `N` column plus the header's global small-sample
+  caveat (contrast S2-3's gated flag, which needed `MIN_OPENER_SAMPLE` only because it
+  drove a `⚠`).
+- **S3a-7 (`--json` additive).** Given `--json`, Then the degrade data rides in the SAME
+  versioned envelope S1b shipped (`{version, population, report}`) as **additive fields on
+  `VarietyReport`** (`degrades: DegradeRow[]`) — no new top-level key, no envelope
+  reshape. The envelope `version` (= `BENCHMARK_VERSION`) is **unchanged** (S3a is a pure
+  read-only reduction — no scoring-input touch ⇒ the invariant forbids a bump; an added
+  field is a non-breaking JSON change per cli-design). `--json` round-trips
+  (`JSON.parse(stdout).report` `toEqual` `runVariety()`), mirroring S1b Slice 3 / S2-7.
+- **S3a-8 (determinism, inherited).** Given fixed seeds + rules, When run twice, Then the
+  degrade section is byte-identical — a pure reduction over `runFight` reading only
+  `.action` + `.degrade` (both already emitted; `benchmark.ts` already walks `.degrade`),
+  no `INPUT_HASH` / `BENCHMARK_VERSION` impact — the same non-negotiable as S1a-6 / S2-8,
+  depending on the S3a-4 total row order.
+
 ## Parking lot
 
 - **S5a is (mostly) not a build.** Grill decision #6 already puts a population
@@ -271,16 +346,47 @@ measurability. All closed; two S1a mirrors folded; nothing parked.
 Consistency check passed: the N-gate (S2-3) and win%↓ sort (S2-5) interact cleanly — a
 high-win% low-N opener floats up but wears no `⚠`; its `opens` column tells the story.
 
+## Gaps closed — find-gaps session, 2026-07-13 (S3a)
+
+Focus: **S3a** acceptance examples (1 loose bullet → 8 testable, S3a-1…S3a-8). The metric
+definition was the sole real Blocker; the rest are S1a/S2 render + edge-case mirrors.
+Grounded in the engine (`sim.ts:70` — the 5 `DegradeReason`s; `sim.ts:1321` — the frame
+records the RETURNED action + honour result). All closed; nothing parked.
+
+```
+[Blocker → S3a-1]   Metric: which reasons = failure + the denominator. Resolved:
+                    start-failure rate = {oob,unaff,wctx,inert} / (honoured + those);
+                    LOCKED EXCLUDED from num AND denom (busy-fighter artifact, not a
+                    failed pick — else every slow-but-fine move reads ~100%)
+[Should → S3a-2]    Reason split: FULL per-reason counts (4 columns), third section
+                    (out-of-band vs unaffordable ⇒ different remedies, Metric 5)
+[Should → S3a-3]    Zero-guard: startAttempts==0 → all-0 row, rate "—", all 13 listed
+[Should → S3a-4]    Sort: rate↓ → N↓ → canonical; "—" (0-attempt) rows sink to bottom
+[Should → S3a-5]    S1a cross-ref: honoured(X) IS the usage count; always-fail move =
+                    100% here / 0 in usage → a usage-0 means "attempted, never executed"
+[Should → S3a-7]    --json additive (degrades on VarietyReport); envelope version unchanged
+[Nice   → S3a-6]    No ⚠ flag — diagnostic only, no §P7 dial, no sample gate, exit 0
+[Inherit→ S3a-8]    Determinism byte-identical (S1a-6), depends on the S3a-4 total order
+```
+
+Consistency check passed: S3a-1's `locked` exclusion and S3a-5's cross-ref agree — the
+denominator (`honoured + failedStarts`, no `locked`) makes `honoured(X)` exactly S1a's
+usage count, so the two sections reconcile as `attempts = usage + failedStarts`. No `⚠`
+(S3a-6) means no `MIN_*` sample gate is needed (contrast S2-3), so low-N is handled by the
+visible `N` column alone.
+
 ## Next step
 
 **S1a + S1b + S2 are shipped and archived** (S2 plan at
 `docs/archive/variety-telemetry-s2.md`). Both DESIGN §P7 balance dials are now measured.
-The next un-planned child story is **S3a** (per-move degrade-rate) — load `planning` for
-it (no open grills; straight to planning, optionally hardened with `find-gaps` on its
-one acceptance example first). Each planned slice loads `tdd`, `testing`,
-`mutation-testing`, `refactoring` and completes RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR
-before the next begins (the harness's pure reduction core is ideal for factory-driven
-behavioral tests over synthetic `FightResult` fixtures — the `benchmark.ts` test pattern).
+**S3a** (per-move degrade-rate) is now **hardened via find-gaps (S3a-1…S3a-8) and ready
+for `planning`** — no open grills (degrade is a per-frame fact, so S4's
+commitment-reconstruction/rekka grill does NOT apply here). Load `planning` to turn
+S3a-1…S3a-8 into PR-sized slices in `plans/variety-telemetry-s3a.md`. Each planned slice
+loads `tdd`, `testing`, `mutation-testing`, `refactoring` and completes
+RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins (the harness's pure
+reduction core is ideal for factory-driven behavioral tests over synthetic `FightResult`
+fixtures — the `benchmark.ts` test pattern).
 
 Remaining un-planned stories (each independently valuable, each needs its own planning
 pass): **S3a** (per-move degrade-rate), **S3b** (distance-occupancy histogram — *grill*
