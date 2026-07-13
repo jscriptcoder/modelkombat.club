@@ -4,7 +4,8 @@
 // through the validator gate, runs the both-sides round-robin, and prints the
 // pooled move-usage histogram over the 13 techniques.
 //
-//   npm run telemetry
+//   npm run telemetry            # the human histogram
+//   npm run telemetry -- --json  # the raw report as a versioned JSON envelope
 //
 // All logic lives in run-telemetry.ts (testable); this file only wires the real
 // filesystem + manifest and performs the stream writes / exit. The population load
@@ -49,7 +50,7 @@ const deps: TelemetryDeps = {
   version: BENCHMARK_VERSION,
 };
 
-const out = runTelemetryCli(deps);
+const out = runTelemetryCli(process.argv.slice(2), deps);
 process.stdout.write(out.stdout);
 if (out.stderr) process.stderr.write(out.stderr);
 process.exit(out.code);
