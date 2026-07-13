@@ -8,15 +8,17 @@ Decisions locked in the sibling scoping doc `variety-telemetry-harness.md`
 
 **Shipped:** **S1a** (PRs #270–#272, archived) + **S1b** (PRs #273–#276, archived via
 #277) + **S2** (PRs #278–#280, plan archived at `docs/archive/variety-telemetry-s2.md`) +
-**S3a** (plan #282 / slice #283, plan archived at `docs/archive/variety-telemetry-s3a.md`)
+**S3a** (plan #282 / slice #283, plan archived at `docs/archive/variety-telemetry-s3a.md`) +
+**S3b** (plan #285 / slice #286, plan archived at `docs/archive/variety-telemetry-s3b.md`)
 are complete + live. The `telemetry` CLI now emits the pooled usage histogram, per-bot
 adoption (k/N) + mean share, the effective-move-count diversity headline + live/dead
 list, `--json`, a `-- <path…>` population override with fail-fast load, the **opener
 win-rate table** with the sample-gated §P7 `⚠` flag — so **both** DESIGN §P7 balance
-dials (usage > 35%, opener > 60%) are now measured — and the **per-move start-failure
-rate** (`locked`-excluded, full per-reason split). **S3b** (distance/spacing-occupancy
-histogram) is now **grilled + planned** (`plans/variety-telemetry-s3b.md`, one slice); the
-distance bucketing — the roadmap's named blocker — resolved to **5 coarse reach tiers**.
+dials (usage > 35%, opener > 60%) are now measured — the **per-move start-failure
+rate** (`locked`-excluded, full per-reason split), and the **reach-zone occupancy
+histogram** (5 coarse reach tiers, one distance sample per tick, diagnostic-only) — so
+DESIGN §P7 Metric 6 is measured too. The next un-planned story is **S4** (scoring
+attribution — *grill first*).
 
 ## Parent
 
@@ -483,17 +485,15 @@ raw shares sum to 1.0. The single-sample-per-tick denominator (S3b-1) is what ma
 
 ## Next step
 
-**S1a + S1b + S2 + S3a are shipped and archived; S3b is grilled + planned.** Both DESIGN
-§P7 balance dials plus the per-move start-failure rate are measured, and S3b's distance
-bucketing (the roadmap's named blocker) is resolved to **5 coarse reach tiers**, hardened
-into S3b-1…S3b-9 and sequenced into a single-slice plan `plans/variety-telemetry-s3b.md`.
-Next is to **land that plan as its own `docs(plan)` PR** (the S2 "no plan on main" lesson),
-then implement the slice: load `tdd`, `testing`, `mutation-testing`, `refactoring` and
-complete RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR (the harness's pure reduction core is ideal
-for factory-driven behavioral tests over synthetic `FightResult` fixtures — the
-`benchmark.ts` pattern).
+**S1a + S1b + S2 + S3a + S3b are shipped and archived** (S3b plan at
+`docs/archive/variety-telemetry-s3b.md`). Both DESIGN §P7 balance dials, the per-move
+start-failure rate, AND the reach-zone occupancy histogram are now measured — the harness's
+headline + diagnostic readouts are all in place over the frozen gauntlet. The next
+un-planned child story is **S4** (scoring attribution — "which moves actually *score* vs
+whiff?") — **grill first**: the commitment-reconstruction window + rekka-chain
+disambiguation. An engine survey answering both is already captured in the session
+scratchpad `s4-scoring-attribution-engine-research.md` for when S4 is picked up. Then
+`find-gaps` → `planning` → TDD, PR-per-slice, each completing
+RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins.
 
-Remaining un-planned story after S3b: **S4** (scoring attribution — *grill first*: the
-commitment-reconstruction window + rekka disambiguation; an engine survey answering both is
-already captured in the session scratchpad `s4-scoring-attribution-engine-research.md` for
-when S4 is picked up). S5a/b/c are post-launch / far-future.
+S5a/b/c (external corpus / committed board / web surface) are post-launch / far-future.
