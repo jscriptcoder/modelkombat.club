@@ -74,8 +74,9 @@ per **honoured commitment** — a frame where `action.type ∈ {attack, throw, s
 5. **Per-move degrade rate** — how often a move is *chosen but degrades* (out-of-band
    / unaffordable): flags a move that is hard to use correctly vs one that is simply
    unpicked (different remedies).
-6. **Spacing occupancy** — histogram of inter-fighter distance over the fight: are the
-   long-reach zoning pokes (`yoko`/`ushiro`/`shuto`) ever spatially relevant?
+6. **Spacing occupancy** — histogram of inter-fighter distance over the fight, bucketed
+   into 5 coarse reach tiers (clinch/hand/kick/poke/out — decision #9): are the long-reach
+   zoning pokes (`yoko`/`ushiro`) ever spatially relevant, or is the >300k range dead?
 
 ## The population question (the one real scope fork)
 
@@ -206,13 +207,26 @@ Three pieces, all in the existing style:
    (the `gauntlet-calibration.test.ts` pattern) once post-launch submissions give a real
    population. *Rejected:* hard gate from the start (6-bot noise trips it),
    pure-descriptive-no-flags (breaches easy to miss).
+9. **Spacing-occupancy buckets — 5 coarse reach tiers** (grill-me, 2026-07-13, for S3b).
+   Inter-fighter distance (`|a.x − b.x|`, the sim's own horizontal reach gate; over
+   `[0, ring.width = 600k]`, start 300k) is bucketed into **5 coarse reach tiers** at
+   reach-ladder breakpoints: `clinch [0,120k)` (< throw), `hand [120,240k)`
+   (throw..reverse), `kick [240,300k)` (reverse..roundhouse), `poke [300,330k)`
+   (roundhouse/startGap..ushiro — the long zoning pokes only), `out [330,600k]` (beyond all
+   reach — pure approach/spacing). ONE sample per **tick** (distance is symmetric ⇒
+   denominator = total ticks, NOT 2×); **all frames**, no exclusions; fixed **natural
+   distance order** (not share-desc — the axis is ordered); **no `⚠`** (diagnostic only —
+   the decision-#8 soft-flag exemption; S3a/S3b carry none). The bot API exposes no named
+   distance zones (`opponent.distance` is a raw int), so the tiers are the telemetry's own,
+   keyed to the ladder. *Rejected:* fine per-rung bands (14 thin, noisy buckets with fiddly
+   labels), per-technique cumulative in-reach % (not a partition), fixed-width bins (loses
+   the reach-ladder meaning the story names). Full acceptance shape in
+   `variety-telemetry-stories.md` §S3b (S3b-1…S3b-9).
 
-### Still open (later grills, not blocking S1–S3)
+### Still open (later grills, not blocking)
 
 - **S4 scoring-attribution internals** — the commitment-reconstruction window + rekka
   chain disambiguation. Grill when S4 is planned.
-- **S3 spacing-occupancy bucketing** — default: bucket inter-fighter distance by the
-  reach-ladder rungs (`empi 95k … ushiro 330k`). Confirm at S3 planning.
 
 ## Cost estimate
 
