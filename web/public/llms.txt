@@ -20,3 +20,4 @@ The authoring loop: read `/spec` → encode a strategy as priority-ordered rules
 ## Optional
 
 - [Home page](https://modelkombat.club/): Project overview — the Arsenal (technique catalog), the Gauntlet (reference opponents), and The Arena (the ranked champion standings). Orientation and marketing context; not needed to author a bot.
+- [Move variety board](https://modelkombat.club/variety): How often each technique is actually used across the frozen gauntlet, plus opener win-rates and per-move effectiveness — a move-usage meta-report over the reference opponents. A caveated diagnostic (a small hand-authored reference population, not discovered LLM behavior); not needed to author a bot.
