@@ -1,8 +1,10 @@
 # Variety-telemetry harness — capability scoping
 
 **Status:** SCOPING — **grill-me complete (2026-07-12)**; the 5 open questions + 3
-surfaced decision-tree branches are resolved (see §Resolved decisions). Ready for
-`story-splitting` → `planning`. Not a plan; no code implied.
+surfaced decision-tree branches are resolved (see §Resolved decisions), plus the
+per-slice grills for S3b (spacing buckets, decision #9) and **S4 (scoring attribution,
+decision #10 — grill-me 2026-07-13)**. Ready for `story-splitting` → `planning`. Not a
+plan; no code implied.
 
 ## The question it answers
 
@@ -132,11 +134,12 @@ Three pieces, all in the existing style:
 - **S2 — opener win-rate** — the second DESIGN §P7 dial (first-honoured-commitment →
   fight-outcome join), with the `⚠` soft-flag on a `>60%` opener.
 - **S3 — per-move degrade rate + spacing occupancy** — usability + spatial signals.
-- **S4 (optional, has modeling nuance) — scoring attribution** — whiff-vs-land and
-  points-per-move. Needs a commitment-reconstruction pass: a point delta at tick `t`
-  is attributed to the most-recent *honoured* attack start within the move's
-  `startup+active` window (with care for rekka chains where several strikes start in
-  quick succession). Defer until S1–S3 prove the instrument.
+- **S4 (has modeling nuance — GRILLED, decision #10) — scoring attribution** —
+  whiff-vs-land and points-per-move. A point delta at tick `t` is attributed to the
+  most-recent *honoured* attack start within the move's `[startup, startup+active−1]`
+  window; rekka chains are provably unambiguous (windows never overlap), penalty deltas
+  are excluded + reconciled, and score-0 knockdown moves render knockdown-class. Ready
+  to plan (S1a–S3b already proved the instrument).
 - **S5 (post-launch) — external submission corpus** ingest, and/or a committed board
   doc / web "meta report" surface.
 
@@ -222,11 +225,48 @@ Three pieces, all in the existing style:
    labels), per-technique cumulative in-reach % (not a partition), fixed-width bins (loses
    the reach-ladder meaning the story names). Full acceptance shape in
    `variety-telemetry-stories.md` §S3b (S3b-1…S3b-9).
+10. **Scoring attribution — strict point-delta join to the covering honoured-start**
+    (grill-me, 2026-07-13, for S4; engine grounding captured in the session scratchpad
+    `s4-scoring-attribution-engine-research.md`). Per technique X the report shows
+    `starts · land · land% · pts · pts/start` (Q1): `starts(X)` = honoured-starts of X
+    (== the S1a usage count — the honoured-commitment count, so this section reconciles
+    with S1); a start **lands** iff a positive scoreboard delta
+    (`frame[t].points − frame[t−1].points > 0`) falls in that start's
+    `[startup, startup+active−1]` real-tick window; `pts` = the summed attributed deltas
+    with **counter bonuses INCLUDED** (the whole delta to the committing move — Q4);
+    `land%` + `pts/start` derived. The window is **exact for grounded AND air moves** —
+    `elapsed` advances 1:1 with real ticks while committed/airborne, and an air strike
+    resolves only while airborne (verified `sim.ts:969-995`); a move scores **at most
+    once per start** (the `scored` latch, `sim.ts:847`), so `land` is binary per start.
+    **Penalty deltas excluded** (Q3): a positive delta covered by NO honoured-start
+    window is a jogai/passivity foul point (`sim.ts:1058`, +1 to the OPPONENT) ⇒ dropped
+    from all attribution, and **reconciled** against expected penalty points
+    (`max(0, pooledFoulCount−1)` per fighter, from `FightResult.fouls`) so any
+    window-math drift surfaces loudly instead of silently eating a real point. This
+    yields the master invariant **Σ(attributed pts) + Σ(excluded penalties) == final
+    combined score** — the primary correctness test. **Rekka/cancel chains are
+    provably unambiguous** — one `state` per fighter ⇒ ≤1 live attack, and scoring
+    windows never overlap (needs `active₁ > startup₂+1`; max active 3 < min ground
+    cancel-target startup 7), so "most-recent honoured-start whose window covers X" is
+    a total function. **Score-0 knockdown moves** (`sweep`, `hiza-geri`) score via the
+    LATER okizeme finisher (`sim.ts:829`), which correctly keeps the delta credit — **no
+    knockdown→finish chain reconstruction** (Q2); because they are known `score:0` moves,
+    their `land`/`land%`/`pts-per-start` render `—` (knockdown-class + a one-line note),
+    `pts` 0, so the 0 reads as "scores via okizeme," not "whiffs" (mirrors S1a-9's
+    cross-referenced 0). **tobi-geri** is a normal row (Q5) — an arc that lands before its
+    active window opens is an honest whiff (a TRUE effectiveness datum, unlike sweep/hiza's
+    by-design 0). **Diagnostic only** — no §P7 dial, no `⚠`, no legend, no sample gate,
+    exit 0 (mirrors S3a/S3b, decision #8). *Rejected:* crediting the finisher's point back
+    to the knockdown setup (over-modeling — chain reconstruction the scratchpad warned
+    against), splitting counter bonuses into a separate bucket (breaks the sum invariant +
+    needs parry-event reconstruction), subtract-fouls-at-the-end (mis-attributes the +1s to
+    whatever move is in-window). Full acceptance shape in `variety-telemetry-stories.md`
+    §S4 (S4-1…S4-11).
 
 ### Still open (later grills, not blocking)
 
-- **S4 scoring-attribution internals** — the commitment-reconstruction window + rekka
-  chain disambiguation. Grill when S4 is planned.
+- _(none — S4 scoring-attribution internals RESOLVED via grill-me 2026-07-13; see
+  decision #10 above. All five open questions + S3a/S3b/S4 grills are closed.)_
 
 ## Cost estimate
 
