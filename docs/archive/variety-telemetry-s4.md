@@ -1,7 +1,9 @@
 # Plan: Variety telemetry — S4 (scoring attribution)
 
 **Branch**: `feat/variety-telemetry-s4-attribution` (single slice — see "Slice count")
-**Status**: Active
+**Status**: ✅ Complete — shipped PR #289 (merged 2026-07-13); 100% mutation on both
+files (engine + CLI), all eleven acceptance criteria met. Archived per
+`[[archive-plans-not-delete]]`.
 **Parent story**: `variety-telemetry-stories.md` §S4 (resolved via grill-me 2026-07-13,
 examples S4-1…S4-11). Design grounded in the engine: the frame carries `points`
 (`sim.ts:81`, the post-tick scoreboard) so a per-tick delta is `frame[t].points −
@@ -76,7 +78,7 @@ Over every honoured-start of every round-robin fight, for each fighter side inde
   (`sim.ts:1058`, +1 to the opponent — the only non-move delta) ⇒ **excluded** from all
   attribution and summed into `excludedPenaltyPts`.
 - Per technique: `pts(X)` = Σ attributed deltas; `land% = land/starts`; `pts/start =
-  pts/starts` (both `null` when `starts === 0`).
+pts/starts` (both `null` when `starts === 0`).
 
 Consequences that pin the tests:
 
@@ -180,7 +182,7 @@ is intrinsic, not deferrable).
   `Σ max(0, foulCount − 1)` — kills "attribute the nearest start anyway" and a wrong
   `max(0, k−1)` (off-by-one on the free first warning).
 - **sum invariant (S4-5)**: a mixed fixture (combat scores + a penalty) → `Σ pts + Σ excluded
-  == Σ final scores` — the master guard; kills a dropped/double-counted delta and a
+== Σ final scores` — the master guard; kills a dropped/double-counted delta and a
   counter-bonus split (whole delta must land on the move).
 - **knockdown-class (S4-3)**: a fixture where `sweep` honour-starts N times and the okizeme
   finisher (a later strike) scores → `sweep.knockdownClass == true`, `sweep.pts 0`, and the

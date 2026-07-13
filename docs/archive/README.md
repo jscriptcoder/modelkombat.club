@@ -651,7 +651,45 @@ resolved via a grill-me pass (S3b-1…S3b-9) — the bucketing being the roadmap
 
 [variety-telemetry-s3b.md](variety-telemetry-s3b.md)
 
-**S1a–S3b complete; harness ongoing.** The sibling scoping + story-split docs —
-`variety-telemetry-harness.md` (grill-me: 9 resolved decisions) + `variety-telemetry-stories.md` (story
-split S1a–S5c) — stay live in `plans/` as the trail for the remaining stories **S4–S5** (scoring
-attribution, committed board / web surface).
+## Variety telemetry — S4 (scoring attribution) ✅ COMPLETE
+
+The fifth child story: a **scoring-attribution** section — "which moves actually SCORE vs whiff?"
+(effectiveness, not just choice) — beneath the S1 usage / S2 opener / S3a degrade / S3b occupancy
+sections. Each honoured-start of a technique caught the points its `[startup, startup+active−1]` window
+gained, via a **telescoping** window sum `pointsAt(hi) − pointsAt(lo−1)` (points are monotonic, so this
+sums the per-tick deltas without iterating them; the whole gain ⇒ counter bonuses included). `starts`
+equals `reduceUsage`'s usage count (same honoured predicate), so it reconciles with the degrade section
+(`starts = N − fail`). Penalty points (jogai/passivity +1 to the opponent — the only non-move point) are
+the **residual** `Σ final scores − Σ attributed`, surfaced as `excludedPenaltyPts` and reconciled in tests
+to `Σ max(0, foulCount − 1)` from `FightResult.fouls` (an independent source the reducer never reads). A
+**single PR-slice** (no flag, integration proven by S1a/S1b/S2/S3a/S3b), a **pure read-only reduction**
+over `runFight` (reads only `.action` / `.degrade` / `.points` + per-technique `startup`/`active` from the
+run's `Rules`; no engine/TCB change, no `INPUT_HASH` / `BENCHMARK_VERSION` bump, `npm run fight`
+byte-identical). Design resolved via a grill-me pass (S4-1…S4-11); the plan landed in its own `docs(plan)`
+PR (#288) merged before the slice.
+
+- **Slice 1 — the scoring-attribution section** (PR #289, `feat/variety-telemetry-s4-attribution`) — a pure
+  `reduceScoring(fights, rules)` — the ONE reducer that also takes `rules` (it needs each technique's
+  `startup`/`active`) — structured like `reduceDegrades` (per-technique iteration, `honouredTechnique(e[side])
+=== technique` folding the null-drop into the load-bearing equality — no inert null-guard). `knockdownClass`
+  (sweep, hiza-geri render land/rates as `—`, they score via the okizeme finisher) is a **named set**
+  `["sweep", "hiza-geri"]`, not derived from the spec. `VarietyReport` gains `scoring: ScoringRow[]` +
+  `excludedPenaltyPts`; `renderScoring` prints the 5th section (cols `move·starts·land·land%·pts·pts/start`,
+  sorted **pts desc → starts desc → canonical**, `—` for knockdown-class + null rates, **no ⚠ flag**, a
+  trailing `excluded penalty points` line + note); `--json` carries both additively. **100% mutation** on both
+  files (637 mutants, 0 survived, 0 no-coverage). KEY LESSON: the first-draft explicit per-tick-delta iteration
+  had ~23 survivors (an inert null-guard, an unreachable `windowSpec === undefined` branch, redundant
+  `j >= 0` / `delta > 0` guards, an excluded `starts.some(…)` predicate); **restructuring to the
+  `reduceDegrades` shape + telescoping + residual penalty + a named knockdown set** killed all of them (0
+  equivalents), with a defensive "honoured-but-unconfigured" test making the last engine-invariant branch
+  reachable AND enforcing `starts == usage`, a both-bounds window-delta fixture pinning startup AND active, and
+  startup-0 / OOB / empty-events edge tests. Real-gauntlet finding: `gyaku-zuki` 2322 starts / 86.1% land /
+  3723 pts (the workhorse), and `uraken` 269 starts / 0 land / 0 pts — chosen a lot but never scores, the exact
+  "chosen but bounces" signal the readout exists for.
+
+[variety-telemetry-s4.md](variety-telemetry-s4.md)
+
+**S1a–S4 complete; harness ongoing.** The sibling scoping + story-split docs —
+`variety-telemetry-harness.md` (grill-me: 10 resolved decisions) + `variety-telemetry-stories.md` (story
+split S1a–S5c) — stay live in `plans/` as the trail for the remaining story **S5** (the web board / public
+surface).
