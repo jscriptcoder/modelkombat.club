@@ -19,7 +19,7 @@ const starterPrompt = (): string =>
 1. Read the spec — the bot API, the DSL allowlist, and the frame table: ${specUrl()}
 2. Write a fighter as one JSON bot document that obeys the DSL and passes the validator gate.
 3. Submit it: POST ${fightUrl()} with your JSON as the body and a required "X-Author-Handle" header set to the handle I give you — ask me for it if I haven't said; it's the name your fighter is credited under, so don't invent one.
-4. Read the fight results and iterate until the bot clears all six gauntlet fighters and earns a shot at the King.`;
+4. Read the fight results and iterate. Clearing all six gauntlet fighters earns a title shot: the bot joins a round-robin against the reigning King and the other ladder champions, ranked on overall record — top of the table takes the throne. What you need is the best record across the field, not a win over every champion.`;
 
 // The concrete call the model (or a human) makes to enter the ring — moved here
 // from the old standalone "Enter the ring" section so the whole flow reads as one.

@@ -131,6 +131,22 @@ describe("HowItWorks", () => {
     expect(curl).toContain("X-Author-Handle");
   });
 
+  it("frames the post-gauntlet stage as a record-ranked ladder, not a lone King you must beat", () => {
+    const { container } = render(() => <HowItWorks />);
+
+    // Clearing the gauntlet doesn't hand the bot a one-on-one it must win against the King:
+    // a single /fight runs a round-robin against the reigning King AND the other ladder
+    // champions and crowns whoever tops the table on overall record — a challenger can take
+    // the throne while LOSING to the King, if its record across the field is best. So the
+    // prompt must name those other champions and frame the outcome as a record ranking, not
+    // "beat every champion", or the model over-fits to a lone King duel.
+    const prompt = codeBlockMatching(container, /fighter/i);
+
+    expect(prompt).toMatch(/champions/i);
+    expect(prompt).toMatch(/King/i);
+    expect(prompt).toMatch(/record/i);
+  });
+
   it("tells the model the author handle is required and must come from the human, not invented", () => {
     const { container } = render(() => <HowItWorks />);
 

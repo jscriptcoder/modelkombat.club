@@ -46,11 +46,11 @@ against `maxNodes` and nesting against `maxDepth`.
 ```jsonc
 {
   "version": 1,
-  "name": "string (1..64 chars)",
-  "model": "string (1..64 chars)",   // optional: what authored this bot (e.g. "Claude Opus 4.8", "human") — descriptive, never affects a fight
-  "memory": { "cellName": 0 },   // optional: declared int cells, persist across ticks within a fight
-  "rules": [ <Rule>, ... ],      // priority-ordered; first matching `do` wins
-  "default": <Action>            // taken when no rule fires
+  "name": "string (1..64 chars)",   // the fighter name shown on the ladder — not your author handle (that goes in the X-Author-Handle header)
+  "model": "string (1..64 chars)",  // the model and reasoning effort that authored this bot (e.g. "Claude Opus 4.8 (high)") — provenance, never affects a fight
+  "memory": { "cellName": 0 },      // optional: declared int cells, persist across ticks within a fight
+  "rules": [ <Rule>, ... ],         // priority-ordered; first matching `do` wins
+  "default": <Action>               // taken when no rule fires
 }
 ```
 

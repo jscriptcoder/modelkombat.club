@@ -112,16 +112,43 @@ describe("generateSpec — the factual machine-truth spec", () => {
   describe("document shape", () => {
     const HEADING = "## Document shape";
 
-    it("shows model as an optional sibling of name", () => {
+    it("presents model as authoring provenance — the model and its effort — not as optional", () => {
       const shape = sectionOf(generateSpec(), HEADING);
-      // both the required `name` and the optional provenance `model` appear...
+      // both `name` and the provenance `model` appear...
       expect(shape).toContain('"name"');
       expect(shape).toContain('"model"');
 
-      // ...and `model` is documented as optional (so an author knows it may be omitted)
       const modelLine = shape.split("\n").find((l) => l.includes('"model"'));
 
-      expect(modelLine).toContain("optional");
+      // ...and `model` is framed as expected provenance — the authoring model plus its
+      // reasoning effort — no longer flagged "optional" (authors should record what built
+      // the bot, even though the validator still tolerates its absence).
+      expect(modelLine).not.toContain("optional");
+      expect(modelLine?.toLowerCase()).toContain("effort");
+    });
+
+    it("marks the fighter name as distinct from the author handle", () => {
+      const shape = sectionOf(generateSpec(), HEADING);
+      const nameLine = shape.split("\n").find((l) => l.includes('"name"'));
+
+      // The fighter's name is not the submitter's handle — the handle travels in the
+      // X-Author-Handle header — so an author must not fold their handle into the name.
+      expect(nameLine?.toLowerCase()).toContain("handle");
+    });
+
+    it("column-aligns the trailing comments on the document fields", () => {
+      const shape = sectionOf(generateSpec(), HEADING);
+
+      // Every indented field line that carries a trailing `//` comment (name, model,
+      // memory, rules, default) — but not the full-line `//` comments in the Rule block.
+      const commentCols = shape
+        .split("\n")
+        .filter((l) => /^ {2}"/.test(l) && l.includes("//"))
+        .map((l) => l.indexOf("//"));
+
+      // They all open at the same column, so the block reads as a clean aligned table.
+      expect(commentCols.length).toBeGreaterThan(1);
+      expect(new Set(commentCols).size).toBe(1);
     });
   });
 
