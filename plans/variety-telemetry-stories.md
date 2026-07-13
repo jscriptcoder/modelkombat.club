@@ -2,9 +2,10 @@
 
 **Status:** story-splitting complete; **S1a, S2, and S3a each hardened via find-gaps**
 (S1a 2026-07-12 → 12 examples; S2 + S3a 2026-07-13 → 8 examples each; see §Gaps closed);
-**S3b resolved via a grill-me pass** (2026-07-13 → 9 examples, S3b-1…S3b-9).
-Decisions locked in the sibling scoping doc `variety-telemetry-harness.md`
-(§Resolved decisions). Feeds `planning`, one selected child story at a time.
+**S3b + S4 each resolved via a grill-me pass** (2026-07-13 → S3b 9 examples, S3b-1…S3b-9;
+S4 11 examples, S4-1…S4-11). Decisions locked in the sibling scoping doc
+`variety-telemetry-harness.md` (§Resolved decisions #1–#10). Feeds `planning`, one
+selected child story at a time.
 
 **Shipped:** **S1a** (PRs #270–#272, archived) + **S1b** (PRs #273–#276, archived via
 #277) + **S2** (PRs #278–#280, plan archived at `docs/archive/variety-telemetry-s2.md`) +
@@ -17,8 +18,9 @@ win-rate table** with the sample-gated §P7 `⚠` flag — so **both** DESIGN §
 dials (usage > 35%, opener > 60%) are now measured — the **per-move start-failure
 rate** (`locked`-excluded, full per-reason split), and the **reach-zone occupancy
 histogram** (5 coarse reach tiers, one distance sample per tick, diagnostic-only) — so
-DESIGN §P7 Metric 6 is measured too. The next un-planned story is **S4** (scoring
-attribution — *grill first*).
+DESIGN §P7 Metric 6 is measured too. **S4** (scoring attribution — effectiveness /
+whiff-vs-land) is now **grilled + planned** (scoping decision #10; plan at
+`plans/variety-telemetry-s4.md`); its TDD slice is the immediate next build.
 
 ## Parent
 
@@ -65,7 +67,7 @@ delete-a-follow-up property is why it leads.
 | **S2** | "Does any *opener* over-win?" | Opener = first honoured commitment → fight outcome; per-opener win-rate; `⚠` on >60%; null-opener count | — | see below | internal CLI; shippable |
 | **S3a** | "Which moves are *chosen but keep failing to execute*?" | Per-move **start-failure rate** (`locked`-excluded: gate-failed starts / start attempts) + full per-reason split | — | see below (hardened via find-gaps 2026-07-13, S3a-1…S3a-8) | internal CLI; shippable |
 | **S3b** | "Which reach zones do fights actually happen in?" | Inter-fighter distance occupancy histogram over 5 coarse reach tiers (clinch/hand/kick/poke/out) | — | see below (resolved via grill-me 2026-07-13, S3b-1…S3b-9) | internal CLI; shippable |
-| **S4** | "Which moves actually *score* vs whiff (effectiveness, not just choice)?" | Scoring attribution: `points[t]` delta → most-recent honoured commitment in its `startup+active` window; whiff-vs-land + points-per-move | — | Given a scoring exchange, Then the point is attributed to the committing move; rekka-chain disambiguation covered | internal CLI; shippable — *modeling nuance, grill first* |
+| **S4** | "Which moves actually *score* vs whiff (effectiveness, not just choice)?" | Scoring attribution: `points[t]` delta → most-recent honoured commitment in its `[startup, startup+active−1]` window; `starts · land · land% · pts · pts/start`; penalty deltas excluded + reconciled | — | see below (resolved via grill-me 2026-07-13, S4-1…S4-11) | internal CLI; shippable |
 | **S5a** | "What does the *live* meta look like?" (post-launch) | *Mostly enabled by S1b's override arg* — point the CLI at a submission dir. Real content = having submissions | — | Given a dir of submitted bots, Then the same report runs over them | internal; **valuable only post-launch** |
 | **S5b** | "Can the team review a versioned variety snapshot?" | Committed `docs/variety-<version>.md` board (like `docs/benchmark-gauntlet-v19.md`) | — | Given `npm run telemetry`, Then a committed board regenerates deterministically | repo artifact; shippable once metrics stable |
 | **S5c** | "Can the community see the meta?" | Public web meta-report surface | — | (defer — separate UX surface) | public; far-future |
@@ -345,6 +347,100 @@ keyed to the reach ladder._
   (already emitted every tick), no `INPUT_HASH` / `BENCHMARK_VERSION` impact — the same
   non-negotiable as S1a-6 / S2-8 / S3a-8, depending on the S3b-2 fixed row order.
 
+### S4 — acceptance examples
+
+_Resolved via a grill-me pass (2026-07-13) — the roadmap's named pre-plan blocker (the
+commitment-reconstruction window + rekka disambiguation) plus the metric + render +
+edge-case shape (1 loose bullet → 11 testable examples, S4-1…S4-11). Grounded in the
+engine: the frame carries `points` (`sim.ts:81`, post-tick); a point lands at
+`honoured_tick + startup`, inside `[startup, startup+active−1]` (`elapsed` increments
+after `events.push`); the window is exact for air too (`sim.ts:969-995`); a move scores
+at most once (the `scored` latch, `sim.ts:847`); penalties are the only non-move delta
+(`sim.ts:1058`). Full engine survey in the session scratchpad
+`s4-scoring-attribution-engine-research.md`._
+
+- **S4-1 (metric — point-delta attribution).** Given the round-robin, Then for each
+  technique X: `starts(X)` = honoured-starts of X (a frame where `action` is X's
+  attack/throw/sweep AND `degrade === null` — **identical to the S1a usage count**);
+  `land(X)` = the count of those starts whose `[startup, startup+active−1]` real-tick
+  window (looked up per-move from `CANONICAL_RULES`) contains a **positive scoreboard
+  delta** for that fighter (`frame[t].points − frame[t−1].points > 0`); `pts(X)` = the
+  summed attributed deltas; `land% = land/starts`; `pts/start = pts/starts`. A point
+  lands `startup` ticks AFTER the honoured-start (never the same tick — `elapsed`
+  increments after `events.push`), and a move scores **at most once per start** (the
+  `scored` latch, `sim.ts:847`), so `land` is binary per start and `land ≤ starts`.
+- **S4-2 (render — fifth section, sort).** Given the report, Then scoring attribution
+  renders as a **fifth section** beneath usage (S1) / opener (S2) / degrade (S3a) /
+  occupancy (S3b) in the same `telemetry` report (one report, additive readout — the
+  anti-salami guard), with columns `move · starts · land · land% · pts · pts/start`.
+  Rows sort by **`pts` descending** (the biggest scorers at top — the "which moves put
+  points on the board" headline), ties broken by **`starts` descending**, then the
+  **canonical frame-table order** (the same total order as S1a-7). Rates to **1 decimal
+  place** (matching S1a / `benchmark.ts` `.toFixed(1)`). All 13 techniques always listed.
+  *(Exact column widths pinned by the render tests + CONFIRM, S3a-2-style, not
+  pre-specified.)*
+- **S4-3 (score-0 knockdown class).** Given the two `score:0` knockdown moves (`sweep`,
+  `hiza-geri`), Then they render as **knockdown-class**: `pts` 0 but `land` / `land%` /
+  `pts/start` shown as **`—`** (not `0.0%`), with a one-line note — *"knockdown setups:
+  they score via the okizeme finisher, not directly."* Attribution stays strict (the
+  LATER okizeme finisher, `sim.ts:829`, keeps the delta credit — **no** knockdown→finish
+  chain reconstruction), so the 0 reads as "scores via okizeme," never misread as "whiffs
+  constantly" (mirrors S1a-9's cross-referenced 0). `tobi-geri` is **NOT** knockdown-class
+  — it is a normal row whose arc-truncated no-scores are honest whiffs (a true
+  effectiveness datum, unlike sweep/hiza's by-design 0).
+- **S4-4 (penalty exclusion + reconciliation).** Given a positive scoreboard delta at a
+  tick covered by **no** honoured-start window, Then it is a jogai/passivity foul point
+  (`sim.ts:1058`, +1 to the OPPONENT — the only non-move delta class) ⇒ **excluded** from
+  all attribution. The exclusion is **reconciled**: the total excluded delta count must
+  equal the expected penalty points (`max(0, pooledFoulCount−1)` per fighter, from
+  `FightResult.fouls`), asserted in a test — so any window-math drift surfaces loudly
+  instead of silently dropping a real combat point as a "penalty."
+- **S4-5 (sum invariant — the master correctness test).** Given any run, Then
+  **Σ(attributed pts across all moves) + Σ(excluded penalty pts) == the final combined
+  scoreboard** (`FightResult.scores.a + .b`, summed over all fights). This holds because
+  every combat delta is attributed to exactly one covering start (windows never overlap —
+  S4-8) with **counter bonuses included** (the whole `base + bonus` delta goes to the
+  committing move — not split), and penalties are the only remainder. This is the primary
+  correctness test the mutation suite leans on.
+- **S4-6 (zero-guard — never-started move).** Given a technique with `starts == 0` (never
+  honoured-started — all 13 always listed, mirroring S1a-3 / S2-6 / S3a-3 / S3b-3), Then
+  it appears with `starts` 0, `land` 0, `pts` 0, and `land%` / `pts/start` rendered **`—`**
+  (the ÷0 guard, mirroring S1a-4 / S2-6 / S3a-3), never omitted — so "never even attempted"
+  is a visible datum.
+- **S4-7 (zero-total guard).** Given a population that lands no scores at all
+  (`totalAttributed == 0` — e.g. an all-turtle fixture or empty population), Then every
+  move's `land%` / `pts/start` reads `—` and `pts` 0, no `÷0` NaN or crash. Never occurs
+  for the frozen gauntlet; a required guard for the override population and test fixtures.
+- **S4-8 (rekka + air unambiguity).** Given a rekka/cancel chain (a live attack replaced
+  by a fresh `startAttack` — a NEW honoured-start), Then attribution stays unambiguous:
+  one `state` per fighter ⇒ ≤1 live attack, and scoring windows **provably never overlap**
+  (overlap needs `active₁ > startup₂+1`; max active 3 < min ground cancel-target startup
+  7), so "the most-recent honoured-start whose window covers the delta tick" is a total
+  function. Given an **air** strike (`tobi-geri`), the same `[startup, startup+active−1]`
+  window is **exact** (`elapsed` advances 1:1 while airborne; the strike resolves only
+  while airborne — `sim.ts:969-995`); an arc that lands before the window opens simply
+  produces no delta (a whiff), never a mis-windowed point.
+- **S4-9 (no flag — diagnostic only).** Given any run, Then — like S3a / S3b and unlike
+  S1a (>35%) / S2 (>60%) — scoring attribution carries **no §P7 dial and no `⚠`**: it is a
+  purely diagnostic effectiveness readout (low land% / low pts is a "mis-targeted or
+  outclassed move" signal for the roster designer or bot author, not a balance breach).
+  The process **exits 0**, prints **no legend**, applies **no sample gate** — a low-`starts`
+  reading self-caveats via the visible `starts` column plus the header's global
+  small-sample caveat (S1a-11).
+- **S4-10 (`--json` additive).** Given `--json`, Then the attribution data rides in the
+  SAME versioned envelope S1b shipped (`{version, population, report}`) as an **additive
+  field on `VarietyReport`** (`attribution: AttributionRow[]`) — no new top-level key, no
+  envelope reshape. The envelope `version` (= `BENCHMARK_VERSION`) is **unchanged** (S4 is
+  a pure read-only reduction — no scoring-input touch ⇒ the invariant forbids a bump; an
+  added field is a non-breaking JSON change per cli-design). `--json` round-trips
+  (`JSON.parse(stdout).report` `toEqual` `runVariety()`), mirroring S1b Slice 3 / S2-7 /
+  S3a-7 / S3b-8.
+- **S4-11 (determinism, inherited).** Given fixed seeds + rules, When run twice, Then the
+  attribution section is byte-identical — a pure reduction over `runFight` reading only
+  `.action`, `.degrade`, and `.points` (all already emitted every tick), no `INPUT_HASH` /
+  `BENCHMARK_VERSION` impact — the same non-negotiable as S1a-6 / S2-8 / S3a-8 / S3b-9,
+  depending on the S4-2 total row order.
+
 ## Parking lot
 
 - **S5a is (mostly) not a build.** Grill decision #6 already puts a population
@@ -356,9 +452,10 @@ keyed to the reach ladder._
   cheaply — a planning call.
 - **S3a + S3b are separable** (degrade vs spacing) and kept apart deliberately —
   distinct questions, either can be dropped. The scoping doc bundled them as "S3."
-- **Still-open grills (from scoping):** S4's commitment-reconstruction window + rekka
-  disambiguation. (S3b's distance bucketing — RESOLVED via grill-me 2026-07-13: 5 coarse
-  reach tiers; see §S3b acceptance examples.) Grill S4 when its story is planned.
+- **Still-open grills (from scoping):** _none._ S4's commitment-reconstruction window +
+  rekka disambiguation — RESOLVED via grill-me 2026-07-13 (see §S4 acceptance examples +
+  scoping decision #10); S3b's distance bucketing — RESOLVED via grill-me 2026-07-13
+  (see §S3b). Every open grill is now closed.
 
 ## Warnings
 
@@ -483,17 +580,47 @@ raw shares sum to 1.0. The single-sample-per-tick denominator (S3b-1) is what ma
 "frames = ticks" hold — a copy-pasted per-fighter `[a,b]` double-count would still sum to
 1.0 but mislabel the denominator, so the tests pin `frames === ticks`, not `2×`.
 
+## Gaps closed — grill session, 2026-07-13 (S4)
+
+Focus: **S4** scoring attribution — the roadmap's named pre-plan blocker (the
+commitment-reconstruction window + rekka disambiguation) plus the metric + render +
+edge-case shape (1 loose bullet → 11 testable examples, S4-1…S4-11). The engine facts
+(window, rekka, penalties, air timing) were surveyed into the session scratchpad
+`s4-scoring-attribution-engine-research.md`; the grill converted them into locked design
+decisions (scoping decision #10). All 5 forks resolved; nothing parked.
+
+```
+[Q1 → S4-1/2]    Metric shape: starts · land · land% · pts · pts/start (a connect-rate AND
+                 a points-yield, from {starts, lands, pts}). Rejected: pts-only (hides the
+                 whiff half), rich whiff-cause split (its own follow-up slice)
+[Q2 → S4-3]      Score-0 knockdown moves (sweep/hiza): strict attribution (finisher keeps
+                 credit, NO chain reconstruction) + render knockdown-class "—" + note.
+                 Rejected: credit the finish back to the setup (over-modeling), literal 0.0%
+[Q3 → S4-4]      Penalty deltas: drop any UNCOVERED delta + reconcile vs FightResult.fouls.
+                 Rejected: position-reset fingerprint (no gain), subtract-at-end (mis-attrib)
+[Q4 → S4-5]      Counter bonus: whole delta to the move (counters included) ⇒ the sum
+                 invariant Σ(attributed)+Σ(excluded)==final score holds. Rejected: split bucket
+[Q5 → S4-8]      Air (tobi-geri): window verified EXACT (elapsed 1:1 airborne, sim.ts:969-995)
+                 ⇒ normal row, arc-truncated no-score = honest whiff. No special-casing
+[Mirror→6/7/9/10/11] Zero-start "—" (S1a-3), zero-total "—" (S1a-4), no ⚠ diagnostic (S3a-6),
+                 --json additive (version unchanged), determinism byte-identical
+```
+
+Consistency check passed: the sum invariant (S4-5) and penalty exclusion (S4-4) agree —
+every combat delta is covered (attributed) and every penalty delta is uncovered (excluded),
+so the two partitions exhaust the scoreboard; the reconciliation test (excluded == expected
+foul points) is what proves no combat delta leaks into the penalty bucket via a window-math
+error. And `starts(X)` == the S1a usage count, so S4 reconciles with S1 the way S3a does
+(there `attempts = usage + failedStarts`; here `starts = usage`, `land ≤ starts`).
+
 ## Next step
 
-**S1a + S1b + S2 + S3a + S3b are shipped and archived** (S3b plan at
-`docs/archive/variety-telemetry-s3b.md`). Both DESIGN §P7 balance dials, the per-move
-start-failure rate, AND the reach-zone occupancy histogram are now measured — the harness's
-headline + diagnostic readouts are all in place over the frozen gauntlet. The next
-un-planned child story is **S4** (scoring attribution — "which moves actually *score* vs
-whiff?") — **grill first**: the commitment-reconstruction window + rekka-chain
-disambiguation. An engine survey answering both is already captured in the session
-scratchpad `s4-scoring-attribution-engine-research.md` for when S4 is picked up. Then
-`find-gaps` → `planning` → TDD, PR-per-slice, each completing
-RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins.
+**S1a + S1b + S2 + S3a + S3b are shipped and archived**; **S4 is now grilled + planned**
+(plan at `plans/variety-telemetry-s4.md`, decisions in scoping #10). Both DESIGN §P7
+balance dials, the per-move start-failure rate, AND the reach-zone occupancy histogram are
+already measured over the frozen gauntlet; S4 adds the effectiveness readout (which moves
+actually *score* vs whiff). The immediate next action is the **S4 TDD slice(s)** once this
+`docs(plan)` PR merges (the S2/S3a "no plan on main" lesson) — `planning` → TDD,
+PR-per-slice, each completing RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins.
 
 S5a/b/c (external corpus / committed board / web surface) are post-launch / far-future.
