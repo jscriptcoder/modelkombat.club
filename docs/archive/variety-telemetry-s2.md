@@ -9,8 +9,8 @@ decision #5 (opener = first honoured commitment → that fighter's fight outcome
 ## Goal
 
 The roster designer runs `npm run telemetry` and sees, beneath the S1 usage histogram, a
-per-**opener** win-rate table answering DESIGN §P7's second balance dial — *"does any
-opener over-win?"* — with the `>60%` breach flagged (sample-gated so a 6-bot reference
+per-**opener** win-rate table answering DESIGN §P7's second balance dial — _"does any
+opener over-win?"_ — with the `>60%` breach flagged (sample-gated so a 6-bot reference
 population doesn't false-alarm).
 
 ## Non-negotiable invariant (inherited from S1a/S1b)
@@ -43,10 +43,12 @@ both already emitted.
 ```ts
 // Slice 1:
 export type OpenerRow = {
-  technique: Technique;         // same 13-technique key space as PooledRow
-  opens: number;                // (fighter, fight) observations that opened with this move
-  wins: number; losses: number; draws: number; // opens === wins + losses + draws
-  winRate: number | null;       // wins / opens (raw fraction); null when opens === 0 (÷0 → "—")
+  technique: Technique; // same 13-technique key space as PooledRow
+  opens: number; // (fighter, fight) observations that opened with this move
+  wins: number;
+  losses: number;
+  draws: number; // opens === wins + losses + draws
+  winRate: number | null; // wins / opens (raw fraction); null when opens === 0 (÷0 → "—")
 };
 // VarietyReport gains: openers: OpenerRow[]; nullOpeners: number;
 
@@ -85,6 +87,7 @@ appended to stdout; `--json` carries it for free. Skips: the `⚠` flag + legend
 **Covers**: S2-1, S2-2, S2-4, S2-5, S2-6, S2-7, S2-8.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (present + CONFIRM before code):
+
 - opener = FIRST honoured commitment per side; a fighter that commits X then Y opens with X
 - outcome join: an A-won fight credits side-A's opener a **win** and side-B's opener a **loss**;
   a draw credits **both** openers a draw (opens++, wins unchanged)
@@ -95,7 +98,7 @@ appended to stdout; `--json` carries it for free. Skips: the `⚠` flag + legend
 - `--json` round-trips (`JSON.parse(stdout).report` `toEqual` `runVariety(cfg)`); envelope
   `version` unchanged
 - two runs byte-identical; `git diff --name-only` shows no scoring-input file touched
-**RED** (mutation-aware — likely mutants from `resources/mutator-rules.md`):
+  **RED** (mutation-aware — likely mutants from `resources/mutator-rules.md`):
 - `winRate = wins/opens`: fixture with a known non-symmetric W/L/D (e.g. 6W/2L/2D → 0.6) →
   exact `toBe` (kills `wins↔losses`, `/`→`*`)
 - `opens = wins+losses+draws`: all three terms non-zero, distinct → exact opens (kills a
@@ -112,16 +115,16 @@ appended to stdout; `--json` carries it for free. Skips: the `⚠` flag + legend
 - render presentation: exact `toBe` on the rendered section string (kills column/label/
   spacing mutants — the S1b lesson)
 - determinism: `renderOpeners` twice `toEqual`
-**GREEN**: `reduceOpeners` (flatMap matchups → per-side {opener, outcome}, filter nulls to
-`nullOpeners`, tally per technique over all 13, `winRate` with ÷0 guard); wire into
-`runVariety`; `renderOpeners` with the sort comparator + `—` guard.
-**MUTATE**: `npx stryker run --mutate "src/engine/telemetry.ts,src/cli/run-telemetry.ts"`.
-**KILL MUTANTS**: expect the S1b-class survivors — a `—`/null else-branch (assert the
-exact `—` cell + stdout tail), a sort tie-break equivalent (add the discriminating
-fixture). Ask if any survivor's value is ambiguous.
-**REFACTOR**: assess sharing the tally shape with `reducePerBot`; only if it adds value
-(don't force a premature abstraction — the S1b types stayed split deliberately).
-**Done when**: all Slice-1 AC met, mutation reviewed, `git diff` clean of TCB, human approves.
+  **GREEN**: `reduceOpeners` (flatMap matchups → per-side {opener, outcome}, filter nulls to
+  `nullOpeners`, tally per technique over all 13, `winRate` with ÷0 guard); wire into
+  `runVariety`; `renderOpeners` with the sort comparator + `—` guard.
+  **MUTATE**: `npx stryker run --mutate "src/engine/telemetry.ts,src/cli/run-telemetry.ts"`.
+  **KILL MUTANTS**: expect the S1b-class survivors — a `—`/null else-branch (assert the
+  exact `—` cell + stdout tail), a sort tie-break equivalent (add the discriminating
+  fixture). Ask if any survivor's value is ambiguous.
+  **REFACTOR**: assess sharing the tally shape with `reducePerBot`; only if it adds value
+  (don't force a premature abstraction — the S1b types stayed split deliberately).
+  **Done when**: all Slice-1 AC met, mutation reviewed, `git diff` clean of TCB, human approves.
 
 ### Slice 2: the sample-gated §P7 breach flag
 
@@ -132,13 +135,14 @@ dominant rows + a one-line legend when ≥1 is flagged. Exit 0 unchanged.
 **Covers**: S2-3.
 **Required implementation skills**: `tdd`, `testing`, `mutation-testing`, `refactoring`.
 **Acceptance criteria** (present + CONFIRM before code):
+
 - `dominant = winRate > OPENER_FLAG_THRESHOLD (0.60) AND opens ≥ MIN_OPENER_SAMPLE`
 - exactly 60.0% → NOT flagged (strict `>`); just above 60% with `opens ≥ min` → flagged
 - above 60% but `opens < MIN_OPENER_SAMPLE` → NOT flagged (the gate kills 1-open-100%)
 - `opens` exactly at `MIN_OPENER_SAMPLE` boundary → flagged (`>=`, not `>`)
 - process still exits 0; legend line printed iff ≥1 opener is dominant
 - both `OPENER_FLAG_THRESHOLD` and `MIN_OPENER_SAMPLE` are exported named constants
-**RED** (mutation-aware — boundary + boolean mutants are the whole risk here):
+  **RED** (mutation-aware — boundary + boolean mutants are the whole risk here):
 - exactly-60% fixture → not dominant (kills `>`→`>=`)
 - 60%+ε with `opens ≥ min` → dominant (kills `>`→`<`, threshold literal — use a HARDCODED
   expected boundary, the S1a `SMALL_POPULATION` lesson)
@@ -148,15 +152,16 @@ dominant rows + a one-line legend when ≥1 is flagged. Exit 0 unchanged.
   can't survive (the S1b legend lesson)
 - `⚠` renders on exactly the dominant rows (exact `toBe`)
 - exit code stays 0 with a flagged opener (no gate — decision #8)
-**GREEN**: add `dominant` to `OpenerRow` in `reduceOpeners` (the guarded `&&`); render `⚠`
-+ conditional legend.
-**MUTATE**: same scoped Stryker run.
-**KILL MUTANTS**: the boundary/boolean survivors above; hardcoded-boundary tests, not
-computed expectations.
-**REFACTOR**: assess sharing the legend/flag shape with the usage `renderLegend`; only if
-it removes real duplication of knowledge.
-**Done when**: all Slice-2 AC met, full suite green, mutation 100% (or documented
-equivalents), `git diff` clean of TCB, human approves.
+  **GREEN**: add `dominant` to `OpenerRow` in `reduceOpeners` (the guarded `&&`); render `⚠`
+
+* conditional legend.
+  **MUTATE**: same scoped Stryker run.
+  **KILL MUTANTS**: the boundary/boolean survivors above; hardcoded-boundary tests, not
+  computed expectations.
+  **REFACTOR**: assess sharing the legend/flag shape with the usage `renderLegend`; only if
+  it removes real duplication of knowledge.
+  **Done when**: all Slice-2 AC met, full suite green, mutation 100% (or documented
+  equivalents), `git diff` clean of TCB, human approves.
 
 ## Pre-PR Quality Gate (each slice)
 
@@ -176,6 +181,7 @@ equivalents), `git diff` clean of TCB, human approves.
   exact-`toBe` render tests, not pre-specified here.
 
 ---
-*Per `[[archive-plans-not-delete]]`: on completion, archive to `docs/archive/` + a README
+
+_Per `[[archive-plans-not-delete]]`: on completion, archive to `docs/archive/` + a README
 entry (do NOT delete). The sibling `variety-telemetry-{harness,stories}.md` scoping trail
-stays live for S3+.*
+stays live for S3+._
