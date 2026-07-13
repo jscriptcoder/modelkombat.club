@@ -94,7 +94,7 @@ type error to be classified (gate-failure vs commitment-artifact), not silently 
 - [ ] start-failure rate = `failedStarts / attempts`, `attempts = honoured + failedStarts`;
       `locked` excluded from numerator AND denominator (S3a-1)
 - [ ] third section, columns `move · N · fail · rate% · out-of-band · unaffordable ·
-      wrong-context · inert`; the four reason counts sum to `fail`; rate to 1 dp (S3a-2)
+    wrong-context · inert`; the four reason counts sum to `fail`; rate to 1 dp (S3a-2)
 - [ ] all 13 techniques listed; `attempts == 0` → all-0 row, rate `—` (S3a-3)
 - [ ] sort rate↓ → N↓ → canonical; `—` (0-attempt) rows sink to the bottom (S3a-4)
 - [ ] `honoured(X)` == S1a usage count so `attempts = usage + failedStarts`; a
