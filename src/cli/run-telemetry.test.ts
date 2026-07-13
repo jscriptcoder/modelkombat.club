@@ -3,6 +3,7 @@ import {
   renderDiversity,
   renderHeader,
   renderLegend,
+  renderOpenerLegend,
   renderOpeners,
   renderReport,
   runTelemetryCli,
@@ -201,6 +202,26 @@ describe("runTelemetryCli", () => {
     expect(out.stdout.indexOf("opener")).toBeGreaterThan(
       out.stdout.indexOf("effective moves"),
     );
+  });
+
+  it("appends the opener legend as the final line when an opener is dominant", () => {
+    // mawashi-geri (score 2) beats gyaku-zuki (score 1) in the seed-independent mock fight,
+    // so the mawashi-opener wins 100% over 20 opens (2 orderings × 10 seeds) ⇒ ≥ 10 samples
+    // and > 60% ⇒ dominant, which surfaces the ⚠ + the trailing legend.
+    const population = [bot("s", "mawashi-geri"), bot("w", "gyaku-zuki")];
+    const seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const out = runTelemetryCli([], { ...deps(population), seeds });
+
+    const rep = runVariety({
+      population,
+      seeds,
+      maxTicks: 30,
+      rules: MOCK_RULES,
+    });
+
+    expect(renderOpenerLegend(rep)).not.toBe(""); // guard: the scenario really is dominant
+    expect(out.stdout).toContain("⚠");
+    expect(out.stdout.endsWith(`${renderOpenerLegend(rep)}\n`)).toBe(true);
   });
 });
 
@@ -536,6 +557,7 @@ describe("renderOpeners — exact opener win-rate table (table + null-opener lin
             losses: 1,
             draws: 1,
             winRate: 0.5,
+            dominant: false,
           },
           {
             technique: "sweep",
@@ -544,6 +566,7 @@ describe("renderOpeners — exact opener win-rate table (table + null-opener lin
             losses: 0,
             draws: 0,
             winRate: null,
+            dominant: false,
           },
         ],
         3,
@@ -589,6 +612,42 @@ describe("renderOpeners — exact opener win-rate table (table + null-opener lin
         "\n\nnull openers (turtled): 3",
     );
   });
+
+  it("marks a dominant opener with ⚠ in the trailing column, leaving others unflagged", () => {
+    const out = renderOpeners(
+      openerReport(
+        [
+          {
+            technique: "gyaku-zuki",
+            opens: 10,
+            wins: 8,
+            losses: 2,
+            draws: 0,
+            winRate: 0.8,
+            dominant: true,
+          },
+          {
+            technique: "sweep",
+            opens: 10,
+            wins: 5,
+            losses: 5,
+            draws: 0,
+            winRate: 0.5,
+            dominant: false,
+          },
+        ],
+        0,
+      ),
+    );
+
+    const lines = out.split("\n");
+    const gyakuLine = lines.find((l) => l.startsWith("gyaku-zuki")) ?? "";
+    const sweepLine = lines.find((l) => l.startsWith("sweep")) ?? "";
+
+    expect(gyakuLine.endsWith("⚠")).toBe(true); // the dominant row carries the flag
+    expect(sweepLine.endsWith("⚠")).toBe(false); // the non-dominant row does not
+    expect(sweepLine.endsWith("50.0%")).toBe(true); // and ends at win% (no trailing flag pad)
+  });
 });
 
 describe("renderLegend — the ⚠ threshold footnote", () => {
@@ -608,6 +667,50 @@ describe("renderLegend — the ⚠ threshold footnote", () => {
         report([
           { technique: "gyaku-zuki", count: 1, share: 0.2, dominant: false },
         ]),
+      ),
+    ).toBe("");
+  });
+});
+
+describe("renderOpenerLegend — the opener ⚠ footnote", () => {
+  it("names the 60% threshold and the 10-open sample floor when an opener is dominant", () => {
+    expect(
+      renderOpenerLegend(
+        openerReport(
+          [
+            {
+              technique: "sweep",
+              opens: 12,
+              wins: 10,
+              losses: 2,
+              draws: 0,
+              winRate: 10 / 12,
+              dominant: true,
+            },
+          ],
+          0,
+        ),
+      ),
+    ).toBe("⚠ = opener win-rate over 60% (≥10 opens)");
+  });
+
+  it("is empty when no opener is dominant", () => {
+    expect(
+      renderOpenerLegend(
+        openerReport(
+          [
+            {
+              technique: "sweep",
+              opens: 12,
+              wins: 6,
+              losses: 6,
+              draws: 0,
+              winRate: 0.5,
+              dominant: false,
+            },
+          ],
+          0,
+        ),
       ),
     ).toBe("");
   });

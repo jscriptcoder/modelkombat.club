@@ -10,6 +10,8 @@
 // population could not be loaded (fail fast — a partial roster would misreport).
 // ============================================================================
 import {
+  MIN_OPENER_SAMPLE,
+  OPENER_FLAG_THRESHOLD,
   runVariety,
   USAGE_FLAG_THRESHOLD,
   type PooledReport,
@@ -199,7 +201,7 @@ export const renderDiversity = (report: PooledReport): string => {
 // line. Pure data → string; the exact output is a stdout contract (cli-design).
 export const renderOpeners = (report: VarietyReport): string => {
   const table = render([
-    ["opener", "opens", "W", "L", "D", "win%"],
+    ["opener", "opens", "W", "L", "D", "win%", ""],
     ...report.openers.map((r) => [
       r.technique,
       `${r.opens}`,
@@ -207,11 +209,19 @@ export const renderOpeners = (report: VarietyReport): string => {
       `${r.losses}`,
       `${r.draws}`,
       r.winRate === null ? "—" : `${(r.winRate * 100).toFixed(1)}%`,
+      r.dominant ? "⚠" : "",
     ]),
   ]);
 
   return `${table}\n\nnull openers (turtled): ${report.nullOpeners}`;
 };
+
+// The one-line footnote naming the opener `⚠` threshold + sample floor — present only when
+// some opener is flagged (empty otherwise, so the caller omits the line). Reads openers only.
+export const renderOpenerLegend = (report: VarietyReport): string =>
+  report.openers.some((r) => r.dominant)
+    ? `⚠ = opener win-rate over ${(OPENER_FLAG_THRESHOLD * 100).toFixed(0)}% (≥${MIN_OPENER_SAMPLE} opens)`
+    : "";
 
 export const runTelemetryCli = (
   argv: string[],
@@ -259,11 +269,13 @@ export const runTelemetryCli = (
   });
 
   const legend = renderLegend(report);
+  const openerLegend = renderOpenerLegend(report);
 
   const body =
     `${renderReport(report)}\n\n${renderDiversity(report)}` +
     (legend ? `\n\n${legend}` : "") +
-    `\n\n${renderOpeners(report)}`;
+    `\n\n${renderOpeners(report)}` +
+    (openerLegend ? `\n\n${openerLegend}` : "");
 
   return {
     stdout: `${header}\n\n${body}\n`,
