@@ -717,8 +717,42 @@ plan landed in its own `docs(plan)` PR (#291) merged before the slice.
 
 [variety-telemetry-s5b.md](variety-telemetry-s5b.md)
 
-**S1a–S5b complete; the internal-CLI variety arc is done.** The sibling scoping + story-split docs —
-`variety-telemetry-harness.md` (grill-me: 11 resolved decisions) + `variety-telemetry-stories.md` (story
-split S1a–S5c) — stay live in `plans/` as the trail for the remaining post-launch stories **S5a** (an
-external submission corpus — no build, just the S1b `-- <path…>` override on a submissions dir) and
-**S5c** (the public web meta-report surface).
+## Variety telemetry — S5c (the public `/variety` page) ✅ COMPLETE
+
+The last variety-telemetry story with a build: a **public web surface** for the move-variety board. A
+newcomer opens `https://modelkombat.club/variety` and reads the frozen gauntlet's move-usage meta as a
+static, prerendered, **no-JS** page — a `/spec-guide` clone, **byte-derived at build from
+`generateVariety()`** (the same source as `docs/variety.md`), so it can never drift. A grill-me pass
+(decision #12) resolved the design tree against the existing `web/` precedents: shape → a prerendered
+`/spec-guide`-clone page (not a bespoke designed presentation); content → regenerate at build via
+`generateVariety()` unbundled in `scripts/prerender.ts` (pipeline-consistency with the spec, not
+`readFileSync`); discoverability → sitemap + llms.txt + one Arsenal link, **not** top-nav. A **serve-time
+presentation** change only — the `web/` layer stays decoupled from `src/engine` (the only `src/` reach is
+`scripts/prerender.ts` importing the already-pure `generateVariety()`); no engine/TCB change, no
+`INPUT_HASH` / `BENCHMARK_VERSION` bump, `docs/variety.md` unchanged. `web/**` + `scripts/**` are outside
+Stryker's node scope ⇒ exhaustive exact-assertion tests + a manual mutator scan (the `public-page-web-ui`
+precedent). Two slices, PR per slice.
+
+- **Slice 1 — the `/variety` page end-to-end** (PR #295, `feat/variety-page`) — the shared markdown
+  renderer is extracted from `SpecPage` into `web/src/shared/lib/render-markdown.ts` (slug-anchored,
+  trusted first-party; `SpecPage` reuses it, behavior-preserving) and drives a presentational `VarietyPage`
+  (reusing the `.spec-doc` typography). `renderVarietyPage(shell, board)` mirrors `renderSpecGuidePage`
+  (`injectBody → setTitle → setCanonical → stripScripts`: own `<title>` + canonical
+  `${CANONICAL_ORIGIN}/variety`, zero `<script>`). `scripts/prerender.ts` calls `generateVariety()`
+  unbundled → writes `dist/variety.html`; `VARIETY_PATH` + a `/variety → /variety.html` vercel rewrite (the
+  page is emitted by the post-build prerender, so the client Vite build is unaffected).
+- **Slice 2 — discoverability** (PR #296, `feat/variety-discoverable`) — `/variety` is added to
+  `web/public/sitemap.xml` (priority 0.7) + `web/public/llms.txt` (a caveated usage/effectiveness
+  meta-report under `## Optional`), and the Arsenal section gains a "how often each move actually gets used"
+  hand-off link to `VARIETY_PATH` (a second peer to the `/spec-guide#frame-table` hand-off). It is
+  **deliberately kept out of the primary `Nav`** — a reference-population diagnostic, not first-class site
+  IA — pinned by a Nav-absence guard; the sitemap/llms surfaces are verified by a browser-mode
+  `variety-discovery.test.tsx` (real `DOMParser` on the served sitemap + an `llms.txt` fetch).
+
+[variety-telemetry-s5c.md](variety-telemetry-s5c.md)
+
+**S1a–S5c complete; the variety-telemetry arc is done bar the no-build S5a.** The sibling scoping +
+story-split docs — `variety-telemetry-harness.md` (grill-me: 12 resolved decisions) +
+`variety-telemetry-stories.md` (story split S1a–S5c) — stay live in `plans/` as the trail for the one
+remaining post-launch story **S5a** (an external submission corpus — no build, just the S1b `-- <path…>`
+override on a submissions dir).

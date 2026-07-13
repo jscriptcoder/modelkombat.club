@@ -5,7 +5,8 @@ surfaced decision-tree branches are resolved (see §Resolved decisions), plus th
 per-slice grills for S3b (spacing buckets, decision #9), **S4 (scoring attribution,
 decision #10 — grill-me 2026-07-13)**, **S5b (the committed variety board, decision #11
 — grill-me 2026-07-13)**, and **S5c (the public `/variety` page, decision #12 — grill-me
-2026-07-13)**. Ready for `story-splitting` → `planning`. Not a plan; no code implied.
+2026-07-13; ✅ SHIPPED PRs #295/#296)**. Ready for `story-splitting` → `planning`. Not a
+plan; no code implied.
 
 ## The question it answers
 
@@ -291,7 +292,8 @@ Three pieces, all in the existing style:
     a regenerated artifact), a computed §P7 verdict headline (asserts §P7 status in a
     second place that must stay in sync with the inline flags). Full plan:
     `plans/variety-telemetry-s5b.md`.
-12. **S5c — public `/variety` page (a prerendered `/spec-guide` clone).** The
+12. **S5c — public `/variety` page (a prerendered `/spec-guide` clone). ✅ SHIPPED +
+    ARCHIVED (Slice 1 page #295 + Slice 2 discoverability #296, 2026-07-13).** The
     move-variety board gets a public web surface as a **static, no-JS `/variety` page**
     mirroring `/spec-guide`: a presentational SolidJS `VarietyPage` renders the board
     markdown via `marked`, composed by a new `renderVarietyPage(shell, board)` transform
@@ -314,8 +316,8 @@ Three pieces, all in the existing style:
     the committed `docs/variety.md` at build (cheaper + already drift-guarded — but the user
     chose pipeline-consistency with `/spec-guide`), a bespoke designed HTML presentation over
     the raw board (hand-curation drift + a design pass — a possible later slice), top-nav
-    elevation (over-weights a caveated internal metric). Full plan:
-    `plans/variety-telemetry-s5c.md`.
+    elevation (over-weights a caveated internal metric). Full plan (archived on
+    completion): `docs/archive/variety-telemetry-s5c.md`.
 
 ### Still open (later grills, not blocking)
 
