@@ -789,3 +789,45 @@ describe("reduceOpeners — opener win-rate (first honoured commitment → outco
     expect(rows[1].winRate).toBe(null); // and the rest are the never-opened tail
   });
 });
+
+// `opens` matchups opening with `t` on side A: `wins` won by the opener, the rest lost ⇒
+// the t-opener has opens=opens, wins=wins, winRate=wins/opens (side B idles ⇒ null opener).
+const openN = (t: Technique, wins: number, opens: number): Matchup[] => [
+  ...Array.from({ length: wins }, () => openA(t, "A")),
+  ...Array.from({ length: opens - wins }, () => openA(t, "B")),
+];
+
+describe("reduceOpeners — sample-gated dominance flag (§P7 opener guard)", () => {
+  it("flags an opener strictly above 60% with enough samples (opens ≥ 10)", () => {
+    // 7/10 = 0.70 > 0.60, opens 10 = the sample floor ⇒ dominant.
+    const { rows } = reduceOpeners(openN("gyaku-zuki", 7, 10));
+
+    expect(rowFor({ rows }, "gyaku-zuki").opens).toBe(10);
+    expect(rowFor({ rows }, "gyaku-zuki").dominant).toBe(true);
+  });
+
+  it("does not flag an opener at EXACTLY 60% (strict >, not >=)", () => {
+    // 6/10 = 0.60 exactly, opens 10 ⇒ NOT dominant.
+    const { rows } = reduceOpeners(openN("gyaku-zuki", 6, 10));
+
+    expect(rowFor({ rows }, "gyaku-zuki").winRate).toBe(0.6);
+    expect(rowFor({ rows }, "gyaku-zuki").dominant).toBe(false);
+  });
+
+  it("does not flag an over-60% opener below the sample floor (opens < 10)", () => {
+    // 9/9 = 1.00 (well over 60%) but only 9 opens < 10 ⇒ NOT dominant. Kills the
+    // 1-open-100% false alarm and pins the floor at 10 (not 9).
+    const { rows } = reduceOpeners(openN("gyaku-zuki", 9, 9));
+
+    expect(rowFor({ rows }, "gyaku-zuki").opens).toBe(9);
+    expect(rowFor({ rows }, "gyaku-zuki").winRate).toBe(1);
+    expect(rowFor({ rows }, "gyaku-zuki").dominant).toBe(false);
+  });
+
+  it("does not flag a never-opened technique (null win-rate) as dominant", () => {
+    const { rows } = reduceOpeners(openN("gyaku-zuki", 7, 10));
+
+    expect(rowFor({ rows }, "throw").winRate).toBe(null);
+    expect(rowFor({ rows }, "throw").dominant).toBe(false);
+  });
+});

@@ -227,8 +227,18 @@ export const reducePerBot = (
   };
 };
 
+// An opener whose win-rate strictly exceeds this fraction is a §P7 dominance candidate
+// (the "no opener > ~60% win" balance target) — but only once it clears the sample floor.
+export const OPENER_FLAG_THRESHOLD = 0.6;
+
+// The minimum opens an opener needs before its win-rate can be flagged. Over a small
+// hand-authored population a move opened once and won reads 100%; gating the flag on a
+// sample floor keeps that noise from tripping a false alarm. A retunable named constant.
+export const MIN_OPENER_SAMPLE = 10;
+
 // A per-opener row: the win/loss/draw split of the fights a technique OPENED (was a
-// fighter's first honoured commitment in), and the resulting win-rate.
+// fighter's first honoured commitment in), the resulting win-rate, and whether it is a
+// sample-gated §P7 dominance candidate.
 export type OpenerRow = {
   technique: Technique;
   opens: number; // (fighter, fight) observations that opened with this technique
@@ -236,6 +246,7 @@ export type OpenerRow = {
   losses: number;
   draws: number;
   winRate: number | null; // wins / opens (raw fraction in [0, 1]); null when opens === 0 (÷0 guard)
+  dominant: boolean; // winRate > OPENER_FLAG_THRESHOLD AND opens >= MIN_OPENER_SAMPLE
 };
 
 // The opener reduction: the per-technique rows (all 13, sorted) + the count of
@@ -285,6 +296,7 @@ export const reduceOpeners = (matchups: readonly Matchup[]): OpenerReport => {
     const wins = mine.filter((o) => o.outcome === "win").length;
     const losses = mine.filter((o) => o.outcome === "loss").length;
     const draws = mine.filter((o) => o.outcome === "draw").length;
+    const winRate = opens === 0 ? null : wins / opens;
 
     return {
       technique,
@@ -292,7 +304,11 @@ export const reduceOpeners = (matchups: readonly Matchup[]): OpenerReport => {
       wins,
       losses,
       draws,
-      winRate: opens === 0 ? null : wins / opens,
+      winRate,
+      // Sample floor FIRST so the short-circuit guards the divide — a below-floor (incl.
+      // 0-open) technique never evaluates `wins / opens`, so no ÷0 and no null to test.
+      dominant:
+        opens >= MIN_OPENER_SAMPLE && wins / opens > OPENER_FLAG_THRESHOLD,
     };
   });
 
