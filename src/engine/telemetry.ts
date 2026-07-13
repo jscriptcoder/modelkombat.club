@@ -88,6 +88,7 @@ export type VarietyReport = Omit<PooledReport, "rows"> & {
   openers: OpenerRow[]; // per-opener win-rates, sorted win% desc → opens desc → canonical
   nullOpeners: number; // (fighter, fight) observations that opened with no honoured commitment
   degrades: DegradeRow[]; // per-technique start-failure rates, sorted rate desc → attempts desc → canonical
+  occupancy: OccupancyRow[]; // reach-zone distance occupancy, in fixed near→far order (S3b)
 };
 
 // The technique a frame's action commits to, or null when the action is not a
@@ -416,6 +417,57 @@ export const reduceDegrades = (
   return [...live, ...dead];
 };
 
+// S3b: reach-zone occupancy. Inter-fighter distance (|a.x − b.x|, sub-units) is partitioned
+// into 5 coarse tiers, listed in this FIXED near→far order — the render honours it (no
+// share-sort: the distance axis is intrinsically ordered).
+export const REACH_ZONES = ["clinch", "hand", "kick", "poke", "out"] as const;
+export type ReachZone = (typeof REACH_ZONES)[number];
+
+// The four cut points partitioning distance into the five REACH_ZONES: a distance
+// < ZONE_UPPER[i] (and ≥ the prior cut) is REACH_ZONES[i]; one ≥ the last cut (330k) is
+// `out` (beyond all reach). Half-open [lo, hi): a distance ON a cut lands in the HIGHER tier.
+// The cuts are the throw / reverse-punch / roundhouse+startGap / ushiro reach rungs (rules.ts)
+// — the reach ladder, not magic literals.
+const ZONE_UPPER = [120000, 240000, 300000, 330000] as const;
+
+// The reach tier a distance falls in: the first tier whose cut it is below; a distance at or
+// beyond the last cut is the open-ended `out` tier.
+const zoneOf = (distance: number): ReachZone => {
+  const i = ZONE_UPPER.findIndex((upper) => distance < upper);
+
+  return i === -1 ? "out" : REACH_ZONES[i];
+};
+
+export type OccupancyRow = {
+  zone: ReachZone; // one of the 5 tiers — all always present, in fixed near→far order
+  frames: number; // ticks whose |a.x − b.x| fell in this tier
+  share: number | null; // frames / totalFrames (raw); null when totalFrames === 0 (÷0 → "n/a")
+};
+
+// Reduce the fights to reach-zone distance occupancy. ONE sample per tick — |a.x − b.x| is
+// symmetric, so a tick contributes a single distance (NOT one per fighter), and the
+// denominator is the total tick count. All frames count (a forced yame-reset or okizeme
+// position is genuine spacing). Pure over `runFight`, reading only `.x`.
+export const reduceOccupancy = (
+  fights: readonly FightResult[],
+): OccupancyRow[] => {
+  const distances = fights.flatMap((fight) =>
+    fight.events.map((event) => Math.abs(event.a.x - event.b.x)),
+  );
+
+  const totalFrames = distances.length;
+
+  return REACH_ZONES.map((zone) => {
+    const frames = distances.filter((d) => zoneOf(d) === zone).length;
+
+    return {
+      zone,
+      frames,
+      share: totalFrames === 0 ? null : frames / totalFrames,
+    };
+  });
+};
+
 // Run the both-sides round-robin over the population — each ordered pair of NON-mirror
 // bots plays with each on each side, at every seed — then reduce the fights to the pooled
 // usage histogram AND attribute per-bot adoption / mean share. Pure over `runFight`: no
@@ -457,5 +509,6 @@ export const runVariety = (cfg: VarietyConfig): VarietyReport => {
     openers: openers.rows,
     nullOpeners: openers.nullOpeners,
     degrades: reduceDegrades(fights),
+    occupancy: reduceOccupancy(fights),
   };
 };
