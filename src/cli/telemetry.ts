@@ -4,11 +4,12 @@
 // through the validator gate, runs the both-sides round-robin, and prints the
 // pooled move-usage histogram over the 13 techniques.
 //
-//   npm run telemetry            # the human histogram
-//   npm run telemetry -- --json  # the raw report as a versioned JSON envelope
+//   npm run telemetry                       # histogram over the frozen gauntlet
+//   npm run telemetry -- bots/a.json b.json  # over a supplied population (shell-expanded)
+//   npm run telemetry -- --json              # the raw report as a versioned JSON envelope
 //
 // All logic lives in run-telemetry.ts (testable); this file only wires the real
-// filesystem + manifest and performs the stream writes / exit. The population load
+// filesystem + manifest and performs the stream writes / exit. The gauntlet load
 // is DEFERRED into a thunk so an unreadable roster file surfaces as a clean
 // non-zero exit (the CLI's fail-fast path), not an uncaught throw.
 // ============================================================================
@@ -28,21 +29,27 @@ import {
 const botPath = (name: string): string =>
   fileURLToPath(new URL(`../../bots/${name}.json`, import.meta.url));
 
-const loadPopulation = () =>
-  GAUNTLET_NAMES.map((name) => {
-    let text: string;
+// A supplied bot path (population override) → validated BotDoc: unreadable ⇒ a clean Error
+// naming the path, invalid ⇒ the gate's ValidationError. Mirrors run-benchmark.ts's loadBot.
+const loadBot = (path: string) => {
+  let text: string;
 
-    try {
-      text = readFileSync(botPath(name), "utf8");
-    } catch {
-      throw new Error(`cannot read bot file: ${botPath(name)}`);
-    }
+  try {
+    text = readFileSync(path, "utf8");
+  } catch {
+    throw new Error(`cannot read bot file: ${path}`);
+  }
 
-    return loadBotDoc(text);
-  });
+  return loadBotDoc(text);
+};
+
+// The frozen 6-bot gauntlet — the default population when no override paths are given.
+// Each name resolves to its bundled file and loads through the same gate as an override.
+const loadGauntlet = () => GAUNTLET_NAMES.map((name) => loadBot(botPath(name)));
 
 const deps: TelemetryDeps = {
-  loadPopulation,
+  loadBot,
+  loadGauntlet,
   rules: CANONICAL_RULES,
   seeds: SEEDS,
   maxTicks: MAX_TICKS,

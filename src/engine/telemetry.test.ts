@@ -454,6 +454,47 @@ describe("runVariety — round-robin over the population", () => {
   });
 });
 
+// A byte-identical clone of GYAKU_BOT: a DISTINCT object with the same content, so the
+// skip is driven by `sameDoc` (JSON equality), not object-reference identity.
+const GYAKU_CLONE = bot("gyaku-bot", {
+  type: "attack",
+  move: "gyaku-zuki",
+  band: "mid",
+});
+
+describe("runVariety — self-mirror skip (a byte-identical dup never fights its clone)", () => {
+  it("drops only the clone-vs-clone pairings from the round-robin", () => {
+    // [GYAKU, GYAKU-clone, MAE]: 3 bots ⇒ 6 ordered pairs × 2 seeds = 12 without the
+    // skip; the two GYAKU↔clone mirror pairings drop ⇒ 4 pairs × 2 seeds = 8.
+    const report = runVariety(
+      varietyConfig({ population: [GYAKU_BOT, GYAKU_CLONE, MAE_BOT] }),
+    );
+
+    expect(report.totalFights).toBe(8);
+  });
+
+  it("still fights a duplicated bot against every NON-clone opponent", () => {
+    // the clone must still meet MAE on both sides — so both techniques fire; only the
+    // meaningless clone-vs-clone bout is skipped, not the dup's real matchups.
+    const report = runVariety(
+      varietyConfig({ population: [GYAKU_BOT, GYAKU_CLONE, MAE_BOT] }),
+    );
+
+    expect(rowFor(report, "gyaku-zuki").count).toBeGreaterThan(0);
+    expect(rowFor(report, "mae-geri").count).toBeGreaterThan(0);
+  });
+
+  it("does not skip distinct bots — two different docs fight both sides", () => {
+    // sanity guard on the OR's sameDoc operand: distinct docs (sameDoc false) keep every
+    // pairing (2 ordered pairs × 2 seeds = 4), so a non-dup is never mistaken for a mirror.
+    const report = runVariety(
+      varietyConfig({ population: [GYAKU_BOT, MAE_BOT] }),
+    );
+
+    expect(report.totalFights).toBe(4);
+  });
+});
+
 // ─── reducePerBot: the bot-identity attribution the pooled reduceUsage can't do.
 // Fed synthetic matchups ({a, b, fight}) so a bot's side (A vs B) and its per-fight /
 // per-tick repetition are precisely controllable — the only way to isolate the

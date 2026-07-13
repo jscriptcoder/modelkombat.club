@@ -17,15 +17,79 @@ import {
   type VarietyReport,
 } from "../engine/telemetry.js";
 import type { Rules } from "../engine/types.js";
-import type { BotDoc } from "../engine/dsl.js";
+import { ValidationError, type BotDoc } from "../engine/dsl.js";
 
 export type TelemetryDeps = {
-  loadPopulation: () => BotDoc[]; // throws Error if a population file is unreadable / invalid
+  loadBot: (path: string) => BotDoc; // path → validated bot; throws ValidationError (rejected) or Error (unreadable)
+  loadGauntlet: () => BotDoc[]; // the frozen reference population — deferred so an unreadable roster fails cleanly, not at import
   rules: Rules;
   seeds: readonly number[];
   maxTicks: number;
   match?: VarietyConfig["match"]; // WKF match mode; absent ⇒ fights run to maxTicks
   version: string;
+};
+
+// A load/validate failure rendered for stderr: a rejected bot lists its structured issues
+// (mirroring run-benchmark.ts's invalid-bot block), an unreadable one surfaces its message.
+// Both name the offending path so the operator knows which supplied bot broke the run.
+const formatLoadError = (path: string, e: unknown): string =>
+  e instanceof ValidationError
+    ? `invalid bot ${path}:\n` +
+      e.issues.map((i) => `  ${i.path}: ${i.reason}`).join("\n") +
+      "\n"
+    : `${e instanceof Error ? e.message : String(e)}\n`;
+
+type PopulationOutcome =
+  | { ok: true; population: BotDoc[] }
+  | { ok: false; stderr: string };
+
+// The fold state while loading override paths: the bots gathered so far, plus the FIRST
+// load failure once one occurs (null until then). Once latched, the failure is preserved
+// and no further path is read.
+type LoadAcc = {
+  bots: BotDoc[];
+  failure: { path: string; error: unknown } | null;
+};
+
+// Resolve the population to profile: no paths ⇒ the frozen gauntlet (the S1a default,
+// byte-unchanged); otherwise every supplied path through the validator gate, left to right.
+// The FIRST bad bot latches a failure and short-circuits the rest (fail fast) — a partial
+// population would silently misreport, so it's never assembled, let alone scored. Pure: all
+// I/O is delegated to the injected loaders.
+const loadPopulation = (
+  paths: readonly string[],
+  deps: TelemetryDeps,
+): PopulationOutcome => {
+  if (paths.length === 0) {
+    try {
+      return { ok: true, population: deps.loadGauntlet() };
+    } catch (e) {
+      return {
+        ok: false,
+        stderr: `${e instanceof Error ? e.message : String(e)}\n`,
+      };
+    }
+  }
+
+  const acc = paths.reduce<LoadAcc>(
+    (state, path) => {
+      if (state.failure !== null) return state;
+
+      try {
+        return { bots: [...state.bots, deps.loadBot(path)], failure: null };
+      } catch (error) {
+        return { bots: state.bots, failure: { path, error } };
+      }
+    },
+    { bots: [], failure: null },
+  );
+
+  return acc.failure !== null
+    ? {
+        ok: false,
+        stderr: formatLoadError(acc.failure.path, acc.failure.error),
+      }
+    : { ok: true, population: acc.bots };
 };
 
 export type CliOutput = { stdout: string; stderr: string; code: number };
@@ -132,17 +196,17 @@ export const runTelemetryCli = (
   argv: string[],
   deps: TelemetryDeps,
 ): CliOutput => {
-  let population: BotDoc[];
+  // Positional args (anything that isn't a `--flag`) are the population override paths;
+  // none ⇒ the frozen gauntlet. Flags like `--json` are order-independent, so they're
+  // filtered out here and read separately — `--json bots/a.json` and `bots/a.json --json`
+  // behave identically (cli-design).
+  const paths = argv.filter((arg) => !arg.startsWith("--"));
 
-  try {
-    population = deps.loadPopulation();
-  } catch (e) {
-    return {
-      stdout: "",
-      stderr: `${e instanceof Error ? e.message : String(e)}\n`,
-      code: 1,
-    };
-  }
+  const loaded = loadPopulation(paths, deps);
+
+  if (!loaded.ok) return { stdout: "", stderr: loaded.stderr, code: 1 };
+
+  const population = loaded.population;
 
   const report = runVariety({
     population,

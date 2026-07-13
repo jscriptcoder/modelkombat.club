@@ -9,7 +9,7 @@ import {
   type TelemetryDeps,
 } from "./run-telemetry.js";
 import type { Rules } from "../engine/types.js";
-import type { BotDoc } from "../engine/dsl.js";
+import { ValidationError, type BotDoc } from "../engine/dsl.js";
 import {
   runVariety,
   type PooledReport,
@@ -44,8 +44,17 @@ const bot = (name: string, move: OneMove): BotDoc => ({
   default: { type: "attack", move, band: "mid" },
 });
 
-const deps = (population: BotDoc[]): TelemetryDeps => ({
-  loadPopulation: () => population,
+// The gauntlet (no-args default) is injected as `loadGauntlet`; `loadBot` (path → BotDoc)
+// serves the population-override path and defaults to a stub that throws if ever reached,
+// so a test that supplies no paths proves the override branch is untouched.
+const deps = (
+  gauntlet: BotDoc[],
+  loadBot: (path: string) => BotDoc = () => {
+    throw new Error("loadBot stub: no bot path expected in this test");
+  },
+): TelemetryDeps => ({
+  loadGauntlet: () => gauntlet,
+  loadBot,
   rules: MOCK_RULES,
   seeds: [1, 2],
   maxTicks: 30,
@@ -146,7 +155,7 @@ describe("runTelemetryCli", () => {
   it("fails fast — non-zero exit, empty stdout, and a stderr message — when the population can't load", () => {
     const out = runTelemetryCli([], {
       ...deps([]),
-      loadPopulation: () => {
+      loadGauntlet: () => {
         throw new Error("cannot read bot file: bots/jabber.json");
       },
     });
@@ -233,6 +242,127 @@ describe("runTelemetryCli --json", () => {
     const second = runTelemetryCli(["--json"], deps(BALANCED));
 
     expect(first.stdout).toBe(second.stdout);
+  });
+});
+
+// ─── population override: positional paths after `--` profile a SUPPLIED bot set through
+// the validator gate (no paths ⇒ the frozen gauntlet, unchanged); a bad bot fails loudly
+// rather than silently shrinking the population. `loadBot` maps a path to a bot or throws. ──
+const loadFrom =
+  (map: Record<string, BotDoc>) =>
+  (path: string): BotDoc => {
+    const found = map[path];
+
+    if (found === undefined) throw new Error(`cannot read bot file: ${path}`);
+
+    return found;
+  };
+
+describe("runTelemetryCli — population override", () => {
+  const SUPPLIED: Record<string, BotDoc> = {
+    "a.json": bot("a", "gyaku-zuki"),
+    "b.json": bot("b", "mae-geri"),
+    "c.json": bot("c", "mawashi-geri"),
+  };
+
+  it("profiles the SUPPLIED bots (names + fight count), not the frozen gauntlet", () => {
+    // gauntlet BALANCED (g, m, w) is present but must be ignored in favour of the paths.
+    const out = runTelemetryCli(
+      ["a.json", "b.json", "c.json"],
+      deps(BALANCED, loadFrom(SUPPLIED)),
+    );
+
+    expect(out.code).toBe(0);
+    expect(out.stdout).toContain("population: a, b, c");
+    expect(out.stdout).not.toContain("population: g, m, w");
+    // 3 supplied bots ⇒ 3·2 ordered pairs × 2 seeds = 12 fights (pins the arg slice).
+    expect(out.stdout).toMatch(/3 bots · 2 seeds · round-robin = 12 fights/);
+  });
+
+  it("falls back to the frozen gauntlet when no paths are supplied (loadBot untouched)", () => {
+    const out = runTelemetryCli([], {
+      ...deps(BALANCED),
+      loadBot: () => {
+        throw new Error("loadBot must not be called for the gauntlet default");
+      },
+    });
+
+    expect(out.code).toBe(0);
+    expect(out.stdout).toContain("population: g, m, w");
+  });
+
+  it("honours --json alongside positional paths — the flag is not treated as a bot path", () => {
+    const out = runTelemetryCli(
+      ["--json", "a.json", "b.json"],
+      deps(BALANCED, loadFrom(SUPPLIED)),
+    );
+
+    const parsed = JSON.parse(out.stdout) as { population: string[] };
+
+    expect(parsed.population).toEqual(["a", "b"]);
+  });
+
+  it("fails fast with a structured multi-issue stderr + non-zero exit when a supplied bot is invalid", () => {
+    const out = runTelemetryCli(["bad.json"], {
+      ...deps(BALANCED),
+      loadBot: () => {
+        throw new ValidationError([
+          { path: "$.default", reason: "unknown move" },
+          { path: "$.rules[0]", reason: "unknown field" },
+        ]);
+      },
+    });
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    // both issues, one per line — the `\n` join between them is part of the stderr contract.
+    expect(out.stderr).toBe(
+      "invalid bot bad.json:\n" +
+        "  $.default: unknown move\n" +
+        "  $.rules[0]: unknown field\n",
+    );
+  });
+
+  it("latches the first failure — a good path after a bad one cannot rescue the run", () => {
+    // bad.json is FIRST; without the fail-fast latch, loading good.json next would clear the
+    // error and mis-report success. Order matters — the bad bot precedes the good one.
+    const out = runTelemetryCli(["bad.json", "good.json"], {
+      ...deps(BALANCED),
+      loadBot: (path) => {
+        if (path === "bad.json")
+          throw new ValidationError([{ path: "$", reason: "nope" }]);
+
+        return bot("good", "gyaku-zuki");
+      },
+    });
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    expect(out.stderr).toContain("invalid bot bad.json");
+  });
+
+  it("reports a read failure as its message (non-zero exit, empty stdout)", () => {
+    const out = runTelemetryCli(["missing.json"], deps(BALANCED, loadFrom({})));
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    expect(out.stderr).toBe("cannot read bot file: missing.json\n");
+  });
+
+  it("never scores a partial population — one bad bot among good ones aborts the whole run", () => {
+    const out = runTelemetryCli(["good.json", "bad.json"], {
+      ...deps(BALANCED),
+      loadBot: (path) => {
+        if (path === "bad.json")
+          throw new ValidationError([{ path: "$", reason: "nope" }]);
+
+        return bot("good", "gyaku-zuki");
+      },
+    });
+
+    expect(out.code).toBe(1);
+    expect(out.stdout).toBe("");
+    expect(out.stderr).toContain("invalid bot bad.json");
   });
 });
 
