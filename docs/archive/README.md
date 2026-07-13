@@ -594,7 +594,38 @@ MIN_OPENER_SAMPLE AND wins/opens > OPENER_FLAG_THRESHOLD` (the sample floor shor
 
 [variety-telemetry-s2.md](variety-telemetry-s2.md)
 
-**S1a–S2 complete; harness ongoing.** The sibling scoping + story-split docs —
+## Variety telemetry — S3a (per-move start-failure rate) ✅ COMPLETE
+
+The third child story: a per-technique **start-failure rate** — `DESIGN §P7` Metric 5 ("which moves are
+chosen but keep failing to execute, and via which gate?") — beneath the S1 usage histogram + S2 opener
+table. For each technique, a **start attempt** is a frame that chose it and was NOT `locked`; a non-null
+degrade is a gate **failure**. `rate = failedStarts / attempts`, with **`locked` excluded from both
+numerator and denominator** (a busy fighter's ignored input while committed to an already-honoured move,
+not a failed pick — else every slow-but-fine move reads ~100%). `honoured(X)` equals `reduceUsage`'s usage
+count, so the sections reconcile as `attempts = usage + failedStarts`. A **single PR-slice** (no flag to
+isolate + integration proven by S1a/S1b/S2), a **pure read-only reduction** over `runFight` (reads only
+`.action` + `.degrade`; no engine/TCB change, no `INPUT_HASH` / `BENCHMARK_VERSION` bump, `npm run fight`
+byte-identical). Design hardened via find-gaps (S3a-1…S3a-8).
+
+- **Slice 1 — the start-failure section** (PR #283, `feat/variety-telemetry-s3a-degrade`) — a pure
+  `reduceDegrades(fights)` (sibling of `reduceUsage`) with `FAILURE_REASONS = {out-of-band, unaffordable,
+  wrong-context, inert}` (a `satisfies DegradeReason[]` tuple, `locked` deliberately absent); per-technique
+  frame filtering (`techniqueOf === X && degrade !== "locked"`) so both guards stay load-bearing on the
+  counts. `VarietyReport` gains `degrades`; `renderDegrades` prints the 3rd section (cols
+  `move·N·fail·rate·<4 reasons>`, the reason counts summing to `fail`), rows sorted **rate desc → attempts
+  desc → canonical** via the S2 **two-list** split (`—` for 0-attempt), **no ⚠ flag** (diagnostic only),
+  + a note cross-referencing the usage histogram; `--json` carries `degrades` additively (round-trip test
+  covers it). Two survivor-kills via "refactor to make mutants observable": the `technique === null` skip
+  guard was equivalent-by-construction (leaked nulls match no technique row) → **folded into the
+  per-technique `=== X` equality** so `!== "locked"` moves `attempts` directly (the locked tests pin it);
+  plus an all-four-reasons distinct-count test made the `wrong-context` / `inert` buckets load-bearing →
+  **100% mutation** on both `telemetry.ts` (273) + `run-telemetry.ts` (204), 0 survivors. Real-gauntlet
+  finding: start-failures are almost entirely `unaffordable` (moves picked but not affordable under the
+  stamina gate), plus `tobi-geri`'s aerial `wrong-context`.
+
+[variety-telemetry-s3a.md](variety-telemetry-s3a.md)
+
+**S1a–S3a complete; harness ongoing.** The sibling scoping + story-split docs —
 `variety-telemetry-harness.md` (grill-me: 8 resolved decisions) + `variety-telemetry-stories.md` (story
-split S1a–S5c) — stay live in `plans/` as the trail for the remaining stories **S3–S5** (degrade-rate +
-spacing, scoring attribution, committed board / web surface).
+split S1a–S5c) — stay live in `plans/` as the trail for the remaining stories **S3b–S5** (distance/spacing
+occupancy, scoring attribution, committed board / web surface).

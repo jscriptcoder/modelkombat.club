@@ -6,14 +6,15 @@ Decisions locked in the sibling scoping doc `variety-telemetry-harness.md`
 (§Resolved decisions). Feeds `planning`, one selected child story at a time.
 
 **Shipped:** **S1a** (PRs #270–#272, archived) + **S1b** (PRs #273–#276, archived via
-#277) + **S2** (PRs #278–#280, plan archived at `docs/archive/variety-telemetry-s2.md`)
+#277) + **S2** (PRs #278–#280, plan archived at `docs/archive/variety-telemetry-s2.md`) +
+**S3a** (plan #282 / slice #283, plan archived at `docs/archive/variety-telemetry-s3a.md`)
 are complete + live. The `telemetry` CLI now emits the pooled usage histogram, per-bot
 adoption (k/N) + mean share, the effective-move-count diversity headline + live/dead
-list, `--json`, a `-- <path…>` population override with fail-fast load, and the **opener
+list, `--json`, a `-- <path…>` population override with fail-fast load, the **opener
 win-rate table** with the sample-gated §P7 `⚠` flag — so **both** DESIGN §P7 balance
-dials (usage > 35%, opener > 60%) are now measured. **Next story: S3a**
-(per-move degrade-rate) — **hardened via find-gaps (2026-07-13, S3a-1…S3a-8), ready for
-`planning`**; not yet planned/built.
+dials (usage > 35%, opener > 60%) are now measured — and the **per-move start-failure
+rate** (`locked`-excluded, full per-reason split). **Next un-planned story: S3b**
+(distance/spacing-occupancy histogram — *grill the distance bucketing first*).
 
 ## Parent
 
@@ -377,20 +378,20 @@ visible `N` column alone.
 
 ## Next step
 
-**S1a + S1b + S2 are shipped and archived** (S2 plan at
-`docs/archive/variety-telemetry-s2.md`). Both DESIGN §P7 balance dials are now measured.
-**S3a** (per-move degrade-rate) is now **hardened via find-gaps (S3a-1…S3a-8) and ready
-for `planning`** — no open grills (degrade is a per-frame fact, so S4's
-commitment-reconstruction/rekka grill does NOT apply here). Load `planning` to turn
-S3a-1…S3a-8 into PR-sized slices in `plans/variety-telemetry-s3a.md`. Each planned slice
-loads `tdd`, `testing`, `mutation-testing`, `refactoring` and completes
-RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR before the next begins (the harness's pure
-reduction core is ideal for factory-driven behavioral tests over synthetic `FightResult`
-fixtures — the `benchmark.ts` test pattern).
+**S1a + S1b + S2 + S3a are shipped and archived** (S2 plan at
+`docs/archive/variety-telemetry-s2.md`, S3a plan at
+`docs/archive/variety-telemetry-s3a.md`). Both DESIGN §P7 balance dials plus the per-move
+start-failure rate are now measured. The next un-planned child story is **S3b**
+(distance/spacing-occupancy histogram) — **grill the distance bucketing first** (scoping
+default: bucket inter-fighter distance by the reach-ladder rungs `empi 95k … ushiro 330k`),
+then `find-gaps` → `planning`. Each planned slice loads `tdd`, `testing`,
+`mutation-testing`, `refactoring` and completes RED–GREEN–MUTATE–KILL MUTANTS–REFACTOR
+before the next begins (the harness's pure reduction core is ideal for factory-driven
+behavioral tests over synthetic `FightResult` fixtures — the `benchmark.ts` test pattern).
 
 Remaining un-planned stories (each independently valuable, each needs its own planning
-pass): **S3a** (per-move degrade-rate), **S3b** (distance-occupancy histogram — *grill*
-the distance bucketing first), **S4** (scoring attribution — *grill first*: the
-commitment-reconstruction window + rekka disambiguation; an engine survey answering both
-is already captured in the session scratchpad `s4-scoring-attribution-engine-research.md`
-for when S4 is picked up). S5a/b/c are post-launch / far-future.
+pass): **S3b** (distance-occupancy histogram — *grill* the distance bucketing first),
+**S4** (scoring attribution — *grill first*: the commitment-reconstruction window + rekka
+disambiguation; an engine survey answering both is already captured in the session
+scratchpad `s4-scoring-attribution-engine-research.md` for when S4 is picked up). S5a/b/c
+are post-launch / far-future.
