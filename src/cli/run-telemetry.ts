@@ -192,6 +192,27 @@ export const renderDiversity = (report: PooledReport): string => {
   return `effective moves ${emc} of ${report.rows.length}   ·   live ${live} / dead ${dead.length}${deadList}`;
 };
 
+// Render the opener win-rate table (the second DESIGN §P7 dial): per opener, the
+// opens-count and its W / L / D split behind the win-rate. Rows arrive already sorted
+// (win% desc → opens desc → canonical); a 0-open technique shows `—` (the ÷0 guard). The
+// null-opener count — fighters that opened with no honoured commitment — is the trailing
+// line. Pure data → string; the exact output is a stdout contract (cli-design).
+export const renderOpeners = (report: VarietyReport): string => {
+  const table = render([
+    ["opener", "opens", "W", "L", "D", "win%"],
+    ...report.openers.map((r) => [
+      r.technique,
+      `${r.opens}`,
+      `${r.wins}`,
+      `${r.losses}`,
+      `${r.draws}`,
+      r.winRate === null ? "—" : `${(r.winRate * 100).toFixed(1)}%`,
+    ]),
+  ]);
+
+  return `${table}\n\nnull openers (turtled): ${report.nullOpeners}`;
+};
+
 export const runTelemetryCli = (
   argv: string[],
   deps: TelemetryDeps,
@@ -241,7 +262,8 @@ export const runTelemetryCli = (
 
   const body =
     `${renderReport(report)}\n\n${renderDiversity(report)}` +
-    (legend ? `\n\n${legend}` : "");
+    (legend ? `\n\n${legend}` : "") +
+    `\n\n${renderOpeners(report)}`;
 
   return {
     stdout: `${header}\n\n${body}\n`,

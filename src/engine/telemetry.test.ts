@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  reduceOpeners,
   reducePerBot,
   reduceUsage,
   runVariety,
@@ -421,6 +422,21 @@ describe("runVariety — round-robin over the population", () => {
     expect(runVariety(varietyConfig())).toEqual(runVariety(varietyConfig()));
   });
 
+  it("carries opener win-rates + a null-opener count from the round-robin", () => {
+    // both bots attack from the start ⇒ each opens with its move (gyaku / mae), nobody
+    // turtles ⇒ the opener table lists all 13 techniques and no null openers.
+    const report = runVariety(varietyConfig());
+
+    expect(report.openers).toHaveLength(13);
+    expect(
+      rowFor({ rows: report.openers }, "gyaku-zuki").opens,
+    ).toBeGreaterThan(0);
+    expect(rowFor({ rows: report.openers }, "mae-geri").opens).toBeGreaterThan(
+      0,
+    );
+    expect(report.nullOpeners).toBe(0);
+  });
+
   it("attributes per-bot adoption (k/N) to each committing bot and sets botCount = population size", () => {
     // GYAKU_BOT only ever lands gyaku-zuki, MAE_BOT only mae-geri ⇒ each move is
     // adopted by exactly one of the two bots; every other technique by none.
@@ -594,5 +610,182 @@ describe("reducePerBot — per-bot adoption + mean share", () => {
     );
 
     expect(attribution("gyaku-zuki").meanShare).toBe(null);
+  });
+});
+
+// ─── reduceOpeners: opener (each fighter's FIRST honoured commitment) → that fighter's
+// fight outcome. Fed synthetic matchups so both the opener technique per side AND the
+// fight winner are precisely controllable — the outcome join a pooled reducer can't do. ─
+const fightWon = (
+  winner: FightResult["winner"],
+  events: FightEvent[],
+): FightResult => ({ ...fightOf(events), winner });
+
+const opening = (
+  a: number,
+  b: number,
+  winner: FightResult["winner"],
+  events: FightEvent[],
+): Matchup => ({ a, b, fight: fightWon(winner, events) });
+
+// A matchup where side A opens with `t` (B idles ⇒ B is a null opener), decided by `winner`.
+const openA = (t: Technique, winner: FightResult["winner"]): Matchup =>
+  opening(0, 1, winner, [ev(frame(techniqueAction(t)), frame(IDLE))]);
+
+describe("reduceOpeners — opener win-rate (first honoured commitment → outcome)", () => {
+  it("takes the FIRST honoured commitment as the opener, not a later one", () => {
+    // side A commits gyaku (honoured) then mae later ⇒ opener is gyaku; mae never opens.
+    const { rows } = reduceOpeners([
+      opening(0, 1, "A", [
+        ev(frame(attack("gyaku-zuki")), frame(IDLE)),
+        ev(frame(attack("mae-geri")), frame(IDLE)),
+      ]),
+    ]);
+
+    expect(rowFor({ rows }, "gyaku-zuki").opens).toBe(1);
+    expect(rowFor({ rows }, "mae-geri").opens).toBe(0);
+  });
+
+  it("skips a degraded opening pick — the opener is the first HONOURED commitment", () => {
+    // side A's first frame commits gyaku but it DEGRADES; its first honoured commitment
+    // is the later mae ⇒ mae opens, gyaku does not.
+    const { rows } = reduceOpeners([
+      opening(0, 1, "A", [
+        ev(frame(attack("gyaku-zuki"), "inert"), frame(IDLE)),
+        ev(frame(attack("mae-geri")), frame(IDLE)),
+      ]),
+    ]);
+
+    expect(rowFor({ rows }, "mae-geri").opens).toBe(1);
+    expect(rowFor({ rows }, "gyaku-zuki").opens).toBe(0);
+  });
+
+  it("credits the winner's opener a win and the loser's opener a loss", () => {
+    // A opens gyaku, B opens mae, A wins ⇒ gyaku 1-0-0, mae 0-1-0.
+    const { rows } = reduceOpeners([
+      opening(0, 1, "A", [
+        ev(frame(attack("gyaku-zuki")), frame(attack("mae-geri"))),
+      ]),
+    ]);
+
+    const gyaku = rowFor({ rows }, "gyaku-zuki");
+    const mae = rowFor({ rows }, "mae-geri");
+
+    expect([gyaku.opens, gyaku.wins, gyaku.losses, gyaku.draws]).toEqual([
+      1, 1, 0, 0,
+    ]);
+    expect([mae.opens, mae.wins, mae.losses, mae.draws]).toEqual([1, 0, 1, 0]);
+    expect(gyaku.winRate).toBe(1);
+    expect(mae.winRate).toBe(0);
+  });
+
+  it("counts a draw for BOTH openers — never a win, but kept in the denominator", () => {
+    const { rows } = reduceOpeners([
+      opening(0, 1, "draw", [
+        ev(frame(attack("gyaku-zuki")), frame(attack("mae-geri"))),
+      ]),
+    ]);
+
+    const gyaku = rowFor({ rows }, "gyaku-zuki");
+    const mae = rowFor({ rows }, "mae-geri");
+
+    expect([gyaku.opens, gyaku.wins, gyaku.draws]).toEqual([1, 0, 1]);
+    expect([mae.opens, mae.wins, mae.draws]).toEqual([1, 0, 1]);
+    expect(gyaku.winRate).toBe(0);
+  });
+
+  it("computes win-rate = wins / opens with draws in the denominator", () => {
+    // gyaku opens 4× on side A: 2 wins (A), 1 loss (B), 1 draw ⇒ 2/4 = 0.5.
+    // (draws-EXCLUDED would read 2/3 ≈ 0.667 — this fixture distinguishes the two.)
+    const { rows } = reduceOpeners([
+      openA("gyaku-zuki", "A"),
+      openA("gyaku-zuki", "A"),
+      openA("gyaku-zuki", "B"),
+      openA("gyaku-zuki", "draw"),
+    ]);
+
+    const gyaku = rowFor({ rows }, "gyaku-zuki");
+
+    expect([gyaku.opens, gyaku.wins, gyaku.losses, gyaku.draws]).toEqual([
+      4, 2, 1, 1,
+    ]);
+    expect(gyaku.winRate).toBe(0.5);
+  });
+
+  it("counts a fighter with no honoured commitment as a null opener (excluded, tallied)", () => {
+    // side A idles the whole fight ⇒ null opener; side B opens gyaku and wins.
+    const { rows, nullOpeners } = reduceOpeners([
+      opening(0, 1, "B", [ev(frame(IDLE), frame(attack("gyaku-zuki")))]),
+    ]);
+
+    expect(nullOpeners).toBe(1);
+    expect(rowFor({ rows }, "gyaku-zuki").opens).toBe(1); // B's opener still counted
+    expect(rowFor({ rows }, "gyaku-zuki").wins).toBe(1); // B won ⇒ its opener won
+    // side A contributed no opener anywhere in the table.
+    expect(rows.reduce((sum, r) => sum + r.opens, 0)).toBe(1);
+  });
+
+  it("guards the zero-open case: a never-opened technique has winRate null (÷0), not NaN", () => {
+    const { rows } = reduceOpeners([
+      opening(0, 1, "A", [ev(frame(attack("gyaku-zuki")), frame(IDLE))]),
+    ]);
+
+    const ushiro = rowFor({ rows }, "ushiro-geri");
+
+    expect(ushiro.opens).toBe(0);
+    expect(ushiro.winRate).toBe(null);
+    expect(Number.isNaN(ushiro.winRate as unknown as number)).toBe(false);
+  });
+
+  it("lists all 13 techniques, sorted win% desc → opens desc → canonical, nulls last", () => {
+    // kizami 1/1 = 1.0 (top). Then a 0.5 cluster: gyaku 2/4 (opens 4), sweep 1/2 and
+    // mae 1/2 (opens 2 each). opens-desc floats gyaku above sweep/mae — the OPPOSITE of
+    // canonical (sweep idx 0 < gyaku idx 2) — isolating the opens tie-break; sweep & mae
+    // tie on win% AND opens ⇒ canonical breaks them (sweep idx 0 before mae idx 3). Every
+    // other technique never opens ⇒ winRate null ⇒ sinks to the bottom in canonical order.
+    const { rows } = reduceOpeners([
+      openA("kizami-zuki", "A"),
+      openA("gyaku-zuki", "A"),
+      openA("gyaku-zuki", "A"),
+      openA("gyaku-zuki", "B"),
+      openA("gyaku-zuki", "B"),
+      openA("sweep", "A"),
+      openA("sweep", "B"),
+      openA("mae-geri", "A"),
+      openA("mae-geri", "B"),
+    ]);
+
+    expect(rows.map((r) => r.technique)).toEqual([
+      "kizami-zuki",
+      "gyaku-zuki",
+      "sweep",
+      "mae-geri",
+      "mawashi-geri",
+      "uraken",
+      "shuto",
+      "yoko-geri",
+      "ushiro-geri",
+      "empi",
+      "hiza-geri",
+      "tobi-geri",
+      "throw",
+    ]);
+    // the tail is genuinely the null (0-open) rows.
+    expect(rowFor({ rows }, "throw").winRate).toBe(null);
+  });
+
+  it("ranks a real 0%-win opener (has opens) above the never-opened (—) techniques", () => {
+    // gyaku opened twice and LOST both ⇒ winRate 0.0 — a real rate with opens 2, NOT null.
+    // It must lead the table (a 0.0 rate outranks the never-opened rows), which distinguishes
+    // "opened and always lost" from "nobody ever opened with it".
+    const { rows } = reduceOpeners([
+      openA("gyaku-zuki", "B"),
+      openA("gyaku-zuki", "B"),
+    ]);
+
+    expect(rowFor({ rows }, "gyaku-zuki").winRate).toBe(0); // real 0.0, not null
+    expect(rowFor({ rows }, "gyaku-zuki").opens).toBe(2);
+    expect(rows[0].technique).toBe("gyaku-zuki"); // above every never-opened (—) row
+    expect(rows[1].winRate).toBe(null); // and the rest are the never-opened tail
   });
 });
