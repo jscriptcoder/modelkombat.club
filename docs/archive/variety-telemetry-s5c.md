@@ -1,7 +1,12 @@
 # Plan: Variety web surface — S5c (public `/variety` page)
 
-**Branch**: feat/variety-page
-**Status**: Active
+**Branch**: feat/variety-page (Slice 1) · feat/variety-discoverable (Slice 2)
+**Status**: ✅ Complete — shipped across two PRs: #295 (Slice 1, the static `/variety` page)
+
+- #296 (Slice 2, discoverability), both merged 2026-07-13. All 6 acceptance criteria met;
+  full suite green (1769). `web/**` + `scripts/**` are outside Stryker's node scope, so
+  verification is exhaustive exact-assertion tests + a manual mutator scan (the
+  `public-page-web-ui` precedent). Archived per `[[archive-plans-not-delete]]`.
 
 ## Goal
 
@@ -65,33 +70,33 @@ importing the already-pure `generateVariety()`.
 
 ## Acceptance Criteria
 
-- [ ] **S5c-1 (page renders the board).** `<VarietyPage board={…}/>` renders the board's
+- [x] **S5c-1 (page renders the board).** `<VarietyPage board={…}/>` renders the board's
       content as HTML: the H1 (carrying `BENCHMARK_VERSION`), the provenance line, the
       static §P7 note, and the fenced telemetry report as a `<pre><code>` block — with
       **no raw markdown leaking** (mirrors `SpecPage.test.tsx`'s no-leak assertions).
       Verified by a browser-mode `VarietyPage.test.tsx`.
-- [ ] **S5c-2 (no client JS — static, crawlable).** The prerendered `/variety` output
+- [x] **S5c-2 (no client JS — static, crawlable).** The prerendered `/variety` output
       ships **no `<script>`** (like `/spec-guide`): `renderVarietyPage` runs `stripScripts`,
       so the page is fully static and server-visible to LLMs/crawlers. Verified by a node
       `prerender.ssr.test.tsx` case asserting body injected, the variety `<title>`, the
       canonical = `${CANONICAL_ORIGIN}/variety`, and no `<script>`.
-- [ ] **S5c-3 (source = `generateVariety()` at build).** `scripts/prerender.ts` writes
+- [x] **S5c-3 (source = `generateVariety()` at build).** `scripts/prerender.ts` writes
       `dist/variety.html` = `renderVarietyPage(shell, generateVariety())`, calling
       `generateVariety()` **unbundled** (from `../src/cli/gen-variety.js`) — the same
       generate-at-build lineage as `generateSpec()` → `dist/spec-guide.html`. The render
       transform is pure over its `board` arg (identical input ⇒ identical output), so the
       page can't diverge from the generator.
-- [ ] **S5c-4 (routing — path constant + rewrite).** `VARIETY_PATH = "/variety"` is added
+- [x] **S5c-4 (routing — path constant + rewrite).** `VARIETY_PATH = "/variety"` is added
       to `web/src/shared/lib/paths.ts`, and `vercel.json` rewrites `/variety` →
       `/variety.html` (mirroring the `/spec-guide` rewrite). The client Vite build is
       unaffected (the page is emitted by the post-build prerender step, not a Vite input).
-- [ ] **S5c-5 (discoverable — sitemap + llms + one link, not nav).** `/variety` is listed
+- [x] **S5c-5 (discoverable — sitemap + llms + one link, not nav).** `/variety` is listed
       in `web/public/sitemap.xml` and `web/public/llms.txt`, and a human link to
       `VARIETY_PATH` is added from the Arsenal section; it is **NOT** in the shared top
       `Nav`. Verified by browser-mode static-asset tests (`fetch('/sitemap.xml')` +
       `DOMParser`, per the ring-submit precedent) + an Arsenal render test for the link +
       a Nav test asserting `/variety` is absent.
-- [ ] **S5c-6 (read-only / no-version invariant).** No scoring-input / engine / TCB file
+- [x] **S5c-6 (read-only / no-version invariant).** No scoring-input / engine / TCB file
       changes; `INPUT_HASH` and `BENCHMARK_VERSION` unchanged; `npm run fight`
       byte-identical; `generateVariety()` / `docs/variety.md` unchanged. Verified by
       `git diff --name-only` (only `web/**`, `scripts/prerender.ts`, `vercel.json`, + the
