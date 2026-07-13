@@ -511,7 +511,57 @@ fights · C honoured commitments`, plus a caveat line when `population.length < 
 
 [variety-telemetry-s1a.md](variety-telemetry-s1a.md)
 
-**S1a complete; harness ongoing.** The sibling scoping + story-split docs — `variety-telemetry-harness.md`
-(grill-me: 8 resolved decisions) + `variety-telemetry-stories.md` (story split S1a–S5c) — stay live in
-`plans/` as the trail for the next slice **S1b** (effective-move-count + adoption + `--json` + population
-override) and beyond.
+## Variety telemetry — S1b (enrichment: diversity · adoption · `--json` · override) ✅ COMPLETE
+
+The enrichment story that turns the S1a pooled histogram into the full first-class variety
+instrument: a diversity headline, a tempo-neutral per-bot adoption column, machine-readable
+`--json`, and a population override so the same command profiles any supplied bot set. **Four
+PR-slices**, each still a **pure read-only reduction** over `runFight` (no engine/TCB change, no
+`INPUT_HASH` / `BENCHMARK_VERSION` bump, `npm run fight` byte-identical), extending the same trio
+(`src/engine/telemetry.ts` + `src/cli/run-telemetry.ts` + `src/cli/telemetry.ts`). Each slice TDD'd
+at **100% mutation** on the two changed pure-logic files (the thin fs shell is smoke-verified glue,
+outside the node Stryker scope).
+
+- **Slice 1 — diversity headline (effective-move-count + live/dead)** (PR #273,
+  `feat/variety-telemetry-diversity`) — the report closes with `effective moves 7.2 of 13 · live 13 /
+dead 0`: `effectiveMoves` = `exp(Shannon entropy)` of the pooled shares (Hill q=1, "how many of the
+  13 are effectively in rotation"), added to `VarietyReport` and computed in `reduceUsage` (a
+  `share > 0` guard skips `0·ln0`; `totalCommitments === 0` ⇒ `null`, rendered `n/a`, never `NaN`),
+  plus the live/dead split with the dead-move list in canonical frame-table order. REFACTOR split the
+  `⚠` legend out of `renderReport` (table-only) into `renderLegend` + added `renderDiversity`, composed
+  **table → diversity → legend**. GOTCHA: the `legend ? … : ""` else-branch StringLiteral survivor needs
+  a `stdout.endsWith(renderDiversity + "\n")` no-legend-tail assertion (containment misses appended junk).
+- **Slice 2 — per-bot adoption (k/N) + mean per-bot share** (PR #274, `feat/variety-telemetry-adoption`) —
+  the one **structural** slice: each row gains **adoption** `k/N` (distinct bots that honour the move
+  ≥once, counted once, honoured-only) + a tempo-neutral **mean per-bot share** (mean over participating
+  bots of each bot's own share; `n/a`/`null` when nobody committed). Since `reduceUsage(FightResult[])`
+  carries no bot identity, `runVariety` now builds bot-indexed **matchups** `{a, b, fight}` + a pure
+  `reducePerBot(matchups, botCount)` closure. **TYPE SPLIT** to stay honest: `PooledRow`/`PooledReport`
+  (what `reduceUsage` returns) vs `UsageRow`(+`adoptingBots`,`meanShare`)/`VarietyReport`(+`botCount`)
+  (enriched, from `runVariety`). GOTCHA: a null-branch **conditional-spread** left an equivalent-by-
+  accident survivor → refactored to a null-**filter** type-predicate so every mutant is observable;
+  the mean divides by PARTICIPATING bots, not `botCount`.
+- **Slice 3 — `--json` versioned envelope** (PR #275, `feat/telemetry-json-envelope`) — `npm run telemetry
+-- --json` emits the report AS DATA: a **versioned envelope** `{version, population, report}` (refines
+  locked decision #7 "raw `VarietyReport`" — `--json` drops the human header, the only place version +
+  roster appear, so the envelope preserves that provenance for run-to-run diffs; `report` IS the raw
+  enriched report). `runTelemetryCli` gained an `argv` **first** param (mirrors `runBenchmarkCli(argv,
+deps)`); the thin shell passes `process.argv.slice(2)`. Test round-trips the full report via
+  `expect(JSON.parse(stdout).report).toEqual(runVariety(…))` — one assertion kills every field-drop mutant.
+- **Slice 4 — population override + fail-fast load + mirror-skip** (PR #276,
+  `feat/telemetry-population-override`) — closes S1b: `npm run telemetry -- <path…>` profiles a supplied
+  bot set (no args ⇒ the frozen gauntlet, unchanged); a bad bot fails loudly (structured stderr + exit 1,
+  **never a partial population**); a byte-identical dup never fights its clone. Deps `loadPopulation()` →
+  `loadBot(path)` + `loadGauntlet()`; positional argv = the override paths (`--` flags filtered, so
+  `--json` is order-independent); path input = **shell-expansion** (dep-free — no glob library). Two
+  survivor-kills via the "refactor to make mutants observable" pattern: the pairing guard `a === b ||
+sameDoc` had an equivalent `false || sameDoc` (self-pairs are byte-identical too) → simplified to just
+  **`sameDoc(botA, botB)`**; the `flatMap(… : [])` else-branch was unreachable → rewritten as a fail-fast
+  **`reduce`** loader + a bad-first test proving the short-circuit is load-bearing.
+
+[variety-telemetry-s1b.md](variety-telemetry-s1b.md)
+
+**S1a + S1b complete; harness ongoing.** The sibling scoping + story-split docs —
+`variety-telemetry-harness.md` (grill-me: 8 resolved decisions) + `variety-telemetry-stories.md` (story
+split S1a–S5c) — stay live in `plans/` as the trail for the remaining stories **S2–S5** (opener win-rate,
+degrade-rate + spacing, scoring attribution, committed board / web surface).
