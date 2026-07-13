@@ -609,23 +609,49 @@ byte-identical). Design hardened via find-gaps (S3a-1…S3a-8).
 
 - **Slice 1 — the start-failure section** (PR #283, `feat/variety-telemetry-s3a-degrade`) — a pure
   `reduceDegrades(fights)` (sibling of `reduceUsage`) with `FAILURE_REASONS = {out-of-band, unaffordable,
-  wrong-context, inert}` (a `satisfies DegradeReason[]` tuple, `locked` deliberately absent); per-technique
+wrong-context, inert}` (a `satisfies DegradeReason[]` tuple, `locked` deliberately absent); per-technique
   frame filtering (`techniqueOf === X && degrade !== "locked"`) so both guards stay load-bearing on the
   counts. `VarietyReport` gains `degrades`; `renderDegrades` prints the 3rd section (cols
   `move·N·fail·rate·<4 reasons>`, the reason counts summing to `fail`), rows sorted **rate desc → attempts
   desc → canonical** via the S2 **two-list** split (`—` for 0-attempt), **no ⚠ flag** (diagnostic only),
-  + a note cross-referencing the usage histogram; `--json` carries `degrades` additively (round-trip test
-  covers it). Two survivor-kills via "refactor to make mutants observable": the `technique === null` skip
-  guard was equivalent-by-construction (leaked nulls match no technique row) → **folded into the
-  per-technique `=== X` equality** so `!== "locked"` moves `attempts` directly (the locked tests pin it);
-  plus an all-four-reasons distinct-count test made the `wrong-context` / `inert` buckets load-bearing →
-  **100% mutation** on both `telemetry.ts` (273) + `run-telemetry.ts` (204), 0 survivors. Real-gauntlet
-  finding: start-failures are almost entirely `unaffordable` (moves picked but not affordable under the
-  stamina gate), plus `tobi-geri`'s aerial `wrong-context`.
+  - a note cross-referencing the usage histogram; `--json` carries `degrades` additively (round-trip test
+    covers it). Two survivor-kills via "refactor to make mutants observable": the `technique === null` skip
+    guard was equivalent-by-construction (leaked nulls match no technique row) → **folded into the
+    per-technique `=== X` equality** so `!== "locked"` moves `attempts` directly (the locked tests pin it);
+    plus an all-four-reasons distinct-count test made the `wrong-context` / `inert` buckets load-bearing →
+    **100% mutation** on both `telemetry.ts` (273) + `run-telemetry.ts` (204), 0 survivors. Real-gauntlet
+    finding: start-failures are almost entirely `unaffordable` (moves picked but not affordable under the
+    stamina gate), plus `tobi-geri`'s aerial `wrong-context`.
 
 [variety-telemetry-s3a.md](variety-telemetry-s3a.md)
 
-**S1a–S3a complete; harness ongoing.** The sibling scoping + story-split docs —
-`variety-telemetry-harness.md` (grill-me: 8 resolved decisions) + `variety-telemetry-stories.md` (story
-split S1a–S5c) — stay live in `plans/` as the trail for the remaining stories **S3b–S5** (distance/spacing
-occupancy, scoring attribution, committed board / web surface).
+## Variety telemetry — S3b (reach-zone occupancy histogram) ✅ COMPLETE
+
+The fourth child story: a **reach-zone occupancy histogram** — `DESIGN §P7` Metric 6 ("which reach zones do
+fights actually happen in?") — beneath the S1 usage / S2 opener / S3a degrade sections. Each **tick**
+contributes ONE inter-fighter distance `|a.x − b.x|` (symmetric ⇒ denominator = total ticks, NOT 2×),
+partitioned into **5 coarse reach tiers** at the reach-ladder cut points (throw 120k / reverse 240k /
+roundhouse+startGap 300k / ushiro 330k): `clinch · hand · kick · poke · out`. All frames counted, no
+exclusions (a yame-reset re-approach or okizeme clinch is genuine spacing). A **single PR-slice** (no flag,
+integration proven by S1a/S1b/S2/S3a), a **pure read-only reduction** over `runFight` (reads only `.x`; no
+engine/TCB change, no `INPUT_HASH` / `BENCHMARK_VERSION` bump, `npm run fight` byte-identical). Design
+resolved via a grill-me pass (S3b-1…S3b-9) — the bucketing being the roadmap's named pre-plan blocker.
+
+- **Slice 1 — the reach-zone section** (PR #286, `feat/variety-telemetry-s3b-occupancy`) — a pure
+  `reduceOccupancy(fights)` (sibling of `reduceDegrades`, but ONE sample **per tick** not per fighter) that
+  buckets via `ZONE_UPPER = [120k, 240k, 300k, 330k]` + `findIndex(d < upper)` with `i === -1 ? "out"` — a
+  design that keeps **every cut point AND the catch-all branch load-bearing** (no equivalent-mutant redundant
+  `hi` field). `VarietyReport` gains `occupancy: OccupancyRow[]`; `renderOccupancy` prints the 4th section
+  (cols `zone·distance·frames·share%`) in **fixed near→far order** — NOT share-desc, because the distance
+  axis is intrinsically ordered (the S3b divergence from S1a/S2/S3a) — with an `n/a` ÷0 guard and **no ⚠
+  flag** (diagnostic only); `--json` carries `occupancy` additively (round-trip test covers it). **100%
+  mutation on the FIRST run** — 533 killed (`telemetry.ts` 299 + `run-telemetry.ts` 234), 0 survivors, 0
+  no-coverage. Real-gauntlet finding: fights concentrate in **hand range 64.4%** + kick 16.6%, and the >300k
+  **poke zone is occupied 9.4%** (NOT spacing-dead); only 0.3% sits beyond all reach.
+
+[variety-telemetry-s3b.md](variety-telemetry-s3b.md)
+
+**S1a–S3b complete; harness ongoing.** The sibling scoping + story-split docs —
+`variety-telemetry-harness.md` (grill-me: 9 resolved decisions) + `variety-telemetry-stories.md` (story
+split S1a–S5c) — stay live in `plans/` as the trail for the remaining stories **S4–S5** (scoring
+attribution, committed board / web surface).

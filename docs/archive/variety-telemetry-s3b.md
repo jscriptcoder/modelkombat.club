@@ -23,8 +23,9 @@ A **pure read-only reduction** over `runFight`. NO change to any scoring-input f
 NO `INPUT_HASH` flip; NO `BENCHMARK_VERSION` bump; `npm run fight` stays byte-identical.
 The occupancy reduction reads only `.x` (already emitted every tick). Verify the PR with
 `git diff --name-only` touching only `src/engine/telemetry.ts`, `src/cli/run-telemetry.ts`
-+ their co-located `*.test.ts` (and the plan/stories/harness docs). `src/cli/telemetry.ts`
-(the fs shell) is untouched — no new deps, the population is already loaded.
+
+- their co-located `*.test.ts` (and the plan/stories/harness docs). `src/cli/telemetry.ts`
+  (the fs shell) is untouched — no new deps, the population is already loaded.
 
 ## Architecture (mirrors the S1a/S1b/S2/S3a trio + benchmark.ts)
 
@@ -54,7 +55,7 @@ Over every tick of every round-robin fight (ONE sample per tick — distance is 
   `clinch [0,120k)` · `hand [120,240k)` · `kick [240,300k)` · `poke [300,330k)` ·
   `out [330,600k]`.
 - `totalFrames = Σ ticks` (the count of distance samples). `share(zone) = frames(zone) /
-  totalFrames`; `null` when `totalFrames === 0` (÷0 → `n/a`).
+totalFrames`; `null` when `totalFrames === 0` (÷0 → `n/a`).
 
 Consequences that pin the tests:
 
