@@ -4,6 +4,7 @@ import {
   renderDiversity,
   renderHeader,
   renderLegend,
+  renderOccupancy,
   renderOpenerLegend,
   renderOpeners,
   renderReport,
@@ -177,7 +178,7 @@ describe("runTelemetryCli", () => {
     );
   });
 
-  it("ends with the start-failure table (the final section, below the openers) when nothing is dominant", () => {
+  it("ends with the reach-zone occupancy table (the final section) when nothing is dominant", () => {
     const population = BALANCED; // three ~even moves ⇒ none dominant ⇒ no usage legend
     const out = runTelemetryCli([], deps(population));
 
@@ -188,9 +189,10 @@ describe("runTelemetryCli", () => {
       rules: MOCK_RULES,
     });
 
-    // the degrade section is now the LAST block; the opener table + diversity precede it,
-    // and (nothing dominant) no legend appears anywhere.
-    expect(out.stdout.endsWith(`${renderDegrades(rep)}\n`)).toBe(true);
+    // the occupancy section is now the LAST block; the degrade table + opener table +
+    // diversity precede it, and (nothing dominant) no legend appears anywhere.
+    expect(out.stdout.endsWith(`${renderOccupancy(rep)}\n`)).toBe(true);
+    expect(out.stdout).toContain(`${renderDegrades(rep)}\n\n`);
     expect(out.stdout).toContain(`${renderOpeners(rep)}\n\n`);
     expect(out.stdout).toContain(`${renderDiversity(rep)}\n\n`);
     expect(out.stdout).not.toContain("⚠");
@@ -207,7 +209,7 @@ describe("runTelemetryCli", () => {
     );
   });
 
-  it("keeps the opener legend above the final start-failure table when an opener is dominant", () => {
+  it("keeps the opener legend above the final reach-zone table when an opener is dominant", () => {
     // mawashi-geri (score 2) beats gyaku-zuki (score 1) in the seed-independent mock fight,
     // so the mawashi-opener wins 100% over 20 opens (2 orderings × 10 seeds) ⇒ ≥ 10 samples
     // and > 60% ⇒ dominant, which surfaces the ⚠ + the opener legend.
@@ -224,9 +226,11 @@ describe("runTelemetryCli", () => {
 
     expect(renderOpenerLegend(rep)).not.toBe(""); // guard: the scenario really is dominant
     expect(out.stdout).toContain("⚠");
-    // the opener legend is present but NO LONGER the last line — the degrade section follows it.
+    // the opener legend is present but NO LONGER the last line — the degrade + occupancy
+    // sections follow it, and the occupancy table is the final block.
     expect(out.stdout).toContain(`${renderOpenerLegend(rep)}\n\n`);
-    expect(out.stdout.endsWith(`${renderDegrades(rep)}\n`)).toBe(true);
+    expect(out.stdout).toContain(`${renderDegrades(rep)}\n\n`);
+    expect(out.stdout.endsWith(`${renderOccupancy(rep)}\n`)).toBe(true);
   });
 });
 
@@ -433,6 +437,7 @@ const usageReport = (
   openers: [],
   nullOpeners: 0,
   degrades: [],
+  occupancy: [],
 });
 
 // A report carrying only the opener fields renderOpeners reads (the usage side is inert).
@@ -448,6 +453,7 @@ const openerReport = (
   openers,
   nullOpeners,
   degrades: [],
+  occupancy: [],
 });
 
 // A report carrying only the degrade rows renderDegrades reads (the usage + opener sides
@@ -461,6 +467,23 @@ const degradeReport = (degrades: VarietyReport["degrades"]): VarietyReport => ({
   openers: [],
   nullOpeners: 0,
   degrades,
+  occupancy: [],
+});
+
+// A report carrying only the occupancy rows renderOccupancy reads (the other sides inert).
+// Lets a fixture pin the reach-zone section's exact columns in isolation.
+const occupancyReport = (
+  occupancy: VarietyReport["occupancy"],
+): VarietyReport => ({
+  rows: [],
+  totalCommitments: 0,
+  totalFights: 0,
+  effectiveMoves: null,
+  botCount: 0,
+  openers: [],
+  nullOpeners: 0,
+  degrades: [],
+  occupancy,
 });
 
 describe("renderReport — exact histogram layout (table only)", () => {
@@ -753,6 +776,89 @@ describe("renderDegrades — exact start-failure table (columns + — + no flag)
     );
     // S3a-6: no §P7 dial ⇒ no ⚠ column, even for a 100% row (the exact match above already
     // proves it; this is the explicit guard against a stray flag being re-introduced).
+    expect(out).not.toContain("⚠");
+  });
+});
+
+describe("renderOccupancy — exact reach-zone table (near→far order + n/a + no flag)", () => {
+  it("aligns zone / distance / frames / share in fixed near→far order, and NEVER flags", () => {
+    const out = renderOccupancy(
+      occupancyReport([
+        { zone: "clinch", frames: 40, share: 0.08 },
+        { zone: "hand", frames: 175, share: 0.35 },
+        { zone: "kick", frames: 110, share: 0.22 },
+        { zone: "poke", frames: 0, share: 0 }, // an unoccupied tier: 0.0% (totalFrames > 0), never omitted
+        { zone: "out", frames: 175, share: 0.35 },
+      ]),
+    );
+
+    expect(out).toBe(
+      "zone" +
+        " ".repeat(10) +
+        "distance" +
+        " ".repeat(2) +
+        "frames" +
+        " ".repeat(2) +
+        "share" +
+        "\n" +
+        "clinch" +
+        " ".repeat(10) +
+        "0-120k" +
+        " ".repeat(6) +
+        "40" +
+        " ".repeat(3) +
+        "8.0%" +
+        "\n" +
+        "hand range" +
+        " ".repeat(4) +
+        "120-240k" +
+        " ".repeat(5) +
+        "175" +
+        " ".repeat(2) +
+        "35.0%" +
+        "\n" +
+        "kick range" +
+        " ".repeat(4) +
+        "240-300k" +
+        " ".repeat(5) +
+        "110" +
+        " ".repeat(2) +
+        "22.0%" +
+        "\n" +
+        "poke range" +
+        " ".repeat(4) +
+        "300-330k" +
+        " ".repeat(7) +
+        "0" +
+        " ".repeat(3) +
+        "0.0%" +
+        "\n" +
+        "out of range" +
+        " ".repeat(5) +
+        "330k+" +
+        " ".repeat(5) +
+        "175" +
+        " ".repeat(2) +
+        "35.0%" +
+        "\n\nnote: one |a.x - b.x| sample per tick, bucketed by the reach ladder; poke = the >300k zoning pokes",
+    );
+    // diagnostic only (S3b-7): no §P7 dial ⇒ no ⚠, even with a 100%-in-one-zone reading.
+    expect(out).not.toContain("⚠");
+  });
+
+  it("renders n/a for every zone in the zero-total case (no ticks), never a percentage or flag", () => {
+    const out = renderOccupancy(
+      occupancyReport([
+        { zone: "clinch", frames: 0, share: null },
+        { zone: "hand", frames: 0, share: null },
+        { zone: "kick", frames: 0, share: null },
+        { zone: "poke", frames: 0, share: null },
+        { zone: "out", frames: 0, share: null },
+      ]),
+    );
+
+    expect((out.match(/n\/a/g) ?? []).length).toBe(5); // all five zones guarded
+    expect(out).not.toContain("%");
     expect(out).not.toContain("⚠");
   });
 });

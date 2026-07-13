@@ -15,6 +15,7 @@ import {
   runVariety,
   USAGE_FLAG_THRESHOLD,
   type PooledReport,
+  type ReachZone,
   type VarietyConfig,
   type VarietyReport,
 } from "../engine/telemetry.js";
@@ -258,6 +259,44 @@ export const renderDegrades = (report: VarietyReport): string => {
   return `${table}\n\nnote: N = honoured + failed starts (locked excluded); a technique with 0 usage but failures here was chosen but never executed`;
 };
 
+// The human label + distance range for each reach zone (presentation only — the engine keeps
+// REACH_ZONES as bare ids). Iterated via report.occupancy's fixed near→far order.
+const ZONE_LABEL: Record<ReachZone, string> = {
+  clinch: "clinch",
+  hand: "hand range",
+  kick: "kick range",
+  poke: "poke range",
+  out: "out of range",
+};
+
+const ZONE_RANGE: Record<ReachZone, string> = {
+  clinch: "0-120k",
+  hand: "120-240k",
+  kick: "240-300k",
+  poke: "300-330k",
+  out: "330k+",
+};
+
+// Render the reach-zone occupancy table (S3b — Metric 6): per tier, the frame count and its
+// share of all ticks. Rows arrive in FIXED near→far order (clinch → out) — the distance axis
+// is intrinsically ordered, so unlike the other sections there is NO share-sort. A zone with
+// no frames shows 0.0% (or `n/a` in the zero-total case, the ÷0 guard). NO ⚠ flag — a purely
+// diagnostic spacing readout, not a §P7 balance dial. Pure data → string; the exact output is
+// a stdout contract (cli-design).
+export const renderOccupancy = (report: VarietyReport): string => {
+  const table = render([
+    ["zone", "distance", "frames", "share"],
+    ...report.occupancy.map((r) => [
+      ZONE_LABEL[r.zone],
+      ZONE_RANGE[r.zone],
+      `${r.frames}`,
+      r.share === null ? "n/a" : `${(r.share * 100).toFixed(1)}%`,
+    ]),
+  ]);
+
+  return `${table}\n\nnote: one |a.x - b.x| sample per tick, bucketed by the reach ladder; poke = the >300k zoning pokes`;
+};
+
 export const runTelemetryCli = (
   argv: string[],
   deps: TelemetryDeps,
@@ -311,7 +350,8 @@ export const runTelemetryCli = (
     (legend ? `\n\n${legend}` : "") +
     `\n\n${renderOpeners(report)}` +
     (openerLegend ? `\n\n${openerLegend}` : "") +
-    `\n\n${renderDegrades(report)}`;
+    `\n\n${renderDegrades(report)}` +
+    `\n\n${renderOccupancy(report)}`;
 
   return {
     stdout: `${header}\n\n${body}\n`,

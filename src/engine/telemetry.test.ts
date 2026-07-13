@@ -2,11 +2,13 @@ import { describe, it, expect } from "vitest";
 import {
   FAILURE_REASONS,
   reduceDegrades,
+  reduceOccupancy,
   reduceOpeners,
   reducePerBot,
   reduceUsage,
   runVariety,
   type Matchup,
+  type OccupancyRow,
   type PooledReport,
   type Technique,
   type VarietyConfig,
@@ -452,6 +454,26 @@ describe("runVariety — round-robin over the population", () => {
       0,
     );
     expect(rowFor({ rows: report.degrades }, "gyaku-zuki").rate).toBe(0);
+  });
+
+  it("carries reach-zone occupancy rows from the round-robin", () => {
+    // startGap 200000 (the 'hand' tier) — the fighters begin in hand range and close in, so
+    // real ticks accrue across the near tiers; every tick is bucketed into exactly one zone.
+    const report = runVariety(varietyConfig());
+
+    expect(report.occupancy).toHaveLength(5);
+    expect(report.occupancy.map((r) => r.zone)).toEqual([
+      "clinch",
+      "hand",
+      "kick",
+      "poke",
+      "out",
+    ]);
+    const totalFrames = report.occupancy.reduce((sum, r) => sum + r.frames, 0);
+    expect(totalFrames).toBeGreaterThan(0);
+    expect(
+      report.occupancy.reduce((sum, r) => sum + (r.share ?? 0), 0),
+    ).toBeCloseTo(1, 10);
   });
 
   it("attributes per-bot adoption (k/N) to each committing bot and sets botCount = population size", () => {
@@ -1037,5 +1059,144 @@ describe("reduceDegrades — per-technique start-failure rate", () => {
     ]);
     // the tail is genuinely the null (0-attempt) rows.
     expect(rowFor({ rows }, "throw").rate).toBe(null);
+  });
+});
+
+// ─── reduceOccupancy: reach-zone occupancy over inter-fighter distance. Each tick contributes
+// ONE sample — |a.x − b.x| (symmetric) — bucketed into 5 half-open reach tiers at the reach
+// ladder's cut points (throw 120k / reverse 240k / roundhouse 300k / ushiro 330k). Reads only
+// `x`; a distance ON a cut lands in the HIGHER tier; a distance beyond the last cut is `out`. ──
+
+// A frame at horizontal position `x` (occupancy reads only x; action/degrade are inert here).
+const at = (x: number): FighterFrame => ({
+  x,
+  y: 0,
+  action: IDLE,
+  points: 0,
+  stamina: 0,
+  degrade: null,
+});
+
+// An event whose fighters sit `d` sub-units apart (a at 0, b at d ⇒ |a.x − b.x| = d).
+const apart = (d: number): FightEvent => ev(at(0), at(d));
+
+const zoneFor = (
+  rows: readonly OccupancyRow[],
+  zone: OccupancyRow["zone"],
+): OccupancyRow => {
+  const found = rows.find((r) => r.zone === zone);
+
+  if (found === undefined) throw new Error(`no row for zone ${zone}`);
+
+  return found;
+};
+
+describe("reduceOccupancy — reach-zone occupancy over inter-fighter distance", () => {
+  it("buckets each tick's |a.x − b.x| into its half-open reach tier — a boundary lands in the higher tier", () => {
+    // two ticks in each tier, the lower of each pair sitting just below the cut, the upper ON
+    // the cut (which belongs to the HIGHER tier), plus the ring ceiling in the top tier.
+    const rows = reduceOccupancy([
+      fightOf([
+        apart(0), // clinch
+        apart(119999), // clinch (just below the 120k cut)
+        apart(120000), // hand   (the 120k cut → the HIGHER tier)
+        apart(239999), // hand
+        apart(240000), // kick   (the 240k cut)
+        apart(299999), // kick
+        apart(300000), // poke   (the 300k cut)
+        apart(329999), // poke
+        apart(330000), // out    (the 330k cut)
+        apart(600000), // out    (the ring ceiling)
+      ]),
+    ]);
+
+    expect(zoneFor(rows, "clinch").frames).toBe(2);
+    expect(zoneFor(rows, "hand").frames).toBe(2);
+    expect(zoneFor(rows, "kick").frames).toBe(2);
+    expect(zoneFor(rows, "poke").frames).toBe(2);
+    expect(zoneFor(rows, "out").frames).toBe(2);
+  });
+
+  it("counts ONE distance sample per tick, not one per fighter", () => {
+    // 3 ticks, all at a 'kick'-range gap ⇒ kick 3 (NOT 6), and the grand total is 3 ticks.
+    const rows = reduceOccupancy([
+      fightOf([apart(250000), apart(250000), apart(250000)]),
+    ]);
+
+    expect(zoneFor(rows, "kick").frames).toBe(3);
+    expect(rows.reduce((sum, r) => sum + r.frames, 0)).toBe(3);
+  });
+
+  it("measures the absolute gap regardless of which fighter leads", () => {
+    // a ahead of b, then b ahead of a — both a 200k gap ⇒ both land in 'hand' (drops abs ⇒ fails).
+    const rows = reduceOccupancy([
+      fightOf([ev(at(300000), at(100000)), ev(at(100000), at(300000))]),
+    ]);
+
+    expect(zoneFor(rows, "hand").frames).toBe(2);
+  });
+
+  it("computes each zone's share as frames / total ticks", () => {
+    // 12 ticks: 3 in 'kick', 9 in 'clinch' ⇒ 0.25 and 0.75.
+    const rows = reduceOccupancy([
+      fightOf([
+        ...Array.from({ length: 3 }, () => apart(250000)),
+        ...Array.from({ length: 9 }, () => apart(0)),
+      ]),
+    ]);
+
+    expect(zoneFor(rows, "kick").share).toBe(0.25);
+    expect(zoneFor(rows, "clinch").share).toBe(0.75);
+  });
+
+  it("lists an unoccupied tier with 0 frames / 0 share — never omitted", () => {
+    const rows = reduceOccupancy([fightOf([apart(0), apart(0)])]); // all clinch
+
+    expect(rows).toHaveLength(5);
+    expect(zoneFor(rows, "poke").frames).toBe(0);
+    expect(zoneFor(rows, "poke").share).toBe(0);
+  });
+
+  it("guards the zero-total case: every share is null (never NaN) when no tick occurs", () => {
+    const rows = reduceOccupancy([]); // no fights ⇒ no frames
+
+    expect(rows).toHaveLength(5);
+    expect(rows.every((r) => r.frames === 0)).toBe(true);
+    expect(rows.every((r) => r.share === null)).toBe(true);
+  });
+
+  it("partitions every tick into exactly one tier — frames sum to the tick count, raw shares to 1.0", () => {
+    const rows = reduceOccupancy([
+      fightOf([
+        apart(0),
+        apart(119999),
+        apart(120000),
+        apart(239999),
+        apart(240000),
+        apart(299999),
+        apart(300000),
+        apart(329999),
+        apart(330000),
+        apart(600000),
+      ]),
+    ]);
+
+    expect(rows.reduce((sum, r) => sum + r.frames, 0)).toBe(10);
+    expect(rows.reduce((sum, r) => sum + (r.share ?? 0), 0)).toBeCloseTo(1, 10);
+  });
+
+  it("keeps rows in fixed near→far order even when a far tier dominates", () => {
+    // 'poke' carries the most frames, but the rows must still read clinch → out.
+    const rows = reduceOccupancy([
+      fightOf([apart(0), apart(310000), apart(310000), apart(310000)]),
+    ]);
+
+    expect(rows.map((r) => r.zone)).toEqual([
+      "clinch",
+      "hand",
+      "kick",
+      "poke",
+      "out",
+    ]);
   });
 });
