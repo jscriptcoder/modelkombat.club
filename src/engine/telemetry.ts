@@ -89,6 +89,8 @@ export type VarietyReport = Omit<PooledReport, "rows"> & {
   nullOpeners: number; // (fighter, fight) observations that opened with no honoured commitment
   degrades: DegradeRow[]; // per-technique start-failure rates, sorted rate desc → attempts desc → canonical
   occupancy: OccupancyRow[]; // reach-zone distance occupancy, in fixed near→far order (S3b)
+  scoring: ScoringRow[]; // per-technique scoring attribution, sorted pts desc → starts desc → canonical (S4)
+  excludedPenaltyPts: number; // pooled jogai/passivity penalty points, excluded from attribution (S4)
 };
 
 // The technique a frame's action commits to, or null when the action is not a
@@ -468,6 +470,114 @@ export const reduceOccupancy = (
   });
 };
 
+// S4: scoring attribution. Per technique, joins each point the scoreboard gained to the
+// honoured-start whose active window covers the tick it landed — answering "which moves
+// actually put points on the board vs whiff?" (effectiveness, not just choice). `pts`
+// includes counter bonuses (the whole gain credits the committing move). sweep + hiza-geri
+// are score-0 knockdown moves: they score via the LATER okizeme finisher, not their own hit,
+// so they carry pts 0 and render their land/rates as "—" (knockdownClass).
+export type ScoringRow = {
+  technique: Technique;
+  starts: number; // honoured-starts of X — IDENTICAL to reduceUsage's count (same predicate)
+  land: number; // starts whose window caught points (binary per start ⇒ land ≤ starts)
+  pts: number; // points attributed to X's windows (counter bonuses included)
+  landRate: number | null; // land / starts; null when starts === 0 (÷0 guard, renders "—")
+  ptsPerStart: number | null; // pts / starts; null likewise
+  knockdownClass: boolean; // score-0 knockdown move (sweep/hiza) — scores via okizeme, not directly
+};
+
+// The scoring reduction: the per-technique rows (all 13, sorted) + the pooled penalty total
+// — every scoreboard point NOT attributed to a move window (a jogai/passivity foul awards +1
+// to the opponent, the only non-move point). Computed as a residual (total scored − attributed)
+// and reconciled to Σ max(0, foulCount − 1) over the fights' fouls (an independent source the
+// reducer never reads), so a window-math drift that mis-attributes a real point surfaces loudly.
+export type ScoringReport = { rows: ScoringRow[]; excludedPenaltyPts: number };
+
+// The score-0 knockdown techniques (the DESIGN's okizeme setups): they DOWN the foe and score
+// via the okizeme finisher, not their own hit, so they carry pts 0 and render their land /
+// rates as "—". Named explicitly — the render note names the same pair.
+const KNOCKDOWN_CLASS: readonly Technique[] = ["sweep", "hiza-geri"];
+
+// Reduce a set of fights to per-technique scoring attribution, using the SAME `rules` the
+// round-robin ran on (read, never mutated) for each technique's [startup, startup+active−1]
+// window. Per technique, per fight, per fighter side: an honoured-start at frame i (the
+// reduceUsage predicate ⇒ `starts` == the usage count) caught the points its window gained —
+// `pointsAt(i+startup+active−1) − pointsAt(i+startup−1)` (points are monotonic, so this
+// telescopes the per-tick deltas; the whole gain ⇒ counter bonuses included). A start LANDS
+// iff that gain is positive. Every scoreboard point not attributed to a window is a penalty,
+// taken as the residual `Σ final scores − Σ attributed` (windows provably never overlap ⇒ no
+// double-count). Pure over `runFight`, reading only `.action`/`.degrade`/`.points`.
+export const reduceScoring = (
+  fights: readonly FightResult[],
+  rules: Rules,
+): ScoringReport => {
+  const rows = TECHNIQUES.map((technique) => {
+    // This technique's frame data — moves[X] (incl. sweep) or rules.throw. Absent ⇒ the
+    // technique is inert and can never be honoured, so its window is never actually consulted.
+    const spec = technique === "throw" ? rules.throw : rules.moves[technique];
+
+    // The points each honoured-start of THIS technique caught in its window, over every fight
+    // + side (matching `=== technique` drops non-committing and other-move frames — no leak).
+    const caught = fights.flatMap((fight) =>
+      (["a", "b"] as const).flatMap((side) => {
+        const points = fight.events.map((event) => event[side].points);
+
+        // The scoreboard AT frame index k for this side: 0 before the fight (k < 0), flat at
+        // the final score after it (k ≥ last) — so a window running past the fight end is safe.
+        const pointsAt = (k: number): number =>
+          k < 0 ? 0 : points[Math.min(k, points.length - 1)];
+
+        return fight.events.flatMap((event, i) =>
+          honouredTechnique(event[side]) === technique
+            ? [
+                spec === undefined
+                  ? 0
+                  : pointsAt(i + spec.startup + spec.active - 1) -
+                    pointsAt(i + spec.startup - 1),
+              ]
+            : [],
+        );
+      }),
+    );
+
+    const starts = caught.length;
+    const land = caught.filter((windowPts) => windowPts > 0).length;
+    const pts = caught.reduce((sum, windowPts) => sum + windowPts, 0);
+
+    return {
+      technique,
+      starts,
+      land,
+      pts,
+      landRate: starts === 0 ? null : land / starts,
+      ptsPerStart: starts === 0 ? null : pts / starts,
+      knockdownClass: KNOCKDOWN_CLASS.includes(technique),
+    };
+  });
+
+  // Every point the scoreboard ever gained, over both fighters + all fights (points are
+  // monotonic, so each side's final score is its total scored).
+  const totalScored = fights.reduce(
+    (sum, fight) =>
+      sum +
+      (["a", "b"] as const).reduce((sideSum, side) => {
+        const points = fight.events.map((event) => event[side].points);
+
+        return sideSum + (points.length === 0 ? 0 : points[points.length - 1]);
+      }, 0),
+    0,
+  );
+
+  const attributed = rows.reduce((sum, r) => sum + r.pts, 0);
+
+  // Single stable sort over canonical-ordered rows: pts desc, ties by starts desc, then
+  // canonical order (both keys are always numeric — no null sentinel to special-case).
+  return {
+    rows: [...rows].sort((a, b) => b.pts - a.pts || b.starts - a.starts),
+    excludedPenaltyPts: totalScored - attributed,
+  };
+};
+
 // Run the both-sides round-robin over the population — each ordered pair of NON-mirror
 // bots plays with each on each side, at every seed — then reduce the fights to the pooled
 // usage histogram AND attribute per-bot adoption / mean share. Pure over `runFight`: no
@@ -501,6 +611,7 @@ export const runVariety = (cfg: VarietyConfig): VarietyReport => {
   const pooled = reduceUsage(fights);
   const attributionOf = reducePerBot(matchups, cfg.population.length);
   const openers = reduceOpeners(matchups);
+  const scoring = reduceScoring(fights, cfg.rules);
 
   return {
     ...pooled,
@@ -510,5 +621,7 @@ export const runVariety = (cfg: VarietyConfig): VarietyReport => {
     nullOpeners: openers.nullOpeners,
     degrades: reduceDegrades(fights),
     occupancy: reduceOccupancy(fights),
+    scoring: scoring.rows,
+    excludedPenaltyPts: scoring.excludedPenaltyPts,
   };
 };

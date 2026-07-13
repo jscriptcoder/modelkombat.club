@@ -8,6 +8,7 @@ import {
   renderOpenerLegend,
   renderOpeners,
   renderReport,
+  renderScoring,
   runTelemetryCli,
   type HeaderInfo,
   type TelemetryDeps,
@@ -178,7 +179,7 @@ describe("runTelemetryCli", () => {
     );
   });
 
-  it("ends with the reach-zone occupancy table (the final section) when nothing is dominant", () => {
+  it("ends with the scoring-attribution table (the final section) when nothing is dominant", () => {
     const population = BALANCED; // three ~even moves ⇒ none dominant ⇒ no usage legend
     const out = runTelemetryCli([], deps(population));
 
@@ -189,9 +190,10 @@ describe("runTelemetryCli", () => {
       rules: MOCK_RULES,
     });
 
-    // the occupancy section is now the LAST block; the degrade table + opener table +
+    // the scoring section is now the LAST block; the occupancy + degrade + opener tables +
     // diversity precede it, and (nothing dominant) no legend appears anywhere.
-    expect(out.stdout.endsWith(`${renderOccupancy(rep)}\n`)).toBe(true);
+    expect(out.stdout.endsWith(`${renderScoring(rep)}\n`)).toBe(true);
+    expect(out.stdout).toContain(`${renderOccupancy(rep)}\n\n`);
     expect(out.stdout).toContain(`${renderDegrades(rep)}\n\n`);
     expect(out.stdout).toContain(`${renderOpeners(rep)}\n\n`);
     expect(out.stdout).toContain(`${renderDiversity(rep)}\n\n`);
@@ -226,11 +228,12 @@ describe("runTelemetryCli", () => {
 
     expect(renderOpenerLegend(rep)).not.toBe(""); // guard: the scenario really is dominant
     expect(out.stdout).toContain("⚠");
-    // the opener legend is present but NO LONGER the last line — the degrade + occupancy
-    // sections follow it, and the occupancy table is the final block.
+    // the opener legend is present but NO LONGER the last line — the degrade + occupancy +
+    // scoring sections follow it, and the scoring table is the final block.
     expect(out.stdout).toContain(`${renderOpenerLegend(rep)}\n\n`);
     expect(out.stdout).toContain(`${renderDegrades(rep)}\n\n`);
-    expect(out.stdout.endsWith(`${renderOccupancy(rep)}\n`)).toBe(true);
+    expect(out.stdout).toContain(`${renderOccupancy(rep)}\n\n`);
+    expect(out.stdout.endsWith(`${renderScoring(rep)}\n`)).toBe(true);
   });
 });
 
@@ -287,6 +290,15 @@ describe("runTelemetryCli --json", () => {
     const second = runTelemetryCli(["--json"], deps(BALANCED));
 
     expect(first.stdout).toBe(second.stdout);
+  });
+
+  it("carries the scoring attribution + excluded-penalty total additively in the JSON report", () => {
+    const out = runTelemetryCli(["--json"], deps(BALANCED));
+
+    const parsed = JSON.parse(out.stdout) as { report: VarietyReport };
+
+    expect(parsed.report.scoring).toHaveLength(13); // all 13 techniques, additively
+    expect(typeof parsed.report.excludedPenaltyPts).toBe("number");
   });
 });
 
@@ -438,6 +450,8 @@ const usageReport = (
   nullOpeners: 0,
   degrades: [],
   occupancy: [],
+  scoring: [],
+  excludedPenaltyPts: 0,
 });
 
 // A report carrying only the opener fields renderOpeners reads (the usage side is inert).
@@ -454,6 +468,8 @@ const openerReport = (
   nullOpeners,
   degrades: [],
   occupancy: [],
+  scoring: [],
+  excludedPenaltyPts: 0,
 });
 
 // A report carrying only the degrade rows renderDegrades reads (the usage + opener sides
@@ -468,6 +484,8 @@ const degradeReport = (degrades: VarietyReport["degrades"]): VarietyReport => ({
   nullOpeners: 0,
   degrades,
   occupancy: [],
+  scoring: [],
+  excludedPenaltyPts: 0,
 });
 
 // A report carrying only the occupancy rows renderOccupancy reads (the other sides inert).
@@ -484,6 +502,8 @@ const occupancyReport = (
   nullOpeners: 0,
   degrades: [],
   occupancy,
+  scoring: [],
+  excludedPenaltyPts: 0,
 });
 
 describe("renderReport — exact histogram layout (table only)", () => {
@@ -859,6 +879,121 @@ describe("renderOccupancy — exact reach-zone table (near→far order + n/a + n
 
     expect((out.match(/n\/a/g) ?? []).length).toBe(5); // all five zones guarded
     expect(out).not.toContain("%");
+    expect(out).not.toContain("⚠");
+  });
+});
+
+// A report carrying only the scoring rows + excluded-penalty total renderScoring reads
+// (the other sides inert). Lets a fixture pin the attribution section's exact columns.
+const scoringReport = (
+  scoring: VarietyReport["scoring"],
+  excludedPenaltyPts: number,
+): VarietyReport => ({
+  rows: [],
+  totalCommitments: 0,
+  totalFights: 0,
+  effectiveMoves: null,
+  botCount: 0,
+  openers: [],
+  nullOpeners: 0,
+  degrades: [],
+  occupancy: [],
+  scoring,
+  excludedPenaltyPts,
+});
+
+describe("renderScoring — exact scoring-attribution table (columns + — + no flag)", () => {
+  it("aligns move / starts / land / land% / pts / pts-per-start, blanks knockdown + zero-start cells to —, appends the excluded-penalty line, and NEVER flags", () => {
+    const out = renderScoring(
+      scoringReport(
+        [
+          {
+            technique: "gyaku-zuki",
+            starts: 5,
+            land: 3,
+            pts: 4,
+            landRate: 0.6,
+            ptsPerStart: 0.8,
+            knockdownClass: false,
+          },
+          {
+            // knockdown-class: land / land% / pts-per-start blank to — (scores via okizeme),
+            // pts shows the literal 0.
+            technique: "sweep",
+            starts: 4,
+            land: 0,
+            pts: 0,
+            landRate: 0,
+            ptsPerStart: 0,
+            knockdownClass: true,
+          },
+          {
+            // never started: land shows 0, but land% / pts-per-start are — (the ÷0 guard).
+            technique: "ushiro-geri",
+            starts: 0,
+            land: 0,
+            pts: 0,
+            landRate: null,
+            ptsPerStart: null,
+            knockdownClass: false,
+          },
+        ],
+        2,
+      ),
+    );
+
+    expect(out).toBe(
+      "move" +
+        " ".repeat(9) +
+        "starts" +
+        "  " +
+        "land" +
+        "  " +
+        "land%" +
+        "  " +
+        "pts" +
+        "  " +
+        "pts/start" +
+        "\n" +
+        "gyaku-zuki" +
+        " ".repeat(8) +
+        "5" +
+        " ".repeat(5) +
+        "3" +
+        "  " +
+        "60.0%" +
+        " ".repeat(4) +
+        "4" +
+        " ".repeat(8) +
+        "0.8" +
+        "\n" +
+        "sweep" +
+        " ".repeat(13) +
+        "4" +
+        " ".repeat(5) +
+        "—" +
+        " ".repeat(6) +
+        "—" +
+        " ".repeat(4) +
+        "0" +
+        " ".repeat(10) +
+        "—" +
+        "\n" +
+        "ushiro-geri" +
+        " ".repeat(7) +
+        "0" +
+        " ".repeat(5) +
+        "0" +
+        " ".repeat(6) +
+        "—" +
+        " ".repeat(4) +
+        "0" +
+        " ".repeat(10) +
+        "—" +
+        "\n\nexcluded penalty points: 2" +
+        "\n\nnote: pts joins each score to the move whose active window caught it; knockdown setups (sweep, hiza-geri) score via the okizeme finisher, shown —",
+    );
+    // diagnostic only: no §P7 dial ⇒ no ⚠, even for a dominant scorer.
     expect(out).not.toContain("⚠");
   });
 });
