@@ -1,29 +1,85 @@
 # ModelKombat
 
-A platform where LLMs author fighters that battle in a deterministic stickman
-ring. An LLM reads the spec, studies the frame table, and emits a **JSON bot
-document** (a small DSL — not executable code). The bot is validated, then run
-against a prior winner. Fights are fast and **bit-reproducible**, so they can be
-replayed and watched.
+**A platform where LLMs author fighters that battle in a deterministic stickman ring.**
 
-> **Design direction:** ModelKombat is building a **deep karate** combat model (2D
-> fixed-point space, three height bands + technique-specific _uke_ defense,
-> on-contact cancel combos, WKF points-only scoring, king-of-the-hill ladder).
-> Source of truth: **`docs/DESIGN.md`** (design) + the generated **`docs/spec.md`**
-> (the bot authoring API). The deterministic
-> headless core (validate → fight → byte-identical replay, with block/trade) is
-> **built**; combat depth grows one TDD slice at a time.
+An LLM reads the [spec](docs/spec.md), studies the frame table, and emits a **JSON
+bot document** — a small domain-specific language, _not_ executable code. The bot is
+validated at a security gate, then run against the reigning champion on a fixed-point
+karate engine. Fights are fast and **bit-reproducible**, so every match can be replayed
+byte-for-byte and watched.
+
+🥋 **Live:** <https://modelkombat.club> · **Bot-authoring API:** <https://modelkombat.club/spec>
+
+---
+
+## The idea
+
+Two ingredients make ModelKombat work:
+
+1. **A deep-karate combat model.** 2D fixed-point space, three height bands with
+   technique-specific _uke_ defense, a perception-latency keystone (you react to a
+   _delayed_ snapshot of your opponent), on-contact cancel combos, a throw triangle,
+   sweeps and okizeme, a stamina economy, and WKF **points-only** scoring with _yame_
+   resets and a king-of-the-hill ladder.
+
+2. **Bots as data, never code.** An LLM doesn't write a program — it writes a JSON
+   decision tree in a bounded DSL. That single decision makes the whole platform safe,
+   cheap to run, and perfectly reproducible.
 
 ## Why a DSL instead of running the LLM's code
 
 Bots are **data, not code**. The bot language has no loops, recursion, or I/O, so:
 
 - **Safe by construction** — the vocabulary contains no dangerous operations; a
-  malicious bot literally cannot express network/file/host access. The trusted
-  computing base is one ~250-line interpreter, not a JS engine.
-- **No DoS** — loop-free means worst-case cost is bounded by document size,
-  checked at validation. No instruction metering needed.
-- **Bit-identical replays** — integer/fixed-point arithmetic only.
+  malicious bot literally cannot express network / file / host access. The trusted
+  computing base is one small interpreter ([`src/engine/dsl.ts`](src/engine/dsl.ts)),
+  not a JS engine.
+- **No DoS** — loop-free means worst-case cost is bounded by document size, checked at
+  validation time. No instruction metering needed.
+- **Bit-identical replays** — integer / fixed-point arithmetic only, seeded PRNG, no
+  wall-clock. The same inputs always produce the same fight.
+
+These are the project's [non-negotiable invariants](docs/DESIGN.md) — determinism,
+security / TCB, a bounded DSL, and the same-pre-tick-snapshot rule. Read them before
+touching the engine.
+
+## How a fight happens
+
+```
+ spec.md  ──►  LLM  ──►  bot.json  ──►  validate  ──►  fight vs champion  ──►  replay
+(the rules)  (author)  (a DSL doc)   (the TCB gate)   (deterministic sim)   (byte-identical)
+```
+
+1. **Read** — the LLM reads [`docs/spec.md`](docs/spec.md) (the machine-generated bot
+   API + frame table + strategic primer).
+2. **Author** — it emits a JSON bot document: a list of `when → do` rules over a
+   whitelisted read surface (distance, height bands, stamina, the delayed opponent
+   snapshot…).
+3. **Validate** — the document passes the validator gate ([`POST /validate`](https://modelkombat.club/spec)),
+   which rejects anything outside the allowlisted vocabulary.
+4. **Fight** — the bot runs the frozen gauntlet, and a clearer challenges the
+   king-of-the-hill throne ([`POST /fight`](https://modelkombat.club/spec)).
+5. **Replay** — because the engine is deterministic, the whole fight is reproducible
+   from its seed.
+
+## Repository layout
+
+```
+src/                TypeScript source (the deterministic engine + all tooling)
+  engine/           the deterministic core + the trusted computing base  → src/engine/README.md
+  cli/              headless command-line tooling (fight / benchmark / telemetry / gen)  → src/cli/README.md
+  http/             the platform HTTP layer imported by the API functions  → src/http/README.md
+api/                Vercel serverless functions (/spec /validate /fight /king)  → api/README.md
+bots/               example + gauntlet bot documents  → bots/README.md
+web/                the public website (Vite + SolidJS) — modelkombat.club
+docs/               DESIGN.md (design of record) · STATUS.md (build log) · spec.md (generated bot API)
+  archive/          archived per-slice plans + design records
+scripts/            build-time helpers (static prerender of the site)
+plans/              in-flight vertical-slice plans
+```
+
+Every directory under `src/`, plus `api/` and `bots/`, has its own `README.md` with the
+detail. Start there when you want to understand a specific layer.
 
 ## Quick start
 
@@ -31,81 +87,62 @@ Bots are **data, not code**. The bot language has no loops, recursion, or I/O, s
 npm install        # once
 npm test           # vitest (test-first; the suite grows with each TDD slice)
 npm run build      # tsc → dist/
-npm run typecheck  # tsc --noEmit
-npm run format     # prettier --write . (format:check to verify only)
-npm run lint       # eslint . (lint:fix to auto-fix; adds block spacing)
+npm run typecheck  # tsc --noEmit (engine + api + web)
+npm run format     # prettier --write .  (format:check to verify only)
+npm run lint       # eslint .  (lint:fix to auto-fix)
 
 # run a headless demo fight (prints the tick log + winner):
 npm run fight -- bots/aggressor.json bots/turtle.json
+
+# score a bot against the frozen 6-bot gauntlet:
+npm run benchmark -- bots/rekka.json
 ```
 
-## Layout
+See [`src/cli/README.md`](src/cli/README.md) for every command and flag.
 
-All code lives under a single top-level `src/` (no monorepo nesting). `✅` exists
-today; the rest is the structure the TDD build grows into:
+## The live platform
 
-```
-src/               TypeScript source (pure engine + CLI tooling)
-  engine/          ✅ deterministic core (pure, no I/O)
-    types.ts      ✅ state schema + action grammar + Rules (single source of truth)
-    dsl.ts        ✅ bot AST, validator, interpreter  ← the trusted computing base
-    sim.ts        ✅ deterministic fight loop (x + vertical y; grows to full 2D)
-    prng.ts       ✅ seeded mulberry32 PRNG (perception jitter; the sim's only RNG)
-    rules.ts      ✅ CANONICAL_RULES — the authoritative frame table (every number proven by a runFight test)
-    *.test.ts     ✅ vitest behaviour suites (validate / interpret / fight / perception / rules)
-  cli/             ✅ headless fight runner — npm run fight (loads + validates bots, fights on the canonical table, prints the tick log)
-bots/              ✅ example bot documents (aggressor / counter / grappler / sweeper / turtle)
-docs/              DESIGN.md (combat + platform) + spec.md (generated bot authoring API)
-(planned) api/     Vercel serverless functions (import the engine from src/engine/)
-(planned) viewer   Vite + Pixi + SolidJS replay/fight viewer
-```
+The API is a set of Vercel serverless functions that import the engine directly from
+`src/` — the same `validate` / `runFight` and contract types run in the CLI, the tests,
+and production, so there is no cross-language drift.
 
-The karate move taxonomy + stick-figure rig + Pixi adapter are harvested from the
-dropped Project Pixel Fist (render layer) when those slices land.
+| Endpoint         | What it does                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------- |
+| `GET /spec`      | The self-describing bot-authoring spec (Markdown) an LLM reads to write a fighter.      |
+| `POST /validate` | Pre-check a bot document without spending a fight.                                      |
+| `POST /fight`    | Run a bot through the frozen gauntlet gate, then challenge the king-of-the-hill throne. |
+| `GET /king`      | The reigning King and the recent line of succession (identity only).                    |
+
+Details in [`api/README.md`](api/README.md) and [`src/http/README.md`](src/http/README.md).
 
 ## Status
 
-**Design resolved** for the deep karate model + bot API (`docs/DESIGN.md`,
-`docs/spec.md`). Shipped so far — each a TDD slice with its own PR:
+The deep-karate **combat engine is complete** — validate → fight → byte-identical
+replay, with the full read/counter game (height bands, perception latency, parry /
+counter / cancel windows, the throw triangle, sweeps + okizeme, air actions, a stamina
+economy), WKF match structure, and a canonical, behaviorally-proven frame table.
 
-- **C1 walking skeleton** (PRs #1–#5): headless deterministic core — validate a JSON
-  bot, run two bots N ticks, replay **byte-identically**, 1D approach + one strike that
-  scores / blocks / trades.
-- **C2 perception-latency keystone** (PRs #7–#11): the opponent is a coherent delayed
-  snapshot (`L_pos`/`L_act`, history ring buffer, dead-reckoning, seeded jitter).
-- **C3 height bands** (PRs #15–#16): `high/mid/low` strike + matching-band guard +
-  `L_act`-delayed `opponent.attackBand`.
-- **C4 vertical axis + occupancy** (PRs #17–#21): fixed-point `y`, gravity arc,
-  jump/crouch; a croucher vacates `high` and a jumper vacates `low` (a strike can
-  **whiff on posture**); `opponent.y` (`L_pos`) + `opponent.posture` (`L_act`) perceived.
-- **C5 parry windows** (PRs #23–#25): a freshly-raised matching-band guard **deflects**
-  (no score + attacker extra recovery) where a stale guard only blocks; a parry opens a
-  **counter window** whose strike scores a `counterBonus`, perceivable live as
-  `self.counterWindow`. First consumer of the **§11 compute-then-apply union**
-  (`computeStrike` + `applyStrike`) — the counter is the first cross-fighter effect.
-- **C6 on-contact cancel combos** (PRs #26–#28): a connecting strike — **hit or block,
-  never whiff/parry** — opens a `cancelWindow`; a `cancelInto`-routed follow-up interrupts
-  the recovery; the live window is perceivable as `self.cancelWindow` for hit-confirm.
-- **C7 throw triangle + knockdown** (PRs #29–#33): a committed `throw` grabs a grounded foe
-  — beating any guard/parry (unbanded) — scoring + knocking **down**; the `strike > throw >
-guard` precedence resolves in the union (strike **stuffs**, `throw-break` escapes, two
-  grabs **clash**); the incoming grab is the `L_act`-delayed `opponent.throwing` tell. The
-  union's genuine **test-forcing** consumer (same-tick cross-fighter mutual dependencies).
-- **C8 sweeps + limited okizeme** (PRs #35–#38): a `sweep` is a low-band knockdown strike
-  (precedence emergent — "a sweep is a strike"); one uniform knockdown lifecycle gives a
-  guaranteed **finish window** (exactly once) before wake-up **i-frames**; the okizeme read
-  is the live `self.finishWindow` + the `L_act`-delayed `opponent.knockdown`.
-- **Canonical frame table** (PRs #44–#49): the provisional demo rules are replaced by
-  engine-level `CANONICAL_RULES` (`src/engine/rules.ts`) — every number proven by a
-  behavioral `runFight` test (the design inequalities + WKF scoring); the CLI runner
-  fights on it and `src/cli/demo-rules.ts` is gone.
+The **platform layer is live**: the HTTP API (`/spec` · `/validate` · `/fight` · `/king`),
+the king-of-the-hill ladder on a durable throne store, and the public website. Still on
+the roadmap: `/replay` and the Pixi replay viewer.
 
-The milestones above are the core-engine highlights; since then the build has added the
-**C9** multi-move arsenal, the **C10** stamina economy, **WKF match structure** (yame +
-win condition + jogai / passivity officiating + senshu / overtime tie-resolution), and
-the offline **LLM bot-authoring benchmark v1**. The full capability-by-capability build
-log and the **"Next in the pipeline"** roadmap are the authoritative status record in
-**`docs/STATUS.md`**.
+The authoritative, capability-by-capability build log and the "next in the pipeline"
+roadmap live in **[`docs/STATUS.md`](docs/STATUS.md)**.
 
-See `docs/STATUS.md` for the live status + roadmap, `.claude/CLAUDE.md` for the
-invariants and current direction, and `docs/DESIGN.md` for the design rationale.
+## Documentation map
+
+| Read this                          | For                                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`docs/DESIGN.md`](docs/DESIGN.md) | The design of record — combat model + platform decisions + the non-negotiable invariants. |
+| [`docs/spec.md`](docs/spec.md)     | The generated bot-authoring API (also served live at `/spec`).                            |
+| [`docs/STATUS.md`](docs/STATUS.md) | The live build status + roadmap.                                                          |
+| [`docs/archive/`](docs/archive/)   | Every completed slice's plan + resolved-decision records.                                 |
+| `.claude/CLAUDE.md`                | Contributor context: invariants, conventions, and the current direction.                  |
+
+## Development
+
+Development follows **strict Test-Driven Development** — every line of production code is
+written in response to a failing test, verified with mutation testing, then refactored
+only where it adds value. The engine is pure TypeScript (ESM, `NodeNext`, strict mode,
+no runtime dependencies); tests are co-located `*.test.ts` files run with vitest. See
+`.claude/CLAUDE.md` for the full contributor guidelines.
