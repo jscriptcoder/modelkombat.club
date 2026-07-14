@@ -1,6 +1,6 @@
 import { For } from "solid-js";
 
-import { SPEC_GUIDE_PATH, VARIETY_PATH } from "../../shared/lib/paths";
+import { SPEC_GUIDE_PATH } from "../../shared/lib/paths";
 
 // A score badge: the numeric glyph the eye reads, plus the label a screen
 // reader announces (so "2·3" isn't voiced as "two middot three"). WKF scoring
@@ -206,12 +206,6 @@ export default function Arsenal() {
       <p class="arsenal-spec">
         <a href={`${SPEC_GUIDE_PATH}#frame-table`} target="_blank">
           Reach, frames, stamina, cancels — see the full frame table{" "}
-          <span aria-hidden="true">↗</span>
-        </a>
-      </p>
-      <p class="arsenal-variety">
-        <a href={VARIETY_PATH} target="_blank">
-          How often each move actually gets used — see the variety board{" "}
           <span aria-hidden="true">↗</span>
         </a>
       </p>
