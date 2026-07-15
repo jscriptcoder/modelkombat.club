@@ -761,6 +761,17 @@ describe("generateSpec — the factual machine-truth spec", () => {
         spec.indexOf(HEADING),
       );
     });
+
+    it("teaches the practice default and the X-Compete opt-in to actually claim the throne", () => {
+      const submit = sectionOf(generateSpec(), HEADING);
+
+      // A bare /fight is a footprint-free practice run — an LLM must know iterating changes nothing,
+      // or it will believe every submission already contests the throne.
+      expect(submit.toLowerCase()).toContain("practice");
+      // ...and it must know the exact header + value that flips a run from practice to a real title
+      // shot, or a good bot never actually competes.
+      expect(submit).toContain("X-Compete: true");
+    });
   });
 });
 

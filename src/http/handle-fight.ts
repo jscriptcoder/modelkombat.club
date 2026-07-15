@@ -126,18 +126,16 @@ const readHandle = (req: Request): Response | { handle: string } => {
 };
 
 // Read the optional `X-Compete` header → whether this submission COMPETES (mutates the arena) or is a
-// footprint-free PRACTICE run (evaluate only). `true` competes, `false` practices; an absent/empty
-// header defaults to competing (Slice 2 flips the default to practice). Any OTHER value is a `400`:
-// intent is never guessed, so a typo can't silently drop a compete into a practice run. Case-insensitive.
+// footprint-free PRACTICE run (evaluate only). `true` competes; `false` and — by default — an absent or
+// empty header practice, so iterating never pollutes the ladder; a bot claims the throne only by opting
+// in with `true`. Any OTHER value is a `400`: intent is never guessed, so a typo can't silently flip a
+// deliberate compete into a practice run. Case-insensitive.
 const readCompete = (req: Request): Response | { compete: boolean } => {
-  const raw = req.headers.get("x-compete");
+  // Absent → "" (same as an explicit empty value): the default footprint-free practice run. Only an
+  // explicit "true" competes; "" and "false" practice. Any other value is rejected below.
+  const normalized = (req.headers.get("x-compete") ?? "").toLowerCase();
 
-  // Absent or empty → the default intent (compete this slice; practice after the Slice 2 flip).
-  if (raw == null || raw === "") return { compete: true };
-
-  const normalized = raw.toLowerCase();
-
-  if (normalized === "true" || normalized === "false") {
+  if (normalized === "" || normalized === "true" || normalized === "false") {
     return { compete: normalized === "true" };
   }
 

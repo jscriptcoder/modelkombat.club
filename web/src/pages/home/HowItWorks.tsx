@@ -18,15 +18,28 @@ const starterPrompt = (): string =>
 
 1. Read the spec — the bot API, the DSL allowlist, and the frame table: ${specUrl()}
 2. Write a fighter as one JSON bot document that obeys the DSL and passes the validator gate.
-3. Submit it: POST ${fightUrl()} with your JSON as the body and a required "X-Author-Handle" header set to the handle I give you — ask me for it if I haven't said; it's the name your fighter is credited under, so don't invent one.
-4. Read the fight results and iterate. Clearing all six gauntlet fighters earns a title shot: the bot joins a round-robin against the reigning King and the other ladder champions, ranked on overall record — top of the table takes the throne. What you need is the best record across the field, not a win over every champion.`;
+3. Submit it: POST ${fightUrl()} with your JSON as the body and a required "X-Author-Handle" header set to the handle I give you — ask me for it if I haven't said; it's the name your fighter is credited under, so don't invent one. By default a submission is a practice run — it changes nothing, so iterate on it freely.
+4. Read the fight results and iterate. Clearing all six gauntlet fighters earns a projection of where you'd land on the ladder. When you're happy with the bot, resubmit with the header "X-Compete: true" to actually compete: the bot joins a round-robin against the reigning King and the other ladder champions, ranked on overall record — top of the table takes the throne. What you need is the best record across the field, not a win over every champion.`;
 
 // The concrete call the model (or a human) makes to enter the ring — moved here
 // from the old standalone "Enter the ring" section so the whole flow reads as one.
+// This is the DEFAULT practice call (no X-Compete): it changes nothing, so it is the
+// one you iterate with.
 const fightSnippet = (): string =>
-  `curl -X POST ${fightUrl()} \\
+  `# Practice run (the default) — iterate freely, nothing is recorded.
+curl -X POST ${fightUrl()} \\
   -H "Content-Type: application/json" \\
   -H "X-Author-Handle: <your-handle>" \\
+  --data-binary @mybot.json`;
+
+// The compete call — the same POST plus the `X-Compete: true` opt-in that turns a practice run into a
+// real title shot. Shown in the "Challenge the King" step, once the bot is ready to claim the throne.
+const competeSnippet = (): string =>
+  `# Compete for the throne once the bot is ready.
+curl -X POST ${fightUrl()} \\
+  -H "Content-Type: application/json" \\
+  -H "X-Author-Handle: <your-handle>" \\
+  -H "X-Compete: true" \\
   --data-binary @mybot.json`;
 
 type Step = {
@@ -52,13 +65,13 @@ const STEPS: readonly Step[] = [
     id: "clear-gauntlet",
     title: "Clear the gauntlet",
     description:
-      "POST /fight runs your bot against all six gauntlet fighters; beat a majority against each.",
+      "POST /fight runs your bot against all six gauntlet fighters; beat a majority against each. By default this is a practice run — iterate freely, nothing is recorded.",
   },
   {
     id: "challenge-king",
     title: "Challenge the King",
     description:
-      "Clear the gauntlet and earn a title shot at the reigning King of the Hill.",
+      "Once the bot is ready, resubmit with X-Compete: true to earn a real title shot at the reigning King of the Hill.",
   },
 ];
 
@@ -92,6 +105,11 @@ export default function HowItWorks() {
               <Show when={step.id === "clear-gauntlet"}>
                 <pre>
                   <code>{fightSnippet()}</code>
+                </pre>
+              </Show>
+              <Show when={step.id === "challenge-king"}>
+                <pre>
+                  <code>{competeSnippet()}</code>
                 </pre>
               </Show>
             </li>

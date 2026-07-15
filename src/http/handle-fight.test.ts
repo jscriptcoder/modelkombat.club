@@ -114,6 +114,10 @@ const staleArenaStore = (
 // on `/fight`, so throne-mechanics tests supply this and stay focused on ranking.
 const DEFAULT_HANDLE = "test-author";
 
+// Throne-mechanics tests verify COMPETE behavior (crowning, ranking, archive), so `fightRequest`
+// makes that intent explicit with `X-Compete: true` — otherwise the Slice 2 default flip (absent →
+// practice) would turn every crowning assertion into a footprint-free projection. Callers override the
+// header (e.g. `"false"`) to exercise practice; `noCompeteRequest` omits it to probe the DEFAULT.
 const fightRequest = (
   body: string,
   headers?: Record<string, string>,
@@ -121,7 +125,20 @@ const fightRequest = (
   new Request("https://mk.example/fight", {
     method: "POST",
     body,
-    headers: { "X-Author-Handle": DEFAULT_HANDLE, ...headers },
+    headers: {
+      "X-Author-Handle": DEFAULT_HANDLE,
+      "X-Compete": "true",
+      ...headers,
+    },
+  });
+
+// A request carrying the handle but NO X-Compete header — exercises the header's DEFAULT intent
+// (practice, post-flip). `fightRequest` forces `X-Compete: true`, so a bare default needs its own ctor.
+const noCompeteRequest = (body: string): Request =>
+  new Request("https://mk.example/fight", {
+    method: "POST",
+    body,
+    headers: { "X-Author-Handle": DEFAULT_HANDLE },
   });
 
 const noHandleRequest = (body: string): Request =>
@@ -1323,12 +1340,12 @@ describe("handleFight — S5.1: reproduction archive", () => {
   });
 });
 
-// Slice 1 (practice/compete): `/fight` gains an OPT-IN practice run. `X-Compete: false` evaluates
-// where the bot WOULD land and returns a `projection` (the same outcome/rank/board/displaced shape as
-// a real title, under a distinct key), writing NOTHING — no arena commit, no archive. `X-Compete: true`
-// (and, this slice, an absent header) keeps the existing compete-and-commit path. A non-true/false
-// value is a `400` malformed request (no silent downgrade). The default flip to practice is Slice 2.
-describe("handleFight — Slice 1: practice mode via X-Compete opt-in", () => {
+// practice/compete: `/fight` DEFAULTS to a footprint-free practice run — an absent/empty (or explicit
+// `false`) `X-Compete` evaluates where the bot WOULD land and returns a `projection` (the same
+// outcome/rank/board/displaced shape as a real title, under a distinct key), writing NOTHING — no arena
+// commit, no archive. Only `X-Compete: true` takes the compete-and-commit path and can claim the throne.
+// A non-true/false value is a `400` malformed request (no silent downgrade).
+describe("handleFight — practice/compete via the X-Compete header", () => {
   // Spy on the store so a stray commit on the read-only practice path is caught by COUNT, not merely
   // inferred from unchanged state (the S2.2/S2.3 belt-and-braces pattern).
   const countingStore = (
@@ -1516,18 +1533,44 @@ describe("handleFight — Slice 1: practice mode via X-Compete opt-in", () => {
     );
   });
 
-  it("treats an EMPTY X-Compete header like an absent one — it competes (default)", async () => {
-    const store = inMemoryThroneStore();
+  it("flips the default: a bare /fight (no X-Compete) PRACTICES, writing nothing", async () => {
+    const inner = inMemoryThroneStore();
+
+    await enthrone(inner, "vTEST", loadBot("aggressor"));
+
+    const before = await inner.readArena("vTEST");
+    const { store, commits } = countingStore(inner);
 
     const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("aggressor")), { "X-Compete": "" }),
+      noCompeteRequest(JSON.stringify(loadBot("berserker"))), // beats the King → would crown
       arena("vTEST", store),
     );
 
-    expect(
-      ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
-    ).toBe("crowned");
-    expect(await store.readArena("vTEST")).toBeDefined(); // committed
+    const body = (await res.json()) as ProjectionBody;
+
+    expect(body.projection?.outcome).toBe("crowned");
+    expect(body).not.toHaveProperty("title");
+    expect(commits()).toBe(0);
+    expect(await inner.readArena("vTEST")).toEqual(before);
+  });
+
+  it("treats an EMPTY X-Compete header like an absent one — it PRACTICES (the flipped default)", async () => {
+    const inner = inMemoryThroneStore();
+
+    await enthrone(inner, "vTEST", loadBot("aggressor"));
+
+    const { store, commits } = countingStore(inner);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker")), { "X-Compete": "" }),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as ProjectionBody;
+
+    expect(body.projection?.outcome).toBe("crowned");
+    expect(body).not.toHaveProperty("title");
+    expect(commits()).toBe(0);
   });
 
   it("parses X-Compete case-insensitively — TRUE competes", async () => {

@@ -461,7 +461,7 @@ describe("RingPage — the /ring submit surface", () => {
     ).toBeNull();
   });
 
-  it("posts the bot to /fight with the author-handle header by default", async () => {
+  it("posts the bot to /fight with the author-handle and compete headers by default", async () => {
     const body = reportBody({ cleared: false });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -486,6 +486,9 @@ describe("RingPage — the /ring submit surface", () => {
           method: "POST",
           headers: expect.objectContaining({
             "x-author-handle": "grandmaster",
+            // the courier competes on send (X-Compete: true) — the API now defaults to a
+            // footprint-free practice run, so the ring must opt in to keep crowning as before
+            "x-compete": "true",
           }),
           body: JSON.stringify(doc),
           signal: expect.anything(),
