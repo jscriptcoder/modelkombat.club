@@ -41,6 +41,19 @@ export type FightDeps = {
   n: number;
 };
 
+// The placement block a clearer reads back — committed as a `title` (compete) or returned as a
+// `projection` (practice). Same shape either way: the challenger's outcome/rank, the per-defender
+// board, and the relegated defender (identity only) when a full arena shed one to seat it.
+type BoardRow = { defender: ReturnType<typeof memberIdentity> } & ReturnType<
+  typeof toTitleFightReport
+>;
+type Placement = {
+  outcome: "crowned" | "entered" | "unplaced";
+  rank?: number | null;
+  board: BoardRow[];
+  displaced?: ReturnType<typeof memberIdentity>;
+};
+
 const json = (body: unknown): Response =>
   new Response(JSON.stringify(body), {
     status: 200,
@@ -112,11 +125,34 @@ const readHandle = (req: Request): Response | { handle: string } => {
   return { handle: raw };
 };
 
+// Read the optional `X-Compete` header → whether this submission COMPETES (mutates the arena) or is a
+// footprint-free PRACTICE run (evaluate only). `true` competes, `false` practices; an absent/empty
+// header defaults to competing (Slice 2 flips the default to practice). Any OTHER value is a `400`:
+// intent is never guessed, so a typo can't silently drop a compete into a practice run. Case-insensitive.
+const readCompete = (req: Request): Response | { compete: boolean } => {
+  const raw = req.headers.get("x-compete");
+
+  // Absent or empty → the default intent (compete this slice; practice after the Slice 2 flip).
+  if (raw == null || raw === "") return { compete: true };
+
+  const normalized = raw.toLowerCase();
+
+  if (normalized === "true" || normalized === "false") {
+    return { compete: normalized === "true" };
+  }
+
+  return problem(
+    400,
+    "/problems/malformed-request",
+    'The X-Compete header must be "true" or "false" (it is absent by default).',
+  );
+};
+
 // The RFC 9457 detail for a byte-identical resubmit of a sitting arena member (C4). A clone can
 // never out-rank its original, so it is rejected as a no-op before any benchmark; the detail names
 // the 1-based slot it duplicates so the author knows which fighter already holds that ground.
 const arenaMirrorDetail = (slot: number): string =>
-  `This exact bot already holds arena slot #${slot} — a byte-identical fighter can't displace itself.`;
+  `This exact bot already holds arena slot #${slot} — resubmitting an unchanged fighter has no effect.`;
 
 // If the submitted document is byte-identical to a current arena member, the 409 that rejects it
 // (naming the member's 1-based slot); otherwise `undefined`, and the submission proceeds. `sameDoc`
@@ -199,6 +235,14 @@ export const handleFight = async (
 
   const { handle } = handleResult;
 
+  // Read the compete/practice intent up front — before the (costlier) benchmark, and after the handle
+  // so a malformed handle wins over a malformed intent. Rejects a non-true/false `X-Compete` with 400.
+  const competeResult = readCompete(req);
+
+  if (competeResult instanceof Response) return competeResult;
+
+  const { compete } = competeResult;
+
   // Build this clearer's reproduction record (S5.1): the challenger doc + the exact defender docs it
   // fought + the frozen seeds + version, from which any fight regenerates via `runFight` (never a
   // tape — invariant #1). `memberSeniority` is the pin key: the seniority it was seated at when it
@@ -241,11 +285,34 @@ export const handleFight = async (
     gauntletNames: deps.gauntletNames,
   });
 
-  // Failed the gate: plain gauntlet report, no title, arena untouched.
+  // Failed the gate: plain gauntlet report, no title/projection, arena untouched.
   if (!report.cleared) return json(report);
 
-  // Empty arena: bootstrap-crown the clearer as this version's first champion (arena #1 at
-  // generation 1, seniority 1). `commitArena` also appends it to the crowning lineage.
+  // Settle a clearer's placement. COMPETE → attempt the (archiving) commit and, on success, return the
+  // placement as a `title`; a lost CAS race surfaces as the 409. PRACTICE → write NOTHING and return the
+  // SAME placement as a `projection` — never a title, so a consumer keying on `title` can't misread a
+  // footprint-free preview as a real crown. Shared by all three clearer outcomes below.
+  const settle = async (
+    placement: Placement,
+    expected: number | null,
+    next: ArenaRecord,
+    record: ReproRecord,
+  ): Promise<Response> => {
+    if (!compete) return json({ ...report, projection: placement });
+
+    const moved = await commit(
+      deps.store,
+      deps.version,
+      expected,
+      next,
+      record,
+    );
+
+    return moved ?? json({ ...report, title: placement });
+  };
+
+  // Empty arena: bootstrap-crown the clearer as this version's first champion (arena #1 at generation
+  // 1, seniority 1), archiving its record with an empty defender list. Practice projects the same crown.
   if (arena === undefined) {
     const challenger: ArenaMember = {
       champion: parsed.doc,
@@ -253,19 +320,11 @@ export const handleFight = async (
       seniority: 1,
     };
 
-    const moved = await commit(
-      deps.store,
-      deps.version,
+    return settle(
+      { outcome: "crowned", rank: 1, board: [] },
       null,
       { members: [challenger], generation: 1, nextSeniority: 2 },
-      // Crowned King, seniority 1 — it fought no defenders (an empty arena), so its record is pinned
-      // by that seniority with an empty defender list.
       reproRecord([], 1),
-    );
-
-    return (
-      moved ??
-      json({ ...report, title: { outcome: "crowned", rank: 1, board: [] } })
     );
   }
 
@@ -299,44 +358,25 @@ export const handleFight = async (
   }));
 
   // Unplaced: the challenger cleared but ranked below every defender of a FULL arena. It joins no
-  // arena slot — but it STILL commits (S5.1), gen-guarded against the arena it fought, to archive its
-  // reproduction record (memberSeniority null — it is no member). The commit leaves the arena
-  // byte-identical (same members/generation/seniority); only the archive grows. A CAS race here means
-  // the arena moved under the challenger, so its "didn't place" verdict is stale → 409, nothing
-  // written. On success the board still diagnoses the near-miss (board[0] = the King fought).
+  // arena slot — but competing it STILL commits (S5.1), gen-guarded against the arena it fought, to
+  // archive its reproduction record (memberSeniority null — it is no member); the commit leaves the
+  // arena byte-identical (only the archive grows). A CAS race means the arena moved under it, so its
+  // "didn't place" verdict is stale → 409. On success board[0] still diagnoses the near-miss King.
   if (placement.outcome === "unplaced") {
-    const moved = await commit(
-      deps.store,
-      deps.version,
+    return settle(
+      { outcome: "unplaced", board },
       arena.generation,
       arena,
       reproRecord(arena.members, null),
     );
-
-    return moved ?? json({ ...report, title: { outcome: "unplaced", board } });
   }
 
-  // A placement mutates the arena at the next generation. A CAS race (the arena moved since our
-  // read) surfaces as 409 throne-moved; the loser resubmits against the new arena. The same atomic
-  // commit archives the challenger's record — the defenders it fought, pinned by the seniority it was
-  // seated at (so its replay is kept for as long as it holds an arena slot).
-  const moved = await commit(
-    deps.store,
-    deps.version,
-    arena.generation,
+  // A placement mutates the arena at the next generation (compete) — a CAS race surfaces as 409
+  // throne-moved and the loser resubmits — or is projected read-only (practice). The atomic commit
+  // archives the challenger's record — the defenders it fought, pinned by the seniority it was seated
+  // at (so its replay is kept for as long as it holds an arena slot).
+  return settle(
     {
-      members: placement.members,
-      generation: arena.generation + 1,
-      nextSeniority: arena.nextSeniority + 1,
-    },
-    reproRecord(arena.members, challenger.seniority),
-  );
-
-  if (moved) return moved;
-
-  return json({
-    ...report,
-    title: {
       outcome: placement.outcome,
       rank: placement.rank,
       board,
@@ -346,5 +386,12 @@ export const handleFight = async (
         ? { displaced: memberIdentity(placement.displaced) }
         : {}),
     },
-  });
+    arena.generation,
+    {
+      members: placement.members,
+      generation: arena.generation + 1,
+      nextSeniority: arena.nextSeniority + 1,
+    },
+    reproRecord(arena.members, challenger.seniority),
+  );
 };
