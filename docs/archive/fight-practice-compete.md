@@ -1,7 +1,7 @@
 # Plan: `/fight` practice-by-default, compete opt-in
 
-**Branch**: feat/fight-practice-compete (Slice 1, merged #300) · feat/fight-practice-default (Slice 2)
-**Status**: Slice 1 MERGED (#300); Slice 2 COMPLETE (pending commit approval)
+**Branch**: feat/fight-practice-compete (Slice 1, #300) · feat/fight-practice-default (Slice 2, #301)
+**Status**: ✅ COMPLETE — both slices merged (#300, #301) and live. Archived.
 
 ## Goal
 
