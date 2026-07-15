@@ -41,7 +41,9 @@ const isAbortError = (error: unknown): boolean =>
 
 // The default seam: post the document to /fight with the author handle, bounded by a 30s abort.
 // A non-2xx still resolves (its problem+json body is meaningful content); only a network failure
-// or the abort rejects.
+// or the abort rejects. `X-Compete: true` opts into competing — the API defaults to a footprint-free
+// practice run, so the courier sends this to crown on a clear (the interactive practice/compete
+// preview is a later slice).
 const postFightToApi: PostFight = async ({ doc, handle }) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -52,6 +54,7 @@ const postFightToApi: PostFight = async ({ doc, handle }) => {
       headers: {
         "content-type": "application/json",
         "x-author-handle": handle,
+        "x-compete": "true",
       },
       body: JSON.stringify(doc),
       signal: controller.signal,

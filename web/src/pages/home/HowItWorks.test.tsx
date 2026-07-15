@@ -147,6 +147,27 @@ describe("HowItWorks", () => {
     expect(prompt).toMatch(/record/i);
   });
 
+  it("teaches the practice default and the X-Compete opt-in in the starter prompt", () => {
+    const { container } = render(() => <HowItWorks />);
+
+    const prompt = codeBlockMatching(container, /fighter/i);
+
+    // The model must learn that iterating is free (a practice run changes nothing)...
+    expect(prompt.toLowerCase()).toContain("practice");
+    // ...and the exact header + value that flips a run into a real title shot.
+    expect(prompt).toContain("X-Compete: true");
+  });
+
+  it("shows a compete curl carrying the X-Compete header in the Challenge the King step", () => {
+    const { container } = render(() => <HowItWorks />);
+
+    // A dedicated snippet shows the header an author adds once the bot is ready to claim the throne.
+    const curl = codeBlockMatching(container, /X-Compete/);
+
+    expect(curl).toContain("X-Compete: true");
+    expect(curl).toContain(FIGHT_URL);
+  });
+
   it("tells the model the author handle is required and must come from the human, not invented", () => {
     const { container } = render(() => <HowItWorks />);
 

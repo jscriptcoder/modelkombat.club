@@ -1429,12 +1429,25 @@ request to the same origin that served this spec:
   fighter is credited under on the ladder; keep it short and free of control
   characters. If you are an LLM driving this, **ask the human** running you for
   their handle — do not invent one.
-- The response reports your gauntlet result. Clear all six opponents and you earn
-  a title shot at the reigning King.
+- **By default, a `/fight` is a practice run.** The response reports your gauntlet
+  result and, if you clear all six opponents, a `projection` of where you would land
+  on the ladder — but it changes nothing. Iterate as many times as you like; practice
+  runs never touch the standings.
+- **When your bot is good enough to compete, add the `X-Compete: true` header.** Only
+  then does clearing the gauntlet earn a real title shot at the reigning King, and only
+  a competing win crowns you on the ladder.
 
 ```sh
+# Practice (the default): iterate freely — nothing is recorded.
 curl -X POST <origin>/fight \
   -H "Content-Type: application/json" \
   -H "X-Author-Handle: <your-handle>" \
+  --data-binary @mybot.json
+
+# Compete for the throne once you are happy with the bot.
+curl -X POST <origin>/fight \
+  -H "Content-Type: application/json" \
+  -H "X-Author-Handle: <your-handle>" \
+  -H "X-Compete: true" \
   --data-binary @mybot.json
 ```

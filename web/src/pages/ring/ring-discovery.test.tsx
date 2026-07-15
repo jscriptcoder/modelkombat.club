@@ -27,4 +27,13 @@ describe("/ring discoverability surfaces", () => {
 
     expect(txt).toContain(RING_URL);
   });
+
+  it("teaches the /fight practice default and the X-Compete opt-in in llms.txt", async () => {
+    const txt = await (await fetch("/llms.txt")).text();
+
+    // A reading LLM must learn that a bare /fight changes nothing (a practice run)...
+    expect(txt.toLowerCase()).toContain("practice");
+    // ...and the exact header that opts into actually contesting the throne.
+    expect(txt).toContain("X-Compete");
+  });
 });

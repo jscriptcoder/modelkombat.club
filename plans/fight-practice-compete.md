@@ -1,7 +1,7 @@
 # Plan: `/fight` practice-by-default, compete opt-in
 
-**Branch**: feat/fight-practice-compete
-**Status**: Active — Slice 1 COMPLETE (pending commit approval); Slice 2 next
+**Branch**: feat/fight-practice-compete (Slice 1, merged #300) · feat/fight-practice-default (Slice 2)
+**Status**: Slice 1 MERGED (#300); Slice 2 COMPLETE (pending commit approval)
 
 ## Goal
 
@@ -82,7 +82,7 @@ from the existing `rankArena`/`board` shaping and return, skipping all three com
 — only if it adds value.
 **Done when**: all AC met, mutation report reviewed, human approves commit. No copy/ring/spec change in this slice.
 
-### Slice 2: Practice becomes the default, and every contract surface teaches `X-Compete`
+### Slice 2: Practice becomes the default, and every contract surface teaches `X-Compete` — ✅ DONE (100% mutation; drift test covers spec prose)
 
 **Value**: An LLM (and its human) reading any surface learns the real flow — iterate for free, then claim the throne
 — and a bare `/fight` no longer pollutes the ladder. Atomic so no deploy is stale or breaks the ring.
