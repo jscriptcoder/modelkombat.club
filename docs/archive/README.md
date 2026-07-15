@@ -793,5 +793,33 @@ slices TDD'd at **100% mutation** on `handle-fight.ts`.
 [fight-practice-compete.md](fight-practice-compete.md) — the plan · [practice-compete-decisions.md](practice-compete-decisions.md) — the grill-me decisions
 
 **The interactive `/ring` two-step UX** (show the `projection` first, then a deliberate "Claim the
-throne" compete button, so the browser flow stops auto-competing and mirrors the API model) is a
-separate future plan — out of this feature's scope.
+throne" compete button, so the browser flow stops auto-competing and mirrors the API model) shipped
+as its own plan — see the next section.
+
+## Web `/ring` — the two-step practice → claim UX (web) ✅ COMPLETE
+
+The interactive follow-through to the practice/compete split: the `/ring` page stops auto-competing.
+A bare submit is a footprint-free **practice** run whose body carries a `projection` — the ring
+renders it hypothetically ("you'd dethrone the reigning King", a "defenders you'd face" board, and
+crucially **no** "See the throne" link — a preview is not a crown) and offers a deliberate,
+outcome-aware claim button. Clicking it fires a second POST with `X-Compete: true`; the committed
+`title` (throne link) replaces the projection. So a human couriering an iterating LLM previews every
+revision for free and crowns only on purpose. **web-only** — the practice/compete API was already
+live — so no `INPUT_HASH` / `BENCHMARK_VERSION` ("v19") / TCB change; `web/**` is outside Stryker, so
+both slices used exact-assertion browser tests + a manual mutator scan. Grill-me UX decisions (R1–R6:
+claim gating to crowned/entered, any-edit-clears staleness, throne-moved retry re-previews via
+practice, outcome-aware label) are captured inline in the plan.
+
+- **Slice 1 — preview then claim** (PR #303, `feat/ring-practice-compete-ux`) — the `PostFight` seam +
+  `postFightToApi` gain `compete`; `runFight(compete)` — the submit and every retry practice, only the
+  claim competes. A `readPlacement()` reads committed `title` **or** preview `projection` into one
+  view-model (single source for the headline + title view); `committedHeadline` / `projectionHeadline`
+  frame reality vs hypothetical; `titleView` carries the defenders label, the throne link (committed
+  crown only), and the outcome-aware claim label ("Take the throne" / "Claim your place"; unplaced →
+  none). Deployable on its own — the happy path still crowns end-to-end, so no deploy loses crowning.
+- **Slice 2 — edit invalidates a pending claim** (PR #304, `feat/ring-claim-staleness`) — a shared
+  `editField(set, value)` helper applies the field update **and** resets `result`; both `onInput`
+  handlers (doc + handle) route through it, so editing either after a projection clears the result +
+  claim button. A claim can only ever compete the exact artifact that was previewed.
+
+[ring-practice-compete-ux.md](ring-practice-compete-ux.md) — the plan (with the grill-me UX decisions inline).
