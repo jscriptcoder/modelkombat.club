@@ -756,3 +756,42 @@ story-split docs — `variety-telemetry-harness.md` (grill-me: 12 resolved decis
 `variety-telemetry-stories.md` (story split S1a–S5c) — stay live in `plans/` as the trail for the one
 remaining post-launch story **S5a** (an external submission corpus — no build, just the S1b `-- <path…>`
 override on a submissions dir).
+
+## `/fight` practice-by-default, compete opt-in ✅ COMPLETE
+
+Decoupled **evaluating** a bot from **mutating the arena** on `POST /fight`. Surfaced by the live
+competition: an LLM iterating against `/fight` had every gauntlet-clear seat a trial fighter into the
+ladder (the **join-if-room** rule filling empty slots with same-author noise), so experimentation
+polluted the standings. Now a bare `/fight` is a **footprint-free practice run** — it clears the gate,
+ranks the round-robin, and returns a `projection` of where the bot would land, writing **nothing** (no
+arena commit, no repro archive). Only `X-Compete: true` takes the compete-and-commit path and can claim
+the throne, so a bot competes exactly when the author decides it is ready. KotH integrity is preserved:
+the compete path re-verifies against the live arena under the existing CAS/`generation` guard.
+Platform-layer only — **TCB untouched**, no DSL op, no engine change, **no `INPUT_HASH` /
+`BENCHMARK_VERSION` bump**. Design trail: grill-me decisions [practice-compete-decisions.md](practice-compete-decisions.md)
+(#1–#10, incl. practice-default, the `X-Compete` header + strict true/false parse, the distinct
+`projection` response vs ground-truth `title`, read-only practice, mode-neutral mirror-reject). Both
+slices TDD'd at **100% mutation** on `handle-fight.ts`.
+
+- **Slice 1 — the opt-in practice machinery** (PR #300, `feat/fight-practice-compete`) — `readCompete`
+  parses `X-Compete` (`true`→compete, `false`→practice, absent→default, else `400`); a shared `settle`
+  helper unifies the three clearer outcomes (bootstrap / placement / unplaced): compete commits + returns
+  `title`, practice returns the same payload as `projection` with zero writes. **Default stayed compete** —
+  a pure, backward-compatible addition, so existing callers/ring/spec were untouched and the risky
+  projection logic landed in isolation. Mirror-reject fires in both modes with mode-neutral wording
+  (softened from the compete-framed "can't displace itself"). 100% mutation (148 killed; a merged
+  true/false return kills the equivalent-object survivor).
+- **Slice 2 — flip the default + align every contract surface** (PR #301, `feat/fight-practice-default`) —
+  one atomic PR so no LLM-facing text ever teaches a stale flow: `readCompete` defaults absent/empty →
+  **practice**; the `gen-spec.ts` `submitSection()` teaches practice-default + a practice/compete curl pair
+  (regenerated `docs/spec.md`, feeding `/spec` · `/spec-guide` · raw `/spec.md`, all covered by the
+  byte-match drift test); `llms.txt` (authoring-loop + `/fight` + `/ring` blurbs); `HowItWorks.tsx` (starter
+  prompt, curl pair, step copy); and `RingPage.tsx` sends `x-compete: true` so the browser courier keeps
+  crowning as before. Existing compete-mechanics tests kept green by making their intent explicit
+  (`X-Compete: true` in the `fightRequest` test helper). 100% mutation on the flipped `readCompete`.
+
+[fight-practice-compete.md](fight-practice-compete.md) — the plan · [practice-compete-decisions.md](practice-compete-decisions.md) — the grill-me decisions
+
+**The interactive `/ring` two-step UX** (show the `projection` first, then a deliberate "Claim the
+throne" compete button, so the browser flow stops auto-competing and mirrors the API model) is a
+separate future plan — out of this feature's scope.
