@@ -179,6 +179,29 @@ const boardedBody = (
     ...extra,
   });
 
+// A cleared report carrying a `projection` block (a PRACTICE run) instead of a committed `title` —
+// the same placement shape, but a PREVIEW the ring renders hypothetically ("you'd…") and never as a
+// real crown (no throne link), with a deliberate claim button.
+const projectedBody = (
+  projection: Record<string, unknown>,
+): Record<string, unknown> => scoredBody({ cleared: true, projection });
+
+// A projection carrying the three-row BOARD at the given outcome (mirrors boardedBody).
+const projectedBoard = (
+  outcome: string,
+  extra?: Record<string, unknown>,
+): Record<string, unknown> =>
+  projectedBody({
+    outcome,
+    board: BOARD.map((r) =>
+      boardEntry({
+        defender: { name: r.name, model: r.model, handle: r.handle },
+        winRate: r.winRate,
+      }),
+    ),
+    ...extra,
+  });
+
 // A `postFight` stub resolving a given HTTP status + body — the injected network seam.
 const resolves =
   (response: FightResponse): (() => Promise<FightResponse>) =>
@@ -259,8 +282,13 @@ describe("RingPage — the /ring submit surface", () => {
 
     submit(ui, doc, "grandmaster");
 
-    // The seam receives the PARSED document (not the raw string) and the typed handle.
-    expect(postFight).toHaveBeenCalledWith({ doc, handle: "grandmaster" });
+    // The seam receives the PARSED document (not the raw string), the typed handle, and — because a
+    // bare submit is now a footprint-free PRACTICE run — `compete: false`. Claiming opts in separately.
+    expect(postFight).toHaveBeenCalledWith({
+      doc,
+      handle: "grandmaster",
+      compete: false,
+    });
   });
 
   it("announces the outcome for each fight result", async () => {
@@ -461,7 +489,7 @@ describe("RingPage — the /ring submit surface", () => {
     ).toBeNull();
   });
 
-  it("posts the bot to /fight with the author-handle and compete headers by default", async () => {
+  it("posts the bot to /fight with the author-handle and a PRACTICE X-Compete by default", async () => {
     const body = reportBody({ cleared: false });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -486,9 +514,9 @@ describe("RingPage — the /ring submit surface", () => {
           method: "POST",
           headers: expect.objectContaining({
             "x-author-handle": "grandmaster",
-            // the courier competes on send (X-Compete: true) — the API now defaults to a
-            // footprint-free practice run, so the ring must opt in to keep crowning as before
-            "x-compete": "true",
+            // A bare submit is a footprint-free PRACTICE run: X-Compete is "false", so iterating
+            // never pollutes the ladder. Claiming the throne sends "true" (a separate, deliberate act).
+            "x-compete": "false",
           }),
           body: JSON.stringify(doc),
           signal: expect.anything(),
@@ -618,6 +646,10 @@ describe("RingPage — the fight card", () => {
       .map((row) => cell(row, ".ring-defender-crown"));
 
     expect(crowns).toEqual(["King", null, null]);
+
+    // A COMMITTED result names the defenders as ones you FOUGHT (past tense) — distinct from a
+    // projection's hypothetical "you'd face". Pins the committed branch of the defenders label.
+    expect(ui.getByText(/the arena defenders you fought/i)).toBeTruthy();
   });
 
   it("shows each defender's win rate and beat/lost, including the 0.5 boundary", async () => {
@@ -880,6 +912,306 @@ describe("RingPage — the fight card", () => {
   });
 });
 
+// The two-step practice → claim flow: a bare submit is a footprint-free PRACTICE run whose body
+// carries a `projection` (not a committed `title`). The ring renders it HYPOTHETICALLY — "you'd…"
+// headlines, a "defenders you'd face" board, and crucially NO "See the throne" link (a preview is
+// not a crown, mirroring the API's projection-vs-title split) — then offers a deliberate claim.
+describe("RingPage — the practice projection", () => {
+  it("frames a crowned projection hypothetically, with no throne link", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: projectedBoard("crowned") })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // A non-empty board projection means you'd DETHRONE the sitting King — framed as a preview...
+    expect(
+      await ui.findByText(/this bot would dethrone the reigning king/i),
+    ).toBeTruthy();
+    // ...and it is NOT the committed crown copy...
+    expect(ui.queryByText(/new champion/i)).toBeNull();
+    // ...and offers no throne link — you don't hold the throne, you're only previewing.
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
+  });
+
+  it("frames a first-crown projection (empty board) as taking the empty throne", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: projectedBody({ outcome: "crowned", rank: 1, board: [] }),
+        })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    expect(await ui.findByText(/take the empty throne/i)).toBeTruthy();
+    // Not the committed "first King" copy, and no throne link on a preview.
+    expect(ui.queryByText(/first king/i)).toBeNull();
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
+    // An empty-board crown still fought no one, so there's no board — but the claim button must
+    // still render (nothing to render EXCEPT the claim), pinning the section's omit rule.
+    expect(ui.getByRole("button", { name: /take the throne/i })).toBeTruthy();
+  });
+
+  it("frames an entered projection with the rank it would take", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: projectedBoard("entered", { rank: 2 }),
+        })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // Pins the #-rank branch in the projection headline — "would enter at #2", not committed "joined".
+    expect(await ui.findByText(/would enter the arena at #2/i)).toBeTruthy();
+    expect(ui.queryByText(/joined the arena/i)).toBeNull();
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
+  });
+
+  it("frames an unplaced projection as wouldn't-place, with no board and no claim", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: projectedBoard("unplaced") })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // The future-tense miss ("wouldn't crack") distinguishes a preview from the committed
+    // "didn't crack" — and an unplaced preview takes no seat, so there's nothing to claim.
+    expect(await ui.findByText(/wouldn't crack the top ranks/i)).toBeTruthy();
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
+    expect(
+      ui.queryByRole("button", { name: /take the throne|claim your place/i }),
+    ).toBeNull();
+  });
+
+  it("labels the projection board as the defenders you'd FACE (not fought)", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: projectedBoard("entered") })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // The board still renders every defender (one row each, King first)...
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+
+    expect(within(list).getAllByRole("listitem")).toHaveLength(BOARD.length);
+    // ...but under the hypothetical "you'd face" label — you haven't fought them, it's a preview.
+    expect(ui.getByText(/defenders you'd face/i)).toBeTruthy();
+    expect(ui.queryByText(/defenders you fought/i)).toBeNull();
+  });
+});
+
+// The claim button appears ONLY on a projection that would take a seat (crowned or entered), and its
+// label names exactly what the click does. An unplaced preview, an uncleared bot, and an already-
+// committed title all show no claim button.
+describe("RingPage — the claim button", () => {
+  it("labels a crowned projection's claim 'Take the throne'", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: projectedBoard("crowned") })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    expect(
+      await ui.findByRole("button", { name: /take the throne/i }),
+    ).toBeTruthy();
+    // The entered label must NOT be what shows for a crown.
+    expect(ui.queryByRole("button", { name: /claim your place/i })).toBeNull();
+  });
+
+  it("labels an entered projection's claim 'Claim your place'", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: projectedBoard("entered", { rank: 3 }),
+        })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    expect(
+      await ui.findByRole("button", { name: /claim your place/i }),
+    ).toBeTruthy();
+    expect(ui.queryByRole("button", { name: /take the throne/i })).toBeNull();
+  });
+
+  it("offers no claim button when the bot didn't clear the gauntlet", async () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // The scorecard proves the (uncleared) result rendered — but there's nothing to claim.
+    await ui.findByRole("region", { name: /gauntlet scorecard/i });
+
+    expect(
+      ui.queryByRole("button", { name: /take the throne|claim your place/i }),
+    ).toBeNull();
+  });
+
+  it("offers no claim button on an already-committed title result", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: boardedBody("crowned") })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // A committed title means you've ALREADY claimed — the throne link shows, not a claim button.
+    expect(await ui.findByRole("link", { name: /throne/i })).toBeTruthy();
+    expect(
+      ui.queryByRole("button", { name: /take the throne|claim your place/i }),
+    ).toBeNull();
+  });
+});
+
+// Claiming: the projection's claim button fires a SECOND POST with compete:true, and the committed
+// `title` it returns REPLACES the projection (throne link now present). A lost throne race (409) on
+// the claim re-previews via PRACTICE — the arena moved, so the honest next step is a fresh preview,
+// not a blind re-compete.
+describe("RingPage — claiming the throne", () => {
+  it("competes on claim and the committed crown replaces the projection", async () => {
+    const postFight = vi.fn((input: { compete: boolean }) =>
+      input.compete
+        ? Promise.resolve({ status: 200, body: boardedBody("crowned") })
+        : Promise.resolve({ status: 200, body: projectedBoard("crowned") }),
+    );
+
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // The practice preview lands first: hypothetical headline, a claim button, and no throne link.
+    const claim = await ui.findByRole("button", { name: /take the throne/i });
+
+    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
+
+    fireEvent.click(claim);
+
+    // The committed crown replaces the preview: real headline + the now-yours throne link...
+    expect(await ui.findByText(/new champion/i)).toBeTruthy();
+    expect(
+      (await ui.findByRole("link", { name: /throne/i })).getAttribute("href"),
+    ).toBe("/#king");
+    // ...and the claim button is gone (already claimed).
+    expect(ui.queryByRole("button", { name: /take the throne/i })).toBeNull();
+
+    // Exactly two POSTs: the practice preview (false), then the deliberate claim (true).
+    expect(postFight.mock.calls.map((c) => c[0].compete)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
+  it("sends X-Compete: true on the real claim POST (the default seam)", async () => {
+    // Drive the REAL seam (no postFight prop) so the outgoing header is exercised: call 1 is the
+    // practice preview (a projection), call 2 the claim (a committed title).
+    let calls = 0;
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      calls += 1;
+
+      const body =
+        calls === 1 ? projectedBoard("crowned") : boardedBody("crowned");
+
+      return Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    });
+
+    try {
+      const ui = render(() => <RingPage />);
+
+      submit(ui, VALID_DOC, "grandmaster");
+
+      const claim = await ui.findByRole("button", { name: /take the throne/i });
+
+      fireEvent.click(claim);
+
+      // The committed crown proves the claim POST landed and parsed.
+      expect(await ui.findByText(/new champion/i)).toBeTruthy();
+
+      // The FIRST POST practiced ("false"); the SECOND — the claim — competes ("true").
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        1,
+        "/fight",
+        expect.objectContaining({
+          headers: expect.objectContaining({ "x-compete": "false" }),
+        }),
+      );
+      expect(fetchSpy).toHaveBeenNthCalledWith(
+        2,
+        "/fight",
+        expect.objectContaining({
+          headers: expect.objectContaining({ "x-compete": "true" }),
+        }),
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("re-previews via practice when a claim loses the throne race (409)", async () => {
+    const postFight = vi.fn((input: { compete: boolean }) =>
+      input.compete
+        ? Promise.resolve({
+            status: 409,
+            body: {
+              type: "/problems/throne-moved",
+              title:
+                "The throne advanced to a new champion before your crown landed; resubmit to challenge the current King.",
+              status: 409,
+            },
+          })
+        : Promise.resolve({ status: 200, body: projectedBoard("crowned") }),
+    );
+
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    const claim = await ui.findByRole("button", { name: /take the throne/i });
+
+    fireEvent.click(claim);
+
+    // The claim lost the race — a throne-moved alert with a resubmit prompt.
+    const resubmit = await ui.findByRole("button", { name: /resubmit/i });
+
+    fireEvent.click(resubmit);
+
+    // Resubmit re-runs PRACTICE (the arena moved — re-preview it), so the projection is back.
+    expect(
+      await ui.findByRole("button", { name: /take the throne/i }),
+    ).toBeTruthy();
+    // The call sequence proves it: practice preview, failed claim, PRACTICE re-preview (not compete).
+    expect(postFight.mock.calls.map((c) => c[0].compete)).toEqual([
+      false,
+      true,
+      false,
+    ]);
+  });
+});
+
 // Slice 3 — input guards: the handle is validated + trimmed CLIENT-side (mirroring the server's
 // `readHandle`), and an empty/whitespace document is caught with its own message — both BEFORE any
 // POST, so a bad handle or no input never contests the throne. All asserted on the injected
@@ -894,6 +1226,7 @@ describe("RingPage — input guards: handle + empty document", () => {
     expect(postFight).toHaveBeenCalledWith({
       doc: VALID_DOC,
       handle: "grandmaster",
+      compete: false,
     });
   });
 
@@ -903,7 +1236,11 @@ describe("RingPage — input guards: handle + empty document", () => {
 
     typeAndSend(ui, JSON.stringify(VALID_DOC), "ko ga");
 
-    expect(postFight).toHaveBeenCalledWith({ doc: VALID_DOC, handle: "ko ga" });
+    expect(postFight).toHaveBeenCalledWith({
+      doc: VALID_DOC,
+      handle: "ko ga",
+      compete: false,
+    });
   });
 
   it("rejects an empty handle inline without calling the ring", () => {
@@ -935,7 +1272,11 @@ describe("RingPage — input guards: handle + empty document", () => {
 
     typeAndSend(ui, JSON.stringify(VALID_DOC), handle);
 
-    expect(postFight).toHaveBeenCalledWith({ doc: VALID_DOC, handle });
+    expect(postFight).toHaveBeenCalledWith({
+      doc: VALID_DOC,
+      handle,
+      compete: false,
+    });
   });
 
   it("accepts a 64-character handle (the boundary)", () => {
@@ -945,7 +1286,11 @@ describe("RingPage — input guards: handle + empty document", () => {
 
     typeAndSend(ui, JSON.stringify(VALID_DOC), handle);
 
-    expect(postFight).toHaveBeenCalledWith({ doc: VALID_DOC, handle });
+    expect(postFight).toHaveBeenCalledWith({
+      doc: VALID_DOC,
+      handle,
+      compete: false,
+    });
   });
 
   it("rejects a 65-character handle inline without calling the ring", () => {
@@ -1377,6 +1722,7 @@ describe("RingPage — submit lifecycle: disable + remembered handle", () => {
       expect(postFight).toHaveBeenCalledWith({
         doc: VALID_DOC,
         handle: "grandmaster",
+        compete: false,
       });
     } finally {
       setItem.mockRestore();

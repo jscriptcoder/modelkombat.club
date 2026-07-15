@@ -19,6 +19,9 @@ export type FightResponse = { status: number; body: unknown };
 type PostFight = (input: {
   doc: unknown;
   handle: string;
+  // Whether this POST COMPETES (X-Compete: true — mutate the arena) or is a footprint-free PRACTICE
+  // run (evaluate only). A bare submit practices; the claim button opts in.
+  compete: boolean;
 }) => Promise<FightResponse>;
 
 type RingPageProps = {
@@ -41,10 +44,10 @@ const isAbortError = (error: unknown): boolean =>
 
 // The default seam: post the document to /fight with the author handle, bounded by a 30s abort.
 // A non-2xx still resolves (its problem+json body is meaningful content); only a network failure
-// or the abort rejects. `X-Compete: true` opts into competing — the API defaults to a footprint-free
-// practice run, so the courier sends this to crown on a clear (the interactive practice/compete
-// preview is a later slice).
-const postFightToApi: PostFight = async ({ doc, handle }) => {
+// or the abort rejects. `X-Compete` carries the intent: "false" is a footprint-free PRACTICE run
+// (the API's default — evaluate only, write nothing), "true" COMPETES (mutate the arena). A bare
+// submit practices; claiming the throne sends "true".
+const postFightToApi: PostFight = async ({ doc, handle, compete }) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -54,7 +57,7 @@ const postFightToApi: PostFight = async ({ doc, handle }) => {
       headers: {
         "content-type": "application/json",
         "x-author-handle": handle,
-        "x-compete": "true",
+        "x-compete": compete ? "true" : "false",
       },
       body: JSON.stringify(doc),
       signal: controller.signal,
@@ -68,39 +71,87 @@ const postFightToApi: PostFight = async ({ doc, handle }) => {
   }
 };
 
+// A clearer's placement rides back as a committed `title` (it COMPETED and now holds the slot) or a
+// footprint-free `projection` (it PRACTICED — a preview of where it would land, mutating nothing).
+// Same inner shape either way (C7); the field name is the ground truth, so a consumer keying on
+// `title` can't misread a preview as a real crown (API decision #5). `committed` drives every
+// present-vs-hypothetical difference below: headline tense, the throne link, and the claim button.
+type Placement = { committed: boolean; block: Record<string, unknown> };
+
+const readPlacement = (body: unknown): Placement | null => {
+  if (!isRecord(body)) return null;
+
+  if (isRecord(body.title)) return { committed: true, block: body.title };
+
+  if (isRecord(body.projection)) {
+    return { committed: false, block: body.projection };
+  }
+
+  return null;
+};
+
+// A dethrone fought the sitting King (a non-empty board); an empty board is the first crown (D-B).
+const boardHasRows = (block: Record<string, unknown>): boolean =>
+  Array.isArray(block.board) && block.board.length > 0;
+
+// The committed headline for a clearer that COMPETED and now holds its placement (C7): crowned
+// (first King vs dethrone, told apart by board emptiness), entered as a defender, or unplaced.
+const committedHeadline = (block: Record<string, unknown>): string => {
+  if (block.outcome === "crowned") {
+    return boardHasRows(block)
+      ? "New champion — you dethroned the reigning King! 👑"
+      : "Cleared the gauntlet — you're the first King! 👑";
+  }
+
+  if (block.outcome === "entered") {
+    return typeof block.rank === "number"
+      ? `Cleared the gauntlet — you joined the arena at #${block.rank}! ⚔️`
+      : "Cleared the gauntlet — you joined the arena! ⚔️";
+  }
+
+  if (block.outcome === "unplaced") {
+    return "Cleared the gauntlet, but didn't crack the top ranks.";
+  }
+
+  return "Cleared the gauntlet.";
+};
+
+// The hypothetical headline for a PRACTICE projection — where the bot WOULD land if it claimed,
+// framed in the conditional so a preview never reads as a real result. Same outcome branches.
+const projectionHeadline = (block: Record<string, unknown>): string => {
+  if (block.outcome === "crowned") {
+    return boardHasRows(block)
+      ? "This bot would dethrone the reigning King. 👑"
+      : "This bot clears the gauntlet — claim it to take the empty throne.";
+  }
+
+  if (block.outcome === "entered") {
+    return typeof block.rank === "number"
+      ? `This bot would enter the arena at #${block.rank}. ⚔️`
+      : "This bot would enter the arena. ⚔️";
+  }
+
+  if (block.outcome === "unplaced") {
+    return "Cleared the gauntlet, but wouldn't crack the top ranks.";
+  }
+
+  return "This bot clears the gauntlet.";
+};
+
 // Map a /fight report body to the author-facing headline. A bot that didn't clear stops at the
-// gauntlet; a clearer reads its arena placement (C7): crowned (first King vs dethrone, told apart
-// by whether the board is empty — you fought no one — D-B), entered as a defender, or unplaced.
+// gauntlet; a clearer's line is committed (it competed) or hypothetical (a practice projection).
 const outcomeHeadline = (body: unknown): string => {
   if (!isRecord(body) || body.cleared !== true) {
     return "Didn't clear the gauntlet.";
   }
 
-  const title = isRecord(body.title) ? body.title : undefined;
-  const outcome = title?.outcome;
+  const placement = readPlacement(body);
 
-  if (outcome === "crowned") {
-    // A dethrone fought the sitting King (a non-empty board); an empty board is the first crown.
-    const board = title?.board;
+  if (placement === null) return "Cleared the gauntlet.";
 
-    return Array.isArray(board) && board.length > 0
-      ? "New champion — you dethroned the reigning King! 👑"
-      : "Cleared the gauntlet — you're the first King! 👑";
-  }
-
-  if (outcome === "entered") {
-    const rank = title?.rank;
-
-    return typeof rank === "number"
-      ? `Cleared the gauntlet — you joined the arena at #${rank}! ⚔️`
-      : "Cleared the gauntlet — you joined the arena! ⚔️";
-  }
-
-  if (outcome === "unplaced") {
-    return "Cleared the gauntlet, but didn't crack the top ranks.";
-  }
-
-  return "Cleared the gauntlet.";
+  return placement.committed
+    ? committedHeadline(placement.block)
+    : projectionHeadline(placement.block);
 };
 
 const isSuccess = (status: number): boolean => status >= 200 && status < 300;
@@ -188,10 +239,17 @@ type Incumbent = { name: string; model: string | null; handle: string | null };
 // the reigning King (board[0]). The card reads these; the fuller telemetry rides in the raw block.
 type BoardRow = { defender: Incumbent; winRate: number; isKing: boolean };
 
-// The title block's view-model. `linksToThrone` is true for a crown (the throne is now yours to
-// view); false when you entered/were unplaced. `board` is the per-defender board, in rank order —
-// empty for the first crown (an empty arena had no defenders to fight).
-type TitleView = { linksToThrone: boolean; board: BoardRow[] };
+// The placement-block view-model, for a committed title OR a practice projection. `linksToThrone`
+// is true only for a COMMITTED crown (the throne is now yours to view) — never on a preview. `board`
+// is the per-defender board in rank order (empty for a first crown). `defendersLabel` reads "you
+// fought" once committed, "you'd face" on a preview. `claimLabel` is the deliberate opt-in button's
+// text — present only on a projection that would take a seat (crowned/entered), null otherwise.
+type TitleView = {
+  linksToThrone: boolean;
+  board: BoardRow[];
+  defendersLabel: string;
+  claimLabel: string | null;
+};
 
 const readIncumbent = (value: unknown): Incumbent | null => {
   if (!isRecord(value) || typeof value.name !== "string") return null;
@@ -220,13 +278,29 @@ const readBoard = (value: unknown): BoardRow[] => {
   });
 };
 
-// Shape the /fight `title` block into the view-model, or null when there is nothing to show — an
-// uncleared/error body, an unrecognised outcome, or a non-crown with no scoutable board — so the
-// card omits the section. A crown always shows (its throne link); a placement shows its board.
-const titleView = (body: unknown): TitleView | null => {
-  if (!isRecord(body) || !isRecord(body.title)) return null;
+// The claim button's label for a PRACTICE projection that would take a seat, or null when there is
+// nothing to claim (an unplaced preview, or an already-committed title). Outcome-aware so the CTA
+// says exactly what the click does: a crown TAKES the throne; an entrant CLAIMS a defender's place.
+const claimLabelFor = (committed: boolean, outcome: unknown): string | null => {
+  if (committed) return null;
+  if (outcome === "crowned") return "Take the throne";
+  if (outcome === "entered") return "Claim your place";
 
-  const { outcome, board } = body.title;
+  return null;
+};
+
+// Shape the /fight placement block (committed `title` or practice `projection`) into the view-model,
+// or null when there is nothing to show — an uncleared/error body, an unrecognised outcome, or a
+// non-crown with no board AND nothing to claim — so the card omits the section. A committed crown
+// always shows (its throne link); a projection that would place always shows (its claim button); any
+// placement with a board shows its rows.
+const titleView = (body: unknown): TitleView | null => {
+  const placement = readPlacement(body);
+
+  if (placement === null) return null;
+
+  const { committed, block } = placement;
+  const { outcome, board } = block;
 
   if (
     outcome !== "crowned" &&
@@ -237,12 +311,17 @@ const titleView = (body: unknown): TitleView | null => {
   }
 
   const rows = readBoard(board);
-  const linksToThrone = outcome === "crowned";
+  const linksToThrone = committed && outcome === "crowned";
+  const claimLabel = claimLabelFor(committed, outcome);
 
-  // A non-crown with no board has nothing to render — omit the section (graceful degrade).
-  return !linksToThrone && rows.length === 0
+  const defendersLabel = committed
+    ? "The arena defenders you fought"
+    : "The arena defenders you'd face";
+
+  // Nothing to render — no throne link, no board rows, and nothing to claim — omit (graceful degrade).
+  return !linksToThrone && rows.length === 0 && claimLabel === null
     ? null
-    : { linksToThrone, board: rows };
+    : { linksToThrone, board: rows, defendersLabel, claimLabel };
 };
 
 // A warning triangle. Decorative — the adjacent message text carries the meaning — so it is hidden
@@ -346,7 +425,10 @@ const RingPage: Component<RingPageProps> = (props) => {
     );
   };
 
-  const runFight = async (): Promise<void> => {
+  // Run a /fight, in one of two modes. `compete: false` is the default footprint-free PRACTICE run
+  // (a bare submit, and every retry — after a lost throne race, re-previewing the moved arena is the
+  // honest next step); `compete: true` is the deliberate claim fired by the projection's claim button.
+  const runFight = async (compete: boolean): Promise<void> => {
     setParseError("");
     setHandleError("");
     setSendError("");
@@ -371,6 +453,7 @@ const RingPage: Component<RingPageProps> = (props) => {
       const response = await post({
         doc: parsed.doc,
         handle: handleCheck.handle,
+        compete,
       });
 
       setResult(response);
@@ -401,7 +484,7 @@ const RingPage: Component<RingPageProps> = (props) => {
         class="ring-form"
         onSubmit={(event) => {
           event.preventDefault();
-          void runFight();
+          void runFight(false);
         }}
       >
         <div class="ring-field">
@@ -455,7 +538,11 @@ const RingPage: Component<RingPageProps> = (props) => {
       <Show when={sendError()}>
         <div class="ring-send-error" role="alert">
           <p class="ring-send-error-line">{sendError()}</p>
-          <button type="button" class="retry" onClick={() => void runFight()}>
+          <button
+            type="button"
+            class="retry"
+            onClick={() => void runFight(false)}
+          >
             Retry
           </button>
         </div>
@@ -495,7 +582,7 @@ const RingPage: Component<RingPageProps> = (props) => {
                         <button
                           type="button"
                           class="retry"
-                          onClick={() => void runFight()}
+                          onClick={() => void runFight(false)}
                         >
                           Resubmit
                         </button>
@@ -510,7 +597,7 @@ const RingPage: Component<RingPageProps> = (props) => {
                         <button
                           type="button"
                           class="retry"
-                          onClick={() => void runFight()}
+                          onClick={() => void runFight(false)}
                         >
                           Retry
                         </button>
@@ -548,9 +635,7 @@ const RingPage: Component<RingPageProps> = (props) => {
                   </Show>
 
                   <Show when={t().board.length > 0}>
-                    <p class="ring-defenders-label">
-                      The arena defenders you fought
-                    </p>
+                    <p class="ring-defenders-label">{t().defendersLabel}</p>
                     <ul class="ring-defender-list" aria-label="Arena defenders">
                       <For each={t().board}>
                         {(row) => (
@@ -584,6 +669,19 @@ const RingPage: Component<RingPageProps> = (props) => {
                         )}
                       </For>
                     </ul>
+                  </Show>
+
+                  <Show when={t().claimLabel}>
+                    {(label) => (
+                      <button
+                        type="button"
+                        class="ring-claim"
+                        disabled={loading()}
+                        onClick={() => void runFight(true)}
+                      >
+                        {label()}
+                      </button>
+                    )}
                   </Show>
                 </section>
               )}
