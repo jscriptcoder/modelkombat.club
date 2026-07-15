@@ -146,3 +146,9 @@ written in response to a failing test, verified with mutation testing, then refa
 only where it adds value. The engine is pure TypeScript (ESM, `NodeNext`, strict mode,
 no runtime dependencies); tests are co-located `*.test.ts` files run with vitest. See
 `.claude/CLAUDE.md` for the full contributor guidelines.
+
+Much of this rigor is enforced with the help of an outstanding set of **Claude Code
+skills, agents, and commands** by [citypaul](https://github.com/citypaul) — the TDD,
+testing, mutation-testing, functional-programming, and planning workflows this project
+leans on all come from his work. They're worth a look:
+**<https://github.com/citypaul/.dotfiles>**.
