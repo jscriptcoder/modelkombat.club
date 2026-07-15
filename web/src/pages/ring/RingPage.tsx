@@ -425,6 +425,15 @@ const RingPage: Component<RingPageProps> = (props) => {
     );
   };
 
+  // Edit a field (doc or handle) AND invalidate any result on screen: a projection's claim button is
+  // a promise to compete the exact bot that was previewed, so the moment either input changes, the
+  // stale preview (and its claim) must clear — a later claim can never compete a silently-edited bot.
+  // The author re-runs practice to get a fresh projection. One rule, shared by both fields.
+  const editField = (set: (value: string) => void, value: string): void => {
+    set(value);
+    setResult(null);
+  };
+
   // Run a /fight, in one of two modes. `compete: false` is the default footprint-free PRACTICE run
   // (a bare submit, and every retry — after a lost throne race, re-previewing the moved arena is the
   // honest next step); `compete: true` is the deliberate claim fired by the projection's claim button.
@@ -496,7 +505,7 @@ const RingPage: Component<RingPageProps> = (props) => {
             class="ring-textarea"
             rows="7"
             value={docText()}
-            onInput={(e) => setDocText(e.currentTarget.value)}
+            onInput={(e) => editField(setDocText, e.currentTarget.value)}
             onFocus={(e) => e.currentTarget.select()}
             aria-invalid={parseError() !== "" ? "true" : undefined}
             aria-describedby="bot-document-error"
@@ -514,7 +523,7 @@ const RingPage: Component<RingPageProps> = (props) => {
               class="ring-input"
               type="text"
               value={handle()}
-              onInput={(e) => setHandle(e.currentTarget.value)}
+              onInput={(e) => editField(setHandle, e.currentTarget.value)}
               aria-invalid={handleError() !== "" ? "true" : undefined}
               aria-describedby="author-handle-error"
             />
