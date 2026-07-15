@@ -332,6 +332,25 @@
   font-weight: 600;
 }
 
+/* The deliberate compete opt-in shown on a practice projection — the primary CTA to claim the
+   seat/throne. Styled like the submit button (accent fill) so "this is the commit" reads at a glance. */
+.ring-claim {
+  margin-top: 1.25rem;
+  padding: 0.6rem 1.6rem;
+  background: var(--accent);
+  color: #0b0e14;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.ring-claim:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 /* The arena-defender board — every defender the challenger fought (S4), rank-ordered, King first. */
 .ring-defenders-label {
   margin: 0.5rem 0 0.75rem;
