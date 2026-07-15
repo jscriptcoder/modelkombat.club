@@ -1212,6 +1212,90 @@ describe("RingPage — claiming the throne", () => {
   });
 });
 
+// Slice 2 (staleness guard): once a practice projection with a claim button is on screen, EDITING
+// the bot doc or the handle invalidates it — the result section + claim button clear, so a later
+// claim can only ever compete the exact artifact that was previewed (never a silently-edited one).
+// The author must re-run practice to get a fresh projection before they can claim again.
+describe("RingPage — editing invalidates a pending claim", () => {
+  it("clears the projection and claim button when the bot doc is edited", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: projectedBoard("crowned") })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    // The projection + claim button are on screen...
+    await ui.findByRole("button", { name: /take the throne/i });
+
+    // ...then the author tweaks the bot document.
+    fireEvent.input(ui.getByRole("textbox", { name: /bot document/i }), {
+      target: { value: JSON.stringify({ ...VALID_DOC, name: "revised" }) },
+    });
+
+    // The stale preview is gone — no claim button (can't claim an un-previewed bot) and the whole
+    // result section (raw block included) is cleared, pinning that `result` itself was reset.
+    expect(ui.queryByRole("button", { name: /take the throne/i })).toBeNull();
+    expect(ui.queryByLabelText(/raw fight result/i)).toBeNull();
+  });
+
+  it("clears the projection and claim button when the handle is edited", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({
+          status: 200,
+          body: projectedBoard("entered", { rank: 2 }),
+        })}
+      />
+    ));
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    await ui.findByRole("button", { name: /claim your place/i });
+
+    // Editing the handle also invalidates the preview — the claim would seat the bot under a
+    // different attribution than was projected (decision R3: any edit clears).
+    fireEvent.input(ui.getByRole("textbox", { name: /handle/i }), {
+      target: { value: "different-handle" },
+    });
+
+    expect(ui.queryByRole("button", { name: /claim your place/i })).toBeNull();
+    expect(ui.queryByLabelText(/raw fight result/i)).toBeNull();
+  });
+
+  it("shows a fresh projection when practice is re-run on the edited bot", async () => {
+    const postFight = vi.fn((_input: { compete: boolean }) =>
+      Promise.resolve({ status: 200, body: projectedBoard("crowned") }),
+    );
+
+    const ui = render(() => <RingPage postFight={postFight} />);
+
+    submit(ui, VALID_DOC, "grandmaster");
+
+    await ui.findByRole("button", { name: /take the throne/i });
+
+    // Edit clears the pending claim...
+    fireEvent.input(ui.getByRole("textbox", { name: /bot document/i }), {
+      target: { value: JSON.stringify({ ...VALID_DOC, name: "revised" }) },
+    });
+
+    expect(ui.queryByRole("button", { name: /take the throne/i })).toBeNull();
+
+    // ...and re-running practice on the edited bot lands a fresh projection + claim button (no
+    // stuck stale state), via a second PRACTICE post — the author can iterate then claim again.
+    fireEvent.click(ui.getByRole("button", { name: /send into the ring/i }));
+
+    expect(
+      await ui.findByRole("button", { name: /take the throne/i }),
+    ).toBeTruthy();
+    expect(postFight.mock.calls.map((c) => c[0].compete)).toEqual([
+      false,
+      false,
+    ]);
+  });
+});
+
 // Slice 3 — input guards: the handle is validated + trimmed CLIENT-side (mirroring the server's
 // `readHandle`), and an empty/whitespace document is caught with its own message — both BEFORE any
 // POST, so a bad handle or no input never contests the throne. All asserted on the injected
