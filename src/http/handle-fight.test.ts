@@ -1322,3 +1322,328 @@ describe("handleFight — S5.1: reproduction archive", () => {
     expect(await store.readArchive("vTEST")).toEqual([]); // no clear ⇒ no archive entry
   });
 });
+
+// Slice 1 (practice/compete): `/fight` gains an OPT-IN practice run. `X-Compete: false` evaluates
+// where the bot WOULD land and returns a `projection` (the same outcome/rank/board/displaced shape as
+// a real title, under a distinct key), writing NOTHING — no arena commit, no archive. `X-Compete: true`
+// (and, this slice, an absent header) keeps the existing compete-and-commit path. A non-true/false
+// value is a `400` malformed request (no silent downgrade). The default flip to practice is Slice 2.
+describe("handleFight — Slice 1: practice mode via X-Compete opt-in", () => {
+  // Spy on the store so a stray commit on the read-only practice path is caught by COUNT, not merely
+  // inferred from unchanged state (the S2.2/S2.3 belt-and-braces pattern).
+  const countingStore = (
+    inner: ThroneStore,
+  ): { store: FightDeps["store"]; commits: () => number } => {
+    let commits = 0;
+
+    return {
+      commits: () => commits,
+      store: {
+        readArena: inner.readArena,
+        readArchive: inner.readArchive,
+        commitArena: (v, e, n, r) => {
+          commits += 1;
+
+          return inner.commitArena(v, e, n, r);
+        },
+      },
+    };
+  };
+
+  type ProjectionBody = {
+    cleared: boolean;
+    title?: unknown;
+    projection?: {
+      outcome: string;
+      rank?: number;
+      board?: {
+        defender: { name: string; model: string | null; handle: string | null };
+        winRate: number;
+      }[];
+      displaced?: { name: string; model: string | null; handle: string | null };
+    };
+  };
+
+  const practiceRequest = (body: string): Request =>
+    fightRequest(body, { "X-Compete": "false" });
+
+  it("PROJECTS a would-be crown against a non-empty arena and writes nothing", async () => {
+    const inner = inMemoryThroneStore();
+
+    await enthrone(inner, "vTEST", loadBot("aggressor")); // lone King, generation 1
+
+    const before = await inner.readArena("vTEST");
+    const { store, commits } = countingStore(inner);
+
+    const res = await handleFight(
+      practiceRequest(JSON.stringify(loadBot("berserker"))), // beats aggressor 1.00 → would crown
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as ProjectionBody;
+
+    expect(body.cleared).toBe(true);
+    expect(body.projection?.outcome).toBe("crowned");
+    expect(body.projection?.rank).toBe(1);
+    expect(body.projection?.board).toHaveLength(1);
+    expect(body.projection?.board?.[0].defender.name).toBe("aggressor");
+    expect(body.projection?.board?.[0].winRate).toBe(1);
+    // a projection is NEVER a title — a consumer keying on `title` must not see this as a real crown
+    expect(body).not.toHaveProperty("title");
+
+    // nothing was written: no commit, arena byte-identical, archive empty
+    expect(commits()).toBe(0);
+    expect(await inner.readArena("vTEST")).toEqual(before);
+    expect(await inner.readArchive("vTEST")).toEqual([]);
+  });
+
+  it("PROJECTS a would-be entrant (rank 2) whose board reflects the loss, writing nothing", async () => {
+    const inner = inMemoryThroneStore();
+
+    await enthrone(inner, "vTEST", loadBot("berserker")); // lone King
+
+    const { store, commits } = countingStore(inner);
+
+    const res = await handleFight(
+      practiceRequest(JSON.stringify(loadBot("aggressor"))), // loses 0.00 → would enter #2 (room)
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as ProjectionBody;
+
+    expect(body.projection?.outcome).toBe("entered");
+    expect(body.projection?.rank).toBe(2);
+    expect(body.projection?.board?.[0].defender.name).toBe("berserker");
+    expect(body.projection?.board?.[0].winRate).toBe(0); // swept by the King
+    expect(body).not.toHaveProperty("title");
+    expect(commits()).toBe(0);
+  });
+
+  it("PROJECTS a full-arena relegation — displaced identity present — without evicting anyone", async () => {
+    const inner = inMemoryThroneStore();
+
+    // Full arena: two bots that beat aggressor + an idle dummy. The challenger (aggressor) beats only
+    // the dummy → would enter #3 and relegate the dummy. In practice nothing is evicted.
+    await seatArena(inner, "vTEST", [
+      { champion: loadBot("berserker"), handle: null, seniority: 1 },
+      { champion: loadBot("pacer"), handle: null, seniority: 2 },
+      { champion: dummy(), handle: null, seniority: 3 },
+    ]);
+
+    const before = await inner.readArena("vTEST");
+    const { store, commits } = countingStore(inner);
+
+    const res = await handleFight(
+      practiceRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as ProjectionBody;
+
+    expect(body.projection?.outcome).toBe("entered");
+    expect(body.projection?.rank).toBe(3);
+    expect(body.projection?.displaced).toEqual({
+      name: "dummy",
+      model: "test",
+      handle: null,
+    });
+    expect(body.projection?.board).toHaveLength(3);
+    // read-only: no commit, and the dummy is still seated
+    expect(commits()).toBe(0);
+    expect(await inner.readArena("vTEST")).toEqual(before);
+  });
+
+  it("PROJECTS the empty-arena bootstrap crown as rank 1 with an empty board, writing nothing", async () => {
+    const inner = inMemoryThroneStore();
+    const { store, commits } = countingStore(inner);
+
+    const res = await handleFight(
+      practiceRequest(JSON.stringify(loadBot("aggressor"))),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as ProjectionBody;
+
+    expect(body.projection?.outcome).toBe("crowned");
+    expect(body.projection?.rank).toBe(1);
+    expect(body.projection?.board).toEqual([]);
+    expect(body).not.toHaveProperty("title");
+    expect(commits()).toBe(0);
+    expect(await inner.readArena("vTEST")).toBeUndefined(); // arena still empty
+  });
+
+  it("returns the plain gauntlet report — neither projection nor title — when a practice bot fails the gate", async () => {
+    const inner = inMemoryThroneStore();
+    const { store, commits } = countingStore(inner);
+
+    const res = await handleFight(
+      practiceRequest(JSON.stringify(mover())), // only walks → cannot clear the idle dummy
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as ProjectionBody;
+
+    expect(body.cleared).toBe(false);
+    expect(body).not.toHaveProperty("projection");
+    expect(body).not.toHaveProperty("title");
+    expect(commits()).toBe(0);
+    expect(await inner.readArena("vTEST")).toBeUndefined();
+  });
+
+  it("still competes-and-commits when X-Compete is true (returns a title, not a projection)", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Compete": "true",
+      }),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as ProjectionBody & {
+      title?: { outcome: string };
+    };
+
+    expect(body.title?.outcome).toBe("crowned");
+    expect(body).not.toHaveProperty("projection");
+    // the crown actually landed
+    expect((await store.readArena("vTEST"))?.members[0].champion.name).toBe(
+      "aggressor",
+    );
+  });
+
+  it("treats an EMPTY X-Compete header like an absent one — it competes (default)", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), { "X-Compete": "" }),
+      arena("vTEST", store),
+    );
+
+    expect(
+      ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
+    ).toBe("crowned");
+    expect(await store.readArena("vTEST")).toBeDefined(); // committed
+  });
+
+  it("parses X-Compete case-insensitively — TRUE competes", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Compete": "TRUE",
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(
+      ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
+    ).toBe("crowned");
+    expect(await store.readArena("vTEST")).toBeDefined(); // committed
+  });
+
+  it("parses X-Compete case-insensitively — False projects, writing nothing", async () => {
+    const inner = inMemoryThroneStore();
+
+    await enthrone(inner, "vTEST", loadBot("aggressor"));
+
+    const { store, commits } = countingStore(inner);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("berserker")), {
+        "X-Compete": "False",
+      }),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as ProjectionBody;
+
+    expect(body.projection?.outcome).toBe("crowned");
+    expect(body).not.toHaveProperty("title");
+    expect(commits()).toBe(0);
+  });
+
+  // A lenient truthy/substring parse would wrongly accept these as compete (or silently downgrade to
+  // practice). The strict rule rejects every non-true/false value with 400 and touches nothing.
+  it.each(["yes", "1", "tru", "on", "0"])(
+    "rejects the ambiguous X-Compete value %j with 400 malformed-request, touching nothing",
+    async (value) => {
+      const inner = inMemoryThroneStore();
+      const { store, commits } = countingStore(inner);
+
+      const res = await handleFight(
+        fightRequest(JSON.stringify(loadBot("aggressor")), {
+          "X-Compete": value,
+        }),
+        arena("vTEST", store),
+      );
+
+      expect(res.status).toBe(400);
+      expect(res.headers.get("content-type")).toContain(
+        "application/problem+json",
+      );
+
+      const body = (await res.json()) as { type: string; title: string };
+
+      expect(body.type).toBe("/problems/malformed-request");
+      expect(body.title).toContain("X-Compete");
+      expect(commits()).toBe(0);
+      expect(await inner.readArena("vTEST")).toBeUndefined();
+    },
+  );
+
+  it("mirror-rejects a byte-identical current member even in practice (409, before the benchmark)", async () => {
+    const inner = inMemoryThroneStore();
+
+    await seatArena(inner, "vTEST", [
+      { champion: loadBot("berserker"), handle: null, seniority: 1 },
+      { champion: loadBot("aggressor"), handle: null, seniority: 2 },
+    ]);
+
+    const before = await inner.readArena("vTEST");
+    const { store, commits } = countingStore(inner);
+
+    const res = await handleFight(
+      practiceRequest(JSON.stringify(loadBot("aggressor"))), // clone of defender #2
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(409);
+
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/arena-mirror");
+    expect(body.title).toContain("#2");
+    // mode-neutral wording (decision #7): a projection never "displaces", so the detail states the
+    // plain no-op instead of a compete-framed "can't displace itself".
+    expect(body.title).toContain("no effect");
+    expect(body.title.toLowerCase()).not.toContain("displace");
+    expect(commits()).toBe(0);
+    expect(await inner.readArena("vTEST")).toEqual(before);
+  });
+
+  it("checks the handle BEFORE the compete parse — a missing handle wins over a bad X-Compete", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleFight(
+      new Request("https://mk.example/fight", {
+        method: "POST",
+        body: JSON.stringify(loadBot("aggressor")),
+        headers: { "X-Compete": "nonsense" }, // no X-Author-Handle
+      }),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/malformed-request");
+    expect(body.title).toContain("X-Author-Handle"); // the handle guard fired first
+    expect(await store.readArena("vTEST")).toBeUndefined();
+  });
+});
