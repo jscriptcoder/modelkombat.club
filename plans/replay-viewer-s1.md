@@ -23,17 +23,17 @@ Behavior-driven, tested at the lowest level that gives confidence (engine unit +
 throughout: **determinism / no persisted tape (#1)**, **TCB untouched (`dsl.ts`,
 `INPUT_HASH`, `BENCHMARK_VERSION`)**, **doc-privacy** (bot documents never cross the wire).
 
-- [ ] `renderTape(cfg)` returns a per-tick rich-frame tape; the last frame's
+- [x] `renderTape(cfg)` returns a per-tick rich-frame tape; the last frame's
       score/winner/tick-count **equals a direct `runFight(cfg)`** on the same params
       (fidelity), and `runFight` / `FightResult` remain **byte-identical** (no regression,
-      hot path untouched).
-- [ ] `GET /replay/{id}` returns the headline bout's tape + both fighters' `name`/`model`
+      hot path untouched). ✅ **Slice 1 — PR #306 merged 2026-07-16.**
+- [x] `GET /replay/{id}` returns the headline bout's tape + both fighters' `name`/`model`
       and **no bot documents**; unknown / evicted / malformed / bootstrap id →
       `404 /problems/replay-not-found` **without running a fight**; success carries
-      `Cache-Control: public, immutable`.
-- [ ] `GET /replay` returns the current version's watchable fights **newest-first**
+      `Cache-Control: public, immutable`. ✅ **Slice 2.**
+- [x] `GET /replay` returns the current version's watchable fights **newest-first**
       (reversed append order), **bootstrap-filtered**, identities only; empty archive →
-      `200` + `[]`.
+      `200` + `[]`. ✅ **Slice 2.**
 - [ ] Opening the viewer page **auto-plays the newest fight**: two stickmen move to their
       per-tick X, face each other, a HUD shows running score + tick; play/pause/restart
       work; loading / fetch-error (retry) / not-found (back-to-list) states render.
@@ -56,7 +56,14 @@ Slices 1–2 are horizontal enablers permitted under the walking-skeleton except
 **names the vertical slice it unlocks**, and each is **smaller done separately** than
 bundled. Slice 3 is the observable spectator outcome.
 
-### Slice 1: `renderTape(cfg)` exposes the per-tick rich render state
+### Slice 1: `renderTape(cfg)` exposes the per-tick rich render state — ✅ DONE (PR #306)
+
+> **Merged 2026-07-16.** `runFight`/`renderTape` share a private `simulate(cfg, collectRender)`
+> core → `FightResult` byte-identical, benchmark hot path builds no render frames. `RenderFrame`
+> = `{x,y,facing,posture,attacking,attackBand,throwing,knockdown,points,stamina}` per tick per
+> fighter, collected post-tick. 94.29% scoped mutation (2 equivalent survivors documented).
+> Gotcha carried forward: posture is computed via `postureOf(f, action, rules)` at the render
+> site (post-advance) — never the stale stored `f.posture`.
 
 **Value**: The public `events` tape is too thin to render (no facing / posture / band /
 throwing / knockdown). `renderTape` projects the rich `Frame` state the engine **already
@@ -72,6 +79,7 @@ Verified by engine unit tests + Stryker.
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (confirm before code):
+
 - `renderTape(cfg)` returns one entry per executed tick; each carries **both** fighters'
   render fields equal to the engine's internal per-tick state (assert on a fight exercising
   a crouch → `posture` crouch, a knockdown → `knockdown` true, a strike → `attacking` +
@@ -81,20 +89,35 @@ Verified by engine unit tests + Stryker.
 - **Regression**: `runFight` and `FightResult` byte-identical to `main` (a golden/replay test
   still passes; the benchmark hot path imports nothing new).
 - **Invariants**: `dsl.ts`, `INPUT_HASH`, `BENCHMARK_VERSION` untouched.
-**RED**: a failing test asserting `renderTape` emits `posture`/`knockdown`/`facing`/
-`attackBand` at the correct ticks for a scripted fight (fields absent from `FightResult.events`).
-**GREEN**: implement the `Frame`→`RenderFrame` projection over the already-built histories;
-keep `runFight`'s return frozen (share loop internals, split only the public surface).
-**MUTATE**: Stryker on the `renderTape` region — target 100% changed-line (each projected
-field pinned by an assertion).
-**KILL MUTANTS**: strengthen per-field assertions for any survivor (e.g. a dropped
-`facing` or `attackBand`).
-**REFACTOR**: assess sharing the loop between `runFight` and `renderTape` without widening
-`runFight`'s contract.
-**Done when**: all ACs met, Stryker report clean on changed lines, `runFight` regression
-green, human approves the commit. Branch `feat/engine-render-tape`.
+  **RED**: a failing test asserting `renderTape` emits `posture`/`knockdown`/`facing`/
+  `attackBand` at the correct ticks for a scripted fight (fields absent from `FightResult.events`).
+  **GREEN**: implement the `Frame`→`RenderFrame` projection over the already-built histories;
+  keep `runFight`'s return frozen (share loop internals, split only the public surface).
+  **MUTATE**: Stryker on the `renderTape` region — target 100% changed-line (each projected
+  field pinned by an assertion).
+  **KILL MUTANTS**: strengthen per-field assertions for any survivor (e.g. a dropped
+  `facing` or `attackBand`).
+  **REFACTOR**: assess sharing the loop between `runFight` and `renderTape` without widening
+  `runFight`'s contract.
+  **Done when**: all ACs met, Stryker report clean on changed lines, `runFight` regression
+  green, human approves the commit. Branch `feat/engine-render-tape`.
 
-### Slice 2: `GET /replay` + `GET /replay/{id}` serve the list and the reconstructed tape
+### Slice 2: `GET /replay` + `GET /replay/{id}` serve the list and the reconstructed tape — ✅ DONE
+
+> **Complete (branch `feat/replay-api`).** Injectable `src/http/handle-replay.ts` + thin
+> `api/replay.ts` wired with the arena's frozen `CANONICAL_RULES`/`MAX_TICKS`/`MATCH` +
+> `BENCHMARK_VERSION`; `vercel.json` rewrites `/replay` + `/replay/(.*)` → `?id=$1`. List is
+> newest-first + bootstrap-filtered + identities-only; item reconstructs the headline bout via
+> `renderTape`, `Cache-Control: immutable`; any non-resolving id → `404 replay-not-found`
+> **without running a fight**; store-throw → `503` (parity with `/king`, decided 2026-07-16);
+> list → `public, max-age=30` (decided 2026-07-16). `id` = sha256 of the record's **canonical**
+> (recursively key-sorted) JSON over `challenger+defenders+seeds+version` (exported `replayId`).
+> Shared the `sanitize` control-strip with `champion-identity.ts` (DRY-by-knowledge). Mutation:
+> `handle-replay.ts` 92.75%, `api/replay.ts` 100% — 5 accepted survivors (2 equivalent in
+> `canonicalize`: an unreachable `null`-guard + an array-as-object encoding that keeps the id
+> deterministic/distinct/order-independent; 3 problem-prose strings, per the repo's
+> assert-`type`-not-prose convention). No doc leakage (body-scan test); TCB / `INPUT_HASH` /
+> `BENCHMARK_VERSION` untouched.
 
 **Value**: Serves the newest-fight list + a reconstructed, doc-free tape over HTTP —
 independently verifiable (handler tests / curl, internal-only before the page). **Unlocks**
@@ -111,40 +134,46 @@ imports the arena fights on** — `CANONICAL_RULES`, `MATCH`, `MAX_TICKS`, `BENC
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (confirm before code):
+
 - `GET /replay/{id}` for a real archived record → `200` `{ tape, fighters: [challenger
-  {name,model?}, King {name,model?}] }`; **no bot document field anywhere** in the body.
+{name,model?}, King {name,model?}] }`; **no bot document field anywhere** in the body.
 - The tape reconstructs `runFight({ botA: challenger, botB: defenders[0], seed: record.seeds[0],
-  rules: CANONICAL_RULES, maxTicks: MAX_TICKS, match: MATCH })` via `renderTape` (a test
+rules: CANONICAL_RULES, maxTicks: MAX_TICKS, match: MATCH })` via `renderTape` (a test
   asserts the served tape equals a local `renderTape` on those pinned params).
 - Unknown / evicted / malformed / **bootstrap** (`defenders: []`) id → `404
-  /problems/replay-not-found`, **no fight run** (archive lookup miss short-circuits before
+/problems/replay-not-found`, **no fight run** (archive lookup miss short-circuits before
   reconstruction).
 - `GET /replay/{id}` success response carries `Cache-Control: public, immutable` (+ long
   `max-age`).
+- `GET /replay` (list) success carries a short `Cache-Control: public, max-age=30` — mirrors
+  `/king`'s read-handler convention (the list moves only when a fight is archived).
+- The store throwing on `readArchive` (Upstash unreachable) → `503
+/problems/throne-unavailable`, never a silent empty list — mirrors `/king` (decided
+  2026-07-16, not a plain `500`).
 - `id` = `sha256` of the record's canonical JSON (`challenger + defenders + seeds +
-  version`); the same record always hashes to the same id.
+version`); the same record always hashes to the same id.
 - `GET /replay` → `200` list of `{ id, fighters: [challenger, King] }` **newest-first**
   (reversed `readArchive` append order), **bootstrap records filtered out**, identities
   only (`name` + optional `model`, no handle — none in the archive).
 - Empty archive, or only bootstrap/evicted records → `GET /replay` returns `200` + `[]`.
 - **Invariants**: `dsl.ts` / `INPUT_HASH` / `BENCHMARK_VERSION` untouched (pure transport
   over `readArchive` + `renderTape`); docs never serialized.
-**RED**: handler tests against a fake `ThroneStore` seeded with a real + a bootstrap record:
-`/replay/{id}` body has a tape and identities but **no doc**; unknown id → 404; list is
-newest-first and excludes the bootstrap entry.
-**GREEN**: `readArchive(BENCHMARK_VERSION)` → filter `defenders.length > 0` → hash each →
-resolve `{id}` (or list) → `renderTape` the headline bout → project identities; miss → 404
-via the shared envelope; set the cache header on success.
-**MUTATE**: Stryker on `handle-replay` + pure helpers (hash, bootstrap filter, newest-first
-ordering, identity projection, id resolution, 404 branch) — 100% changed-region. Extract
-the pure pieces (per the #250 extract-to-pure lesson) so tally/filter mutants are killable.
-**KILL MUTANTS**: cover the `defenders.length > 0` boundary, reversed-order, and
-docs-omitted projection explicitly.
-**REFACTOR**: assess sharing the identity projection with the existing
-`champion-identity.ts` (`name`/`model` shaper) rather than a new one.
-**Done when**: all ACs met, Stryker clean, no doc leakage (a body-scan assertion), human
-approves. WAF per-IP backstop noted as a dashboard action for the public-release gate (not
-repo code). Branch `feat/replay-api`.
+  **RED**: handler tests against a fake `ThroneStore` seeded with a real + a bootstrap record:
+  `/replay/{id}` body has a tape and identities but **no doc**; unknown id → 404; list is
+  newest-first and excludes the bootstrap entry.
+  **GREEN**: `readArchive(BENCHMARK_VERSION)` → filter `defenders.length > 0` → hash each →
+  resolve `{id}` (or list) → `renderTape` the headline bout → project identities; miss → 404
+  via the shared envelope; set the cache header on success.
+  **MUTATE**: Stryker on `handle-replay` + pure helpers (hash, bootstrap filter, newest-first
+  ordering, identity projection, id resolution, 404 branch) — 100% changed-region. Extract
+  the pure pieces (per the #250 extract-to-pure lesson) so tally/filter mutants are killable.
+  **KILL MUTANTS**: cover the `defenders.length > 0` boundary, reversed-order, and
+  docs-omitted projection explicitly.
+  **REFACTOR**: assess sharing the identity projection with the existing
+  `champion-identity.ts` (`name`/`model` shaper) rather than a new one.
+  **Done when**: all ACs met, Stryker clean, no doc leakage (a body-scan assertion), human
+  approves. WAF per-IP backstop noted as a dashboard action for the public-release gate (not
+  repo code). Branch `feat/replay-api`.
 
 ### Slice 3: The Pixi viewer page auto-plays the King's latest fight
 
@@ -161,6 +190,7 @@ layer via **display-object assertions**; `agent-browser` out-of-band visual smok
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (confirm before code):
+
 - Pure `scene(tape, tick)`: given a tape + playhead, returns both fighters' **screen
   positions** (deterministic world→screen mapping of fixed-point X/Y), **facing**, and
   **HUD values** (score, tick). Exhaustively unit-tested at boundaries: tick 0, last tick,
@@ -174,20 +204,20 @@ layer via **display-object assertions**; `agent-browser` out-of-band visual smok
   for facing) asserted at a given tick; the tape crossing a tick moves it.
 - **No engine/API change** (consumes Slice 2's tape as JSON; `web/src` still imports nothing
   from `src/`).
-**RED**: (a) a `scene()` unit test asserting fighter screen-X + HUD at a chosen tick fails
-until `scene` exists; (b) a browser-mode test asserting the page mounts two fighter display
-objects whose `x` differs between tick T and tick T+k.
-**GREEN**: implement `scene` (pure), the Pixi draw layer applying it, the fetch/auto-play
-wiring, and the three async states.
-**MUTATE**: Stryker on `scene` (pure, node-reachable) — 100% changed-line. Web presentation
-is **not** Stryker-reachable → exhaustive **exact-assertion** browser tests + a **mandatory
-manual mutator scan** (project practice, per `public-page-web-ui`).
-**KILL MUTANTS**: pin the world→screen mapping, facing flip, and HUD derivation with
-boundary assertions.
-**REFACTOR**: assess extracting the playback clock + fetch state machine as pure/testable
-units separate from the Pixi mount.
-**Done when**: all ACs met, `scene` Stryker clean, browser tests + manual scan done,
-`agent-browser` smoke confirms it animates, human approves. Branch `feat/replay-viewer-page`.
+  **RED**: (a) a `scene()` unit test asserting fighter screen-X + HUD at a chosen tick fails
+  until `scene` exists; (b) a browser-mode test asserting the page mounts two fighter display
+  objects whose `x` differs between tick T and tick T+k.
+  **GREEN**: implement `scene` (pure), the Pixi draw layer applying it, the fetch/auto-play
+  wiring, and the three async states.
+  **MUTATE**: Stryker on `scene` (pure, node-reachable) — 100% changed-line. Web presentation
+  is **not** Stryker-reachable → exhaustive **exact-assertion** browser tests + a **mandatory
+  manual mutator scan** (project practice, per `public-page-web-ui`).
+  **KILL MUTANTS**: pin the world→screen mapping, facing flip, and HUD derivation with
+  boundary assertions.
+  **REFACTOR**: assess extracting the playback clock + fetch state machine as pure/testable
+  units separate from the Pixi mount.
+  **Done when**: all ACs met, `scene` Stryker clean, browser tests + manual scan done,
+  `agent-browser` smoke confirms it animates, human approves. Branch `feat/replay-viewer-page`.
 
 ## Pre-PR Quality Gate (each slice)
 
@@ -200,4 +230,5 @@ units separate from the Pixi mount.
    in any `/replay` response; no persisted tape.
 
 ---
-*Delete this file when the plan is complete. If `plans/` is empty, delete the directory.*
+
+_Delete this file when the plan is complete. If `plans/` is empty, delete the directory._

@@ -21,7 +21,9 @@ const DEL = 0x7f;
 // characters (incl. spaces and markup like `<script>`) are kept verbatim — the client
 // renders those inertly (Solid escapes them). Code-point comparison (not a control-literal
 // regex) keeps the boundaries explicit and the source free of embedded control bytes.
-const sanitize = (value: string): string =>
+// Exported so `/replay`'s fighter identities strip controls by the SAME rule (the shared
+// "sanitize an identity before the wire" knowledge lives here once).
+export const sanitize = (value: string): string =>
   [...value]
     .filter((ch) => {
       const code = ch.charCodeAt(0);
