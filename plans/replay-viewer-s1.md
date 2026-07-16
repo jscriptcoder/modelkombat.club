@@ -34,9 +34,10 @@ throughout: **determinism / no persisted tape (#1)**, **TCB untouched (`dsl.ts`,
 - [x] `GET /replay` returns the current version's watchable fights **newest-first**
       (reversed append order), **bootstrap-filtered**, identities only; empty archive →
       `200` + `[]`. ✅ **Slice 2.**
-- [ ] **S3a** — Opening the viewer page (`/watch`) **auto-plays the newest fight**: two
+- [x] **S3a** — Opening the viewer page (`/watch`) **auto-plays the newest fight**: two
       stickmen move to their per-tick X, face each other, a HUD shows running score + tick;
-      **loading / fetch-error (retry) / empty-list** states render.
+      **loading / fetch-error (retry) / empty-list** states render. ✅ **Slice 3a — PR #308
+      merged 2026-07-16.**
 - [ ] **S3b** — **play/pause** halts/resumes the clock and **restart** returns to tick 0.
       (The dedicated **not-found → back-to-list** state ships with the S4 list + permalinks —
       there is no list to return to before then; S3a's retryable error covers a transient
@@ -180,7 +181,24 @@ version`); the same record always hashes to the same id.
   approves. WAF per-IP backstop noted as a dashboard action for the public-release gate (not
   repo code). Branch `feat/replay-api`.
 
-### Slice 3a: The Pixi viewer page auto-plays the King's latest fight (walking skeleton)
+### Slice 3a: The Pixi viewer page auto-plays the King's latest fight — ✅ DONE (PR #308)
+
+> **Merged 2026-07-16 (branch `feat/replay-viewer-page`).** New multi-page entry
+> `web/replay.html` + `web/src/pages/replay/replay.tsx` mount; `vercel.json` rewrites `/watch`
+> → `/replay.html`. On load: pure `loadReplay` (`GET /replay` → `[0]` → `GET /replay/{id}`,
+> local view-model types mirroring the Slice 2 wire, importing nothing from `src/`) → a pure
+> `scene(tape, playhead, viewport) → Scene` (world→screen X/Y via mirrored `WORLD_WIDTH`,
+> facing pass-through, HUD tick+scores) → a Pixi `figures`/`createStage` draw layer → a
+> `ReplayPlayer` mounting Pixi with an autoplay ticker (tick 0 → last, then stops).
+> `ReplayPage` is a `<Switch>` state machine: loading / fetch-error (**retry** re-runs the
+> whole fetch) / **empty-list** (link to `/ring`, no player) / ready. **Pixi v8 mounts headless**
+> under browser-mode Playwright — assert scene-graph `x`/`scale.x`/`Text`, not pixels. `web/`
+> is not Stryker-reachable → the pure `scene`/`figures`/`loader` got exhaustive exact-assertion
+> browser tests + a documented manual mutator scan (caught: unasserted `y` wiring, HUD
+> scoreA/scoreB swap, unasserted list path — all fixed). Live-animation smoke deferred to the
+> Vercel preview (Pixi RAF + Vite HMR socket defeated local `agent-browser` network-idle).
+> Invariants held: no engine/API change, `web/src` imports nothing from `src/`,
+> `dsl.ts`/`INPUT_HASH`/`BENCHMARK_VERSION` untouched.
 
 **Value**: The observable spectator behavior — a real archived bout plays back as two
 stickmen with a live HUD. The tracer's payoff; proves the whole
