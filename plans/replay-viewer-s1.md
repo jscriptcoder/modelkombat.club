@@ -34,13 +34,17 @@ throughout: **determinism / no persisted tape (#1)**, **TCB untouched (`dsl.ts`,
 - [x] `GET /replay` returns the current version's watchable fights **newest-first**
       (reversed append order), **bootstrap-filtered**, identities only; empty archive →
       `200` + `[]`. ✅ **Slice 2.**
-- [ ] Opening the viewer page **auto-plays the newest fight**: two stickmen move to their
-      per-tick X, face each other, a HUD shows running score + tick; play/pause/restart
-      work; loading / fetch-error (retry) / not-found (back-to-list) states render.
+- [ ] **S3a** — Opening the viewer page (`/watch`) **auto-plays the newest fight**: two
+      stickmen move to their per-tick X, face each other, a HUD shows running score + tick;
+      **loading / fetch-error (retry) / empty-list** states render.
+- [ ] **S3b** — **play/pause** halts/resumes the clock and **restart** returns to tick 0.
+      (The dedicated **not-found → back-to-list** state ships with the S4 list + permalinks —
+      there is no list to return to before then; S3a's retryable error covers a transient
+      item 404.)
 
 ## Dependency note (evaluate-existing-solutions)
 
-Slice 3 introduces **Pixi** as a durable `web/` dependency. The build-vs-adopt / which-lib
+Slice 3a introduces **Pixi** as a durable `web/` dependency. The build-vs-adopt / which-lib
 decision was made in the `grill-me` session (Q9: SVG vs Canvas2D vs Pixi compared;
 decision-owner chose Pixi for animation headroom — `plans/replay-viewer-decisions.md`
 decision 9). Preflight satisfied; planning sequences the chosen solution.
@@ -54,7 +58,8 @@ RED-GREEN-MUTATE-KILL-MUTANTS-REFACTOR, ACs confirmed with the human **before an
 Slices 1–2 are horizontal enablers permitted under the walking-skeleton exception: each is
 **independently verifiable** (engine tests; handler/curl tests — internal-only), each
 **names the vertical slice it unlocks**, and each is **smaller done separately** than
-bundled. Slice 3 is the observable spectator outcome.
+bundled. Slices 3a–3b are the observable spectator outcomes (the dedicated not-found + the
+browsable list land with S4 — permalinks + list — outside this walking-skeleton plan).
 
 ### Slice 1: `renderTape(cfg)` exposes the per-tick rich render state — ✅ DONE (PR #306)
 
@@ -175,54 +180,89 @@ version`); the same record always hashes to the same id.
   approves. WAF per-IP backstop noted as a dashboard action for the public-release gate (not
   repo code). Branch `feat/replay-api`.
 
-### Slice 3: The Pixi viewer page auto-plays the King's latest fight
+### Slice 3a: The Pixi viewer page auto-plays the King's latest fight (walking skeleton)
 
 **Value**: The observable spectator behavior — a real archived bout plays back as two
-stickmen. The tracer's payoff; proves the whole pipeline visually.
-**Path**: a new route/page in `web/` (Pixi canvas) → on load `GET /replay` → take `[0]` →
-`GET /replay/{id}` → a **pure `scene(tape, tick) → Scene`** (world→screen mapped fighter
-positions, facing, HUD values) → a thin Pixi draw layer → a playback clock (autoplay +
-play/pause/restart). Pure `scene` unit-tested exhaustively (node-reachable → Stryker); Pixi
-layer via **display-object assertions**; `agent-browser` out-of-band visual smoke.
+stickmen with a live HUD. The tracer's payoff; proves the whole
+archive→reconstruct→tape→Pixi pipeline visually, end-to-end thin.
+**Path**: a new multi-page entry `web/replay.html` + `web/src/pages/replay/replay.tsx` mount
+(the `ring.html`/`ring.tsx` precedent) + a `vercel.json` rewrite `/watch` → `/replay.html`
+(the public `/replay` path is the **API**, so the page gets its own `/watch` path; `/watch/{id}`
+permalinks arrive with the S4 list) → on load `GET /replay` → take `[0]` → `GET /replay/{id}`
+(local `web/src` view-model types mirror the Slice 2 contract, importing nothing from `src/`) →
+a **pure `scene(tape, tick) → Scene`** (world→screen fighter positions, facing, HUD values) → a
+thin Pixi draw layer applying it → an **autoplay clock** (tick 0 → last, then stops).
 **Class**: Behavior change.
-**Required implementation skills**: `tdd`, `testing`, `front-end-testing`,
-`mutation-testing` (on `scene`), `refactoring`.
+**Required implementation skills**: `tdd`, `testing`, `front-end-testing`, `refactoring`
+(mutation on the pure `scene` is browser exact-assertion + manual scan — `web/` is not
+Stryker-reachable; `stryker.config.mjs` mutates only `src/**` + `api/**`).
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (confirm before code):
 
 - Pure `scene(tape, tick)`: given a tape + playhead, returns both fighters' **screen
-  positions** (deterministic world→screen mapping of fixed-point X/Y), **facing**, and
+  positions** (deterministic world→screen mapping of the fixed-point x/y), **facing**, and
   **HUD values** (score, tick). Exhaustively unit-tested at boundaries: tick 0, last tick,
-  a mid-tick where the two have crossed (facing flips), score after a scoring tick.
+  a mid-tick where the two have crossed (facing), score after a scoring tick.
 - On load the page auto-plays the **newest** fight (list `[0]` → its tape): two figures
-  move to their per-tick X, face each other, HUD shows the running score + current tick.
-- **play/pause** halts/resumes the clock; **restart** returns to tick 0.
-- **Loading** state while fetching; **fetch-error** (network/5xx) → error + **retry**; **404
-  not-found** (evicted/rotted) → "fight no longer available" + **back-to-list**, no retry.
+  move to their per-tick screen X, face each other, HUD shows the running score + current
+  tick, and the clock advances to the last tick then stops (autoplay, no controls yet).
+- **Loading** state while fetching; **fetch-error** (network / 5xx on either fetch, and a
+  transient item 404 from a list→item eviction race) → an error message + **retry** that
+  re-runs the whole fetch; **empty-list** (`GET /replay` → `[]`, no King fights yet) → an
+  honest "no fights to watch yet" state (a link to `/ring`), no player mounted.
 - Pixi **display objects reflect the `Scene`**: a fighter object's `x` (and `scale.x`/flip
-  for facing) asserted at a given tick; the tape crossing a tick moves it.
-- **No engine/API change** (consumes Slice 2's tape as JSON; `web/src` still imports nothing
-  from `src/`).
-  **RED**: (a) a `scene()` unit test asserting fighter screen-X + HUD at a chosen tick fails
-  until `scene` exists; (b) a browser-mode test asserting the page mounts two fighter display
-  objects whose `x` differs between tick T and tick T+k.
+  for facing) asserted at a given tick; advancing the clock past a crossing tick moves/flips
+  it.
+- **No engine/API change** (consumes Slice 2's tape as JSON; `web/src` imports nothing from
+  `src/`). `dsl.ts` / `INPUT_HASH` / `BENCHMARK_VERSION` untouched.
+  **RED**: (a) a `scene()` browser-mode unit test asserting a fighter's screen-X + HUD at a
+  chosen tick fails until `scene` exists; (b) a browser-mode test asserting the mounted page
+  shows two fighter display objects whose `x` differs between tick T and tick T+k once the
+  clock runs.
   **GREEN**: implement `scene` (pure), the Pixi draw layer applying it, the fetch/auto-play
-  wiring, and the three async states.
-  **MUTATE**: Stryker on `scene` (pure, node-reachable) — 100% changed-line. Web presentation
-  is **not** Stryker-reachable → exhaustive **exact-assertion** browser tests + a **mandatory
-  manual mutator scan** (project practice, per `public-page-web-ui`).
-  **KILL MUTANTS**: pin the world→screen mapping, facing flip, and HUD derivation with
-  boundary assertions.
+  wiring, the autoplay clock, and the loading / fetch-error / empty-list states.
+  **MUTATE**: `scene` is pure but lives in `web/` (not Stryker-reachable) → **exhaustive
+  exact-assertion** browser tests calling `scene()` directly + a **mandatory manual mutator
+  scan** (project practice, per `public-page-web-ui`). Pin the world→screen mapping, the
+  facing sign, and each HUD field with boundary assertions.
+  **KILL MUTANTS**: cover each mapping boundary + the facing sign + each HUD field explicitly.
   **REFACTOR**: assess extracting the playback clock + fetch state machine as pure/testable
   units separate from the Pixi mount.
-  **Done when**: all ACs met, `scene` Stryker clean, browser tests + manual scan done,
+  **Done when**: all ACs met, `scene` exact-assertion tests + documented manual scan done,
   `agent-browser` smoke confirms it animates, human approves. Branch `feat/replay-viewer-page`.
+
+### Slice 3b: The spectator controls playback
+
+**Value**: Minimal transport — the controls that make the fight _watchable_ on demand
+(pause to study a moment, restart to rewatch). Completes the walking-skeleton viewer.
+**Path**: play/pause + restart buttons wired to the S3a clock (a pure clock/transport model
+kept separate from the Pixi mount, so the tick transitions are exact-assertion testable).
+**Class**: Behavior change.
+**Required implementation skills**: `tdd`, `testing`, `front-end-testing`, `refactoring`.
+**Reduction program**: N/A.
+**Transition/terminal evidence**: N/A.
+**Acceptance criteria** (confirm before code):
+
+- **play/pause** halts/resumes the clock: a paused clock does not advance the tick; resuming
+  continues from the current tick. **restart** returns to tick 0 and resumes autoplay.
+- The controls are keyboard-operable and labelled; clock state is asserted via the tick the
+  HUD / `scene` reads (pause freezes it, restart zeroes it) — behaviour, not pixels.
+- **No engine/API change**; `web/src` imports nothing from `src/`; invariants untouched.
+  **RED**: a browser-mode test where pausing freezes the HUD tick across clock ticks and
+  restart returns it to 0.
+  **GREEN**: add the control buttons + the clock's play/pause/restart transitions.
+  **MUTATE**: the pure clock/transport model → exact-assertion browser tests + manual mutator
+  scan; presentation → exhaustive exact assertions.
+  **KILL MUTANTS**: cover paused-vs-running tick advancement and restart-to-0 explicitly.
+  **REFACTOR**: assess folding the clock into one reviewable transport model.
+  **Done when**: all ACs met, exact-assertion tests + manual scan done, `agent-browser` smoke
+  confirms the controls, human approves. Branch `feat/replay-viewer-controls`.
 
 ## Pre-PR Quality Gate (each slice)
 
-1. Mutation testing where meaningful (engine + `src/http` + `scene`); web-presentation →
-   exact-assertion browser tests + manual mutator scan (documented).
+1. Mutation testing where meaningful (engine + `src/http`); web-presentation (incl. the pure
+   `scene`) → exact-assertion browser tests + manual mutator scan (documented).
 2. Refactoring assessment (only if it adds value).
 3. `npm run typecheck` + `npm run lint` + `npm run format:check` pass.
 4. DDD glossary check: N/A (project doesn't use DDD).

@@ -13,6 +13,7 @@
     { "source": "/spec-guide", "destination": "/spec-guide.html" },
     { "source": "/variety", "destination": "/variety.html" },
     { "source": "/ring", "destination": "/ring.html" },
+    { "source": "/watch", "destination": "/replay.html" },
     {
       "source": "/((?!api/|src/|@|node_modules/|.*\\.).*)",
       "destination": "/index.html"

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>ModelKombat — Watch the King's latest fight</title>
+    <meta
+      name="description"
+      content="Watch the reigning King of the ModelKombat hill defend the throne — the latest title fight, replayed deterministically as two stickmen."
+    />
+    <link rel="canonical" href="https://modelkombat.club/watch" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0b0e14" />
+    <meta name="color-scheme" content="dark" />
+
+    <!-- Icons & PWA manifest -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="ModelKombat" />
+    <meta
+      property="og:title"
+      content="ModelKombat — Watch the King's latest fight"
+    />
+    <meta
+      property="og:description"
+      content="Watch the reigning King defend the throne — replayed deterministically as two stickmen."
+    />
+    <meta property="og:url" content="https://modelkombat.club/watch" />
+    <meta property="og:image" content="https://modelkombat.club/og.png" />
+    <meta property="og:locale" content="en_US" />
+  </head>
+  <body>
+    <div id="root">
+      <noscript>
+        Enable JavaScript to watch the fight. The fight data is served as JSON
+        at <code>/replay</code> (the newest-first list) and
+        <code>/replay/{id}</code> (one fight's render tape).
+      </noscript>
+    </div>
+    <script type="module" src="/src/pages/replay/replay.tsx"></script>
+  </body>
+</html>
