@@ -84,6 +84,26 @@ export type FighterFrame = {
 };
 export type FightEvent = { tick: number; a: FighterFrame; b: FighterFrame };
 
+// A per-tick RENDER frame — the coherent post-tick body state a viewer needs to draw a
+// stickman: position (x/y), facing, the resolved posture/strike/throw/knockdown pose, and
+// the live score + stamina. Distinct from FighterFrame (which carries the bot's returned
+// action but no pose) and from the internal perception Frame (which carries pose but no
+// points). Produced only by `renderTape` (invariant #1: derived on demand, never persisted).
+export type RenderFrame = {
+  x: number;
+  y: number;
+  facing: number; // 1 (facing right) | -1 (facing left)
+  posture: number; // 0 standing / 1 crouching / 2 airborne
+  attacking: boolean;
+  attackBand: number; // 0 none / 1 low / 2 mid / 3 high
+  throwing: boolean;
+  knockdown: boolean;
+  points: number;
+  stamina: number;
+};
+export type RenderTick = { tick: number; a: RenderFrame; b: RenderFrame };
+export type RenderTape = RenderTick[];
+
 export type FightConfig = {
   rules: Rules;
   botA: BotDoc;
@@ -230,6 +250,32 @@ const frameOf = (f: Fighter, prev: Frame | undefined): Frame => ({
   vx: prev ? f.x - prev.x : 0,
   stamina: f.stamina,
   ticksSinceOffense: f.ticksSinceOffense,
+});
+
+// Project a fighter's CURRENT (post-tick, post-advance) state into a render frame — a
+// coherent snapshot: x/y/points and the strike/throw/knockdown pose all read the resolved
+// post-advance state. Posture is RECOMPUTED here via `postureOf` rather than read from the
+// stored `f.posture` (which the loop sets pre-intake for NEXT tick's perception) — so at the
+// landing tick a fighter reads grounded, not stale-airborne. Adds the live `points` the score
+// HUD needs. Called only when `renderTape` collects — the hot fight path never runs it.
+const renderFrameOf = (
+  f: Fighter,
+  action: Action,
+  rules: Rules,
+): RenderFrame => ({
+  x: f.x,
+  y: f.y,
+  facing: f.facing,
+  posture: POSTURE_CODE[postureOf(f, action, rules)],
+  attacking: f.state.kind === "attacking" || f.state.kind === "air-attacking",
+  attackBand:
+    f.state.kind === "attacking" || f.state.kind === "air-attacking"
+      ? BAND_CODE[f.state.band]
+      : 0,
+  throwing: f.state.kind === "throwing",
+  knockdown: f.state.kind === "downed",
+  points: f.points,
+  stamina: f.stamina,
 });
 
 const initMem = (bot: BotDoc): Record<string, number> => ({
@@ -1058,7 +1104,15 @@ const applyPenalty = (
   if (++fouler.penaltyCount > 1) opponent.points += 1;
 };
 
-export function runFight(cfg: FightConfig): FightResult {
+// The shared simulation core: runs the deterministic fight loop once. `collectRender` gates
+// the per-tick render-frame collection so the hot path (`runFight`, the benchmark/gauntlet)
+// pays only a boolean check and builds no render frames, while `renderTape` reuses the SAME
+// outcome path (one source of truth — no second, drift-prone loop). Not exported: callers use
+// `runFight` (result only) or `renderTape` (render frames only).
+function simulate(
+  cfg: FightConfig,
+  collectRender: boolean,
+): { result: FightResult; render: RenderTape } {
   const { rules, botA, botB, maxTicks, match } = cfg;
 
   // The canonical opening positions (A left of centre, B right), computed once and
@@ -1103,6 +1157,7 @@ export function runFight(cfg: FightConfig): FightResult {
   };
 
   const events: FightEvent[] = [];
+  const render: RenderTape = [];
   const lPos = rules.perception?.lPos ?? 0;
   const lAct = rules.perception?.lAct ?? 0;
   const jitter = rules.perception?.jitter ?? 0;
@@ -1339,6 +1394,15 @@ export function runFight(cfg: FightConfig): FightResult {
       },
     });
 
+    // Collect the coherent post-tick render frame (viewer only) from the same resolved state
+    // the event records — so x/y/points match the fight and pose is the resolved stance.
+    if (collectRender)
+      render.push({
+        tick,
+        a: renderFrameOf(a, aAction, rules),
+        b: renderFrameOf(b, bAction, rules),
+      });
+
     // Arm the yame trigger if either fighter's score rose this tick.
     if (a.points > aPointsBefore || b.points > bPointsBefore) scored = true;
 
@@ -1491,11 +1555,25 @@ export function runFight(cfg: FightConfig): FightResult {
   }
 
   return {
-    winner,
-    ticks,
-    scores: { a: a.points, b: b.points },
-    events,
-    endReason,
-    fouls: { a: { ...a.fouls }, b: { ...b.fouls } },
+    result: {
+      winner,
+      ticks,
+      scores: { a: a.points, b: b.points },
+      events,
+      endReason,
+      fouls: { a: { ...a.fouls }, b: { ...b.fouls } },
+    },
+    render,
   };
+}
+
+// Run a fight to a deterministic `FightResult` (the outcome path — no render frames built).
+export function runFight(cfg: FightConfig): FightResult {
+  return simulate(cfg, false).result;
+}
+
+// Reconstruct a fight's per-tick render tape for the viewer (invariant #1: derived on demand
+// from the config, never a persisted tape). Same outcome as `runFight` — only the shape differs.
+export function renderTape(cfg: FightConfig): RenderTape {
+  return simulate(cfg, true).render;
 }
