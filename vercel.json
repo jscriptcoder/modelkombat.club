@@ -8,6 +8,8 @@
     { "source": "/validate", "destination": "/api/validate" },
     { "source": "/fight", "destination": "/api/fight" },
     { "source": "/king", "destination": "/api/king" },
+    { "source": "/replay", "destination": "/api/replay" },
+    { "source": "/replay/(.*)", "destination": "/api/replay?id=$1" },
     { "source": "/spec-guide", "destination": "/spec-guide.html" },
     { "source": "/variety", "destination": "/variety.html" },
     { "source": "/ring", "destination": "/ring.html" },
