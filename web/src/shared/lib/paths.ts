@@ -23,6 +23,10 @@ export const SPEC_GUIDE_PATH = "/spec-guide";
 // committed to docs/variety.md — the frozen gauntlet's move-usage meta, regenerated at build.
 export const VARIETY_PATH = "/variety";
 
+// The fight replay viewer (its own client-rendered shell, replay.html). Distinct from the /replay
+// API below: /watch is the page a person opens to watch a fight; /replay serves the JSON it fetches.
+export const WATCH_PATH = "/watch";
+
 // --- API endpoints the UI calls ---
 
 // The raw spec markdown, served by the api/spec function (and the static /spec.md fallback)
@@ -35,3 +39,7 @@ export const KING_PATH = "/king";
 
 // The gauntlet + King-of-the-Hill title bout (POST), the target of the /ring submit form.
 export const FIGHT_PATH = "/fight";
+
+// The fight-replay archive (GET): the newest-first list at /replay and one fight's reconstructed
+// render tape at /replay/{id}. The source the /watch viewer page fetches and plays.
+export const REPLAY_PATH = "/replay";

@@ -9,11 +9,19 @@ import { defineConfig } from "vite";
 // `hydratable` is on for both so the two outputs carry matching markers.
 export default defineConfig(({ isSsrBuild }) => ({
   plugins: [solid({ ssr: Boolean(isSsrBuild), solid: { hydratable: true } })],
-  // The client build is multi-page: the marketing home (`index.html`, prerendered + hydrated) plus
-  // the client-rendered `/ring` submit page (`ring.html`, its own `ring.tsx` entry). The SSR build
-  // takes its input from the `--ssr` entry flag instead, so the multi-page input is applied to the
-  // client build only.
+  // The client build is multi-page: the marketing home (`index.html`, prerendered + hydrated), the
+  // client-rendered `/ring` submit page (`ring.html`), and the client-rendered `/watch` fight
+  // viewer (`replay.html`, its own `replay.tsx` entry). The SSR build takes its input from the
+  // `--ssr` entry flag instead, so the multi-page input is applied to the client build only.
   build: isSsrBuild
     ? undefined
-    : { rollupOptions: { input: { main: "index.html", ring: "ring.html" } } },
+    : {
+        rollupOptions: {
+          input: {
+            main: "index.html",
+            ring: "ring.html",
+            replay: "replay.html",
+          },
+        },
+      },
 }));
