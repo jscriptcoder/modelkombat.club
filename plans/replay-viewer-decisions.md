@@ -149,6 +149,15 @@ architecture — refined in the S1/S3 slice ACs):
   (list) and `/replay/{id}` request — id, resolve hit/miss (→404), and reconstruction
   tick-count/duration. No new dashboards required for v1.
 
+## Nav visibility — dark launch (2026-07-16)
+
+The `/watch` viewer ships **dark**: **no primary-Nav link**, and the existing "Fight
+replays — in development" teaser stays a non-link. The route — and its shareable
+permalinks — is reachable only by direct URL until we deliberately choose to surface it.
+This defers **all** public entry-point wiring: the S3 slice still builds the list, player,
+and permalinks, but adds no Nav link and no live teaser link. Reversible — revisit when we
+promote the feature.
+
 ## Non-negotiable invariants respected
 
 - **#1 determinism** — reconstruct from stored docs+seeds; **no tape is ever persisted**.
@@ -189,8 +198,9 @@ architecture — refined in the S1/S3 slice ACs):
    HUD), pure scene-model + display-object assertions.
 4. **Postures** — crouch / jump-arc / guard-by-band / strike-by-band / throw / downed +
    score pops.
-5. **Fight-list + transport** — list UI, watch navigation, scrub/speed, permalinks;
-   fulfills the "Fight replays — in development" teaser + finalizes nav.
+5. **Fight-list + transport** — list UI, watch navigation, scrub/speed, permalinks. The
+   route stays **dark** — no primary-Nav link and the "Fight replays — in development"
+   teaser stays a non-link (see **Nav visibility — dark launch**); surfacing it is deferred.
 
 ## Planning-level details (not decisions — noted for later)
 
