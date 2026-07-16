@@ -823,3 +823,59 @@ practice, outcome-aware label) are captured inline in the plan.
   claim button. A claim can only ever compete the exact artifact that was previewed.
 
 [ring-practice-compete-ux.md](ring-practice-compete-ux.md) — the plan (with the grill-me UX decisions inline).
+
+## `/watch` fight replay viewer — S1 walking skeleton ✅ COMPLETE
+
+The **tracer bullet** for the last platform-layer roadmap item: a spectator opens `/watch` and the
+King's most-recent title fight **auto-plays as two stickmen** with a live score/tick HUD and
+play/pause + restart controls. It pulls the whole production path — engine `renderTape` export →
+`GET /replay` (resolve newest) + `GET /replay/{id}` (the reconstructed motion tape) → a Pixi page that
+animates it — through end-to-end thin, retiring the biggest unknown (does archive→reconstruct→tape→Pixi
+animate a real bout, byte-faithfully?) at the lowest feature cost. **Invariant #1 held throughout:** the
+server reconstructs the tape on demand from the KotH repro archive (docs + seeds, never a persisted
+tape) and returns motion + `name`/`model` identities only — **bot documents never cross the wire**
+(KotH integrity + the `/fight` no-docs contract). **TCB / `INPUT_HASH` / `BENCHMARK_VERSION` untouched**;
+`web/src` imports nothing from `src/`. Design trail (live in `plans/`): grill-me
+[replay-viewer-decisions.md](../../plans/replay-viewer-decisions.md) (13 decisions) → story-split
+[replay-viewer-stories.md](../../plans/replay-viewer-stories.md) (S1–S4). `web/**` is outside Stryker's
+node scope ⇒ the pure `scene`/`figures`/`transport` units got exhaustive exact-assertion browser tests +
+a manual mutator scan (the `public-page-web-ui` precedent).
+
+- **Slice 1 — `renderTape` engine export** (PR #306, `feat/engine-render-tape`) — `runFight` +
+  `renderTape` share a private `simulate(cfg, collectRender)` core so `FightResult` stays byte-identical
+  and the benchmark hot path builds no render frames. `RenderFrame` = `{x,y,facing,posture,attacking,
+attackBand,throwing,knockdown,points,stamina}` per tick per fighter, projected post-tick (posture via
+  `postureOf(f, action, rules)` at the render site — never the stale pre-intake stored field). 94.29%
+  scoped mutation (2 documented-equivalent survivors).
+- **Slice 2 — `GET /replay` + `/replay/{id}`** (PR #307, `feat/replay-api`) — injectable
+  `src/http/handle-replay.ts` (the `handle-king` GET pattern) + thin `api/replay.ts`, wired with
+  `selectThroneStore` + the arena-frozen `CANONICAL_RULES`/`MATCH`/`MAX_TICKS`/`BENCHMARK_VERSION`. List
+  = newest-first (reversed append) + bootstrap-filtered + identities-only; item reconstructs the headline
+  bout via `renderTape` (challenger vs `defenders[0]` at `seeds[0]`), `Cache-Control: immutable`. Any
+  non-resolving id → `404 replay-not-found` with **no fight run**; store-throw → `503`. `id` = exported
+  `replayId` = sha256 of the record's **canonical** (recursively key-sorted) JSON. No doc leakage
+  (body-scan test). Mutation: handle-replay 92.75% / api/replay 100%.
+- **Slice 3a — the Pixi `/watch` autoplay page** (PR #308, `feat/replay-viewer-page`) — a new multi-page
+  entry (`web/replay.html` + `replay.tsx`, client-rendered like `/ring`; `vercel.json` rewrites `/watch`
+  → `/replay.html`). On load a pure two-step loader (`GET /replay` → `[0]` → `GET /replay/{id}`, local
+  view-model types mirroring the wire) → a pure `scene(tape, playhead, viewport)` (world→screen via a
+  mirrored `WORLD_WIDTH=600000`) → a `figures`/`createStage` Pixi draw layer → a `ReplayPlayer` that
+  mounts a real Pixi `Application` (headless-capable) with an autoplay ticker. `ReplayPage` is a `<Switch>`
+  state machine: loading / fetch-error (retry) / empty-list (→ `/ring`) / ready. Pixi v8 mounts headless
+  under Playwright — assert scene-graph `x`/`scale.x`/`Text`, not pixels.
+- **Slice 3b — playback controls** (PR #309, `feat/replay-viewer-controls`) — the tick logic is extracted
+  from `ReplayPlayer`'s inline ticker into a **pure `transport.ts`** (`{playhead, playing}`;
+  `startTransport()` = `{0, true}` and the restart target, `advance` clamps while playing / same-ref when
+  paused, `togglePlaying` flips playing + keeps the playhead). `ReplayPlayer` holds a Solid signal seeded
+  with it; the ticker dispatches `advance` each frame and two native `<button>`s (a Pause/Play toggle +
+  Restart) drive it — observed via the toggle's own label since the Pixi HUD is opaque to DOM queries. 6
+  exact-assertion `transport` tests (one composed with `scene` for the HUD tick) + 4 browser control tests.
+
+[replay-viewer-s1.md](replay-viewer-s1.md) — the plan.
+
+**S1 (walking skeleton) complete; the viewer feature is 1 of 4 stories done.** The sibling scoping +
+story-split docs — [replay-viewer-decisions.md](../../plans/replay-viewer-decisions.md) (grill-me: 13
+decisions) + [replay-viewer-stories.md](../../plans/replay-viewer-stories.md) (story split S1–S4) — stay
+live in `plans/` as the trail for the remaining stories: **S2** postures/poses, **S3** browsable list +
+`/watch/{id}` permalinks + nav + dedicated not-found, **S4** transport (scrub/speed/frame-step). Each
+starts its own `planning` pass; S2-vs-S3 ordering is negotiable (both build only on S1).

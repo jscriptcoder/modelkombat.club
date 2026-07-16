@@ -38,10 +38,10 @@ throughout: **determinism / no persisted tape (#1)**, **TCB untouched (`dsl.ts`,
       stickmen move to their per-tick X, face each other, a HUD shows running score + tick;
       **loading / fetch-error (retry) / empty-list** states render. ✅ **Slice 3a — PR #308
       merged 2026-07-16.**
-- [ ] **S3b** — **play/pause** halts/resumes the clock and **restart** returns to tick 0.
+- [x] **S3b** — **play/pause** halts/resumes the clock and **restart** returns to tick 0.
       (The dedicated **not-found → back-to-list** state ships with the S4 list + permalinks —
       there is no list to return to before then; S3a's retryable error covers a transient
-      item 404.)
+      item 404.) ✅ **Slice 3b — PR #309 merged 2026-07-16.**
 
 ## Dependency note (evaluate-existing-solutions)
 
