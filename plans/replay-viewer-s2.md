@@ -67,9 +67,10 @@ and unit-tested.
       a blocking fighter → its guarded band, a non-blocking fighter → 0; `runFight` stays
       byte-identical (existing equality tests green); Stryker score healthy on the change.
       **Done — Slice 1, PR #313 (100% Stryker, 32/32).**
-- [ ] A **crouching** fighter (posture 1) is drawn in a visibly lower stance than a standing
+- [x] A **crouching** fighter (posture 1) is drawn in a visibly lower stance than a standing
       one; an **airborne** fighter (posture 2) is drawn in a distinct in-air pose as it
-      follows the y-arc (already positioned by S1).
+      follows the y-arc (already positioned by S1). **Done — Slice 2, PR #314 (joint-articulated
+      skeleton in the pure `scene`; manual scan + synthetic-tape visual check).**
 - [ ] An **attacking** fighter extends a striking limb toward the resolved band height —
       **low / mid / high** for `attackBand` 1 / 2 / 3 — and retracts when not attacking.
 - [ ] An **air-attack** (airborne *and* attacking on the same tick) renders BOTH cues — the

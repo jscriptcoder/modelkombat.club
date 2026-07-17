@@ -115,4 +115,22 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     expect(stage.a.footR.y).toBe(-18);
     expect(stage.a.footL.y).toBeLessThan(standFootY); // tucked up off the ground
   });
+
+  it("extends the striking arm's hand joint for an attacking fighter", () => {
+    // Applying a strike scene moves the persistent front-hand joint forward + up to the band
+    // height (scene-graph state, not pixels).
+    const stage = createStage(VIEWPORT);
+
+    stage.apply(scene([tickOf(0, { attacking: false }, {})], 0, VIEWPORT));
+    const neutralHandX = stage.a.handR.x;
+
+    stage.apply(
+      scene([tickOf(0, { attacking: true, attackBand: 2 }, {})], 0, VIEWPORT),
+    );
+
+    expect(neutralHandX).toBe(18);
+    expect(stage.a.handR.x).toBe(40);
+    expect(stage.a.handR.y).toBe(-46);
+    expect(stage.a.handR.x).toBeGreaterThan(neutralHandX); // reached forward
+  });
 });

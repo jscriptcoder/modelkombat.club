@@ -66,6 +66,29 @@ const AIR: Skeleton = {
 const skeletonFor = (posture: number): Skeleton =>
   posture === 1 ? CROUCH : posture === 2 ? AIR : STAND;
 
+// The screen height (local frame, up is negative) of a low / mid / high band: the shared ladder a
+// strike reaches toward and — from Slice 4 — a guard rises to. `null` = not a real band (a 0 or an
+// out-of-range code), so callers leave the limb at its stance rather than reaching an unmapped spot.
+const bandHeight = (band: number): number | null =>
+  band === 1 ? -24 : band === 2 ? -46 : band === 3 ? -68 : null;
+
+// How far forward (local +x) a striking hand reaches — past the neutral front hand at x 18. The
+// container flip (S1 facing) turns this local reach into the correct on-screen direction.
+const STRIKE_REACH_X = 40;
+
+// The stance skeleton with a strike layered on: an attacking fighter throws its front hand (handR)
+// forward + up to the attacked band's height; every non-striking case (idle, or a 0 / out-of-range
+// band) keeps the stance hand. Air-attack composes for free — the AIR stance's tucked legs survive
+// because only handR is overridden.
+const poseFor = (frame: ReplayFrame): Skeleton => {
+  const stance = skeletonFor(frame.posture);
+  const reachY = frame.attacking ? bandHeight(frame.attackBand) : null;
+
+  return reachY === null
+    ? stance
+    : { ...stance, handR: { x: STRIKE_REACH_X, y: reachY } };
+};
+
 // The heads-up display for the current playhead: the engine tick number + both fighters' scores.
 export type Hud = { tick: number; scoreA: number; scoreB: number };
 
@@ -101,7 +124,7 @@ export const scene = (
     x: frame.x * pxPerSubunit,
     y: groundY - frame.y * pxPerSubunit,
     facing: frame.facing,
-    pose: skeletonFor(frame.posture),
+    pose: poseFor(frame),
   });
 
   const at = tape[clampPlayhead(playhead, tape.length)];
