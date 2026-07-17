@@ -76,17 +76,26 @@ const bandHeight = (band: number): number | null =>
 // container flip (S1 facing) turns this local reach into the correct on-screen direction.
 const STRIKE_REACH_X = 40;
 
-// The stance skeleton with a strike layered on: an attacking fighter throws its front hand (handR)
-// forward + up to the attacked band's height; every non-striking case (idle, or a 0 / out-of-range
-// band) keeps the stance hand. Air-attack composes for free — the AIR stance's tucked legs survive
-// because only handR is overridden.
+// How far forward a raised guard sits — modest (protective) vs the strike's committed reach, and on
+// the rear hand (handL), so a strike and a guard never fight over the same arm.
+const GUARD_REACH_X = 8;
+
+// The stance skeleton with the action layers applied: an attacking fighter throws its front hand
+// (handR) forward to the attacked band; a guarding fighter raises its rear hand (handL) to the
+// incoming band. Both reuse the `bandHeight` ladder and are TOTAL — an idle fighter, or a 0 /
+// out-of-range band, keeps the stance hand. The layers are independent arms, so they compose with
+// each other and with any stance (an air-attack keeps the AIR tucked legs). `guardBand` is its own
+// gate (0 = no guard); the strike is gated by the `attacking` flag.
 const poseFor = (frame: ReplayFrame): Skeleton => {
   const stance = skeletonFor(frame.posture);
-  const reachY = frame.attacking ? bandHeight(frame.attackBand) : null;
+  const strikeY = frame.attacking ? bandHeight(frame.attackBand) : null;
+  const guardY = bandHeight(frame.guardBand);
 
-  return reachY === null
-    ? stance
-    : { ...stance, handR: { x: STRIKE_REACH_X, y: reachY } };
+  return {
+    ...stance,
+    ...(strikeY === null ? {} : { handR: { x: STRIKE_REACH_X, y: strikeY } }),
+    ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
+  };
 };
 
 // The heads-up display for the current playhead: the engine tick number + both fighters' scores.

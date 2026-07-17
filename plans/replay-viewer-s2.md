@@ -71,10 +71,13 @@ and unit-tested.
       one; an **airborne** fighter (posture 2) is drawn in a distinct in-air pose as it
       follows the y-arc (already positioned by S1). **Done — Slice 2, PR #314 (joint-articulated
       skeleton in the pure `scene`; manual scan + synthetic-tape visual check).**
-- [ ] An **attacking** fighter extends a striking limb toward the resolved band height —
+- [x] An **attacking** fighter extends a striking limb toward the resolved band height —
       **low / mid / high** for `attackBand` 1 / 2 / 3 — and retracts when not attacking.
-- [ ] An **air-attack** (airborne *and* attacking on the same tick) renders BOTH cues — the
-      air stance AND the extended striking limb — not one or the other.
+      **Done — Slice 3, PR #315 (front hand `handR` → `bandHeight` ladder; manual scan +
+      synthetic-tape visual check).**
+- [x] An **air-attack** (airborne *and* attacking on the same tick) renders BOTH cues — the
+      air stance AND the extended striking limb — not one or the other. **Done — Slice 3
+      (only `handR` overridden, so the AIR stance's tucked legs survive).**
 - [ ] A **guarding** fighter raises its guard to the incoming band height (low / mid / high),
       driven by the new `guardBand`.
 - [ ] A **throwing** fighter shows a distinct grab pose (arms forward), and a **downed**

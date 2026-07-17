@@ -20,6 +20,7 @@ export type ReplayFrame = {
   posture: number;
   attacking: boolean;
   attackBand: number;
+  guardBand: number; // 0 none / 1 low / 2 mid / 3 high — the band a neutral blocker raises
   throwing: boolean;
   knockdown: boolean;
   points: number;
