@@ -164,3 +164,74 @@ describe("scene — stance geometry by posture", () => {
     expect(odd.head).toEqual({ x: 0, y: -76 }); // a real stand, not an empty/garbage pose
   });
 });
+
+describe("scene — strike extension by band", () => {
+  // An attacking fighter throws its front arm (handR) forward to the strike's band height. The
+  // reach is in the figure's LOCAL frame (x forward), so the container flip (S1 facing) turns it
+  // into the correct on-screen direction — the strike geometry never needs to know the facing.
+  // Neutral front hand: { x: 18, y: -44 } (the STAND handR). Bands sit ascending up the screen
+  // (up is negative): low -24, mid -46, high -68.
+  const NEUTRAL_HAND = { x: 18, y: -44 };
+
+  const poseAttacking = (
+    attackBand: number,
+    extra: Partial<ReplayFrame> = {},
+  ) =>
+    scene(
+      [tickOf(0, { attacking: true, attackBand, ...extra }, {})],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("extends the striking hand forward to the low band height", () => {
+    expect(poseAttacking(1).handR).toEqual({ x: 40, y: -24 });
+  });
+
+  it("extends the striking hand forward to the mid band height", () => {
+    expect(poseAttacking(2).handR).toEqual({ x: 40, y: -46 });
+  });
+
+  it("extends the striking hand forward to the high band height", () => {
+    expect(poseAttacking(3).handR).toEqual({ x: 40, y: -68 });
+  });
+
+  it("stacks the three bands as distinct heights ascending up the screen", () => {
+    // Higher band ⇒ higher on screen ⇒ more negative y. A collapsed or mis-ordered map fails here.
+    const low = poseAttacking(1).handR.y;
+    const mid = poseAttacking(2).handR.y;
+    const high = poseAttacking(3).handR.y;
+
+    expect(low).toBeGreaterThan(mid);
+    expect(mid).toBeGreaterThan(high);
+  });
+
+  it("leaves the front hand neutral when not attacking, even with a stale band", () => {
+    // The `attacking` flag is the gate, not the band: an idle fighter carrying a non-zero band must
+    // not throw a phantom strike (kills the "drop the attacking gate" mutant).
+    const pose = scene(
+      [tickOf(0, { attacking: false, attackBand: 2 }, {})],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.handR).toEqual(NEUTRAL_HAND);
+  });
+
+  it("does not extend when attacking with a zero band", () => {
+    expect(poseAttacking(0).handR).toEqual(NEUTRAL_HAND);
+  });
+
+  it("does not extend for an out-of-range attack band (total fallback)", () => {
+    expect(poseAttacking(9).handR).toEqual(NEUTRAL_HAND);
+  });
+
+  it("draws both the airborne stance and the strike for an air attack", () => {
+    const pose = poseAttacking(2, { posture: 2 });
+
+    // The air stance still tucks the legs...
+    expect(pose.footL).toEqual({ x: -10, y: -18 });
+    expect(pose.footR).toEqual({ x: 10, y: -18 });
+    // ...while the strike extends the front hand on the same tick.
+    expect(pose.handR).toEqual({ x: 40, y: -46 });
+  });
+});
