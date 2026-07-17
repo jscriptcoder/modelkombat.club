@@ -82,9 +82,11 @@ and unit-tested.
       driven by the new `guardBand`. **Done — Slice 4, PR #316 (rear hand `handL` reuses the
       `bandHeight` ladder at a modest reach; `ReplayFrame` gained `guardBand`; manual scan +
       visual check).**
-- [ ] A **throwing** fighter shows a distinct grab pose (arms forward), and a **downed**
-      fighter is drawn prone/horizontal, then returns upright when `knockdown` clears
-      (wake-up).
+- [x] A **throwing** fighter shows a distinct grab pose (arms forward). **Done — Slice 5,
+      PR #317 (both hands lock forward into a grab, applied last so it wins over strike/guard;
+      manual scan + visual check).**
+- [ ] A **downed** fighter is drawn prone/horizontal, then returns upright when `knockdown`
+      clears (wake-up).
 - [ ] When a fighter's `points` rise, **that fighter's HUD score is highlighted** for a
       lookback window of ~N ticks (default ~30, ≈0.5 s at 60 fps) — deterministic at any
       playhead (restart/scrub-safe, frozen on pause); no highlight when no point was scored

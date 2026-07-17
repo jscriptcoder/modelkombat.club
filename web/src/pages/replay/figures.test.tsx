@@ -166,4 +166,21 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     expect(stage.a.handL.x).toBeGreaterThan(neutralL); // rear hand swung forward
     expect(stage.a.handR.x).toBeGreaterThan(neutralR); // front hand reached further forward
   });
+
+  it("lays the joint display objects prone for a knocked-down fighter", () => {
+    // Applying a knockdown scene drops the head to the ground line and swings the body horizontal
+    // (scene-graph state, not pixels) — the prone override.
+    const stage = createStage(VIEWPORT);
+
+    stage.apply(scene([tickOf(0, { knockdown: false }, {})], 0, VIEWPORT));
+    const standHeadY = stage.a.head.y;
+
+    stage.apply(scene([tickOf(0, { knockdown: true }, {})], 0, VIEWPORT));
+
+    expect(standHeadY).toBe(-76);
+    expect(stage.a.head.x).toBe(-40);
+    expect(stage.a.head.y).toBe(-10);
+    expect(stage.a.head.y).toBeGreaterThan(standHeadY); // head dropped toward the ground
+    expect(stage.a.footL.x).toBe(36); // the body extends horizontally to the far end
+  });
 });
