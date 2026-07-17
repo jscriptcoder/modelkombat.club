@@ -1,7 +1,11 @@
 # Plan: Replay viewer — S4 · Control playback (transport)
 
-**Branch**: per-slice (each slice cuts its own branch / PR). Current: `feat/replay-transport-frame-step` (Slice 3 — final).
-**Status**: Active. **Slice 1 MERGED** (PR #325 · `5e1337f`) — scrub bar + auto-pause. **Slice 2 MERGED** (PR #326 · `388c77c`) — 0.5×/1×/2× speed buttons. Next: **Slice 3** (frame-step ◀/▶, the last S4 slice) — branch cut, awaiting CONFIRM-gate approval before any code.
+**Branch**: per-slice (each slice cut its own branch / PR).
+**Status**: ✅ **COMPLETE + ARCHIVED** (2026-07-17). Slice 1 (PR #325 · `5e1337f`, scrub + auto-pause),
+Slice 2 (PR #326 · `388c77c`, 0.5×/1×/2× speed), Slice 3 (PR #327 · `cce1456`, frame-step ◀/▶) all
+merged — the replay-viewer transport (scrub · speed · frame-step) is done. **This closes the entire
+replay-viewer roadmap** (S1 skeleton → S2 postures → S3 browse → S4 transport); the shared
+`replay-viewer-{decisions,stories}` docs archive alongside this plan.
 
 ## Goal
 
@@ -58,13 +62,13 @@ N/A (Stryker)** and substitutes the proportionate-evidence regime:
 - [x] When the playhead reaches the last tick the clock **auto-pauses** — the Play control
       reappears (no longer frozen on Pause over the final frame). _(Slice 1)_
 - [x] **Scrubbing backward then pressing Play** resumes playback correctly from the new tick. _(Slice 1)_
-- [ ] Speed buttons **0.5× / 1× / 2×** change the playback rate; the active rate is indicated
+- [x] Speed buttons **0.5× / 1× / 2×** change the playback rate; the active rate is indicated
       (`aria-pressed`), default **1×**. _(Slice 2)_
-- [ ] Frame-step **◀ / ▶** advances/retreats **exactly one tick** (pausing first), and each button
+- [x] Frame-step **◀ / ▶** advances/retreats **exactly one tick** (pausing first), and each button
       is **disabled at its end** (◀ at tick 0, ▶ at the last tick). _(Slice 3)_
-- [ ] Every transport control is **keyboard-operable** via native focus semantics (Tab + Enter/Space
+- [x] Every transport control is **keyboard-operable** via native focus semantics (Tab + Enter/Space
       on buttons, ←/→ on the focused scrub slider); the scrub slider exposes `aria-valuetext`.
-- [ ] No `src/` / `api/` / TCB / `INPUT_HASH` change; `web/src` does not import `src/`; the route
+- [x] No `src/` / `api/` / TCB / `INPUT_HASH` change; `web/src` does not import `src/`; the route
       stays **dark** (no Nav link; the "Fight replays — in development" teaser stays a non-link).
 
 ## Slices

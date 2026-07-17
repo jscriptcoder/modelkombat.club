@@ -836,8 +836,8 @@ server reconstructs the tape on demand from the KotH repro archive (docs + seeds
 tape) and returns motion + `name`/`model` identities only — **bot documents never cross the wire**
 (KotH integrity + the `/fight` no-docs contract). **TCB / `INPUT_HASH` / `BENCHMARK_VERSION` untouched**;
 `web/src` imports nothing from `src/`. Design trail (live in `plans/`): grill-me
-[replay-viewer-decisions.md](../../plans/replay-viewer-decisions.md) (13 decisions) → story-split
-[replay-viewer-stories.md](../../plans/replay-viewer-stories.md) (S1–S4). `web/**` is outside Stryker's
+[replay-viewer-decisions.md](replay-viewer-decisions.md) (13 decisions) → story-split
+[replay-viewer-stories.md](replay-viewer-stories.md) (S1–S4). `web/**` is outside Stryker's
 node scope ⇒ the pure `scene`/`figures`/`transport` units got exhaustive exact-assertion browser tests +
 a manual mutator scan (the `public-page-web-ui` precedent).
 
@@ -874,11 +874,11 @@ attackBand,throwing,knockdown,points,stamina}` per tick per fighter, projected p
 [replay-viewer-s1.md](replay-viewer-s1.md) — the plan.
 
 **S1 (walking skeleton) complete; the viewer feature is 1 of 4 stories done.** The sibling scoping +
-story-split docs — [replay-viewer-decisions.md](../../plans/replay-viewer-decisions.md) (grill-me: 13
-decisions) + [replay-viewer-stories.md](../../plans/replay-viewer-stories.md) (story split S1–S4) — stay
-live in `plans/` as the trail for the remaining stories: **S2** postures/poses, **S3** browsable list +
-`/watch/{id}` permalinks + nav + dedicated not-found, **S4** transport (scrub/speed/frame-step). Each
-starts its own `planning` pass; S2-vs-S3 ordering is negotiable (both build only on S1).
+story-split docs — [replay-viewer-decisions.md](replay-viewer-decisions.md) (grill-me: 13
+decisions) + [replay-viewer-stories.md](replay-viewer-stories.md) (story split S1–S4) — were the
+trail in `plans/` (now archived here) for the remaining stories: **S2** postures/poses, **S3** browsable
+list + `/watch/{id}` permalinks + nav + dedicated not-found, **S4** transport (scrub/speed/frame-step).
+Each started its own `planning` pass; S2-vs-S3 ordering was negotiable (both build only on S1).
 
 ## `/watch` fight replay viewer — S2 postures ✅ COMPLETE
 
@@ -968,7 +968,43 @@ ordering: the permalink landed before the list so the cards had a live target to
   cards only; uniquely-named pairings stay clean.
 
 [replay-viewer-s3.md](replay-viewer-s3.md) — the plan (all 3 slices + the whole-story acceptance
-criteria inline; the grill-me decisions stay in the still-live `plans/replay-viewer-decisions.md`).
+criteria inline; the grill-me decisions were then in `plans/replay-viewer-decisions.md`, now archived here).
 
-**S3 (browse) complete; the viewer feature is 3 of 4 stories done.** Remaining, still live in `plans/`:
-**S4** (transport — scrub / speed / frame-step), which starts its own `grill-me` → `planning` pass.
+## `/watch` fight replay viewer — S4 transport ✅ COMPLETE
+
+**Control playback.** A spectator watching a fight can now scrub to any tick, change speed, and step
+frame-by-frame — to rewatch the decisive moment and study a bout in detail. The final replay-viewer
+story. **Web-only** — S1 already shipped the whole `/replay` API and the render tape carries every
+tick, so **no `src/` / `api/` / TCB / `INPUT_HASH` / `BENCHMARK_VERSION` change**; `web/src` imports
+nothing from `src/`. All three slices extend the pure `transport` clock (`{ playhead, playing }`) driven
+by the Pixi ticker in `ReplayPlayer`; `web/**` is outside Stryker, so each slice recorded **Mutation:
+N/A (Stryker)** and substituted exact-assertion `transport` unit tests + browser control tests +
+documented manual mutator scan + a deployed-bundle preview smoke. The route **stays dark** (no Nav link;
+the "Fight replays — in development" teaser stays a non-link).
+
+- **Slice 1 — a scrub bar seeks to any tick + end-of-fight auto-pause** (PR #325, `feat/replay-transport-scrub`)
+  — the `transport` model gained two behaviors: `advance` now **auto-pauses** at `lastTick` (the toggle
+  returns to Play instead of freezing on Pause over the final frame), and a new pure `seek(t, tick,
+  lastTick)` (clamp into `[0, lastTick]`, always pause). `ReplayPlayer` renders a native
+  `<input type=range>` bound to `round(playhead)` (live-tracks during play; `onInput` → `seek` pauses so
+  the per-frame write stops fighting the drag), plus a muted-mono **`tick N / M`** readout + `aria-valuetext`
+  sourced from the tape exactly like the HUD, so the two always agree.
+- **Slice 2 — 0.5× / 1× / 2× speed buttons** (PR #326, `feat/replay-transport-speed`) — a reactive
+  `speed` signal (default 1, persists across Restart) multiplied into the ticker delta
+  (`advance(t, deltaTime × speed, lastTick)`) — **no model change** (speed is a viewer-layer concern). Three
+  buttons form a single-select toggle group (`For` over `RATES = [0.5, 1, 2]`), the active rate carrying
+  `aria-pressed="true"`. The `deltaTime × speed` multiply is the one mutant not unit-killed (impure ticker
+  edge) — covered by preview smoke.
+- **Slice 3 — frame-step ◀ / ▶** (PR #327, `feat/replay-transport-frame-step`) — one new pure
+  `step(t, delta, lastTick) = seek(t, round(playhead) + delta, lastTick)` (rounds a fractional mid-play
+  playhead to a clean neighbouring tick, reusing Slice 1's clamp + pause). Two `aria-label`led icon buttons
+  wired to `step(∓1)`, each `disabled` at its boundary (◀ at tick 0, ▶ at the last tick) — no over/underflow.
+  Every behavioral mutant is unit/browser-killed (pure `step` + exact-asserted gates).
+
+[replay-viewer-s4.md](replay-viewer-s4.md) — the plan (all 3 slices + whole-story acceptance criteria
+inline). Shared story-split docs — [replay-viewer-decisions.md](replay-viewer-decisions.md) +
+[replay-viewer-stories.md](replay-viewer-stories.md) — archived alongside (nothing live remained).
+
+**S4 (transport) complete — the entire replay-viewer roadmap is done (S1 skeleton → S2 postures →
+S3 browse → S4 transport, 4 of 4 stories).** The `/watch` viewer now browses the King's fights, plays
+any one back as karate-doing stickmen, and gives full transport control. No replay-viewer work remains.
