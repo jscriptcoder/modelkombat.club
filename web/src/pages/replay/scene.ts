@@ -80,12 +80,20 @@ const STRIKE_REACH_X = 40;
 // the rear hand (handL), so a strike and a guard never fight over the same arm.
 const GUARD_REACH_X = 8;
 
-// The stance skeleton with the action layers applied: an attacking fighter throws its front hand
-// (handR) forward to the attacked band; a guarding fighter raises its rear hand (handL) to the
-// incoming band. Both reuse the `bandHeight` ladder and are TOTAL — an idle fighter, or a 0 /
-// out-of-range band, keeps the stance hand. The layers are independent arms, so they compose with
-// each other and with any stance (an air-attack keeps the AIR tucked legs). `guardBand` is its own
-// gate (0 = no guard); the strike is gated by the `attacking` flag.
+// A throw's grab: BOTH hands reach forward and lock together at chest height — the cue that reads a
+// throw. Distinct from a strike (front hand only, at a band) and a guard (rear hand, modest reach).
+const GRAB: Pick<Skeleton, "handL" | "handR"> = {
+  handL: { x: 28, y: -44 },
+  handR: { x: 36, y: -44 },
+};
+
+// The stance skeleton with the action layers applied: a strike throws the front hand (handR) forward
+// to the attacked band; a guard raises the rear hand (handL) to the incoming band; a throw locks
+// BOTH hands into a forward grab. All are TOTAL — an idle fighter, or a 0 / out-of-range band, keeps
+// the stance hand. The layers are independent (and mutually exclusive in the engine), so they compose
+// with each other and with any stance (an air-attack keeps the AIR tucked legs). The throw is applied
+// LAST, so it wins if ever combined with a strike/guard. Gates: strike ← `attacking`, guard ←
+// `guardBand` (0 = none), throw ← `throwing`.
 const poseFor = (frame: ReplayFrame): Skeleton => {
   const stance = skeletonFor(frame.posture);
   const strikeY = frame.attacking ? bandHeight(frame.attackBand) : null;
@@ -95,6 +103,7 @@ const poseFor = (frame: ReplayFrame): Skeleton => {
     ...stance,
     ...(strikeY === null ? {} : { handR: { x: STRIKE_REACH_X, y: strikeY } }),
     ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
+    ...(frame.throwing ? GRAB : {}),
   };
 };
 

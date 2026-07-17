@@ -287,3 +287,40 @@ describe("scene — guard raised to the incoming band", () => {
     expect(pose.head).toEqual({ x: 0, y: -58 });
   });
 });
+
+describe("scene — throw grab pose", () => {
+  // A throwing fighter reaches BOTH hands forward and locks them together at chest height — the cue
+  // that reads a throw as a throw. Distinct from a strike (only the front hand, at a band) and from
+  // neutral (hands at ±18). `throwing` gates it; it wins over strike/guard (applied last in poseFor).
+  const poseThrowing = (extra: Partial<ReplayFrame> = {}) =>
+    scene([tickOf(0, { throwing: true, ...extra }, {})], 0, VIEWPORT).a.pose;
+
+  it("reaches both hands forward into a grab when throwing", () => {
+    const pose = poseThrowing();
+
+    expect(pose.handL).toEqual({ x: 28, y: -44 });
+    expect(pose.handR).toEqual({ x: 36, y: -44 });
+  });
+
+  it("leaves the hands at their neutral stance when not throwing", () => {
+    const pose = scene([tickOf(0, { throwing: false }, {})], 0, VIEWPORT).a
+      .pose;
+
+    expect(pose.handL).toEqual({ x: -18, y: -44 });
+    expect(pose.handR).toEqual({ x: 18, y: -44 });
+  });
+
+  it("shows a grab distinct from a strike — the rear hand comes forward too", () => {
+    const grab = poseThrowing();
+
+    const strike = scene(
+      [tickOf(0, { attacking: true, attackBand: 2 }, {})],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    // A strike leaves the rear hand back at the stance; a grab brings BOTH hands forward.
+    expect(strike.handL.x).toBeLessThan(0);
+    expect(grab.handL.x).toBeGreaterThan(0);
+  });
+});
