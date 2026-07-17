@@ -1,7 +1,6 @@
 import { Container, Graphics, Text } from "pixi.js";
 
-import type { Scene } from "./scene";
-import type { Viewport } from "./scene";
+import type { Scene, Skeleton, Viewport } from "./scene";
 
 // The Pixi draw layer: builds the scene-graph (two stickmen + a HUD) and applies a `Scene` to it.
 // Deliberately free of `Application` / renderer / ticker — those live in the player component — so
@@ -11,39 +10,106 @@ import type { Viewport } from "./scene";
 const CHALLENGER_COLOR = 0x4fd1c5;
 const KING_COLOR = 0xf6ad55;
 
-// A minimal stickman drawn with its **feet at the local origin** (all geometry at y ≤ 0), so placing
-// the container at (screenX, groundY) stands the figure on the ground line and `scale.x = ±1` flips
-// it about its feet. Head + torso + two arms + two legs, stroked in the fighter's colour.
-const stickman = (color: number): Container => {
-  const g = new Graphics();
-
-  g.moveTo(0, -34).lineTo(0, -64); // torso: hip → shoulder
-  g.moveTo(0, -34).lineTo(-14, 0).moveTo(0, -34).lineTo(14, 0); // legs → feet
-  g.moveTo(0, -64).lineTo(-18, -44).moveTo(0, -64).lineTo(18, -44); // arms
-  g.stroke({ width: 4, color });
-  g.circle(0, -76, 12).fill(color); // head
-
-  const container = new Container();
-
-  container.addChild(g);
-
-  return container;
+// A fighter's persistent scene-graph: a root container the scene positions + flips, holding one
+// child container per skeleton joint (the head container carries the visible head circle; the rest
+// are pivots the bones connect). A pose change moves the joint containers (cheap transforms) — the
+// joints are the asserted, persistent display objects, since a `Graphics` path is opaque to
+// display-object assertions.
+export type FigureNodes = {
+  root: Container;
+  head: Container;
+  shoulder: Container;
+  hip: Container;
+  handL: Container;
+  handR: Container;
+  footL: Container;
+  footR: Container;
 };
 
-// The mounted stage: the root container to add to the Pixi stage, the two fighter containers and
-// the HUD text (exposed for display-object assertions), and `apply` — the pure Scene → display
-// projection the player calls every frame.
+// The six line segments (stroked into the `bones` Graphics) that connect the joints into a
+// stickman: torso, two legs, two arms. The head is a filled circle riding the head joint.
+const BONES: ReadonlyArray<readonly [keyof Skeleton, keyof Skeleton]> = [
+  ["hip", "shoulder"],
+  ["hip", "footL"],
+  ["hip", "footR"],
+  ["shoulder", "handL"],
+  ["shoulder", "handR"],
+];
+
+type Figure = { nodes: FigureNodes; bones: Graphics; color: number };
+
+const createFigure = (color: number): Figure => {
+  const root = new Container();
+  const bones = new Graphics();
+
+  const head = new Container();
+
+  head.addChild(new Graphics().circle(0, 0, 12).fill(color));
+
+  const shoulder = new Container();
+  const hip = new Container();
+  const handL = new Container();
+  const handR = new Container();
+  const footL = new Container();
+  const footR = new Container();
+
+  root.addChild(bones, head, shoulder, hip, handL, handR, footL, footR);
+
+  return {
+    nodes: { root, head, shoulder, hip, handL, handR, footL, footR },
+    bones,
+    color,
+  };
+};
+
+// Move a joint container to its pose coordinate.
+const place = (node: Container, joint: { x: number; y: number }): void => {
+  node.x = joint.x;
+  node.y = joint.y;
+};
+
+const applyFigure = (
+  figure: Figure,
+  placement: Scene["a"],
+): void => {
+  const { nodes, bones, color } = figure;
+  const pose = placement.pose;
+
+  nodes.root.x = placement.x;
+  nodes.root.y = placement.y;
+  nodes.root.scale.x = placement.facing;
+
+  place(nodes.head, pose.head);
+  place(nodes.shoulder, pose.shoulder);
+  place(nodes.hip, pose.hip);
+  place(nodes.handL, pose.handL);
+  place(nodes.handR, pose.handR);
+  place(nodes.footL, pose.footL);
+  place(nodes.footR, pose.footR);
+
+  bones.clear();
+
+  for (const [from, to] of BONES) {
+    bones.moveTo(pose[from].x, pose[from].y).lineTo(pose[to].x, pose[to].y);
+  }
+
+  bones.stroke({ width: 4, color });
+};
+
+// The mounted stage: the root container to add to the Pixi stage, the two fighters' joint nodes
+// (exposed for display-object assertions), and the HUD text, plus `apply` — the pure Scene →
+// display projection the player calls every frame.
 export type Stage = {
   root: Container;
-  a: Container;
-  b: Container;
+  a: FigureNodes;
+  b: FigureNodes;
   hud: Text;
   apply: (scene: Scene) => void;
 };
 
 export const createStage = (viewport: Viewport): Stage => {
-  const a = stickman(CHALLENGER_COLOR);
-  const b = stickman(KING_COLOR);
+  const a = createFigure(CHALLENGER_COLOR);
+  const b = createFigure(KING_COLOR);
 
   const hud = new Text({
     text: "",
@@ -56,17 +122,13 @@ export const createStage = (viewport: Viewport): Stage => {
 
   const root = new Container();
 
-  root.addChild(a, b, hud);
+  root.addChild(a.nodes.root, b.nodes.root, hud);
 
   const apply = (scene: Scene): void => {
-    a.x = scene.a.x;
-    a.y = scene.a.y;
-    a.scale.x = scene.a.facing;
-    b.x = scene.b.x;
-    b.y = scene.b.y;
-    b.scale.x = scene.b.facing;
+    applyFigure(a, scene.a);
+    applyFigure(b, scene.b);
     hud.text = `tick ${scene.hud.tick}    ${scene.hud.scoreA} : ${scene.hud.scoreB}`;
   };
 
-  return { root, a, b, hud, apply };
+  return { root, a: a.nodes, b: b.nodes, hud, apply };
 };
