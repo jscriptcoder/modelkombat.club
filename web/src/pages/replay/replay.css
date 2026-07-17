@@ -35,6 +35,8 @@
 
 .replay-controls {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 0.75rem;
 }
 
@@ -78,6 +80,24 @@
   font-size: 0.8rem;
   color: var(--muted);
   white-space: nowrap;
+}
+
+/* Discrete playback-rate buttons (0.5× / 1× / 2×) as a single-select toggle group. The active rate
+   (aria-pressed=true) is tinted with the accent so the current speed reads at a glance; the buttons
+   are narrower than the primary controls since their labels are short. */
+.replay-speed {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.replay-speed-button {
+  min-width: 3rem;
+  padding: 0.5rem 0.6rem;
+}
+
+.replay-speed-button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .replay-status,

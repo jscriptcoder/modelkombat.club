@@ -1,4 +1,10 @@
-import { createSignal, onCleanup, onMount, type Component } from "solid-js";
+import {
+  createSignal,
+  For,
+  onCleanup,
+  onMount,
+  type Component,
+} from "solid-js";
 import { Application } from "pixi.js";
 
 import { createStage } from "./figures";
@@ -15,6 +21,10 @@ const DEFAULT_VIEWPORT: Viewport = { width: 1200, height: 600 };
 
 // The site's dark canvas background (matches the theme-color in the page shells).
 const BACKGROUND = 0x0b0e14;
+
+// The discrete playback rates the spectator can pick — half speed to study a fast exchange, double
+// to skip a lull. 1× is the default; the rate scales the per-frame tick delta (deltaTime × speed).
+const RATES = [0.5, 1, 2] as const;
 
 type ReplayPlayerProps = {
   item: ReplayItem;
@@ -34,6 +44,10 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
   // The playback clock (pure transport model) as reactive state: the Pixi ticker advances it each
   // frame, the controls pause/resume/seek/restart it, and the play/pause label tracks `playing`.
   const [transport, setTransport] = createSignal(startTransport());
+
+  // Playback rate as a reactive multiplier on the ticker delta — a viewer-layer concern kept out of
+  // the pure transport model. It persists across Restart (which resets the clock, not the rate).
+  const [speed, setSpeed] = createSignal(1);
 
   // The tape index the playhead lands on (what the renderer draws + the scrub bar's position), and
   // the engine tick number there — the same value the canvas HUD prints (see `scene`).
@@ -80,7 +94,7 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
     // unchanged), then draw the frame the playhead lands on. Reading the signal each frame picks up
     // pause / restart from the controls; a restart resets the playhead and the next frame draws it.
     created.ticker.add((ticker) => {
-      const next = advance(transport(), ticker.deltaTime, lastTick);
+      const next = advance(transport(), ticker.deltaTime * speed(), lastTick);
 
       setTransport(next);
       stage.apply(scene(tape, Math.round(next.playhead), viewport));
@@ -126,6 +140,21 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
         <span class="replay-readout">
           tick {currentTick()} / {finalTick}
         </span>
+
+        <div class="replay-speed" role="group" aria-label="Playback speed">
+          <For each={RATES}>
+            {(rate) => (
+              <button
+                type="button"
+                class="replay-control replay-speed-button"
+                aria-pressed={speed() === rate ? "true" : "false"}
+                onClick={() => setSpeed(rate)}
+              >
+                {rate}×
+              </button>
+            )}
+          </For>
+        </div>
 
         <button
           type="button"

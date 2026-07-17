@@ -134,3 +134,85 @@ describe("ReplayPlayer — scrub transport", () => {
     expect(await findByRole("button", { name: /^play$/i })).toBeTruthy();
   });
 });
+
+describe("ReplayPlayer — speed controls", () => {
+  // Speed is a ticker-layer multiplier (deltaTime × speed), not a transport-model change, so the
+  // rate change itself is proven by preview smoke; here we pin the single-select button group's
+  // active state — the observable, exact-assertable contract — via each button's aria-pressed.
+
+  it("renders 0.5× / 1× / 2× rate buttons with 1× active on mount", async () => {
+    const { findByRole } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    const half = await findByRole("button", { name: /^0\.5×$/ });
+    const one = await findByRole("button", { name: /^1×$/ });
+    const two = await findByRole("button", { name: /^2×$/ });
+
+    // Default playback rate is 1× — it is the only pressed button.
+    expect(half.getAttribute("aria-pressed")).toBe("false");
+    expect(one.getAttribute("aria-pressed")).toBe("true");
+    expect(two.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("selecting a rate activates it and clears the others (single-select group)", async () => {
+    const { findByRole } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    fireEvent.click(await findByRole("button", { name: /^2×$/ }));
+
+    // 2× becomes the sole active rate.
+    expect(
+      (await findByRole("button", { name: /^0\.5×$/ })).getAttribute(
+        "aria-pressed",
+      ),
+    ).toBe("false");
+    expect(
+      (await findByRole("button", { name: /^1×$/ })).getAttribute(
+        "aria-pressed",
+      ),
+    ).toBe("false");
+    expect(
+      (await findByRole("button", { name: /^2×$/ })).getAttribute(
+        "aria-pressed",
+      ),
+    ).toBe("true");
+
+    fireEvent.click(await findByRole("button", { name: /^1×$/ }));
+
+    // Selecting 1× restores the default as the only active rate.
+    expect(
+      (await findByRole("button", { name: /^0\.5×$/ })).getAttribute(
+        "aria-pressed",
+      ),
+    ).toBe("false");
+    expect(
+      (await findByRole("button", { name: /^1×$/ })).getAttribute(
+        "aria-pressed",
+      ),
+    ).toBe("true");
+    expect(
+      (await findByRole("button", { name: /^2×$/ })).getAttribute(
+        "aria-pressed",
+      ),
+    ).toBe("false");
+  });
+
+  it("keeps the selected rate across Restart — restart resets the clock, not the speed", async () => {
+    const { findByRole } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    fireEvent.click(await findByRole("button", { name: /^2×$/ }));
+    fireEvent.click(await findByRole("button", { name: /^restart$/i }));
+
+    // Restart resumed the clock (toggle offers Pause) but left the rate at 2×.
+    expect(
+      (await findByRole("button", { name: /^2×$/ })).getAttribute(
+        "aria-pressed",
+      ),
+    ).toBe("true");
+    expect(await findByRole("button", { name: /^pause$/i })).toBeTruthy();
+  });
+});
