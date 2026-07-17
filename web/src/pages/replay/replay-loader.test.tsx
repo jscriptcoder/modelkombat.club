@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { loadReplay } from "./replay-loader";
+import { loadById, loadReplay } from "./replay-loader";
 import type { ReplayFrame, ReplayItem, ReplaySummary } from "./replay-contract";
 
 // A 200 JSON response and a non-2xx response, standing in for the /replay endpoints. The loader is
@@ -86,5 +86,38 @@ describe("loadReplay — the two-step /replay fetch", () => {
       .mockResolvedValueOnce(failure(404));
 
     await expect(loadReplay(fetchFn)).rejects.toThrow();
+  });
+});
+
+describe("loadById — the /replay/{id} permalink fetch", () => {
+  it("returns the reconstructed fight for a resolvable id", async () => {
+    const body = item();
+
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(ok(body));
+
+    const result = await loadById("abc123", fetchFn);
+
+    expect(result).toEqual({ kind: "found", item: body });
+    expect(fetchFn).toHaveBeenCalledWith("/replay/abc123");
+  });
+
+  it("reports not-found (not an error) when the id 404s", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(failure(404));
+
+    const result = await loadById("gone", fetchFn);
+
+    expect(result).toEqual({ kind: "not-found" });
+  });
+
+  it("throws on a transient failure so the page can offer retry (503)", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(failure(503));
+
+    await expect(loadById("abc123", fetchFn)).rejects.toThrow();
+  });
+
+  it("throws on a 500 — distinct from a 404 not-found", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(failure(500));
+
+    await expect(loadById("abc123", fetchFn)).rejects.toThrow();
   });
 });

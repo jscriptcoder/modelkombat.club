@@ -2,7 +2,7 @@ import { fireEvent, render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
 import ReplayPage from "./ReplayPage";
-import type { ReplayLoad } from "./replay-loader";
+import type { ReplayByIdLoad, ReplayLoad } from "./replay-loader";
 import type { ReplayFrame, ReplayItem } from "./replay-contract";
 
 // A small canvas keeps the Pixi player light in the ready-state tests; the numbers don't matter
@@ -102,5 +102,41 @@ describe("ReplayPage", () => {
 
     expect(await findByText(/couldn't load the fight/i)).toBeTruthy();
     expect(queryByText(/no fights to watch yet/i)).toBeNull();
+  });
+
+  it("routes /watch/{id} to the fight view, threading the parsed id to the by-id loader", async () => {
+    // A path carrying a fight id dispatches to the by-id player (distinguished from the autoplay
+    // view by its back-to-list link), and the id parsed from the path reaches the loader.
+    const loadFight = vi
+      .fn<(id: string) => Promise<ReplayByIdLoad>>()
+      .mockResolvedValue({ kind: "found", item: item() });
+
+    const { findByRole } = render(() => (
+      <ReplayPage
+        path="/watch/abc123"
+        loadFight={loadFight}
+        viewport={VIEWPORT}
+      />
+    ));
+
+    expect(await findByRole("img", { name: /fight playback/i })).toBeTruthy();
+    expect(
+      (await findByRole("link", { name: /all fights/i })).getAttribute("href"),
+    ).toBe("/watch");
+    // The whole chain — path → replayIdFromPath → dispatch → ReplayFight → loader — is pinned:
+    // the loader is called with the id lifted out of the path (kills an id-threading mutant).
+    expect(loadFight).toHaveBeenCalledWith("abc123");
+  });
+
+  it("routes bare /watch to the latest-fight autoplay (no back-to-list link)", async () => {
+    const load = () =>
+      Promise.resolve<ReplayLoad>({ kind: "ready", item: item() });
+
+    const { findByRole, queryByRole } = render(() => (
+      <ReplayPage path="/watch" load={load} viewport={VIEWPORT} />
+    ));
+
+    expect(await findByRole("img", { name: /fight playback/i })).toBeTruthy();
+    expect(queryByRole("link", { name: /all fights/i })).toBeNull();
   });
 });
