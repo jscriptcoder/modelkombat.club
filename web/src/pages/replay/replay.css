@@ -166,3 +166,13 @@
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+/* Disambiguator for repeat-challenge cards (same challenger↔King name pair): a short id fragment,
+   muted and monospaced so it reads as a technical tag beside the "vs", never competing with the
+   fighter identities. Rendered only on colliding cards (see markCollisions). */
+.replay-card-id {
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+}

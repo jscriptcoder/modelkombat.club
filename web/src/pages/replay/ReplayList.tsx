@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 
 import { RING_PATH, WATCH_PATH } from "../../shared/lib/paths";
+import { markCollisions } from "./collisions";
 import type { Fighter } from "./replay-contract";
 import { loadList, type ReplayListLoad } from "./replay-loader";
 
@@ -68,12 +69,19 @@ const ReplayList: Component<ReplayListProps> = (props) => {
         <Match when={readyItems()}>
           {(items) => (
             <ul class="replay-list">
-              <For each={items()}>
+              {/* Repeat-challenge fights (identical challenger↔King name pair) are otherwise
+                  indistinguishable — flag them so only those cards show a short id fragment. */}
+              <For each={markCollisions(items())}>
                 {(fight) => (
                   <li>
                     <a class="replay-card" href={`${WATCH_PATH}/${fight.id}`}>
                       <FighterIdentity fighter={fight.fighters[0]} />
                       <span class="replay-card-vs">vs</span>
+                      <Show when={fight.collides}>
+                        <span class="replay-card-id">
+                          {fight.id.slice(0, 6)}
+                        </span>
+                      </Show>
                       <FighterIdentity fighter={fight.fighters[1]} />
                     </a>
                   </li>
