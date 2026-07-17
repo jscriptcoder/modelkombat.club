@@ -20,21 +20,21 @@ re-running the engine.
 
 ## Resolved decision tree
 
-| #   | Decision                            | Choice                                                                                                                                                                              |
-| --- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Tape reconstruction & doc exposure  | **Server-side reconstruct; return the motion tape only — bot documents never leave the server.** Protects KotH competitive integrity + honors the `/fight` no-docs contract.        |
-| 2   | List unit / "a fight"               | **One entry per archived title attempt** (`ReproRecord`). Headline watchable bout = **challenger vs the King (`defenders[0]`)**. Drill-down (other defenders/seeds) deferred.        |
-| 3   | List content                        | **Identities only** (`name` + `model`); outcome revealed on watch. The list endpoint runs **zero fights** (pure `readArchive` → identity projection).                               |
-| 4   | Version scope                       | **Current version only** (`readArchive(CURRENT_VERSION)`) — byte-exact reconstruction against today's `CANONICAL_RULES` + `MATCH`. No rules-snapshotting; historical replay deferred. |
-| 5   | Fight id                            | **Content hash** — sha256 of the record's canonical JSON (`challenger + defenders + seeds + version`). Eviction-proof, permalinkable, cacheable. Idiomatic vs the `INPUT_HASH` pattern. |
-| 6   | Endpoint shape                      | **REST collection + item**: `GET /replay` (list), `GET /replay/{id}` (tape). One flat `api/replay.ts` behind two rewrites (`/replay` → list, `/replay/{id}` → `?id=$1`).             |
-| 7   | Render state source                 | **Additive render-tape export.** The public `events` tape is too thin (no posture/band/throwing/knockdown/facing). Byte-identical outcome path, **TCB-untouched**, **`INPUT_HASH`-neutral**. |
-| 8   | Export shape                        | **Dedicated `renderTape(cfg)` sibling** — `runFight`/`FightResult` stay frozen so the benchmark hot path pays nothing. Reuses the already-computed internal `Frame` histories.        |
-| 9   | Rendering tech                      | **Pixi** (per `docs/DESIGN.md` — reconsidered vs SVG/Canvas2D; Pixi kept for animation headroom). Tested via a pure scene-model + a thin draw layer.                                |
-| 10  | v1 fidelity bar                     | **Walking skeleton first** — positions + facing + score/tick HUD, minimal poses. Full posture vocabulary is the next slice.                                                          |
-| 11  | Transport in the skeleton slice     | **Autoplay + play/pause/restart** only. Scrub bar + speed land with the later fight-list/transport slice.                                                                            |
-| 12  | Viewer testing                      | **Pure `scene(tape, tick) → Scene` model** exhaustively tested (exact assertions + manual mutator scan; web is not Stryker-reachable) **+ Pixi display-object assertions** (not pixels). `agent-browser` = out-of-band visual smoke. |
-| 13  | Bootstrap records                   | **Filtered out** of the watchable list — a bootstrap crowning (`reproRecord([], 1)`) has empty defenders / no bout to animate. Reversible later.                                     |
+| #   | Decision                           | Choice                                                                                                                                                                                                                               |
+| --- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Tape reconstruction & doc exposure | **Server-side reconstruct; return the motion tape only — bot documents never leave the server.** Protects KotH competitive integrity + honors the `/fight` no-docs contract.                                                         |
+| 2   | List unit / "a fight"              | **One entry per archived title attempt** (`ReproRecord`). Headline watchable bout = **challenger vs the King (`defenders[0]`)**. Drill-down (other defenders/seeds) deferred.                                                        |
+| 3   | List content                       | **Identities only** (`name` + `model`); outcome revealed on watch. The list endpoint runs **zero fights** (pure `readArchive` → identity projection).                                                                                |
+| 4   | Version scope                      | **Current version only** (`readArchive(CURRENT_VERSION)`) — byte-exact reconstruction against today's `CANONICAL_RULES` + `MATCH`. No rules-snapshotting; historical replay deferred.                                                |
+| 5   | Fight id                           | **Content hash** — sha256 of the record's canonical JSON (`challenger + defenders + seeds + version`). Eviction-proof, permalinkable, cacheable. Idiomatic vs the `INPUT_HASH` pattern.                                              |
+| 6   | Endpoint shape                     | **REST collection + item**: `GET /replay` (list), `GET /replay/{id}` (tape). One flat `api/replay.ts` behind two rewrites (`/replay` → list, `/replay/{id}` → `?id=$1`).                                                             |
+| 7   | Render state source                | **Additive render-tape export.** The public `events` tape is too thin (no posture/band/throwing/knockdown/facing). Byte-identical outcome path, **TCB-untouched**, **`INPUT_HASH`-neutral**.                                         |
+| 8   | Export shape                       | **Dedicated `renderTape(cfg)` sibling** — `runFight`/`FightResult` stay frozen so the benchmark hot path pays nothing. Reuses the already-computed internal `Frame` histories.                                                       |
+| 9   | Rendering tech                     | **Pixi** (per `docs/DESIGN.md` — reconsidered vs SVG/Canvas2D; Pixi kept for animation headroom). Tested via a pure scene-model + a thin draw layer.                                                                                 |
+| 10  | v1 fidelity bar                    | **Walking skeleton first** — positions + facing + score/tick HUD, minimal poses. Full posture vocabulary is the next slice.                                                                                                          |
+| 11  | Transport in the skeleton slice    | **Autoplay + play/pause/restart** only. Scrub bar + speed land with the later fight-list/transport slice.                                                                                                                            |
+| 12  | Viewer testing                     | **Pure `scene(tape, tick) → Scene` model** exhaustively tested (exact assertions + manual mutator scan; web is not Stryker-reachable) **+ Pixi display-object assertions** (not pixels). `agent-browser` = out-of-band visual smoke. |
+| 13  | Bootstrap records                  | **Filtered out** of the watchable list — a bootstrap crowning (`reproRecord([], 1)`) has empty defenders / no bout to animate. Reversible later.                                                                                     |
 
 ## Error contract (find-gaps, 2026-07-15)
 
@@ -42,7 +42,7 @@ RFC 9457 `application/problem+json`, consistent with the existing `/fight` flat-
 convention.
 
 - **`GET /replay/{id}` — id doesn't resolve to a watchable fight** → **`404`
-  `/problems/replay-not-found`**. One status for *all* non-resolving cases: unknown hash,
+  `/problems/replay-not-found`**. One status for _all_ non-resolving cases: unknown hash,
   an evicted record, a malformed id, and a bootstrap record's id (bootstrap is never
   listed, so its id is only reachable by guessing/staleness). A client can't distinguish
   evicted from never-existed, so a single 404 is honest and simplest — no separate
@@ -59,13 +59,13 @@ The "byte-faithful" claim is only testable if the reconstructed bout is fully pi
 × seeds and yields no events):
 
 - **Headline bout** = `runFight({ botA: challenger, botB: defenders[0] (King), seed:
-  seeds[0], rules, maxTicks, match })` — challenger as A (starts left), King as B, the
+seeds[0], rules, maxTicks, match })` — challenger as A (starts left), King as B, the
   first frozen seed. Deterministic and faithful to a real sub-bout the arena ran.
 - **Parameter provenance is load-bearing:** `rules` / `maxTicks` / `match` MUST be the
   **same live constants the arena `/fight` handler fought on** — `match` and `maxTicks` are
   **not** stored in the `ReproRecord`, so reconstruction reuses the shared wiring rather
   than re-deriving them. Any drift (a different `match`, a different `maxTicks`) silently
-  produces a *different* fight and breaks the tape-vs-fight equality test. The endpoint and
+  produces a _different_ fight and breaks the tape-vs-fight equality test. The endpoint and
   the arena handler must draw these from one shared source.
 - **Verification AC:** a test reconstructs the tape for a known record and asserts its final
   score/winner/tick-count equals a direct `runFight` on the same pinned parameters (the
@@ -98,11 +98,11 @@ Bounded by:
 
 - **Immutable HTTP/edge caching (primary).** The id is a content hash ⇒ a given fight's
   tape never changes ⇒ respond with `Cache-Control: public, immutable` + a long TTL. Repeat
-  watches are served from cache; only the first computes. Caching a *derived, reproducible*
+  watches are served from cache; only the first computes. Caching a _derived, reproducible_
   tape does not violate invariant #1 (it's not a persisted source-of-truth tape).
 - **WAF per-IP backstop.** Reuse the `/fight`-style modest per-IP rate-limit (a dashboard
   action, not repo code) as a floor against cold-replaying many valid ids.
-- **Cheap failure path.** A non-resolving id returns `404` *before* running any fight
+- **Cheap failure path.** A non-resolving id returns `404` _before_ running any fight
   (lookup in `readArchive` first), so garbage-id spam costs only a lookup.
 - **List endpoint** stays cheap/unthrottled (zero fights; pure identity projection). It may
   carry a short cache TTL (the archive changes only when a challenger clears).
@@ -169,7 +169,7 @@ testing regime (`web/` is not Stryker-reachable → exhaustive exact-assertion b
 mandatory manual mutator scan + a synthetic-tape visual check). `web/src` still never imports
 `src/`.
 
-Most of the S3 *product* tree was already locked by the 2026-07-15 decisions above (list unit,
+Most of the S3 _product_ tree was already locked by the 2026-07-15 decisions above (list unit,
 identities-only, newest-first, `200 []`, dark launch, card identity edge cases). This pass
 resolved what only building S1/S2 could settle — the **client route/URL structure** and how
 the list and player surfaces relate:
@@ -191,12 +191,12 @@ the list and player surfaces relate:
 - **Not-found (distinct state).** A `/watch/{id}` whose id 404s (`replay-not-found` — evicted,
   version-rotted, or garbage) renders a **distinct no-retry "this fight is no longer available"
   state with a "← all fights" back-link to `/watch`** — separate from the transient fetch-error
-  (which keeps *retry*). The by-id loader therefore **distinguishes 404** (→ not-found) from
+  (which keeps _retry_). The by-id loader therefore **distinguishes 404** (→ not-found) from
   5xx/network (→ retry). A small "← all fights" link also sits on the happy-path player, since
   the dark route has no Nav to navigate back with.
 - **Loader shape (mechanical).** Today's `loadReplay` (list→newest→tape autoplay) splits into
   `loadList()` (`GET /replay` → summaries, for the list page) and `loadById(id)` (`GET
-  /replay/{id}` → tape, for the player). The old autoplay loader retires when `/watch` flips to
+/replay/{id}` → tape, for the player). The old autoplay loader retires when `/watch` flips to
   the list.
 - **Card disambiguator.** Cards show `name` + `model` (name-only when `model` absent; long name
   → CSS-truncate + full value in a `title` tooltip). Two cards sharing an identical
@@ -208,6 +208,7 @@ the list and player surfaces relate:
   list is finalized "until S4" — it's **S3**, and it ships dark.
 
 **Slice shape (to confirm in `planning`).** Player-first so cards have a live target:
+
 1. **S3.1 — permalink player at `/watch/{id}`**: `/watch/(.*)` rewrite + URL-parsed view
    selection + `loadById` + the not-found state + back-link. Observable: a shared `/watch/{id}`
    opens and plays that fight (or gracefully reports it's gone). Intermediate state leaves
@@ -216,6 +217,50 @@ the list and player surfaces relate:
    truncation, empty state) + click-through to `/watch/{id}` + the on-collision disambiguator;
    retires the autoplay loader and flips `/watch` to the list. Observable: browse all fights,
    click to watch.
+
+## S4 grill-me — resolved (2026-07-17)
+
+A focused `grill-me` pass on **S4 (control playback — transport)**, run after S1–S3 shipped and
+the S3 browse plan was archived (#324). **S4 is web-only presentation** — it adds no API/engine
+surface (the tape already carries every tick), inherits the same testing regime (`web/` is not
+Stryker-reachable → exhaustive exact-assertion browser tests + pure-`transport` unit tests +
+manual mutator scan; **Mutation: N/A (Stryker)**), and the route still ships **dark** (no Nav
+link; the "Fight replays — in development" teaser stays a non-link). `web/src` never imports `src/`.
+
+It builds on the pure `transport` clock (`Transport = { playhead, playing }`; `advance` clamps to
+`lastTick`; `startTransport` doubles as the restart target) that the S1 Pixi player drives from the
+Pixi ticker (~one engine tick per rendered frame). Scope is fixed by the split (decision 11 deferred
+scrub + speed here): **scrub bar (seek to any tick) · speed multiplier · frame-step**.
+
+| #    | Decision           | Choice                                                                                                                                                                                                                                                                                 |
+| ---- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S4-1 | Scrub bar          | **Native `<input type=range>`** (min 0, max `lastTick`, step 1) — live-tracks the playhead during playback, seeks on drag; native keyboard + screen-reader a11y for free. Custom-styled bar rejected (hand-rolled a11y/keyboard is a whole extra sub-slice).                           |
+| S4-2 | Scrub resume       | Grabbing the bar **pauses** the live advance (so the ticker can't fight the thumb); seek = _set playhead + `playing=false`_; **stays paused on release** (press Play to resume). Keeps the model at `{ playhead, playing }`. Resume-on-release rejected (extra was-playing state).     |
+| S4-3 | End of fight       | **Auto-pause on the last tick** — `advance` flips `playing` false at `lastTick`. A small fix to today's stays-playing edge (Pause button frozen over the final frame; Play never returns without Restart). Keep-playing and loop both rejected.                                        |
+| S4-4 | Speed              | **Discrete rate buttons 0.5× / 1× / 2×**, default 1×, active highlighted (`aria-pressed`). Speed is a **UI signal applied at the ticker delta** (`advance(t, deltaTime × speed, lastTick)`) — `Transport` untouched. Cycle-button (hides rates) and `<select>` (extra click) rejected. |
+| S4-5 | Frame-step         | **Dedicated ◀ / ▶ buttons**; each pauses (if playing) and moves exactly one **integer** tick (`round(playhead) ± 1`), clamped `[0, lastTick]`, disabled at the ends. The native slider's arrow keys still step as a bonus. Arrow-keys-only rejected (undiscoverable, focus-gated).     |
+| S4-6 | Keyboard shortcuts | **Park custom global shortcuts.** The transport is already fully keyboard-operable via native semantics (Tab + Enter/Space on focused controls, ←/→ on the focused slider). A global Space=play/pause (button double-fire + page-scroll conflict) and a fuller map are follow-ups.     |
+| S4-7 | Tick readout       | Visible muted-mono **`tick N / M`** beside the scrub bar + `aria-valuetext="tick N of M"` on the slider. HUD-tick-only rejected (the fight's total length is never shown as a number).                                                                                                 |
+
+**Minor implied (called out, not separately grilled):** the **Restart** button is kept (seek to 0
+
+- play); **speed persists across Restart** (Restart resets the clock, not the chosen rate);
+  **score-pop / HUD are already scrub-safe** (pure `scoredWithin` scan, deterministic) so backward
+  scrubbing renders correctly with no change.
+
+**Model impact.** Only two changes to the pure `transport` model, each driven by its own failing
+test: (a) `advance` auto-pauses at `lastTick` (S4-3); (b) new `seek` (set playhead + `playing=false`,
+integer-clamped) and `step` (integer `±1`, clamped) transitions. Speed lives entirely in the
+reactive/ticker layer — no model change.
+
+**Slice shape (to confirm in `planning`).** Three vertical slices, each independently shippable and
+each a coherent deployable checkpoint:
+
+1. **S4.1 — scrub bar**: the native range slider (seek + live-track + pause-on-grab) + the
+   `tick N / M` readout + the end-of-fight auto-pause (carries the two model changes). Observable:
+   drag to jump to any tick deterministically; the fight auto-pauses at the end.
+2. **S4.2 — speed**: the 0.5× / 1× / 2× rate buttons. Observable: 0.5×/2× changes playback rate.
+3. **S4.3 — frame-step**: the ◀ / ▶ step buttons. Observable: a step advances/retreats exactly one tick.
 
 ## Non-negotiable invariants respected
 
@@ -229,12 +274,12 @@ the list and player surfaces relate:
 ## Key facts (verified during the session)
 
 - `runFight` already emits `FightResult.events` (`FighterFrame`: `{x, y, action, points,
-  stamina, degrade}`), but `action` is the bot's *returned decision*, not resulting body
+stamina, degrade}`), but `action` is the bot's _returned decision_, not resulting body
   state — **insufficient to render** (knockdown/facing unrecoverable; pose during
   committed recovery is guesswork).
 - The engine already builds rich internal `Frame` histories every tick for perception
   (`frameOf`, `sim.ts`): `{x, y, facing, attacking, attackBand, posture, throwing,
-  knockdown, vx, stamina, ...}` — exactly the render state a stickman needs. `renderTape`
+knockdown, vx, stamina, ...}` — exactly the render state a stickman needs. `renderTape`
   exposes a projection of these.
 - `ReproRecord = { challenger, defenders, seeds, version, memberSeniority }`
   (`src/http/throne-store.ts`). Carries **no handle** (handle lives on `ArenaMember`) and

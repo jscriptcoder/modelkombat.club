@@ -3,7 +3,7 @@ import { Application } from "pixi.js";
 
 import { createStage } from "./figures";
 import { scene, type Viewport } from "./scene";
-import { advance, startTransport, togglePlaying } from "./transport";
+import { advance, seek, startTransport, togglePlaying } from "./transport";
 import type { ReplayItem } from "./replay-contract";
 
 // The live viewer: mounts a Pixi Application, draws the two stickmen + HUD via the pure `createStage`
@@ -24,9 +24,21 @@ type ReplayPlayerProps = {
 const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
   const viewport = props.viewport ?? DEFAULT_VIEWPORT;
 
+  // The fight is fixed for this mount, so read its tape facts once. `lastTick` is the scrub bar's
+  // range (index space); `finalTick` is the engine tick at the end — the "M" in the tick N / M
+  // readout, sourced from the tape exactly like the HUD so the two always agree.
+  const tape = props.item.tape;
+  const lastTick = tape.length - 1;
+  const finalTick = tape[lastTick].tick;
+
   // The playback clock (pure transport model) as reactive state: the Pixi ticker advances it each
-  // frame, the controls pause/resume and restart it, and the play/pause label tracks `playing`.
+  // frame, the controls pause/resume/seek/restart it, and the play/pause label tracks `playing`.
   const [transport, setTransport] = createSignal(startTransport());
+
+  // The tape index the playhead lands on (what the renderer draws + the scrub bar's position), and
+  // the engine tick number there — the same value the canvas HUD prints (see `scene`).
+  const tickIndex = () => Math.round(transport().playhead);
+  const currentTick = () => tape[tickIndex()].tick;
 
   let host: HTMLDivElement | undefined;
   let app: Application | undefined;
@@ -62,9 +74,6 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
 
     created.stage.addChild(stage.root);
 
-    const tape = props.item.tape;
-    const lastTick = tape.length - 1;
-
     stage.apply(scene(tape, 0, viewport));
 
     // Advance the clock ~one engine tick per rendered frame while playing (a paused clock is
@@ -97,6 +106,27 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
         >
           {transport().playing ? "Pause" : "Play"}
         </button>
+
+        <input
+          type="range"
+          class="replay-scrub"
+          min={0}
+          max={lastTick}
+          step={1}
+          value={tickIndex()}
+          aria-label="Scrub to tick"
+          aria-valuetext={`tick ${currentTick()} of ${finalTick}`}
+          onInput={(e) =>
+            setTransport(
+              seek(transport(), e.currentTarget.valueAsNumber, lastTick),
+            )
+          }
+        />
+
+        <span class="replay-readout">
+          tick {currentTick()} / {finalTick}
+        </span>
+
         <button
           type="button"
           class="replay-control"

@@ -13,16 +13,32 @@ export type Transport = {
 export const startTransport = (): Transport => ({ playhead: 0, playing: true });
 
 // Advance the playhead by `delta` ticks while playing, clamped so it never runs past the final tick.
-// A paused clock is returned unchanged (same reference) — the tick freezes, and the reactive layer
-// sees no change, so pausing quiets the per-frame updates.
+// Reaching the last tick auto-pauses the clock (the toggle returns to Play) rather than freezing on
+// Pause over the final frame. A paused clock is returned unchanged (same reference) — the tick
+// freezes, and the reactive layer sees no change, so pausing quiets the per-frame updates.
 export const advance = (
   t: Transport,
   delta: number,
   lastTick: number,
-): Transport =>
-  t.playing
-    ? { playing: true, playhead: Math.min(lastTick, t.playhead + delta) }
-    : t;
+): Transport => {
+  if (!t.playing) return t;
+
+  const playhead = Math.min(lastTick, t.playhead + delta);
+
+  return { playhead, playing: playhead < lastTick };
+};
+
+// Jump the playhead to `tick`, clamped into [0, lastTick], and PAUSE there: a scrub stops playback on
+// the chosen frame (so the per-frame live-track write stops fighting the drag). The prior clock is
+// discarded — a seek fully determines the new position and always pauses.
+export const seek = (
+  _t: Transport,
+  tick: number,
+  lastTick: number,
+): Transport => ({
+  playhead: Math.min(lastTick, Math.max(0, tick)),
+  playing: false,
+});
 
 // The play/pause toggle: flip `playing` but keep the playhead, so resuming continues from where the
 // clock paused rather than restarting.

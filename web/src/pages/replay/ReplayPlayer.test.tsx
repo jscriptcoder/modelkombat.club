@@ -28,11 +28,16 @@ const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
   ...overrides,
 });
 
-const item = (): ReplayItem => ({
-  tape: [
-    { tick: 0, a: frame({ x: 150_000 }), b: frame({ x: 450_000 }) },
-    { tick: 1, a: frame({ x: 160_000 }), b: frame({ x: 440_000 }) },
-  ],
+// A fight tape of `ticks` frames (engine tick == index here, so the readout/HUD tick equals the
+// slider position). The default is long enough that the clock is still PLAYING when a test interacts
+// with it — auto-pause only fires at the very end — so the play/pause assertions stay deterministic.
+// The auto-pause test opts into a 2-tick fight that reaches its end within a frame or two.
+const item = (ticks = 600): ReplayItem => ({
+  tape: Array.from({ length: ticks }, (_, i) => ({
+    tick: i,
+    a: frame({ x: 150_000 }),
+    b: frame({ x: 450_000 }),
+  })),
   fighters: [
     { name: "challenger", model: "m" },
     { name: "king", model: "m" },
@@ -85,6 +90,47 @@ describe("ReplayPlayer — playback controls", () => {
     toggle.focus();
     await userEvent.keyboard("{Enter}");
 
+    expect(await findByRole("button", { name: /^play$/i })).toBeTruthy();
+  });
+});
+
+describe("ReplayPlayer — scrub transport", () => {
+  it("renders a scrub slider spanning the fight's ticks", async () => {
+    const { findByRole } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    const slider = await findByRole("slider");
+
+    // The slider indexes the tape: 0 .. lastTick (ticks - 1), one step per tick.
+    expect(slider.getAttribute("min")).toBe("0");
+    expect(slider.getAttribute("max")).toBe("599");
+    expect(slider.getAttribute("step")).toBe("1");
+  });
+
+  it("seeking the slider pauses playback and moves the readout to that tick", async () => {
+    const { findByRole, findByText } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    const slider = await findByRole("slider");
+
+    fireEvent.input(slider, { target: { value: "5" } });
+
+    // Seeking stops the clock on the chosen tick: the toggle returns to Play...
+    expect(await findByRole("button", { name: /^play$/i })).toBeTruthy();
+    // ...the "tick N / M" readout (the same number the HUD prints) lands on tick 5 of 599...
+    expect(await findByText(/tick\s*5\s*\/\s*599/i)).toBeTruthy();
+    // ...and the slider announces the same position to assistive tech.
+    expect(slider.getAttribute("aria-valuetext")).toBe("tick 5 of 599");
+  });
+
+  it("auto-pauses at the end of a short fight — the toggle returns to Play", async () => {
+    const { findByRole } = render(() => (
+      <ReplayPlayer item={item(2)} viewport={VIEWPORT} />
+    ));
+
+    // A 2-tick fight reaches its last tick within a frame or two, then the clock auto-pauses.
     expect(await findByRole("button", { name: /^play$/i })).toBeTruthy();
   });
 });

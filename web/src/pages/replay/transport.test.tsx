@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   advance,
+  seek,
   startTransport,
   togglePlaying,
   type Transport,
@@ -46,10 +47,33 @@ describe("transport — the pure playback clock", () => {
     });
   });
 
-  it("clamps the playhead at the last tick — playback never runs off the end", () => {
+  it("auto-pauses at the last tick — the fight stops cleanly at the end, never running off", () => {
     const nearEnd: Transport = { playhead: 98, playing: true };
 
-    expect(advance(nearEnd, 5, 100)).toEqual({ playhead: 100, playing: true });
+    // 98 + 5 overshoots 100: the playhead clamps to the last tick AND the clock stops there, so the
+    // toggle returns to Play instead of freezing on Pause over the final frame.
+    expect(advance(nearEnd, 5, 100)).toEqual({ playhead: 100, playing: false });
+  });
+
+  it("seeks to a tick and pauses there — a scrub stops playback on the chosen frame", () => {
+    expect(seek({ playhead: 10, playing: true }, 40, 100)).toEqual({
+      playhead: 40,
+      playing: false,
+    });
+  });
+
+  it("clamps a seek below the start back to tick 0", () => {
+    expect(seek({ playhead: 10, playing: true }, -5, 100)).toEqual({
+      playhead: 0,
+      playing: false,
+    });
+  });
+
+  it("clamps a seek past the end back to the last tick", () => {
+    expect(seek({ playhead: 10, playing: true }, 150, 100)).toEqual({
+      playhead: 100,
+      playing: false,
+    });
   });
 
   it("freezes the tick while paused — a paused clock does not advance", () => {
