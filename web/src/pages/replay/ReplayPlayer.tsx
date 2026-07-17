@@ -9,7 +9,13 @@ import { Application } from "pixi.js";
 
 import { createStage } from "./figures";
 import { scene, type Viewport } from "./scene";
-import { advance, seek, startTransport, togglePlaying } from "./transport";
+import {
+  advance,
+  seek,
+  startTransport,
+  step,
+  togglePlaying,
+} from "./transport";
 import type { ReplayItem } from "./replay-contract";
 
 // The live viewer: mounts a Pixi Application, draws the two stickmen + HUD via the pure `createStage`
@@ -119,6 +125,26 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
           onClick={() => setTransport(togglePlaying)}
         >
           {transport().playing ? "Pause" : "Play"}
+        </button>
+
+        <button
+          type="button"
+          class="replay-control replay-step-button"
+          aria-label="Step back one tick"
+          disabled={tickIndex() <= 0}
+          onClick={() => setTransport(step(transport(), -1, lastTick))}
+        >
+          ◀
+        </button>
+
+        <button
+          type="button"
+          class="replay-control replay-step-button"
+          aria-label="Step forward one tick"
+          disabled={tickIndex() >= lastTick}
+          onClick={() => setTransport(step(transport(), 1, lastTick))}
+        >
+          ▶
         </button>
 
         <input

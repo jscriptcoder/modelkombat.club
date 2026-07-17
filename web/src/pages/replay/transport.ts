@@ -40,6 +40,16 @@ export const seek = (
   playing: false,
 });
 
+// Step the playhead by whole `delta` ticks from the ROUNDED current position — the frame-step
+// controls' single move. Composed from `seek`: snap `round(playhead) + delta` into range and pause
+// there, so a mid-play fractional playhead lands on a clean neighbouring tick (never a fraction),
+// and stepping past either end holds at the boundary.
+export const step = (
+  t: Transport,
+  delta: number,
+  lastTick: number,
+): Transport => seek(t, Math.round(t.playhead) + delta, lastTick);
+
 // The play/pause toggle: flip `playing` but keep the playhead, so resuming continues from where the
 // clock paused rather than restarting.
 export const togglePlaying = (t: Transport): Transport => ({

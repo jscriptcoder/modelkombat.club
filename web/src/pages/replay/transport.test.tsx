@@ -4,6 +4,7 @@ import {
   advance,
   seek,
   startTransport,
+  step,
   togglePlaying,
   type Transport,
 } from "./transport";
@@ -71,6 +72,42 @@ describe("transport — the pure playback clock", () => {
 
   it("clamps a seek past the end back to the last tick", () => {
     expect(seek({ playhead: 10, playing: true }, 150, 100)).toEqual({
+      playhead: 100,
+      playing: false,
+    });
+  });
+
+  it("steps forward exactly one tick from an integer playhead, pausing", () => {
+    expect(step({ playhead: 5, playing: true }, 1, 100)).toEqual({
+      playhead: 6,
+      playing: false,
+    });
+  });
+
+  it("steps back exactly one tick from an integer playhead, pausing", () => {
+    expect(step({ playhead: 5, playing: true }, -1, 100)).toEqual({
+      playhead: 4,
+      playing: false,
+    });
+  });
+
+  it("snaps a fractional (mid-play) playhead to round(playhead) ± 1", () => {
+    // 5.6 rounds to 6, so a forward step lands on 7 — not 6.6 (drop-round) or 6 (floor).
+    expect(step({ playhead: 5.6, playing: true }, 1, 100)).toEqual({
+      playhead: 7,
+      playing: false,
+    });
+  });
+
+  it("stops at tick 0 when stepping back from the first tick", () => {
+    expect(step({ playhead: 0, playing: false }, -1, 100)).toEqual({
+      playhead: 0,
+      playing: false,
+    });
+  });
+
+  it("stops at the last tick when stepping forward from the end", () => {
+    expect(step({ playhead: 100, playing: false }, 1, 100)).toEqual({
       playhead: 100,
       playing: false,
     });

@@ -216,3 +216,77 @@ describe("ReplayPlayer — speed controls", () => {
     expect(await findByRole("button", { name: /^pause$/i })).toBeTruthy();
   });
 });
+
+describe("ReplayPlayer — frame step", () => {
+  // The step math (round + clamp + pause) is pinned in transport.test; here we prove the two DOM
+  // buttons exist, advance/retreat the playhead by one tick, and are disabled at their boundary.
+  // Each test seeks to a known tick first (seeking pauses), so the step is deterministic.
+
+  it("renders ◀ / ▶ frame-step buttons", async () => {
+    const { findByRole } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    expect(
+      await findByRole("button", { name: /step back one tick/i }),
+    ).toBeTruthy();
+    expect(
+      await findByRole("button", { name: /step forward one tick/i }),
+    ).toBeTruthy();
+  });
+
+  it("steps forward exactly one tick and pauses on it", async () => {
+    const { findByRole, findByText } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    fireEvent.input(await findByRole("slider"), { target: { value: "10" } });
+    fireEvent.click(
+      await findByRole("button", { name: /step forward one tick/i }),
+    );
+
+    // Advanced by exactly one (10 → 11), and still paused (toggle offers Play).
+    expect(await findByText(/tick\s*11\s*\/\s*599/i)).toBeTruthy();
+    expect(await findByRole("button", { name: /^play$/i })).toBeTruthy();
+  });
+
+  it("steps back exactly one tick", async () => {
+    const { findByRole, findByText } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    fireEvent.input(await findByRole("slider"), { target: { value: "10" } });
+    fireEvent.click(
+      await findByRole("button", { name: /step back one tick/i }),
+    );
+
+    // Retreated by exactly one (10 → 9).
+    expect(await findByText(/tick\s*9\s*\/\s*599/i)).toBeTruthy();
+  });
+
+  it("disables ◀ at tick 0 — no underflow past the start", async () => {
+    const { findByRole } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    fireEvent.input(await findByRole("slider"), { target: { value: "0" } });
+
+    const back = await findByRole("button", { name: /step back one tick/i });
+
+    expect(back.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("disables ▶ at the last tick — no overflow past the end", async () => {
+    const { findByRole } = render(() => (
+      <ReplayPlayer item={item()} viewport={VIEWPORT} />
+    ));
+
+    fireEvent.input(await findByRole("slider"), { target: { value: "599" } });
+
+    const forward = await findByRole("button", {
+      name: /step forward one tick/i,
+    });
+
+    expect(forward.hasAttribute("disabled")).toBe(true);
+  });
+});
