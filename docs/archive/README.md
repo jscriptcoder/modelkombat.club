@@ -929,3 +929,46 @@ find-gaps decisions inline).
 **S3** (browsable list + `/watch/{id}` permalinks + nav + dedicated not-found) and **S4** (transport —
 scrub / speed / frame-step). The **S3 route ships dark** (no nav link; the `#fights` teaser stays a
 non-link) until it lands. Each starts its own `planning` pass.
+
+## `/watch` fight replay viewer — S3 browse ✅ COMPLETE
+
+"**Browse the King's fights**": the viewer gains a front door. `/watch` lists every watchable title
+fight as a newest-first grid of link cards, and `/watch/{id}` is a shareable permalink that plays that
+one fight (or reports it's gone). One `replay.html` SPA dispatches on `location.pathname` via a pure
+`replayIdFromPath` — plain `<a href>` full-page navigation, **no router**; the `/watch/(.*)` →
+`replay.html` rewrite (Vercel-only) is load-bearing. **Web-only** — S1 already shipped the whole
+`/replay` API (`GET /replay` identities-only summaries, `GET /replay/{id}` → `{ tape, fighters }` or a
+`404 /problems/replay-not-found`), so **no `src/` / `api/` / TCB / `INPUT_HASH` / `BENCHMARK_VERSION`
+change**; `web/src` imports nothing from `src/` (the contract is mirrored in `replay-contract.ts`).
+`web/**` is outside Stryker's node scope ⇒ each slice used **exhaustive exact-assertion browser tests +
+pure-helper unit tests + a manual mutator scan + an out-of-band `agent-browser` preview smoke**. The
+route **ships dark** (no primary-Nav link; the `#fights` teaser stays a non-link). Player-first
+ordering: the permalink landed before the list so the cards had a live target to click.
+
+- **Slice 1 — the `/watch/{id}` permalink player** (PR #321, `feat/replay-watch-permalink`) — a
+  shareable per-fight link: `loadById` maps `200` → found / `404` → not-found / else throw; `ReplayFight`
+  is a 4-state shell (loading / retryable error / not-found + "← all fights" back-link / ready →
+  `ReplayPlayer`); `ReplayPage` dispatches on `location.pathname` (pure `replayIdFromPath`), rendering
+  the by-id player when an id is present. Added the `/watch/(.*)` → `replay.html` rewrite (before the SPA
+  catch-all) + `.replay-back` / `.replay-fight` CSS. `/watch` (no id) still autoplayed the newest fight —
+  a coherent intermediate retired by Slice 2.
+- **Slice 2 — the browsable list at `/watch`** (PR #322, `feat/replay-watch-list`) — the index: a
+  newest-first grid of `<a href="/watch/{id}">` cards, identity-only (challenger name/model vs King
+  name/model, **name-only** when a model is absent, long names CSS-truncated with the full value in a
+  `title`), an honest **empty state** (→ `/ring`), and a retryable error. `loadList` + `ReplayList`. The
+  autoplay bridge was **retired** — deleted `ReplayLatest` + the `loadReplay` two-step loader, rewrote
+  their tests into list tests, corrected the `replay.html` head copy + the stale "until S4" comment.
+- **Slice 3 — repeat-challenge collision disambiguator** (PR #323, `feat/replay-watch-collisions`) — a
+  spectator can tell two fights between the same-named challenger and King apart: a pure
+  `markCollisions(summaries)` (`collisions.ts`) flags exactly the entries whose challenger-`name` +
+  King-`name` pair repeats — keyed by `JSON.stringify([challenger, king])` so distinct pairs never
+  concatenate-conflate (`"a"+"bc"` ≠ `"ab"+"c"`) and quotes/specials escape; `> 1` = collides.
+  `ReplayList` renders `id.slice(0, 6)` (git-style short hash) as a muted-mono `.replay-card-id` chip
+  **after `vs` / before fighter[1]** (preserving fighter[1] as `:last-child` right-alignment) on flagged
+  cards only; uniquely-named pairings stay clean.
+
+[replay-viewer-s3.md](replay-viewer-s3.md) — the plan (all 3 slices + the whole-story acceptance
+criteria inline; the grill-me decisions stay in the still-live `plans/replay-viewer-decisions.md`).
+
+**S3 (browse) complete; the viewer feature is 3 of 4 stories done.** Remaining, still live in `plans/`:
+**S4** (transport — scrub / speed / frame-step), which starts its own `grill-me` → `planning` pass.
