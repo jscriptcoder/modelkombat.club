@@ -20,6 +20,7 @@ const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
   posture: 0,
   attacking: false,
   attackBand: 0,
+  guardBand: 0,
   throwing: false,
   knockdown: false,
   points: 0,

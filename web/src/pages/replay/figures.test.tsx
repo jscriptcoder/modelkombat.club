@@ -16,6 +16,7 @@ const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
   posture: 0,
   attacking: false,
   attackBand: 0,
+  guardBand: 0,
   throwing: false,
   knockdown: false,
   points: 0,
@@ -132,5 +133,20 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     expect(stage.a.handR.x).toBe(40);
     expect(stage.a.handR.y).toBe(-46);
     expect(stage.a.handR.x).toBeGreaterThan(neutralHandX); // reached forward
+  });
+
+  it("raises the guard arm's hand joint for a guarding fighter", () => {
+    // Applying a guard scene swings the persistent rear-hand joint forward + up to the band height.
+    const stage = createStage(VIEWPORT);
+
+    stage.apply(scene([tickOf(0, { guardBand: 0 }, {})], 0, VIEWPORT));
+    const neutralGuardX = stage.a.handL.x;
+
+    stage.apply(scene([tickOf(0, { guardBand: 2 }, {})], 0, VIEWPORT));
+
+    expect(neutralGuardX).toBe(-18);
+    expect(stage.a.handL.x).toBe(8);
+    expect(stage.a.handL.y).toBe(-46);
+    expect(stage.a.handL.x).toBeGreaterThan(neutralGuardX); // swung forward into a guard
   });
 });

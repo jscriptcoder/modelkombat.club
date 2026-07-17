@@ -24,6 +24,7 @@ const frame = (): ReplayFrame => ({
   posture: 0,
   attacking: false,
   attackBand: 0,
+  guardBand: 0,
   throwing: false,
   knockdown: false,
   points: 0,

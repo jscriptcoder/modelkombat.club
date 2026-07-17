@@ -17,6 +17,7 @@ const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
   posture: 0,
   attacking: false,
   attackBand: 0,
+  guardBand: 0,
   throwing: false,
   knockdown: false,
   points: 0,
@@ -233,5 +234,56 @@ describe("scene — strike extension by band", () => {
     expect(pose.footR).toEqual({ x: 10, y: -18 });
     // ...while the strike extends the front hand on the same tick.
     expect(pose.handR).toEqual({ x: 40, y: -46 });
+  });
+});
+
+describe("scene — guard raised to the incoming band", () => {
+  // A guarding fighter raises its guard arm (handL, the free rear hand) to the incoming band
+  // height — the same low/mid/high ladder as a strike, but a MODEST forward reach (x 8, protective)
+  // vs the strike's committed x 40. `guardBand` is itself the gate: 0 = not guarding, so no separate
+  // flag. Neutral rear hand: { x: -18, y: -44 } (the STAND handL).
+  const NEUTRAL_GUARD_HAND = { x: -18, y: -44 };
+
+  const poseGuarding = (guardBand: number, extra: Partial<ReplayFrame> = {}) =>
+    scene([tickOf(0, { guardBand, ...extra }, {})], 0, VIEWPORT).a.pose;
+
+  it("raises the guard arm to the low band height", () => {
+    expect(poseGuarding(1).handL).toEqual({ x: 8, y: -24 });
+  });
+
+  it("raises the guard arm to the mid band height", () => {
+    expect(poseGuarding(2).handL).toEqual({ x: 8, y: -46 });
+  });
+
+  it("raises the guard arm to the high band height", () => {
+    expect(poseGuarding(3).handL).toEqual({ x: 8, y: -68 });
+  });
+
+  it("stacks the three guard bands as distinct heights ascending up the screen", () => {
+    const low = poseGuarding(1).handL.y;
+    const mid = poseGuarding(2).handL.y;
+    const high = poseGuarding(3).handL.y;
+
+    expect(low).toBeGreaterThan(mid);
+    expect(mid).toBeGreaterThan(high);
+  });
+
+  it("leaves the guard arm neutral when not guarding (guardBand 0)", () => {
+    expect(poseGuarding(0).handL).toEqual(NEUTRAL_GUARD_HAND);
+  });
+
+  it("leaves the guard arm neutral for an out-of-range guard band", () => {
+    expect(poseGuarding(9).handL).toEqual(NEUTRAL_GUARD_HAND);
+  });
+
+  it("guards independently of stance — the guard composes with a crouch", () => {
+    // Guard height is driven by guardBand, not posture: a crouching fighter can still raise a guard.
+    const pose = poseGuarding(2, { posture: 1 });
+
+    // Guard raised to mid...
+    expect(pose.handL).toEqual({ x: 8, y: -46 });
+    // ...while the CROUCH stance survives (feet planted a touch wider, head dropped).
+    expect(pose.footL).toEqual({ x: -16, y: 0 });
+    expect(pose.head).toEqual({ x: 0, y: -58 });
   });
 });
