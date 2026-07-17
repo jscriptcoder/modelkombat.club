@@ -40,10 +40,10 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene(tape, 0, VIEWPORT));
 
-    expect(stage.a.x).toBe(300);
-    expect(stage.a.y).toBe(420);
-    expect(stage.b.x).toBe(900);
-    expect(stage.b.y).toBe(540);
+    expect(stage.a.root.x).toBe(300);
+    expect(stage.a.root.y).toBe(420);
+    expect(stage.b.root.x).toBe(900);
+    expect(stage.b.root.y).toBe(540);
   });
 
   it("moves a figure across the screen as the playhead advances", () => {
@@ -55,12 +55,12 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     const stage = createStage(VIEWPORT);
 
     stage.apply(scene(tape, 0, VIEWPORT));
-    const startX = stage.a.x;
+    const startX = stage.a.root.x;
 
     stage.apply(scene(tape, 1, VIEWPORT));
 
     expect(startX).toBe(300);
-    expect(stage.a.x).toBe(600);
+    expect(stage.a.root.x).toBe(600);
   });
 
   it("flips a figure horizontally to reflect its facing", () => {
@@ -69,8 +69,8 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene(tape, 0, VIEWPORT));
 
-    expect(stage.a.scale.x).toBe(-1);
-    expect(stage.b.scale.x).toBe(1);
+    expect(stage.a.root.scale.x).toBe(-1);
+    expect(stage.b.root.scale.x).toBe(1);
   });
 
   it("writes the tick and both scores into the HUD text", () => {
@@ -86,5 +86,33 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     // Score ORDER (challenger : King) — asserting "3 : 1" (not just both digits) catches a
     // scoreA/scoreB swap, which a bare toContain("3")+toContain("1") would miss.
     expect(stage.hud.text).toMatch(/3\s*:\s*1/);
+  });
+
+  it("lowers the head joint display object for a crouching fighter", () => {
+    // Applying a crouch scene moves the persistent head joint down (scene-graph state, not pixels).
+    const stage = createStage(VIEWPORT);
+
+    stage.apply(scene([tickOf(0, { posture: 0 }, {})], 0, VIEWPORT));
+    const standHeadY = stage.a.head.y;
+
+    stage.apply(scene([tickOf(0, { posture: 1 }, {})], 0, VIEWPORT));
+
+    expect(standHeadY).toBe(-76);
+    expect(stage.a.head.y).toBe(-58);
+    expect(stage.a.head.y).toBeGreaterThan(standHeadY); // crouch head sits lower
+  });
+
+  it("tucks the foot joint display objects for an airborne fighter", () => {
+    const stage = createStage(VIEWPORT);
+
+    stage.apply(scene([tickOf(0, { posture: 0 }, {})], 0, VIEWPORT));
+    const standFootY = stage.a.footL.y;
+
+    stage.apply(scene([tickOf(0, { posture: 2 }, {})], 0, VIEWPORT));
+
+    expect(standFootY).toBe(0);
+    expect(stage.a.footL.y).toBe(-18);
+    expect(stage.a.footR.y).toBe(-18);
+    expect(stage.a.footL.y).toBeLessThan(standFootY); // tucked up off the ground
   });
 });

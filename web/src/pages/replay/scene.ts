@@ -4,9 +4,67 @@ import type { ReplayFrame, ReplayTape } from "./replay-contract";
 // state the Pixi layer draws. Kept free of Pixi and of any engine import (web/src never imports
 // src/) so it is exhaustively unit-testable — the numeric heart of the viewer.
 
+// A skeleton joint in the figure's LOCAL frame — feet on the ground line at y 0, up is negative
+// (so a larger y sits lower on screen). The draw layer strokes bones between these and the root
+// container carries the whole figure to its screen position / facing.
+export type Joint = { x: number; y: number };
+
+// The articulated stickman pose: the seven joints the draw layer needs to stroke head + torso +
+// two arms + two legs. Later slices extend the hands/feet for strikes, guards, and grabs.
+export type Skeleton = {
+  head: Joint;
+  shoulder: Joint;
+  hip: Joint;
+  handL: Joint;
+  handR: Joint;
+  footL: Joint;
+  footR: Joint;
+};
+
 // A fighter's on-screen placement: pixel position + facing (1 right / -1 left, passed through from
-// the frame so the draw layer can flip the sprite).
-export type Figure = { x: number; y: number; facing: number };
+// the frame so the draw layer can flip the sprite) + the stance-derived skeleton to stroke.
+export type Figure = { x: number; y: number; facing: number; pose: Skeleton };
+
+// The upright default: head at the top, feet planted on the local ground line (mirrors the S1
+// fixed stickman). Crouch and air are edits of this base.
+const STAND: Skeleton = {
+  head: { x: 0, y: -76 },
+  shoulder: { x: 0, y: -64 },
+  hip: { x: 0, y: -34 },
+  handL: { x: -18, y: -44 },
+  handR: { x: 18, y: -44 },
+  footL: { x: -14, y: 0 },
+  footR: { x: 14, y: 0 },
+};
+
+// Crouch: the upper body drops ~18px toward the planted, slightly wider feet — a visibly lower
+// stance that vacates the high band.
+const CROUCH: Skeleton = {
+  head: { x: 0, y: -58 },
+  shoulder: { x: 0, y: -46 },
+  hip: { x: 0, y: -22 },
+  handL: { x: -18, y: -30 },
+  handR: { x: 18, y: -30 },
+  footL: { x: -16, y: 0 },
+  footR: { x: 16, y: 0 },
+};
+
+// Airborne: the upper body holds the stand while the legs tuck up toward the hip — read against
+// the y-arc the container is already lifted along (S1).
+const AIR: Skeleton = {
+  head: { x: 0, y: -76 },
+  shoulder: { x: 0, y: -64 },
+  hip: { x: 0, y: -34 },
+  handL: { x: -18, y: -44 },
+  handR: { x: 18, y: -44 },
+  footL: { x: -10, y: -18 },
+  footR: { x: 10, y: -18 },
+};
+
+// posture → stance skeleton, written TOTAL: only 0/1/2 are emitted by the engine, but any other
+// code falls back to STAND so an odd frame renders a safe neutral figure rather than crashing.
+const skeletonFor = (posture: number): Skeleton =>
+  posture === 1 ? CROUCH : posture === 2 ? AIR : STAND;
 
 // The heads-up display for the current playhead: the engine tick number + both fighters' scores.
 export type Hud = { tick: number; scoreA: number; scoreB: number };
@@ -43,6 +101,7 @@ export const scene = (
     x: frame.x * pxPerSubunit,
     y: groundY - frame.y * pxPerSubunit,
     facing: frame.facing,
+    pose: skeletonFor(frame.posture),
   });
 
   const at = tape[clampPlayhead(playhead, tape.length)];

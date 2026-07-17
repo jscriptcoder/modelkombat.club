@@ -108,3 +108,59 @@ describe("scene — the pure tape → screen projection", () => {
     expect(result.a.x).toBe(300);
   });
 });
+
+describe("scene — stance geometry by posture", () => {
+  // The pose is a skeleton of local joints (feet at the local ground line y=0, up is negative),
+  // carried on `Figure.pose`. The container position/facing (S1) still places the whole figure;
+  // these joints add the body articulation the draw layer strokes.
+  const poseAt = (posture: number) =>
+    scene([tickOf(0, { posture }, {})], 0, VIEWPORT).a.pose;
+
+  it("stands upright at posture 0 — head at the top, feet on the local ground line", () => {
+    const pose = poseAt(0);
+
+    expect(pose.head).toEqual({ x: 0, y: -76 });
+    expect(pose.shoulder).toEqual({ x: 0, y: -64 });
+    expect(pose.hip).toEqual({ x: 0, y: -34 });
+    expect(pose.footL).toEqual({ x: -14, y: 0 });
+    expect(pose.footR).toEqual({ x: 14, y: 0 });
+  });
+
+  it("crouches lower than a stand — the upper body drops while the feet stay planted", () => {
+    const stand = poseAt(0);
+    const crouch = poseAt(1);
+
+    // Every upper joint sits lower on screen (larger local y, since up is negative).
+    expect(crouch.head.y).toBeGreaterThan(stand.head.y);
+    expect(crouch.shoulder.y).toBeGreaterThan(stand.shoulder.y);
+    expect(crouch.hip.y).toBeGreaterThan(stand.hip.y);
+    // Exact drop distances (pins the geometry against off-by mutants).
+    expect(crouch.head).toEqual({ x: 0, y: -58 });
+    expect(crouch.hip).toEqual({ x: 0, y: -22 });
+    // Feet stay on the ground line (y 0), planted a touch wider.
+    expect(crouch.footL).toEqual({ x: -16, y: 0 });
+    expect(crouch.footR).toEqual({ x: 16, y: 0 });
+  });
+
+  it("tucks the legs for an airborne fighter while the upper body holds", () => {
+    const stand = poseAt(0);
+    const air = poseAt(2);
+
+    // Feet lift toward the hip (tucked), distinct from the planted stand feet.
+    expect(air.footL.y).toBeLessThan(stand.footL.y);
+    expect(air.footR.y).toBeLessThan(stand.footR.y);
+    expect(air.footL).toEqual({ x: -10, y: -18 });
+    expect(air.footR).toEqual({ x: 10, y: -18 });
+    // The upper body is unchanged from the stand — only the legs tuck.
+    expect(air.head).toEqual(stand.head);
+    expect(air.hip).toEqual(stand.hip);
+  });
+
+  it("falls back to the standing stance for an unrecognized posture code", () => {
+    // Our engine only emits 0/1/2, but the derivation is total: an odd code renders a safe stand.
+    const odd = poseAt(9);
+
+    expect(odd).toEqual(poseAt(0));
+    expect(odd.head).toEqual({ x: 0, y: -76 }); // a real stand, not an empty/garbage pose
+  });
+});

@@ -63,9 +63,10 @@ and unit-tested.
 
 ## Acceptance Criteria (S2 done bar — behaviour-driven, observable)
 
-- [ ] `renderTape` emits `guardBand` (0 none / 1 low / 2 mid / 3 high) per fighter per tick;
+- [x] `renderTape` emits `guardBand` (0 none / 1 low / 2 mid / 3 high) per fighter per tick;
       a blocking fighter → its guarded band, a non-blocking fighter → 0; `runFight` stays
       byte-identical (existing equality tests green); Stryker score healthy on the change.
+      **Done — Slice 1, PR #313 (100% Stryker, 32/32).**
 - [ ] A **crouching** fighter (posture 1) is drawn in a visibly lower stance than a standing
       one; an **airborne** fighter (posture 2) is drawn in a distinct in-air pose as it
       follows the y-arc (already positioned by S1).
