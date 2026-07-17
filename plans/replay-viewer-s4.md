@@ -1,7 +1,7 @@
 # Plan: Replay viewer — S4 · Control playback (transport)
 
-**Branch**: per-slice (each slice cuts its own branch / PR). First: `feat/replay-transport-scrub` (Slice 1).
-**Status**: Active — plan approved (2026-07-17). Slice 1 (`feat/replay-transport-scrub`) implemented, full suite green; awaiting commit approval.
+**Branch**: per-slice (each slice cuts its own branch / PR). Current: `feat/replay-transport-speed` (Slice 2).
+**Status**: Active. **Slice 1 MERGED** (PR #325 · `5e1337f`, 2026-07-17) — scrub bar + end-of-fight auto-pause live. Next: **Slice 2** (speed buttons) — branch cut, awaiting CONFIRM-gate approval before any code.
 
 ## Goal
 
