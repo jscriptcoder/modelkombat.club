@@ -879,3 +879,53 @@ decisions) + [replay-viewer-stories.md](../../plans/replay-viewer-stories.md) (s
 live in `plans/` as the trail for the remaining stories: **S2** postures/poses, **S3** browsable list +
 `/watch/{id}` permalinks + nav + dedicated not-found, **S4** transport (scrub/speed/frame-step). Each
 starts its own `planning` pass; S2-vs-S3 ordering is negotiable (both build only on S1).
+
+## `/watch` fight replay viewer — S2 postures ✅ COMPLETE
+
+"**See the fighters do karate**": the two stickmen now reflect the full pose vocabulary the render
+tape carries, and the HUD flashes when a point is scored. One engine-adjacent enabling slice put the
+last missing signal on the wire; the other six are pure `web/`. The pose model is **layered** — a base
+`stance` (from `posture`) with independent action overrides composed by object spread (strike → front
+hand, guard → rear hand, throw → both hands), a full-body `PRONE` **override** for knockdown, and a
+HUD score-pop flag from a pure tape scan. Every derivation is written **total** (an odd `posture` →
+stand, a band outside 1–3 → no action, `knockdown` still wins), so a stray frame renders a safe neutral
+figure instead of crashing. **Invariants held:** `web/src` imports nothing from `src/` (the tape stays a
+mirrored view-model); the sole engine touch is the additive `guardBand` projection — **TCB / `INPUT_HASH`
+/ `BENCHMARK_VERSION` untouched** (a render projection is not a scoring input). `web/**` is outside
+Stryker's node scope ⇒ each pure-`web/` slice used **exhaustive exact-assertion browser tests + a manual
+mutator scan + a synthetic-tape visual check** (the live King fight can't guarantee every pose appears).
+
+- **Slice 1 — `renderTape` emits `guardBand`** (PR #313, `feat/replay-guard-field`) — the one missing
+  signal: a blocking fighter's `action` resolves inside a tick but leaves `state.kind` `"neutral"`, so
+  `RenderFrame` gained `guardBand` (0 none / 1 low / 2 mid / 3 high) via the existing pure
+  `guardBandOf(f, action)` helper. `runFight` byte-identical; **100% scoped Stryker (32/32)** — the sole
+  engine/`src/` slice, so real mutation, not the web scan.
+- **Slice 2 — stance by posture** (PR #314, `feat/replay-postures-stance`) — the fixed S1 stickman becomes
+  a 7-joint `Skeleton` in the pure `scene`; `skeletonFor(posture)` branches STAND / CROUCH (upper body
+  drops ~18px, feet planted) / AIR (legs tuck over the S1 y-lift). `figures` becomes a thin joint-stroker.
+- **Slice 3 — strike extension by band** (PR #315, `feat/replay-postures-strike`) — an `attacking` fighter
+  throws its front hand (`handR`) forward to a `bandHeight` ladder (low −24 / mid −46 / high −68, reach
+  x 40); an **air-attack** keeps the AIR tucked legs (only `handR` overridden). Factored `bandHeight` for
+  Slice 4 reuse.
+- **Slice 4 — guard raised to the band** (PR #316, `feat/replay-postures-guard`) — a guarding fighter
+  raises its rear hand (`handL`) to the incoming band on the same ladder at a modest reach (x 8); `web/`'s
+  `ReplayFrame` gained `guardBand`. `guardBand` (0 = none) is itself the gate; guard composes with any
+  stance (crouch-guard test).
+- **Slice 5 — throw grab** (PR #317, `feat/replay-postures-grab`) — a `throwing` fighter locks BOTH hands
+  forward into a grab (`handL` 28 / `handR` 36), applied **last** so it wins over strike/guard.
+- **Slice 6 — knockdown → prone → wake-up** (PR #318, `feat/replay-postures-knockdown`) — the first
+  **full-body override**: `knockdown` → an early-return `PRONE` skeleton (spine flat at y −10, head one
+  end / feet the other) that supersedes stance + every action layer; the tape flipping `knockdown` false
+  the next tick is the wake-up.
+- **Slice 7 — score-pop HUD highlight** (PR #319, `feat/replay-score-pop`) — `Hud` gained
+  `scoredA`/`scoredB` from a pure `scoredWithin` scan of the last N=30 ticks (≈0.5 s) for a strict points
+  increase (low end guarded at index 1, computed from the clamped playhead, no cross-frame state ⇒
+  deterministic/scrub-safe); `figures` prefixes the scorer's score with a colourblind-safe `★`.
+
+[replay-viewer-s2.md](replay-viewer-s2.md) — the plan (all 7 slices, the layered pose model, and the
+find-gaps decisions inline).
+
+**S2 (postures) complete; the viewer feature is 2 of 4 stories done.** Remaining, still live in `plans/`:
+**S3** (browsable list + `/watch/{id}` permalinks + nav + dedicated not-found) and **S4** (transport —
+scrub / speed / frame-step). The **S3 route ships dark** (no nav link; the `#fights` teaser stays a
+non-link) until it lands. Each starts its own `planning` pass.

@@ -1,7 +1,7 @@
 # Plan: Replay viewer S2 — "See the fighters do karate" (postures)
 
 **Branch**: per-slice (`feat/replay-guard-field`, then `feat/replay-postures-*`)
-**Status**: Active
+**Status**: ✅ Complete — all 7 slices merged (PRs #313–#319), 2026-07-17
 
 Child story **S2** from `plans/replay-viewer-stories.md` (decisions:
 `plans/replay-viewer-decisions.md`). S1 (walking-skeleton viewer) is complete +
@@ -89,15 +89,18 @@ and unit-tested.
       clears (wake-up). **Done — Slice 6, PR #318 (full-body `PRONE` skeleton via an early-return
       override in `poseFor`, supersedes stance + strike/guard/throw; two-tick wake-up; manual scan
       + visual check).**
-- [ ] When a fighter's `points` rise, **that fighter's HUD score is highlighted** for a
+- [x] When a fighter's `points` rise, **that fighter's HUD score is highlighted** for a
       lookback window of ~N ticks (default ~30, ≈0.5 s at 60 fps) — deterministic at any
       playhead (restart/scrub-safe, frozen on pause); no highlight when no point was scored
-      in the window, nor at `playhead 0`.
-- [ ] An out-of-range pose code (unexpected `posture`, or a strike/guard band outside 1–3)
+      in the window, nor at `playhead 0`. **Done — Slice 7, PR #319 (pure `scoredWithin` tape
+      scan → `Hud.scoredA/B`; colourblind-safe `★` marker; manual scan + visual check).**
+- [x] An out-of-range pose code (unexpected `posture`, or a strike/guard band outside 1–3)
       renders a **safe neutral** figure (stand / no action) rather than crashing or drawing
-      garbage; `downed` still overrides.
-- [ ] All S1 behaviour still holds (autoplay, world→screen positions, facing, score/tick HUD,
-      play/pause/restart); full suite green; typecheck + lint clean.
+      garbage; `downed` still overrides. **Done — the total derivations built across Slices 2–6
+      (posture 9 → stand, attack/guard band 9 → neutral, all unit-tested; knockdown precedence).**
+- [x] All S1 behaviour still holds (autoplay, world→screen positions, facing, score/tick HUD,
+      play/pause/restart); full suite green; typecheck + lint clean. **Done — full suite
+      1905 green at every slice; `web/`-only, no `src/` import, TCB/`INPUT_HASH` untouched.**
 
 ## Testing approach (applies to every web slice)
 
@@ -374,5 +377,5 @@ Parked:
 ```
 
 ---
-*Archive to `docs/archive/` when S2 is complete (per [[archive-plans-not-delete]]); the
-`replay-viewer-{decisions,stories}.md` docs stay live for S3–S4.*
+*Archived to `docs/archive/` on S2 completion (2026-07-17, per [[archive-plans-not-delete]]); the
+`replay-viewer-{decisions,stories}.md` docs stay live in `plans/` for S3–S4.*
