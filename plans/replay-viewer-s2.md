@@ -78,8 +78,10 @@ and unit-tested.
 - [x] An **air-attack** (airborne *and* attacking on the same tick) renders BOTH cues — the
       air stance AND the extended striking limb — not one or the other. **Done — Slice 3
       (only `handR` overridden, so the AIR stance's tucked legs survive).**
-- [ ] A **guarding** fighter raises its guard to the incoming band height (low / mid / high),
-      driven by the new `guardBand`.
+- [x] A **guarding** fighter raises its guard to the incoming band height (low / mid / high),
+      driven by the new `guardBand`. **Done — Slice 4, PR #316 (rear hand `handL` reuses the
+      `bandHeight` ladder at a modest reach; `ReplayFrame` gained `guardBand`; manual scan +
+      visual check).**
 - [ ] A **throwing** fighter shows a distinct grab pose (arms forward), and a **downed**
       fighter is drawn prone/horizontal, then returns upright when `knockdown` clears
       (wake-up).

@@ -149,4 +149,21 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     expect(stage.a.handL.y).toBe(-46);
     expect(stage.a.handL.x).toBeGreaterThan(neutralGuardX); // swung forward into a guard
   });
+
+  it("reaches both hands forward into a grab for a throwing fighter", () => {
+    const stage = createStage(VIEWPORT);
+
+    stage.apply(scene([tickOf(0, { throwing: false }, {})], 0, VIEWPORT));
+    const neutralL = stage.a.handL.x;
+    const neutralR = stage.a.handR.x;
+
+    stage.apply(scene([tickOf(0, { throwing: true }, {})], 0, VIEWPORT));
+
+    expect(neutralL).toBe(-18);
+    expect(neutralR).toBe(18);
+    expect(stage.a.handL.x).toBe(28);
+    expect(stage.a.handR.x).toBe(36);
+    expect(stage.a.handL.x).toBeGreaterThan(neutralL); // rear hand swung forward
+    expect(stage.a.handR.x).toBeGreaterThan(neutralR); // front hand reached further forward
+  });
 });
