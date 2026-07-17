@@ -99,3 +99,70 @@
 .replay-back:focus-visible {
   text-decoration: underline;
 }
+
+/* The /watch index: the King's fights as a newest-first list of link cards. Each card pits the two
+   fighters' identities against each other ("A vs B") and navigates to that fight's permalink. */
+.replay-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.replay-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  color: var(--fg);
+  text-decoration: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.replay-card:hover,
+.replay-card:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.replay-card-fighter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  /* Let the name truncate: a flex child needs min-width:0 for `text-overflow: ellipsis` to bite. */
+  min-width: 0;
+  flex: 1;
+}
+
+/* The second fighter reads right-to-left, so "A vs B" frames the bout symmetrically. */
+.replay-card-fighter:last-child {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.replay-card-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.replay-card-model {
+  font-size: 0.8rem;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.replay-card-vs {
+  flex-shrink: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

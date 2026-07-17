@@ -1,12 +1,12 @@
-import { fireEvent, render } from "@solidjs/testing-library";
+import { render } from "@solidjs/testing-library";
 import { describe, expect, it, vi } from "vitest";
 
 import ReplayPage from "./ReplayPage";
-import type { ReplayByIdLoad, ReplayLoad } from "./replay-loader";
-import type { ReplayFrame, ReplayItem } from "./replay-contract";
+import type { ReplayByIdLoad, ReplayListLoad } from "./replay-loader";
+import type { ReplayFrame, ReplayItem, ReplaySummary } from "./replay-contract";
 
-// A small canvas keeps the Pixi player light in the ready-state tests; the numbers don't matter
-// here (the scene→screen maths is proven in scene.test), only that the player mounts.
+// A small canvas keeps the Pixi player light in the fight-view test; the numbers don't matter here
+// (the scene→screen maths is proven in scene.test), only that the player mounts.
 const VIEWPORT = { width: 300, height: 150 };
 
 const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
@@ -35,78 +35,18 @@ const item = (): ReplayItem => ({
   ],
 });
 
-describe("ReplayPage", () => {
-  it("shows an accessible loading state while the fight is being fetched", () => {
-    // A loader that never settles holds the page in its loading state.
-    const load = () => new Promise<ReplayLoad>(() => {});
+const summary = (id: string): ReplaySummary => ({
+  id,
+  fighters: [
+    { name: "challenger", model: "m" },
+    { name: "king", model: "m" },
+  ],
+});
 
-    const { getByRole } = render(() => (
-      <ReplayPage load={load} viewport={VIEWPORT} />
-    ));
-
-    expect(getByRole("status")).toBeTruthy();
-  });
-
-  it("mounts the labelled fight player once a fight loads", async () => {
-    const load = () =>
-      Promise.resolve<ReplayLoad>({ kind: "ready", item: item() });
-
-    const { findByRole } = render(() => (
-      <ReplayPage load={load} viewport={VIEWPORT} />
-    ));
-
-    expect(await findByRole("img", { name: /fight playback/i })).toBeTruthy();
-  });
-
-  it("shows an empty state linking to /ring when there are no fights yet", async () => {
-    const load = () => Promise.resolve<ReplayLoad>({ kind: "empty" });
-
-    const { findByText, getByRole } = render(() => (
-      <ReplayPage load={load} viewport={VIEWPORT} />
-    ));
-
-    expect(await findByText(/no fights to watch yet/i)).toBeTruthy();
-    expect(
-      getByRole("link", { name: /send a bot into the ring/i }).getAttribute(
-        "href",
-      ),
-    ).toBe("/ring");
-  });
-
-  it("shows a retryable error state whose Retry re-runs the load and then plays", async () => {
-    const load = vi
-      .fn<() => Promise<ReplayLoad>>()
-      .mockRejectedValueOnce(new Error("down"))
-      .mockResolvedValueOnce({ kind: "ready", item: item() });
-
-    const { findByRole, findByText } = render(() => (
-      <ReplayPage load={load} viewport={VIEWPORT} />
-    ));
-
-    // First load fails → a distinct error with Retry (never the empty CTA).
-    expect(await findByText(/couldn't load the fight/i)).toBeTruthy();
-
-    fireEvent.click(await findByRole("button", { name: /retry/i }));
-
-    // Retry re-runs the load and the fight then mounts.
-    expect(await findByRole("img", { name: /fight playback/i })).toBeTruthy();
-    expect(load).toHaveBeenCalledTimes(2);
-  });
-
-  it("never shows the empty CTA on a load failure", async () => {
-    const load = () => Promise.reject<ReplayLoad>(new Error("down"));
-
-    const { findByText, queryByText } = render(() => (
-      <ReplayPage load={load} viewport={VIEWPORT} />
-    ));
-
-    expect(await findByText(/couldn't load the fight/i)).toBeTruthy();
-    expect(queryByText(/no fights to watch yet/i)).toBeNull();
-  });
-
+describe("ReplayPage — the /watch dispatcher", () => {
   it("routes /watch/{id} to the fight view, threading the parsed id to the by-id loader", async () => {
-    // A path carrying a fight id dispatches to the by-id player (distinguished from the autoplay
-    // view by its back-to-list link), and the id parsed from the path reaches the loader.
+    // A path carrying a fight id dispatches to the by-id player (distinguished from the list by its
+    // back-to-list link), and the id parsed from the path reaches the loader.
     const loadFight = vi
       .fn<(id: string) => Promise<ReplayByIdLoad>>()
       .mockResolvedValue({ kind: "found", item: item() });
@@ -123,20 +63,27 @@ describe("ReplayPage", () => {
     expect(
       (await findByRole("link", { name: /all fights/i })).getAttribute("href"),
     ).toBe("/watch");
-    // The whole chain — path → replayIdFromPath → dispatch → ReplayFight → loader — is pinned:
-    // the loader is called with the id lifted out of the path (kills an id-threading mutant).
+    // The whole chain — path → replayIdFromPath → dispatch → ReplayFight → loader — is pinned: the
+    // loader is called with the id lifted out of the path (kills an id-threading mutant).
     expect(loadFight).toHaveBeenCalledWith("abc123");
   });
 
-  it("routes bare /watch to the latest-fight autoplay (no back-to-list link)", async () => {
-    const load = () =>
-      Promise.resolve<ReplayLoad>({ kind: "ready", item: item() });
+  it("routes bare /watch to the browsable fight list, not the by-id player", async () => {
+    const loadList = () =>
+      Promise.resolve<ReplayListLoad>({
+        kind: "ready",
+        items: [summary("newest")],
+      });
 
     const { findByRole, queryByRole } = render(() => (
-      <ReplayPage path="/watch" load={load} viewport={VIEWPORT} />
+      <ReplayPage path="/watch" loadList={loadList} />
     ));
 
-    expect(await findByRole("img", { name: /fight playback/i })).toBeTruthy();
-    expect(queryByRole("link", { name: /all fights/i })).toBeNull();
+    // The no-id branch mounts the list: a card links to that fight's permalink...
+    expect((await findByRole("link")).getAttribute("href")).toBe(
+      "/watch/newest",
+    );
+    // ...and the fight player is NOT mounted (distinguishes the list from the by-id view).
+    expect(queryByRole("img", { name: /fight playback/i })).toBeNull();
   });
 });
