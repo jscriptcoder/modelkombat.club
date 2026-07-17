@@ -87,14 +87,32 @@ const GRAB: Pick<Skeleton, "handL" | "handR"> = {
   handR: { x: 36, y: -44 },
 };
 
-// The stance skeleton with the action layers applied: a strike throws the front hand (handR) forward
-// to the attacked band; a guard raises the rear hand (handL) to the incoming band; a throw locks
-// BOTH hands into a forward grab. All are TOTAL — an idle fighter, or a 0 / out-of-range band, keeps
-// the stance hand. The layers are independent (and mutually exclusive in the engine), so they compose
-// with each other and with any stance (an air-attack keeps the AIR tucked legs). The throw is applied
-// LAST, so it wins if ever combined with a strike/guard. Gates: strike ← `attacking`, guard ←
-// `guardBand` (0 = none), throw ← `throwing`.
+// A knocked-down fighter lies PRONE: the whole body laid horizontal just above the ground line —
+// the spine flat at y -10 with the head at one end (x -40) and the feet at the far end (x 36), arms
+// splayed by the shoulders. A complete skeleton (not a per-limb layer), because a knockdown reshapes
+// the WHOLE figure; it is applied as an early-return override so it supersedes every stance + action.
+const PRONE: Skeleton = {
+  head: { x: -40, y: -10 },
+  shoulder: { x: -24, y: -10 },
+  hip: { x: 6, y: -10 },
+  handL: { x: -20, y: -2 },
+  handR: { x: -20, y: -18 },
+  footL: { x: 36, y: -6 },
+  footR: { x: 36, y: -14 },
+};
+
+// The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
+// over everything (highest precedence — an early return, so a downed fighter is never also striking
+// or throwing); otherwise a strike throws the front hand (handR) forward to the attacked band; a
+// guard raises the rear hand (handL) to the incoming band; a throw locks BOTH hands into a forward
+// grab. All are TOTAL — an idle fighter, or a 0 / out-of-range band, keeps the stance hand. The
+// layers are independent (and mutually exclusive in the engine), so they compose with each other and
+// with any stance (an air-attack keeps the AIR tucked legs). The throw is applied LAST of the action
+// layers, so it wins if ever combined with a strike/guard. Gates: knockdown ← `knockdown`, strike ←
+// `attacking`, guard ← `guardBand` (0 = none), throw ← `throwing`.
 const poseFor = (frame: ReplayFrame): Skeleton => {
+  if (frame.knockdown) return PRONE;
+
   const stance = skeletonFor(frame.posture);
   const strikeY = frame.attacking ? bandHeight(frame.attackBand) : null;
   const guardY = bandHeight(frame.guardBand);

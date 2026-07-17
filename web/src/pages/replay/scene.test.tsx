@@ -324,3 +324,79 @@ describe("scene — throw grab pose", () => {
     expect(grab.handL.x).toBeGreaterThan(0);
   });
 });
+
+describe("scene — knockdown prone pose and wake-up", () => {
+  // A knocked-down fighter is drawn PRONE: the whole body laid horizontal near the ground line —
+  // the spine flat at y -10, the head at one end (x -40) and the feet at the far end (x 36). This
+  // is a FULL-BODY override applied FIRST (an early return in poseFor), so it supersedes every
+  // stance and action layer — a downed fighter is never also striking or throwing. When the flag
+  // clears the next tick the fighter returns to its stance: the wake-up.
+  const PRONE = {
+    head: { x: -40, y: -10 },
+    shoulder: { x: -24, y: -10 },
+    hip: { x: 6, y: -10 },
+    handL: { x: -20, y: -2 },
+    handR: { x: -20, y: -18 },
+    footL: { x: 36, y: -6 },
+    footR: { x: 36, y: -14 },
+  };
+
+  const poseDowned = (extra: Partial<ReplayFrame> = {}) =>
+    scene([tickOf(0, { knockdown: true, ...extra }, {})], 0, VIEWPORT).a.pose;
+
+  it("lays the whole body prone when knocked down", () => {
+    expect(poseDowned()).toEqual(PRONE);
+  });
+
+  it("lowers and rotates the body versus a standing fighter", () => {
+    const stand = scene([tickOf(0, {}, {})], 0, VIEWPORT).a.pose;
+    const prone = poseDowned();
+
+    // The head drops toward the ground (larger y = lower on screen) instead of standing tall.
+    expect(prone.head.y).toBeGreaterThan(stand.head.y);
+    // The spine goes horizontal — head and hip share a y (a flat body) where a stand separates them.
+    expect(prone.head.y).toBe(prone.hip.y);
+    expect(stand.head.y).not.toBe(stand.hip.y);
+    // ...and the head is displaced along x (rotated off the vertical axis a stand holds at x 0).
+    expect(prone.head.x).not.toBe(prone.hip.x);
+    expect(stand.head.x).toBe(stand.hip.x);
+  });
+
+  it("overrides a strike — a downed fighter is not also striking", () => {
+    // knockdown:true with a live attack on the same tick still renders prone; the front hand is
+    // NOT thrown to the strike reach (kills a "compose knockdown with the action layers" mutant).
+    const pose = poseDowned({ attacking: true, attackBand: 3 });
+
+    expect(pose).toEqual(PRONE);
+    expect(pose.handR).not.toEqual({ x: 40, y: -68 }); // the high-band strike geometry
+  });
+
+  it("overrides a throw — prone wins over the grab that is otherwise applied last", () => {
+    const pose = poseDowned({ throwing: true });
+
+    expect(pose).toEqual(PRONE);
+    expect(pose.handL).not.toEqual({ x: 28, y: -44 }); // the grab geometry
+  });
+
+  it("wakes up — returns to the standing stance the tick knockdown clears", () => {
+    const tape: ReplayTape = [
+      tickOf(0, { knockdown: true }, {}),
+      tickOf(1, { knockdown: false }, {}),
+    ];
+
+    const downed = scene(tape, 0, VIEWPORT).a.pose;
+    const woken = scene(tape, 1, VIEWPORT).a.pose;
+
+    expect(downed.head).toEqual({ x: -40, y: -10 }); // prone at the knockdown tick
+    expect(woken.head).toEqual({ x: 0, y: -76 }); // upright stand the next tick — wake-up
+  });
+
+  it("leaves a standing fighter unaffected when not knocked down", () => {
+    // knockdown is the gate — an idle fighter is a normal stand (kills an "always prone" mutant).
+    const pose = scene([tickOf(0, { knockdown: false }, {})], 0, VIEWPORT).a
+      .pose;
+
+    expect(pose.head).toEqual({ x: 0, y: -76 });
+    expect(pose.footL).toEqual({ x: -14, y: 0 });
+  });
+});
