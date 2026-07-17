@@ -60,6 +60,18 @@
   outline-offset: 2px;
 }
 
+.replay-control:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border);
+}
+
+/* Frame-step buttons (◀ / ▶) are icon-width — narrower than the primary controls. */
+.replay-step-button {
+  min-width: 3rem;
+  padding: 0.5rem 0.75rem;
+}
+
 /* The scrub bar grows to span the control row so a spectator can drag to any tick; the readout
    beside it names the current tick in muted mono (matching the id chip / HUD styling). */
 .replay-scrub {

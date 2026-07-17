@@ -1,7 +1,7 @@
 # Plan: Replay viewer — S4 · Control playback (transport)
 
-**Branch**: per-slice (each slice cuts its own branch / PR). Current: `feat/replay-transport-speed` (Slice 2).
-**Status**: Active. **Slice 1 MERGED** (PR #325 · `5e1337f`, 2026-07-17) — scrub bar + end-of-fight auto-pause live. Next: **Slice 2** (speed buttons) — branch cut, awaiting CONFIRM-gate approval before any code.
+**Branch**: per-slice (each slice cuts its own branch / PR). Current: `feat/replay-transport-frame-step` (Slice 3 — final).
+**Status**: Active. **Slice 1 MERGED** (PR #325 · `5e1337f`) — scrub bar + auto-pause. **Slice 2 MERGED** (PR #326 · `388c77c`) — 0.5×/1×/2× speed buttons. Next: **Slice 3** (frame-step ◀/▶, the last S4 slice) — branch cut, awaiting CONFIRM-gate approval before any code.
 
 ## Goal
 
