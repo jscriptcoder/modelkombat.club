@@ -68,10 +68,7 @@ const place = (node: Container, joint: { x: number; y: number }): void => {
   node.y = joint.y;
 };
 
-const applyFigure = (
-  figure: Figure,
-  placement: Scene["a"],
-): void => {
+const applyFigure = (figure: Figure, placement: Scene["a"]): void => {
   const { nodes, bones, color } = figure;
   const pose = placement.pose;
 
@@ -95,6 +92,13 @@ const applyFigure = (
 
   bones.stroke({ width: 4, color });
 };
+
+// The score-pop marker: a colourblind-safe glyph (not hue alone) prefixed onto a fighter's HUD
+// score for the tick window after they score, so a point reads as "that scored!" at a glance.
+const POP_MARKER = "★";
+
+const scoreLabel = (score: number, scored: boolean): string =>
+  scored ? `${POP_MARKER}${score}` : `${score}`;
 
 // The mounted stage: the root container to add to the Pixi stage, the two fighters' joint nodes
 // (exposed for display-object assertions), and the HUD text, plus `apply` — the pure Scene →
@@ -127,7 +131,11 @@ export const createStage = (viewport: Viewport): Stage => {
   const apply = (scene: Scene): void => {
     applyFigure(a, scene.a);
     applyFigure(b, scene.b);
-    hud.text = `tick ${scene.hud.tick}    ${scene.hud.scoreA} : ${scene.hud.scoreB}`;
+
+    const scoreA = scoreLabel(scene.hud.scoreA, scene.hud.scoredA);
+    const scoreB = scoreLabel(scene.hud.scoreB, scene.hud.scoredB);
+
+    hud.text = `tick ${scene.hud.tick}    ${scoreA} : ${scoreB}`;
   };
 
   return { root, a: a.nodes, b: b.nodes, hud, apply };

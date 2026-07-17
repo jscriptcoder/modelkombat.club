@@ -85,8 +85,10 @@ and unit-tested.
 - [x] A **throwing** fighter shows a distinct grab pose (arms forward). **Done — Slice 5,
       PR #317 (both hands lock forward into a grab, applied last so it wins over strike/guard;
       manual scan + visual check).**
-- [ ] A **downed** fighter is drawn prone/horizontal, then returns upright when `knockdown`
-      clears (wake-up).
+- [x] A **downed** fighter is drawn prone/horizontal, then returns upright when `knockdown`
+      clears (wake-up). **Done — Slice 6, PR #318 (full-body `PRONE` skeleton via an early-return
+      override in `poseFor`, supersedes stance + strike/guard/throw; two-tick wake-up; manual scan
+      + visual check).**
 - [ ] When a fighter's `points` rise, **that fighter's HUD score is highlighted** for a
       lookback window of ~N ticks (default ~30, ≈0.5 s at 60 fps) — deterministic at any
       playhead (restart/scrub-safe, frozen on pause); no highlight when no point was scored
