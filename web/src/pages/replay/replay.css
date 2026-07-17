@@ -80,3 +80,22 @@
 .replay-empty-link a {
   color: var(--accent);
 }
+
+/* The permalink player's ONLY way back on this dark, nav-less route — also the not-found state's
+   escape hatch. Left-aligned above the fight so it reads as "up a level". */
+.replay-fight {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.replay-back {
+  align-self: start;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.replay-back:hover,
+.replay-back:focus-visible {
+  text-decoration: underline;
+}

@@ -158,6 +158,65 @@ This defers **all** public entry-point wiring: the S3 slice still builds the lis
 and permalinks, but adds no Nav link and no live teaser link. Reversible — revisit when we
 promote the feature.
 
+## S3 grill-me — resolved (2026-07-17)
+
+A focused `grill-me` pass on **S3 (browse the King's fights)**, run after S1+S2 shipped.
+Two facts reframed the story before any decision: **S3 is web-only** — S1 already shipped
+the full `/replay` list + `/replay/{id}` item contract in `handle-replay.ts` (identities-only
+summaries, newest-first, bootstrap-filtered, `200 []`, `404 replay-not-found`, immutable
+item cache), so **no `src/` / `api/` change is needed**; and the viewer inherits S2's
+testing regime (`web/` is not Stryker-reachable → exhaustive exact-assertion browser tests +
+mandatory manual mutator scan + a synthetic-tape visual check). `web/src` still never imports
+`src/`.
+
+Most of the S3 *product* tree was already locked by the 2026-07-15 decisions above (list unit,
+identities-only, newest-first, `200 []`, dark launch, card identity edge cases). This pass
+resolved what only building S1/S2 could settle — the **client route/URL structure** and how
+the list and player surfaces relate:
+
+- **Route structure.** `/watch` becomes the **browsable card list** (index); `/watch/{id}` is
+  the **permalink player**. Mirrors the API (`/replay` list + `/replay/{id}` item) and yields
+  clean shareable permalinks. This **replaces** S1's autoplay-at-`/watch` behavior — the newest
+  fight is now one click from the list. Safe because the route is dark (no Nav/teaser link), so
+  nothing internal depended on the old autoplay. A new `/watch/(.*)` → `replay.html` rewrite is
+  added ahead of the SPA catch-all; the browser URL stays `/watch/{id}` (Vercel rewrites are
+  server-side/transparent), so the client can read `location.pathname`.
+- **View selection + navigation.** One `replay.html` SPA parses `location.pathname` **at mount**:
+  no id → list view; a present id → player view. Cards are plain `<a href="/watch/{id}">` —
+  **full-page navigation, no router**. Native back/forward, deep-links, and shared permalinks
+  all "just work"; matches the house pattern (index/ring/replay are separate mini Solid apps).
+  Accepted tradeoff: a full reload + Pixi re-init when opening a fight (the player already
+  fresh-mounts; fine at this scale). Client-side pushState routing was considered and rejected
+  as unnecessary moving parts for a web-only, manually-scanned slice.
+- **Not-found (distinct state).** A `/watch/{id}` whose id 404s (`replay-not-found` — evicted,
+  version-rotted, or garbage) renders a **distinct no-retry "this fight is no longer available"
+  state with a "← all fights" back-link to `/watch`** — separate from the transient fetch-error
+  (which keeps *retry*). The by-id loader therefore **distinguishes 404** (→ not-found) from
+  5xx/network (→ retry). A small "← all fights" link also sits on the happy-path player, since
+  the dark route has no Nav to navigate back with.
+- **Loader shape (mechanical).** Today's `loadReplay` (list→newest→tape autoplay) splits into
+  `loadList()` (`GET /replay` → summaries, for the list page) and `loadById(id)` (`GET
+  /replay/{id}` → tape, for the player). The old autoplay loader retires when `/watch` flips to
+  the list.
+- **Card disambiguator.** Cards show `name` + `model` (name-only when `model` absent; long name
+  → CSS-truncate + full value in a `title` tooltip). Two cards sharing an identical
+  challenger-name + King-name pair get a **6-char content-hash id fragment — only on the
+  colliding cards** (a pure collision-detection pass over the list). Always-show (noise on every
+  card) and never-show (drops the guarantee) were both rejected.
+- **Dark launch reaffirmed.** No Nav link; the "Fight replays — in development" teaser stays a
+  non-link. One doc-drift to fix in implementation: `ReplayApp.tsx`'s comment says the browsable
+  list is finalized "until S4" — it's **S3**, and it ships dark.
+
+**Slice shape (to confirm in `planning`).** Player-first so cards have a live target:
+1. **S3.1 — permalink player at `/watch/{id}`**: `/watch/(.*)` rewrite + URL-parsed view
+   selection + `loadById` + the not-found state + back-link. Observable: a shared `/watch/{id}`
+   opens and plays that fight (or gracefully reports it's gone). Intermediate state leaves
+   `/watch` still autoplaying the newest (coherent).
+2. **S3.2 — the list at `/watch`**: `loadList` + card grid (newest-first, identities-only,
+   truncation, empty state) + click-through to `/watch/{id}` + the on-collision disambiguator;
+   retires the autoplay loader and flips `/watch` to the list. Observable: browse all fights,
+   click to watch.
+
 ## Non-negotiable invariants respected
 
 - **#1 determinism** — reconstruct from stored docs+seeds; **no tape is ever persisted**.

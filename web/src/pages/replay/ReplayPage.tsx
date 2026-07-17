@@ -1,67 +1,47 @@
-import { createResource, Match, Switch, type Component } from "solid-js";
+import { Show, type Component } from "solid-js";
 
 import "../../shared/app.css";
 import "./replay.css";
-import { RING_PATH } from "../../shared/lib/paths";
-import { loadReplay, type ReplayLoad } from "./replay-loader";
-import ReplayPlayer from "./ReplayPlayer";
+import { replayIdFromPath } from "./replay-route";
+import type { ReplayByIdLoad, ReplayLoad } from "./replay-loader";
+import ReplayFight from "./ReplayFight";
+import ReplayLatest from "./ReplayLatest";
 import type { Viewport } from "./scene";
 
+// The /watch shell dispatches on the URL: /watch/{id} → the permalink player (ReplayFight); bare
+// /watch → the latest-fight autoplay (ReplayLatest). The two views own their own data loads; this
+// only picks which mounts, so each view's fetch runs on exactly its branch. The `/watch/(.*)`
+// rewrite (vercel.json) serves this SPA for deep links, and the browser keeps the real path — so
+// `location.pathname` is the source of truth.
 type ReplayPageProps = {
-  // The data seam. Injected in tests to drive every state without a network; defaults to the live
-  // two-step /replay fetch (list → newest → tape). Mirrors RingPage's `postFight`.
+  // The route seam. Injected in tests to select the view without touching history; defaults to the
+  // live browser path.
+  path?: string;
+  // The bare-/watch autoplay loader (forwarded to ReplayLatest). Injected in tests.
   load?: () => Promise<ReplayLoad>;
-  // Canvas size, forwarded to the player — overridden in tests, a sensible default in production.
+  // The /watch/{id} by-id loader (forwarded to ReplayFight). Injected in tests.
+  loadFight?: (id: string) => Promise<ReplayByIdLoad>;
+  // Canvas size, forwarded to whichever view mounts.
   viewport?: Viewport;
 };
 
 const ReplayPage: Component<ReplayPageProps> = (props) => {
-  const [data, { refetch }] = createResource(() =>
-    (props.load ?? loadReplay)(),
-  );
-
-  // The loaded fight, or null unless the load resolved to a watchable fight — so only the `ready`
-  // branch mounts the player.
-  const readyItem = () => {
-    const current = data();
-
-    return current?.kind === "ready" ? current.item : null;
-  };
+  const id = () => replayIdFromPath(props.path ?? window.location.pathname);
 
   return (
     <main class="replay" id="top">
-      <h1 class="replay-title">Watch the King's latest fight</h1>
-
-      <Switch>
-        <Match when={data.loading}>
-          <p class="replay-status" role="status">
-            Loading the fight…
-          </p>
-        </Match>
-
-        <Match when={data.error}>
-          <div class="replay-error" role="alert">
-            <p class="replay-error-line">⚠ Couldn't load the fight.</p>
-            <button type="button" class="retry" onClick={() => void refetch()}>
-              Retry
-            </button>
-          </div>
-        </Match>
-
-        <Match when={readyItem()}>
-          {(item) => <ReplayPlayer item={item()} viewport={props.viewport} />}
-        </Match>
-
-        <Match when={data()?.kind === "empty"}>
-          <div class="replay-empty">
-            <p class="replay-empty-line">No fights to watch yet.</p>
-            <p class="replay-empty-link">
-              <a href={RING_PATH}>Send a bot into the ring</a> to crown the
-              first King.
-            </p>
-          </div>
-        </Match>
-      </Switch>
+      <Show
+        when={id()}
+        fallback={<ReplayLatest load={props.load} viewport={props.viewport} />}
+      >
+        {(fightId) => (
+          <ReplayFight
+            id={fightId()}
+            load={props.loadFight}
+            viewport={props.viewport}
+          />
+        )}
+      </Show>
     </main>
   );
 };
