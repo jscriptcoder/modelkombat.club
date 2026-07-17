@@ -1,9 +1,9 @@
 # Plan: Replay viewer — S3 · Browse the King's fights
 
-**Branch**: per-slice (each slice cuts its own branch / PR). Current: `feat/replay-watch-collisions` (Slice 3).
-**Status**: Active — Slices 1 & 2 merged (#321, #322); Slice 3 in setup (branch cut, CONFIRM gate not yet presented).
+**Branch**: per-slice (each slice cut its own branch / PR).
+**Status**: ✅ **Complete** — all 3 slices merged (#321, #322, #323). Being archived to `docs/archive/`.
 
-## Progress / resume state (2026-07-18)
+## Progress / resume state (2026-07-17 — story complete)
 
 - ✅ **Slice 1 — permalink player** — **MERGED** (PR #321, squashed to `main` @ `5c0fb12`).
   `/watch/{id}` plays a fight; a 404 → no-retry "no longer available" + "← All fights" back-link;
@@ -17,22 +17,19 @@
   `ReplayLatest.tsx` + the `loadReplay` two-step loader; rewrote their tests into list tests; added
   `loadList` + `ReplayList.tsx`; corrected `replay.html` head copy + the `ReplayApp` "until S4"
   comment. Verified end-to-end on the Vercel preview.
-- 🔜 **Slice 3 — repeat-challenge collision disambiguator** — **CURRENT.** Branch
-  `feat/replay-watch-collisions` is cut from `main` (@ `205d166`). The three whole-story ACs Slice 2
-  satisfied are **now ticked in this file (uncommitted — they ride into the Slice 3 PR)**. **Slice 3's
-  per-slice ACs have NOT yet been presented for the CONFIRM gate — that is the next step.**
-  - **On approval:** load `tdd` + `testing` + `front-end-testing`, then RED → GREEN per the Slice 3
-    spec below.
-  - **Scope:** a pure `markCollisions(summaries)` flags exactly the entries whose challenger-`name` +
-    King-`name` pair repeats; each flagged card shows a short 6-char content-hash `id` fragment;
-    uniquely-named pairings stay clean. `ReplayList.tsx` renders the fragment on flagged cards only.
-    No `src/` / `api/` / TCB touch.
-- ▶️ **RESUME HERE:** present the Slice 3 CONFIRM-gate ACs (in the Slice 3 section) for approval; on
-  approval, start RED. Testing regime = S2's (web/ not Stryker-reachable → exact-assertion browser +
-  pure-helper unit tests + manual mutator scan; **Mutation: N/A (Stryker)**).
-  - **After Slice 3 merges:** archive this file to `docs/archive/` (+ README entry, never delete),
-    then the only remaining viewer roadmap is **S4 transport** (scrub / speed / frame-step — its own
-    grill-me → planning story).
+- ✅ **Slice 3 — repeat-challenge collision disambiguator** — **MERGED** (PR #323, squashed to
+  `main` @ `c529630`). A pure `markCollisions(summaries)` (`collisions.ts`) flags exactly the entries
+  whose challenger-`name` + King-`name` pair repeats — keyed by `JSON.stringify([challenger, king])`
+  so distinct pairs never concatenate-conflate and names with quotes/specials escape; `> 1` = collides.
+  `ReplayList.tsx` renders `id.slice(0, 6)` as a muted-mono `.replay-card-id` chip **after `vs` /
+  before fighter[1]** (preserving fighter[1] as `:last-child` right-alignment) on flagged cards only.
+  No `src/` / `api/` / TCB touch. Verified: full suite green, manual mutator scan documented, and both
+  the negative (all-unique → 0 chips) and positive (synthetic collision via init-script fetch patch)
+  cases smoke-tested on the Vercel preview.
+- ▶️ **STORY COMPLETE — archiving.** All three slices merged; every whole-story AC met (below).
+  This file is being moved to `docs/archive/replay-viewer-s3.md` (+ README index entry, never
+  deleted). The only remaining viewer roadmap item is **S4 transport** (scrub / speed / frame-step —
+  its own grill-me → planning story).
 
 ## Goal
 
@@ -85,8 +82,8 @@ N/A (Stryker)** and substitutes the S2 proportionate-evidence regime:
       truncate with the full value in a `title` tooltip. _(Slice 2)_
 - [x] Clicking a card navigates to that fight's `/watch/{id}` permalink and plays it. _(Slice 2)_
 - [x] An empty archive shows the honest **empty state** — never an error. _(Slice 2)_
-- [ ] Two cards sharing an **identical** challenger-vs-King name pair each show a short
-      content-hash id fragment; uniquely-named pairings stay clean.
+- [x] Two cards sharing an **identical** challenger-vs-King name pair each show a short
+      content-hash id fragment; uniquely-named pairings stay clean. _(Slice 3)_
 - [x] The route ships **dark** — no primary-Nav link; the "Fight replays — in development"
       teaser stays a non-link. _(held from Slice 1)_
 - [x] No `src/` / `api/` / TCB / `INPUT_HASH` change; `web/src` does not import `src/`. _(held from Slice 1)_
