@@ -18,6 +18,9 @@ const ATTACK_MID = bot({ type: "attack", move: "gyaku-zuki", band: "mid" });
 const CROUCH = bot({ type: "crouch" });
 const JUMP = bot({ type: "jump", dir: 0 });
 const THROW = bot({ type: "throw" });
+const BLOCK_LOW = bot({ type: "block", band: "low" });
+const BLOCK_MID = bot({ type: "block", band: "mid" });
+const BLOCK_HIGH = bot({ type: "block", band: "high" });
 
 // Jumps the instant it is free (grounded, neutral), then — committed mid-air — its default
 // air-strikes: an `attack` on an `air:true` move is the airborne exception to commitment, so
@@ -104,6 +107,7 @@ describe("renderTape — per-tick render state for the viewer", () => {
       posture: 0, // standing
       attacking: true,
       attackBand: 2, // mid
+      guardBand: 0, // committed to a strike ⇒ not guarding
       throwing: false,
       knockdown: false,
       points: 0,
@@ -183,6 +187,33 @@ describe("renderTape — per-tick render state for the viewer", () => {
 
     expect(tape.some((t) => t.a.throwing)).toBe(true);
     expect(tape.some((t) => t.b.knockdown)).toBe(true);
+  });
+
+  it("emits the band code of the guard a neutral fighter raises", () => {
+    // A raises a fixed-band block each tick (block keeps it neutral, so it re-guards
+    // every tick); B idles. The guard reads as the raised band's code — low 1 / mid 2 /
+    // high 3 — distinctly, and the non-guarding idler reads 0.
+    const guardOf = (blocker: BotDoc): number =>
+      renderTape(getMockConfig({ botA: blocker, botB: IDLE }))[0].a.guardBand;
+
+    expect(guardOf(BLOCK_LOW)).toBe(1);
+    expect(guardOf(BLOCK_MID)).toBe(2);
+    expect(guardOf(BLOCK_HIGH)).toBe(3);
+
+    // The idle defender guards nothing.
+    const tape = renderTape(getMockConfig({ botA: BLOCK_MID, botB: IDLE }));
+
+    expect(tape[0].b.guardBand).toBe(0);
+  });
+
+  it("reads no guard for an attacker while its neutral opponent blocks", () => {
+    // A commits a mid strike (the `attacking` state, not neutral) while B blocks mid.
+    // A committed fighter cannot guard, so its guardBand is 0 even mid-strike; B's stays 2.
+    const tape = renderTape(getMockConfig({ botA: ATTACK_MID, botB: BLOCK_MID }));
+
+    expect(tape[0].a.attacking).toBe(true);
+    expect(tape[0].a.guardBand).toBe(0);
+    expect(tape[0].b.guardBand).toBe(2);
   });
 
   it("tracks an advancing fighter's position moving toward centre", () => {

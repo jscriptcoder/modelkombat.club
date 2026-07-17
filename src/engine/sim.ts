@@ -96,6 +96,7 @@ export type RenderFrame = {
   posture: number; // 0 standing / 1 crouching / 2 airborne
   attacking: boolean;
   attackBand: number; // 0 none / 1 low / 2 mid / 3 high
+  guardBand: number; // 0 none / 1 low / 2 mid / 3 high (the band a neutral blocker raises)
   throwing: boolean;
   knockdown: boolean;
   points: number;
@@ -272,6 +273,7 @@ const renderFrameOf = (
     f.state.kind === "attacking" || f.state.kind === "air-attacking"
       ? BAND_CODE[f.state.band]
       : 0,
+  guardBand: ((b) => (b === null ? 0 : BAND_CODE[b]))(guardBandOf(f, action)),
   throwing: f.state.kind === "throwing",
   knockdown: f.state.kind === "downed",
   points: f.points,
