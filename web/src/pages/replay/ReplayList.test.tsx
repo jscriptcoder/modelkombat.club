@@ -160,4 +160,37 @@ describe("ReplayList — the /watch fight index", () => {
     expect(await findByText(/couldn't load the fights/i)).toBeTruthy();
     expect(queryByText(/no fights to watch yet/i)).toBeNull();
   });
+
+  it("shows a 6-char id fragment only on cards whose challenger↔King name pair repeats", async () => {
+    // Two "aki vs rex" fights (indistinguishable by name) and one unique "juno vs rex" between them.
+    const load = ready([
+      summary({
+        id: "abcdef01",
+        fighters: [fighter({ name: "aki" }), fighter({ name: "rex" })],
+      }),
+      summary({
+        id: "99887766",
+        fighters: [fighter({ name: "juno" }), fighter({ name: "rex" })],
+      }),
+      summary({
+        id: "123456ff",
+        fighters: [fighter({ name: "aki" }), fighter({ name: "rex" })],
+      }),
+    ]);
+
+    const { findAllByRole, container } = render(() => (
+      <ReplayList load={load} />
+    ));
+
+    await findAllByRole("link");
+
+    // Exactly two chips render — one per colliding card — each the 6-char prefix of its own id,
+    // in card order. The unique middle card carries none.
+    const chips = container.querySelectorAll(".replay-card-id");
+
+    expect(Array.from(chips, (chip) => chip.textContent)).toEqual([
+      "abcdef",
+      "123456",
+    ]);
+  });
 });
