@@ -167,6 +167,51 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     expect(stage.a.handR.x).toBeGreaterThan(neutralR); // front hand reached further forward
   });
 
+  it("marks the scoring fighter's HUD score with a pop glyph", () => {
+    // A scores at tick 1 (points 0 → 3); at that playhead A's score carries the colourblind-safe
+    // marker (a glyph, not hue), while B's stays plain.
+    const stage = createStage(VIEWPORT);
+
+    const tape: ReplayTape = [
+      tickOf(0, { points: 0 }, { points: 0 }),
+      tickOf(1, { points: 3 }, { points: 0 }),
+    ];
+
+    stage.apply(scene(tape, 1, VIEWPORT));
+
+    expect(stage.hud.text).toContain("★3");
+    expect(stage.hud.text).not.toContain("★0"); // B did not score — no marker
+  });
+
+  it("marks only the fighter who scored, leaving the other plain", () => {
+    const stage = createStage(VIEWPORT);
+
+    const tape: ReplayTape = [
+      tickOf(0, { points: 0 }, { points: 0 }),
+      tickOf(1, { points: 0 }, { points: 2 }),
+    ];
+
+    stage.apply(scene(tape, 1, VIEWPORT));
+
+    // B scored → the marker sits on B's score; A's stays a bare digit.
+    expect(stage.hud.text).toMatch(/0 : ★2/);
+  });
+
+  it("leaves both scores plain when nobody scored in the window", () => {
+    // Flat scores across two ticks: no strike, no marker (kills an "always mark" mutant).
+    const stage = createStage(VIEWPORT);
+
+    const tape: ReplayTape = [
+      tickOf(0, { points: 3 }, { points: 1 }),
+      tickOf(1, { points: 3 }, { points: 1 }),
+    ];
+
+    stage.apply(scene(tape, 1, VIEWPORT));
+
+    expect(stage.hud.text).toMatch(/^tick 1 +3 : 1$/);
+    expect(stage.hud.text).not.toContain("★");
+  });
+
   it("lays the joint display objects prone for a knocked-down fighter", () => {
     // Applying a knockdown scene drops the head to the ground line and swings the body horizontal
     // (scene-graph state, not pixels) — the prone override.

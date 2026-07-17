@@ -1,4 +1,4 @@
-import type { ReplayFrame, ReplayTape } from "./replay-contract";
+import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
 
 // The world→screen projection: a pure function from (tape, playhead, viewport) to the on-screen
 // state the Pixi layer draws. Kept free of Pixi and of any engine import (web/src never imports
@@ -125,8 +125,38 @@ const poseFor = (frame: ReplayFrame): Skeleton => {
   };
 };
 
-// The heads-up display for the current playhead: the engine tick number + both fighters' scores.
-export type Hud = { tick: number; scoreA: number; scoreB: number };
+// The heads-up display for the current playhead: the engine tick number + both fighters' scores,
+// plus a per-fighter "just scored" flag the draw layer highlights (see `scoredWithin`).
+export type Hud = {
+  tick: number;
+  scoreA: number;
+  scoreB: number;
+  scoredA: boolean;
+  scoredB: boolean;
+};
+
+// The score-pop lookback: a fighter's score highlights if their points rose within the last N ticks
+// ending at the playhead (≈0.5 s at 60 fps). Held long enough to read as "that scored!".
+const SCORE_POP_TICKS = 30;
+
+// True if the selected fighter's `points` STRICTLY rose at any tick in the window (playhead−N,
+// playhead] — the low end guarded at index 1 so we never compare against a negative index. A pure
+// scan of the tape at this playhead: no cross-frame state, so it is identical on replay and correct
+// after a restart or a backward scrub.
+const scoredWithin = (
+  tape: ReplayTape,
+  playhead: number,
+  points: (tick: ReplayTick) => number,
+): boolean => {
+  const from = Math.max(1, playhead - SCORE_POP_TICKS + 1);
+
+  const window = Array.from(
+    { length: Math.max(0, playhead - from + 1) },
+    (_, k) => from + k,
+  );
+
+  return window.some((i) => points(tape[i]) > points(tape[i - 1]));
+};
 
 export type Scene = { a: Figure; b: Figure; hud: Hud };
 
@@ -163,11 +193,18 @@ export const scene = (
     pose: poseFor(frame),
   });
 
-  const at = tape[clampPlayhead(playhead, tape.length)];
+  const p = clampPlayhead(playhead, tape.length);
+  const at = tape[p];
 
   return {
     a: figure(at.a),
     b: figure(at.b),
-    hud: { tick: at.tick, scoreA: at.a.points, scoreB: at.b.points },
+    hud: {
+      tick: at.tick,
+      scoreA: at.a.points,
+      scoreB: at.b.points,
+      scoredA: scoredWithin(tape, p, (t) => t.a.points),
+      scoredB: scoredWithin(tape, p, (t) => t.b.points),
+    },
   };
 };

@@ -78,7 +78,9 @@ describe("scene — the pure tape → screen projection", () => {
 
     const result = scene(tape, 1, VIEWPORT);
 
-    expect(result.hud).toEqual({ tick: 12, scoreA: 3, scoreB: 1 });
+    expect(result.hud).toEqual(
+      expect.objectContaining({ tick: 12, scoreA: 3, scoreB: 1 }),
+    );
   });
 
   it("clamps a playhead past the last tick to the final frame", () => {
@@ -93,7 +95,9 @@ describe("scene — the pure tape → screen projection", () => {
 
     const result = scene(tape, 99, VIEWPORT);
 
-    expect(result.hud).toEqual({ tick: 20, scoreA: 5, scoreB: 2 });
+    expect(result.hud).toEqual(
+      expect.objectContaining({ tick: 20, scoreA: 5, scoreB: 2 }),
+    );
     expect(result.a.x).toBe(600); // 300000 · 0.002
   });
 
@@ -398,5 +402,88 @@ describe("scene — knockdown prone pose and wake-up", () => {
 
     expect(pose.head).toEqual({ x: 0, y: -76 });
     expect(pose.footL).toEqual({ x: -14, y: 0 });
+  });
+});
+
+describe("scene — score pop over a lookback window", () => {
+  // When a fighter's points rise, their HUD score flag lights up for a lookback window of N ticks
+  // ending at the playhead (default 30 ≈ 0.5 s at 60 fps). The flag is a PURE scan of the tape at
+  // the given playhead — no cross-frame state — so it is identical on replay and correct after a
+  // restart or a backward scrub. A rise is a STRICT increase between consecutive ticks. N defaults
+  // to 30, so the boundary case below reads the window as [t, t+29] with t+30 just past it.
+
+  // A tape of `length` ticks where `who` scores a single point at tick `t` (points 0 before, 1 from
+  // t on) — so a strict rise occurs exactly at index t (needs t ≥ 1 to have a prior tick).
+  const tapeScoringAt = (
+    t: number,
+    length: number,
+    who: "a" | "b" = "a",
+  ): ReplayTape =>
+    Array.from({ length }, (_, i) => {
+      const pts = i >= t ? 1 : 0;
+
+      return who === "a"
+        ? tickOf(i, { points: pts }, {})
+        : tickOf(i, {}, { points: pts });
+    });
+
+  it("pops the scorer's flag across the window and not outside it", () => {
+    const tape = tapeScoringAt(5, 40); // A's points rise at tick 5
+    const popAt = (p: number) => scene(tape, p, VIEWPORT).hud.scoredA;
+
+    expect(popAt(4)).toBe(false); // the tick before the score — no pop yet
+    expect(popAt(5)).toBe(true); // the scoring tick
+    expect(popAt(34)).toBe(true); // last tick of the window (t + N − 1 = 5 + 29)
+    expect(popAt(35)).toBe(false); // one past the window (t + N) — the pop has expired
+  });
+
+  it("never pops at playhead 0 — there is no prior tick to compare", () => {
+    const tape = tapeScoringAt(1, 10); // A scores at the earliest possible tick
+    const first = scene(tape, 0, VIEWPORT).hud;
+
+    expect(first.scoredA).toBe(false);
+    expect(first.scoredB).toBe(false);
+    // ...but the score is real — it pops the very next tick.
+    expect(scene(tape, 1, VIEWPORT).hud.scoredA).toBe(true);
+  });
+
+  it("pops only the fighter who scored", () => {
+    const tape = tapeScoringAt(3, 20, "b"); // only B scores, at tick 3
+    const hud = scene(tape, 5, VIEWPORT).hud; // a playhead inside B's window
+
+    expect(hud.scoredB).toBe(true);
+    expect(hud.scoredA).toBe(false);
+  });
+
+  it("does not pop on a flat stretch — equal scores are not an increase", () => {
+    // Both hold steady scores across the whole tape: no strict rise anywhere (kills a `>=` mutant).
+    const tape: ReplayTape = Array.from({ length: 20 }, (_, i) =>
+      tickOf(i, { points: 2 }, { points: 1 }),
+    );
+
+    const hud = scene(tape, 10, VIEWPORT).hud;
+
+    expect(hud.scoredA).toBe(false);
+    expect(hud.scoredB).toBe(false);
+  });
+
+  it("is deterministic — a backward jump re-derives the same flag", () => {
+    // Purity guard: the pop depends only on (tape, playhead), never on what was rendered before.
+    const tape = tapeScoringAt(5, 40);
+    const forward = scene(tape, 10, VIEWPORT).hud.scoredA;
+
+    scene(tape, 39, VIEWPORT); // jump to the end...
+    const backAgain = scene(tape, 10, VIEWPORT).hud.scoredA; // ...then scrub back
+
+    expect(forward).toBe(true);
+    expect(backAgain).toBe(true);
+  });
+
+  it("pops a score at tick 1 without reading a negative index", () => {
+    // The window's low end is guarded so an early playhead never reaches before the tape start.
+    const tape = tapeScoringAt(1, 10);
+
+    expect(scene(tape, 1, VIEWPORT).hud.scoredA).toBe(true);
+    expect(scene(tape, 2, VIEWPORT).hud.scoredA).toBe(true); // still inside the window
   });
 });
