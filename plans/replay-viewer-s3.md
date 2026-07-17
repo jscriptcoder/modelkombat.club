@@ -1,7 +1,35 @@
 # Plan: Replay viewer — S3 · Browse the King's fights
 
-**Branch**: `feat/replay-watch-permalink` (Slice 1; each slice cuts its own branch / PR)
-**Status**: Active
+**Branch**: per-slice (each slice cuts its own branch / PR). Current: `feat/replay-watch-list` (Slice 2).
+**Status**: Active — Slice 1 merged (#321); Slice 2 in setup (CONFIRM gate presented, awaiting approval).
+
+## Progress / resume state (2026-07-17)
+
+- ✅ **Slice 1 — permalink player** — **MERGED** (PR #321, squashed to `main` @ `5c0fb12`).
+  `/watch/{id}` plays a fight; a 404 → no-retry "no longer available" + "← All fights" back-link;
+  a transient 5xx → retry; bare `/watch` still autoplays the newest (the S3.1 bridge). Shipped:
+  `replay-route.ts` (`replayIdFromPath`), `loadById` (404→not-found, else throw), `ReplayFight.tsx`,
+  `ReplayLatest.tsx` (the extracted autoplay bridge), `ReplayPage.tsx` dispatcher over
+  `location.pathname`, the `/watch/(.*)` → `replay.html` rewrite, `.replay-back`/`.replay-fight` CSS.
+- 🔜 **Slice 2 — the browsable list at `/watch`** — **CURRENT.** Branch `feat/replay-watch-list` is
+  cut from `main`. The five whole-story ACs Slice 1 satisfied are **already ticked in this file
+  (uncommitted — they ride into the Slice 2 PR)**. **Slice 2's per-slice ACs were presented for the
+  CONFIRM gate and are AWAITING the human's approval — NO code written yet.**
+  - **On approval:** load `tdd` + `testing` + `front-end-testing`, then RED → GREEN per the Slice 2
+    spec below.
+  - **Scope reminder (retiring the autoplay):** this slice flips `/watch` from autoplay → list, so it
+    **deletes `ReplayLatest.tsx` + the `loadReplay` two-step loader** and **rewrites the 5 existing
+    autoplay-oriented `ReplayPage`/`loadReplay` tests into list tests**. Keep `loadById` + the
+    dispatcher's id-branch untouched. Also correct `replay.html`'s head copy ("Watch the King's latest
+    fight" → browse-the-list) and the stale `ReplayApp.tsx` "until S4" comment (the list is S3, dark).
+  - **New pieces:** `loadList(fetchFn)` (`GET /replay` → `ReplaySummary[]`; throws on non-2xx) and
+    `ReplayList.tsx` (cards, newest-first, name+model / name-only / truncate+`title`, empty state,
+    retry). `ReplaySummary = { id, fighters: [Fighter, Fighter] }`, `Fighter = { name, model }`.
+- ⏳ **Slice 3 — collision disambiguator** — planned as its own thin PR (foldable into Slice 2).
+  **OPEN QUESTION still unanswered: keep Slice 3 separate (recommended) or fold it into Slice 2?**
+- ▶️ **RESUME HERE:** re-present the Slice 2 CONFIRM-gate ACs (in the Slice 2 section) + the
+  separate-vs-folded question; on approval, start RED. Testing regime = S2's (web/ not
+  Stryker-reachable → exact-assertion browser tests + manual mutator scan; **Mutation: N/A (Stryker)**).
 
 ## Goal
 
@@ -44,11 +72,11 @@ N/A (Stryker)** and substitutes the S2 proportionate-evidence regime:
 
 ## Acceptance Criteria (whole-story done bar)
 
-- [ ] A shared `/watch/{id}` permalink opens and deterministically plays that specific fight.
-- [ ] A `/watch/{id}` whose id no longer resolves (evicted / version-rotted / garbage) shows a
+- [x] A shared `/watch/{id}` permalink opens and deterministically plays that specific fight. *(Slice 1)*
+- [x] A `/watch/{id}` whose id no longer resolves (evicted / version-rotted / garbage) shows a
       distinct **"this fight is no longer available"** state with a **"← all fights"** link back
       to `/watch` — **no retry**.
-- [ ] A transient failure fetching a fight (5xx / network) shows the **retryable** error state.
+- [x] A transient failure fetching a fight (5xx / network) shows the **retryable** error state. *(Slice 1)*
 - [ ] `/watch` shows one card per watchable fight, **newest-first**, identity-only (challenger
       `name`/`model` vs King `name`/`model`); **name-only** when a `model` is absent; long names
       truncate with the full value in a `title` tooltip.
@@ -56,9 +84,9 @@ N/A (Stryker)** and substitutes the S2 proportionate-evidence regime:
 - [ ] An empty archive shows the honest **empty state** — never an error.
 - [ ] Two cards sharing an **identical** challenger-vs-King name pair each show a short
       content-hash id fragment; uniquely-named pairings stay clean.
-- [ ] The route ships **dark** — no primary-Nav link; the "Fight replays — in development"
-      teaser stays a non-link.
-- [ ] No `src/` / `api/` / TCB / `INPUT_HASH` change; `web/src` does not import `src/`.
+- [x] The route ships **dark** — no primary-Nav link; the "Fight replays — in development"
+      teaser stays a non-link. *(held from Slice 1)*
+- [x] No `src/` / `api/` / TCB / `INPUT_HASH` change; `web/src` does not import `src/`. *(held from Slice 1)*
 
 ## Slices
 

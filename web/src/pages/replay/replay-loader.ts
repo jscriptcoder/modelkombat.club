@@ -1,17 +1,8 @@
 import { REPLAY_PATH } from "../../shared/lib/paths";
 import type { ReplayItem, ReplaySummary } from "./replay-contract";
 
-// The viewer's data load: `GET /replay` (the newest-first list) → take the first (newest) fight →
-// `GET /replay/{id}` (its reconstructed tape). Returns `empty` when there are no watchable fights.
-// A non-2xx on either call (store 503, a transient item 404, any 5xx) throws — the page turns that
-// into the retryable error state. The `fetch` is a parameter so tests drive it with a fake, exactly
-// as RingPage injects `postFight`; production binds the real global `fetch`.
-
-export type ReplayLoad =
-  | { kind: "empty" }
-  | { kind: "ready"; item: ReplayItem };
-
-export type ReplayLoader = (fetchFn?: typeof fetch) => Promise<ReplayLoad>;
+// The viewer's data loads, both driven by an injected `fetch` (tests pass a fake — no network —
+// exactly as RingPage injects `postFight`; production binds the real global `fetch`).
 
 const getJson = async <T>(fetchFn: typeof fetch, path: string): Promise<T> => {
   const response = await fetchFn(path);
@@ -23,21 +14,21 @@ const getJson = async <T>(fetchFn: typeof fetch, path: string): Promise<T> => {
   return (await response.json()) as T;
 };
 
-export const loadReplay: ReplayLoader = async (fetchFn = fetch) => {
-  const list = await getJson<ReplaySummary[]>(fetchFn, REPLAY_PATH);
+// The /watch index load: a single `GET /replay` → the newest-first summary list (order preserved
+// verbatim — the API sorts it). An empty list is a first-class `empty` (the honest empty state),
+// a non-empty list is `ready`; any non-2xx throws so the page can offer retry.
+export type ReplayListLoad =
+  | { kind: "empty" }
+  | { kind: "ready"; items: ReplaySummary[] };
 
-  const newest = list[0];
+export type ReplayListLoader = (
+  fetchFn?: typeof fetch,
+) => Promise<ReplayListLoad>;
 
-  if (newest === undefined) {
-    return { kind: "empty" };
-  }
+export const loadList: ReplayListLoader = async (fetchFn = fetch) => {
+  const items = await getJson<ReplaySummary[]>(fetchFn, REPLAY_PATH);
 
-  const item = await getJson<ReplayItem>(
-    fetchFn,
-    `${REPLAY_PATH}/${newest.id}`,
-  );
-
-  return { kind: "ready", item };
+  return items.length === 0 ? { kind: "empty" } : { kind: "ready", items };
 };
 
 // The /watch/{id} permalink load: a single `GET /replay/{id}`. A `404` is a first-class

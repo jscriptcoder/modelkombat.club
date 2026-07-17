@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { loadById, loadReplay } from "./replay-loader";
+import { loadById, loadList } from "./replay-loader";
 import type { ReplayFrame, ReplayItem, ReplaySummary } from "./replay-contract";
 
 // A 200 JSON response and a non-2xx response, standing in for the /replay endpoints. The loader is
@@ -47,45 +47,38 @@ const item = (): ReplayItem => ({
   ],
 });
 
-describe("loadReplay — the two-step /replay fetch", () => {
-  it("reports empty and does not fetch an item when the archive list is empty", async () => {
-    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(ok([]));
+describe("loadList — the /replay archive list", () => {
+  it("reports ready with the summaries when the list is non-empty", async () => {
+    const list = [summary("newest"), summary("older")];
 
-    const result = await loadReplay(fetchFn);
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(ok(list));
 
-    expect(result).toEqual({ kind: "empty" });
-    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const result = await loadList(fetchFn);
+
+    // The list's order is preserved verbatim (the API already sorts newest-first).
+    expect(result).toEqual({ kind: "ready", items: list });
+    expect(fetchFn).toHaveBeenCalledWith("/replay");
   });
 
-  it("loads the newest (first-listed) fight's tape when the list is non-empty", async () => {
-    const body = item();
+  it("reports empty (not an error) when the archive list is empty", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(ok([]));
 
-    const fetchFn = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(ok([summary("newest"), summary("older")]))
-      .mockResolvedValueOnce(ok(body));
+    const result = await loadList(fetchFn);
 
-    const result = await loadReplay(fetchFn);
-
-    expect(result).toEqual({ kind: "ready", item: body });
-    // First the list endpoint, then the FIRST summary's id — the newest fight.
-    expect(fetchFn).toHaveBeenNthCalledWith(1, "/replay");
-    expect(fetchFn).toHaveBeenNthCalledWith(2, "/replay/newest");
+    expect(result).toEqual({ kind: "empty" });
+    expect(fetchFn).toHaveBeenCalledWith("/replay");
   });
 
   it("throws when the list request is not ok (store unreachable → 503)", async () => {
     const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(failure(503));
 
-    await expect(loadReplay(fetchFn)).rejects.toThrow();
+    await expect(loadList(fetchFn)).rejects.toThrow();
   });
 
-  it("throws when the item request is not ok (a transient 404 race)", async () => {
-    const fetchFn = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(ok([summary("gone")]))
-      .mockResolvedValueOnce(failure(404));
+  it("throws on a 500", async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValueOnce(failure(500));
 
-    await expect(loadReplay(fetchFn)).rejects.toThrow();
+    await expect(loadList(fetchFn)).rejects.toThrow();
   });
 });
 
