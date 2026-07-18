@@ -110,15 +110,28 @@ Decisions that tighten the table above into something implementable without re-a
   immediately shows a strike landing. `/dojo` is **desktop-only** — no responsive/mobile
   investment (it's a tuning tool; see Nice-to-have).
 
-- **M11 — Head form ("brand coin").** The head is a **filled disc in the brand's signature
-  hue** with the glyph in **contrast** on top (the glyph must not be the same hue as its disc
-  or it vanishes — knock it out in the canvas-dark / white). The **body and limbs keep the
-  side color** (challenger-teal / king-amber); the head carries the brand — the decision-6
-  split. **Grok** is monochrome (no hue): a **dark/neutral disc with a near-white ring + slash**
-  (its `currentColor` identity, made explicit since canvas has no CSS `currentColor`).
-  **Head size** (proposal): diameter ≈ **0.3× body height**, derived from the M2 height knob so
-  it scales with the fighter. The head **counter-flips** (decision 6) so the coin is never
-  mirrored when facing left.
+- **M11 — Head form ("bare brand glyph").** _(REVISED 2026-07-18 — the "brand coin" disc is
+  dropped; see note below.)_ The head is the **brand glyph alone, no disc** — rendered in the
+  brand's signature hue, exactly as the home-page hero draws its three logo-headed stickmen
+  (`Hero.tsx` places a bare `<BrandMark>` as each fighter's head, no circle). Without a disc the
+  glyph can be drawn **larger and more defined**, and the viewer matches the header the site
+  already ships. The **body and limbs keep the side color** (challenger-teal / king-amber); the
+  head carries the brand — the decision-6 split still holds (the glyph's own hue is the brand
+  signal; the body colour stays the challenger/king signal, unlike the hero where the body is
+  brand-tinted). **Grok** is monochrome — its glyph inks to a **near-white** ring + slash on the
+  dark canvas (its `currentColor` identity, made **explicit** for Pixi since the canvas has no
+  CSS `currentColor`); no disc. **Head size** (proposal): ≈ **0.3× body height**, derived from
+  the M2 height knob so it scales with the fighter (story 3 / world-scale); for the identity-only
+  story-2 pass, size the glyph to read clearly (noticeably larger than the old ~24px circle),
+  tuned by eye in `/dojo`. The head **counter-flips** (decision 6) so the glyph is never mirrored
+  when facing left.
+
+  _Why the coin was dropped (decision-owner, 2026-07-18):_ the disc-plus-contrast-glyph "coin"
+  was a Pixi-only embellishment (the DOM marks never had one). A bare glyph looks better, reads
+  bigger/crisper, and keeps the viewer consistent with the hero's logo-heads. This **simplifies**
+  the head render: no disc `Graphics`, no contrast-knockout colour rule (the M11-original "glyph
+  must not match its disc or it vanishes" concern is now moot) — the glyph renders in its own
+  brand hue, and only Grok needs an explicit canvas ink.
 - **M12 — Vertical fit (tuning note).** Big fighters (~480px at the initial height guess) plus
   jump displacement could clip the top of the 1200×600 canvas. This is an **outcome of the M2
   height knob**, resolved by eye in `/dojo`: if extreme jumps clip, lower the height constant
