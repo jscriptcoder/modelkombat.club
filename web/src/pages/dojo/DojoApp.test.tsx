@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import DojoApp from "./DojoApp";
 import type { DojoStageProps } from "./DojoStage";
 import type { ReplayTape } from "../replay/replay-contract";
+import type { Brand } from "../../shared/lib/brand";
 
 // /dojo is the pose lab: a dark dev route that renders two fighters through the real replay pipeline
 // so the pose model can be tuned in isolation. The scene-graph maths is asserted in dojo-tape.test /
@@ -13,19 +14,33 @@ import type { ReplayTape } from "../replay/replay-contract";
 // is injected as a spy so the control→tape wiring is asserted without a WebGL canvas (which is opaque
 // to DOM assertions and hangs agent-browser).
 
-// A spy render sink capturing every tape DojoApp hands the stage, newest last.
+// A spy render sink capturing every tape AND brand pair DojoApp hands the stage, newest last, plus a
+// mount count — each fresh Stage instance is one mount, so a remount (brand change) increments it.
 const spyStage = () => {
   const tapes: ReplayTape[] = [];
+  const brandPairs: (readonly [Brand, Brand])[] = [];
+  let mounts = 0;
 
   const Stage: Component<DojoStageProps> = (props) => {
+    mounts += 1;
+
     createEffect(() => {
       tapes.push(props.tape);
+    });
+
+    createEffect(() => {
+      brandPairs.push(props.brands);
     });
 
     return <div data-testid="spy-stage" />;
   };
 
-  return { Stage, latest: () => tapes[tapes.length - 1] };
+  return {
+    Stage,
+    latest: () => tapes[tapes.length - 1],
+    latestBrands: () => brandPairs[brandPairs.length - 1],
+    mounts: () => mounts,
+  };
 };
 
 describe("DojoApp — the pose-lab page", () => {
@@ -80,8 +95,12 @@ describe("DojoApp — per-figure pose controls", () => {
 
     const challenger = getByRole("group", { name: "Challenger" });
 
-    fireEvent.click(within(challenger).getByRole("checkbox", { name: "Knockdown" }));
-    fireEvent.click(within(challenger).getByRole("checkbox", { name: "Throwing" }));
+    fireEvent.click(
+      within(challenger).getByRole("checkbox", { name: "Knockdown" }),
+    );
+    fireEvent.click(
+      within(challenger).getByRole("checkbox", { name: "Throwing" }),
+    );
 
     expect(latest()[0].a.knockdown).toBe(true);
     expect(latest()[0].a.throwing).toBe(true);
@@ -124,7 +143,10 @@ describe("DojoApp — per-figure pose controls", () => {
       within(challenger).getByRole("button", { name: "Stand", pressed: true }),
     ).toBeTruthy();
     expect(
-      within(challenger).getByRole("button", { name: "Crouch", pressed: false }),
+      within(challenger).getByRole("button", {
+        name: "Crouch",
+        pressed: false,
+      }),
     ).toBeTruthy();
 
     fireEvent.click(within(challenger).getByRole("button", { name: "Crouch" }));
@@ -136,6 +158,93 @@ describe("DojoApp — per-figure pose controls", () => {
     expect(
       within(challenger).getByRole("button", { name: "Stand", pressed: false }),
     ).toBeTruthy();
+  });
+});
+
+describe("DojoApp — per-figure brand picker", () => {
+  it("opens with the challenger's Claude head and the king's generic head (M10 default)", () => {
+    const { Stage, latestBrands } = spyStage();
+
+    render(() => <DojoApp stage={Stage} />);
+
+    expect(latestBrands()).toEqual(["claude", "generic"]);
+  });
+
+  it("offers all five brand marks as options on a figure's picker", () => {
+    const { getByRole } = render(() => <DojoApp />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const picker = within(challenger).getByRole("combobox", { name: "Brand" });
+
+    const values = within(picker)
+      .getAllByRole("option")
+      .map((option) => option.getAttribute("value"));
+
+    expect(values).toEqual(["claude", "openai", "gemini", "grok", "generic"]);
+  });
+
+  it("sets the challenger's brand from its picker, leaving the king's untouched", () => {
+    const { Stage, latestBrands } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Brand" }),
+      { target: { value: "grok" } },
+    );
+
+    expect(latestBrands()).toEqual(["grok", "generic"]);
+  });
+
+  it("sets the king's brand independently of the challenger's", () => {
+    const { Stage, latestBrands } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const king = getByRole("group", { name: "King" });
+
+    fireEvent.change(within(king).getByRole("combobox", { name: "Brand" }), {
+      target: { value: "gemini" },
+    });
+
+    expect(latestBrands()).toEqual(["claude", "gemini"]);
+  });
+
+  it("remounts the stage on a brand change but not on a pose change (brand is baked at figure creation)", () => {
+    const { Stage, mounts } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const afterFirstMount = mounts();
+
+    // A pose edit re-applies the tape on the SAME stage — no rebuild (Q3).
+    fireEvent.click(within(challenger).getByRole("button", { name: "Crouch" }));
+
+    expect(mounts()).toBe(afterFirstMount);
+
+    // A brand edit rebuilds the stage — createStage bakes the brand into each figure at creation.
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Brand" }),
+      { target: { value: "grok" } },
+    );
+
+    expect(mounts()).toBe(afterFirstMount + 1);
+  });
+
+  it("keeps the chosen brand when a pose control changes (independent signal)", () => {
+    const { Stage, latestBrands, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Brand" }),
+      { target: { value: "grok" } },
+    );
+    fireEvent.click(within(challenger).getByRole("button", { name: "Crouch" }));
+
+    expect(latestBrands()[0]).toBe("grok"); // the brand survived the pose edit
+    expect(latest()[0].a.posture).toBe(1); // and the pose still applied
   });
 });
 
@@ -195,6 +304,8 @@ describe("DojoApp — world-gap spacing control", () => {
       target: { value: "123000" },
     });
 
-    expect(getByRole("option", { name: "Custom", selected: true })).toBeTruthy();
+    expect(
+      getByRole("option", { name: "Custom", selected: true }),
+    ).toBeTruthy();
   });
 });

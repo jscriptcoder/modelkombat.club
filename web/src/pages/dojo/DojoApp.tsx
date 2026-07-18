@@ -1,4 +1,4 @@
-import { createMemo, createSignal, type Component } from "solid-js";
+import { createMemo, createSignal, Show, type Component } from "solid-js";
 import { Dynamic } from "solid-js/web";
 
 import DojoStage, { type DojoStageProps } from "./DojoStage";
@@ -12,6 +12,7 @@ import {
   DEFAULT_KING_CONTROLS,
   type FigureControls,
 } from "./controls";
+import { type Brand } from "../../shared/lib/brand";
 import "../../shared/app.css";
 import "./dojo.css";
 
@@ -38,6 +39,12 @@ const DojoApp: Component<DojoAppProps> = (props) => {
 
   const [gap, setGap] = createSignal(DEFAULT_GAP);
 
+  // Each fighter's authoring brand (its head glyph), the M10 opening identities. Separate from the
+  // pose signals — identity rides the item, not the render frame.
+  const [challengerBrand, setChallengerBrand] = createSignal<Brand>("claude");
+
+  const [kingBrand, setKingBrand] = createSignal<Brand>("generic");
+
   const tape = createMemo(() =>
     buildDojoTape({
       a: controlsToFrame(challenger()),
@@ -46,11 +53,24 @@ const DojoApp: Component<DojoAppProps> = (props) => {
     }),
   );
 
+  // `createStage` bakes the brand into each figure at creation, so a brand change must rebuild the
+  // stage. A keyed <Show> on this string remounts the Pixi mount when either brand changes, while a
+  // pose/gap edit (key unchanged) keeps the mount and just re-applies the tape.
+  const brandKey = () => `${challengerBrand()}|${kingBrand()}`;
+
+  const brandPair = (): [Brand, Brand] => [challengerBrand(), kingBrand()];
+
   return (
     <main class="dojo">
       <h1>Dojo — pose lab</h1>
 
-      <Dynamic component={props.stage ?? DojoStage} tape={tape()} />
+      <Show when={brandKey()} keyed>
+        <Dynamic
+          component={props.stage ?? DojoStage}
+          tape={tape()}
+          brands={brandPair()}
+        />
+      </Show>
 
       <SpacingControl gap={gap()} onChange={setGap} />
 
@@ -59,8 +79,16 @@ const DojoApp: Component<DojoAppProps> = (props) => {
           label="Challenger"
           controls={challenger()}
           onChange={setChallenger}
+          brand={challengerBrand()}
+          onBrandChange={setChallengerBrand}
         />
-        <FigureControlPanel label="King" controls={king()} onChange={setKing} />
+        <FigureControlPanel
+          label="King"
+          controls={king()}
+          onChange={setKing}
+          brand={kingBrand()}
+          onBrandChange={setKingBrand}
+        />
       </div>
     </main>
   );

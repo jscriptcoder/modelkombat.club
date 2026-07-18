@@ -10,6 +10,7 @@ import { Application } from "pixi.js";
 import { createStage, type Stage } from "../replay/figures";
 import { scene, type Viewport } from "../replay/scene";
 import type { ReplayTape } from "../replay/replay-contract";
+import type { Brand } from "../../shared/lib/brand";
 
 // The pose lab's Pixi mount: like ReplayPlayer's, it attaches an Application and draws the two
 // stickmen through the pure `createStage` + `scene` — but with NO ticker/transport. A pose is static,
@@ -24,6 +25,7 @@ const BACKGROUND = 0x0b0e14;
 
 export type DojoStageProps = {
   tape: ReplayTape;
+  brands: readonly [Brand, Brand];
   viewport?: Viewport;
 };
 
@@ -64,9 +66,9 @@ const DojoStage: Component<DojoStageProps> = (props) => {
     app = created;
     host.appendChild(created.canvas);
 
-    // A default brand pair (challenger Claude vs a generic king — the M10 opening identities) so the
-    // pose lab shows real glyph heads; the interactive per-figure brand picker arrives in Slice 3.
-    const mounted = createStage(viewport, ["claude", "generic"]);
+    // Brand is baked into the figures at creation, so a brand change remounts this component (a
+    // keyed <Show> in DojoApp) to rebuild the stage; here we just read the current pair.
+    const mounted = createStage(viewport, props.brands);
 
     created.stage.addChild(mounted.root);
     setStage(mounted);

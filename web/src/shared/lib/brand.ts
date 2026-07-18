@@ -7,6 +7,16 @@
 
 export type Brand = "claude" | "openai" | "gemini" | "grok" | "generic";
 
+// The brands in canonical order, for surfaces that enumerate them at runtime (the /dojo picker).
+// `satisfies` proves every entry is a real Brand without widening the tuple to `string[]`.
+export const BRANDS = [
+  "claude",
+  "openai",
+  "gemini",
+  "grok",
+  "generic",
+] as const satisfies readonly Brand[];
+
 // Each brand's glyph as the INNER SVG markup of a `0 0 24 24` viewBox — distinct nominative
 // shapes, each in its brand's signature hue for at-a-glance identity (Grok is monochrome and inks
 // to `currentColor` so it flips with the theme). The markup is a trusted constant (never user
