@@ -87,12 +87,13 @@ const bandHeight = (band: number): number | null =>
 // the rear hand (handL), so a strike and a guard never fight over the same arm.
 const GUARD_REACH_X = 8;
 
-// A throw's grab: BOTH hands reach forward and lock together at chest height — the cue that reads a
-// throw. Distinct from a strike (front hand only, at a band) and a guard (rear hand, modest reach).
-const GRAB: Pick<Stance, "handL" | "handR"> = {
-  handL: { x: 28, y: -44 },
-  handR: { x: 36, y: -44 },
-};
+// A throw's grab reaches BOTH hands to the opponent's near edge at chest height (M8) — the cue that
+// reads a throw. Chest height (no band, unlike a strike) and the spread between the two grab hands: the
+// front hand (handR) leads onto the near edge, the rear hand (handL) closes a hand's-width behind it,
+// so two arms read as a two-handed grab rather than one hand drawn twice. The forward x is solved
+// per-frame by throwGrabFor (reach-to-target), not authored here.
+const GRAB_Y = -44;
+const GRAB_SPREAD = 8;
 
 // A knocked-down fighter lies PRONE: the whole body laid horizontal just above the ground line —
 // the spine flat at y -10 with the head at one end (x -40) and the feet at the far end (x 36), arms
@@ -185,14 +186,19 @@ const strikeLean = (handX: number): number =>
 // striking hand (`strikeHand` — already solved toward the opponent by strikeHandFor, or `null` for no
 // strike to draw) takes the front hand (handR) AND leans the upper body (head + shoulder) forward into
 // the reach (M2 lean, strike-only); a guard raises the rear hand (handL) to the incoming
-// band; a throw locks BOTH hands into a forward grab. All are TOTAL — an idle fighter, a 0 /
-// out-of-range band, or a defensively-zeroed reach keeps the stance hand. The layers are independent
-// (and mutually exclusive in the engine), so they compose with each other and with any stance (an
-// air-attack keeps the AIR tucked legs). The throw is applied LAST of the action layers, so it wins if
-// ever combined with a strike/guard. Finally the mid-joints are DERIVED from the resulting endpoints,
-// so a strike / guard / throw re-bends the elbow to follow the moved hand. Gates: knockdown ←
-// `knockdown`, strike ← `strikeHand` (non-null), guard ← `guardBand` (0 = none), throw ← `throwing`.
-const poseFor = (frame: ReplayFrame, strikeHand: Joint | null): Skeleton => {
+// band; a throw reaches BOTH hands into a grab on the opponent's near edge (`grab` — already solved by
+// throwGrabFor, or `null` for no throw to draw). All are TOTAL — an idle fighter, a 0 / out-of-range
+// band, or a defensively-zeroed reach keeps the stance hand. The layers are independent (and mutually
+// exclusive in the engine), so they compose with each other and with any stance (an air-attack keeps
+// the AIR tucked legs). The throw is applied LAST of the action layers, so it wins if ever combined
+// with a strike/guard. Finally the mid-joints are DERIVED from the resulting endpoints, so a strike /
+// guard / throw re-bends the elbow to follow the moved hand. Gates: knockdown ← `knockdown`, strike ←
+// `strikeHand` (non-null), guard ← `guardBand` (0 = none), throw ← `grab` (non-null).
+const poseFor = (
+  frame: ReplayFrame,
+  strikeHand: Joint | null,
+  grab: Pick<Stance, "handL" | "handR"> | null,
+): Skeleton => {
   if (frame.knockdown) return PRONE;
 
   const stance = stanceFor(frame.posture);
@@ -210,7 +216,7 @@ const poseFor = (frame: ReplayFrame, strikeHand: Joint | null): Skeleton => {
           handR: strikeHand,
         }),
     ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
-    ...(frame.throwing ? GRAB : {}),
+    ...(grab === null ? {} : grab),
   };
 
   return deriveSkeleton(endpoints);
@@ -295,11 +301,40 @@ const BODY_HALF_WIDTH = 10;
 // backward arm. Bounded by the move's own reach cap, so a very short technique never out-reaches it.
 const STRIKE_FLOOR_X = 24;
 
-// The reach-to-target solve: where the striking hand lands. Returns the front-hand endpoint aimed at
-// the opponent's near body edge, clamped to the move's true reach — or `null` when there is no strike
-// to draw (not attacking, an unmapped band, or a defensively-rejected reach ⇒ the stance hand stays).
-// The y is the band height; only the x reaches. Pure in the two frames' fields + the constants above
-// — no viewport, no cross-frame state — so it is identical on replay and any scrub (M-purity).
+// The reach-to-target solve, shared by every committed action (strike front hand + throw grab hands,
+// M8): how far FORWARD (local px) the reaching hand lands — aimed at the opponent's near body edge,
+// clamped to the move's true reach — or `null` when the committed reach is defensively rejected. Only
+// the forward x is solved here; the caller supplies the y (a strike's band, a throw's chest height).
+// Pure in the two frames' fields + the constants above — no viewport, no cross-frame state — so it is
+// identical on replay and any scrub (M-purity).
+const reachTargetX = (
+  self: ReplayFrame,
+  opponent: ReplayFrame,
+): number | null => {
+  // The committed reach, read defensively (M7): the tape always carries `attackReach`, but the loader
+  // casts the JSON wholesale, so an absent / non-numeric / non-positive value means "no reach" ⇒ the
+  // reaching hand keeps its stance pose (the idle fallback). `!(reach > 0)` rejects NaN as well as ≤0.
+  const reach = self.attackReach;
+
+  if (typeof reach !== "number" || !(reach > 0)) return null;
+
+  // In-front (facing-relative) distance to the opponent's near edge, in local px. The reach
+  // direction is ALWAYS the facing, so a negative in-front distance (opponent behind / overlapping)
+  // just floors forward — the hand never swings backward, and the arithmetic never divides to a NaN.
+  const centerGap = self.facing * (opponent.x - self.x) * SUBUNIT_TO_LOCAL;
+
+  const edgeGap = centerGap - BODY_HALF_WIDTH;
+  const cap = reach * SUBUNIT_TO_LOCAL;
+  // Clamp forward into [floor, cap]: never past the move's reach, never below the point-blank floor,
+  // and the floor itself never exceeds the cap (a short move can't out-reach its own range).
+  const floor = Math.min(STRIKE_FLOOR_X, cap);
+
+  return Math.max(floor, Math.min(edgeGap, cap));
+};
+
+// Where the striking front hand (handR) lands: the reach-to-target x at the band height — or `null`
+// when there is no strike to draw (not attacking, an unmapped band, or a defensively-rejected reach ⇒
+// the stance hand stays). The y is the band height; only the x reaches (via reachTargetX).
 const strikeHandFor = (
   striker: ReplayFrame,
   opponent: ReplayFrame,
@@ -310,27 +345,32 @@ const strikeHandFor = (
 
   if (y === null) return null;
 
-  // The committed reach, read defensively (M7): the tape always carries `attackReach`, but the loader
-  // casts the JSON wholesale, so an absent / non-numeric / non-positive value means "no reach" ⇒ the
-  // striking hand keeps its stance pose (the idle fallback). `!(reach > 0)` rejects NaN as well as ≤0.
-  const reach = striker.attackReach;
+  const x = reachTargetX(striker, opponent);
 
-  if (typeof reach !== "number" || !(reach > 0)) return null;
-
-  // In-front (facing-relative) distance to the opponent's near edge, in local px. The strike
-  // direction is ALWAYS the facing, so a negative in-front distance (opponent behind / overlapping)
-  // just floors forward — the hand never swings backward, and the arithmetic never divides to a NaN.
-  const centerGap =
-    striker.facing * (opponent.x - striker.x) * SUBUNIT_TO_LOCAL;
-
-  const edgeGap = centerGap - BODY_HALF_WIDTH;
-  const cap = reach * SUBUNIT_TO_LOCAL;
-  // Clamp forward into [floor, cap]: never past the move's reach, never below the point-blank floor,
-  // and the floor itself never exceeds the cap (a short move can't out-reach its own range).
-  const floor = Math.min(STRIKE_FLOOR_X, cap);
-  const x = Math.max(floor, Math.min(edgeGap, cap));
+  if (x === null) return null;
 
   return { x, y };
+};
+
+// Where a throw's TWO grab hands land (M8): both reach the reach-to-target x at chest height, so the
+// grab lands on the opponent instead of grabbing air — the same solve as a strike, applied to both
+// hands. The front hand (handR) leads onto the near edge; the rear hand (handL) closes a GRAB_SPREAD
+// behind it, so two arms read as a two-handed grab. `null` when there is no throw to draw (not
+// throwing, or a defensively-rejected reach ⇒ the stance hands stay, the M7 idle fallback).
+const throwGrabFor = (
+  thrower: ReplayFrame,
+  opponent: ReplayFrame,
+): Pick<Stance, "handL" | "handR"> | null => {
+  if (!thrower.throwing) return null;
+
+  const x = reachTargetX(thrower, opponent);
+
+  if (x === null) return null;
+
+  return {
+    handR: { x, y: GRAB_Y },
+    handL: { x: x - GRAB_SPREAD, y: GRAB_Y },
+  };
 };
 
 // The uniform body scale: how many screen px one reference-px becomes, chosen so a
@@ -385,14 +425,21 @@ export const scene = (
   const groundY = viewport.height * GROUND_RATIO;
   const scale = bodyScale(viewport);
 
-  // Each fighter's pose needs the OTHER's frame: the strike reach-to-target solve aims the striking
-  // hand at the opponent's near edge (strikeHandFor). Everything else is a pure function of the one
-  // frame; the opponent only feeds the strike layer.
+  // Each fighter's pose needs the OTHER's frame: the reach-to-target solves aim the striking hand and
+  // the throw grab at the opponent's near edge (strikeHandFor / throwGrabFor). Everything else is a
+  // pure function of the one frame; the opponent only feeds the reach-to-target layers.
   const figure = (frame: ReplayFrame, opponent: ReplayFrame): Figure => ({
     x: frame.x * pxPerSubunit,
     y: groundY - frame.y * pxPerSubunit,
     facing: frame.facing,
-    pose: scalePose(poseFor(frame, strikeHandFor(frame, opponent)), scale),
+    pose: scalePose(
+      poseFor(
+        frame,
+        strikeHandFor(frame, opponent),
+        throwGrabFor(frame, opponent),
+      ),
+      scale,
+    ),
   });
 
   const p = clampPlayhead(playhead, tape.length);

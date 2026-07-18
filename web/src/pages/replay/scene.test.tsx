@@ -620,40 +620,230 @@ describe("scene — guard raised to the incoming band", () => {
   });
 });
 
-describe("scene — throw grab pose", () => {
-  // A throwing fighter reaches BOTH hands forward and locks them together at chest height — the cue
-  // that reads a throw as a throw. Distinct from a strike (only the front hand, at a band) and from
-  // neutral (hands at ±18). `throwing` gates it; it wins over strike/guard (applied last in poseFor).
-  const poseThrowing = (extra: Partial<ReplayFrame> = {}) =>
-    scene([tickOf(0, { throwing: true, ...extra }, {})], 0, VIEWPORT).a.pose;
+describe("scene — throw grab reaches the opponent (M8)", () => {
+  // A throwing fighter reaches BOTH grab hands to the OPPONENT's near body edge at chest height, using
+  // the frame's attackReach (= the engine's throw.reach) — the SAME reach-to-target solve as a strike
+  // (M8), so a grab lands on the opponent instead of grabbing air. The front hand (handR) leads ONTO
+  // the near edge; the rear hand (handL) closes a hand's-width (GRAB_SPREAD 8) behind it, so two arms
+  // read as a two-handed grab. Chest height is a fixed GRAB_Y (−44), no band. The reach is viewport-
+  // independent LOCAL px (one sub-unit = 76/240000), the near edge one BODY_HALF_WIDTH (10) short of
+  // the opponent's centre, the reach clamped to [STRIKE_FLOOR_X (24), attackReach·(76/240000)] —
+  // identical machinery to the strike, so a whiff stops short and an overlap floors forward. Every
+  // expected x is that physical anchor, recomputed independently of the production formula. Reach is a
+  // fixed LOCAL +x direction; the container flip (S1 facing) turns it on-screen.
+  const GRAB_Y = -44;
+  const GRAB_SPREAD = 8;
+  const STRIKE_FLOOR_X = 24; // point-blank floor, shared with the strike
+  const NEUTRAL_HANDS = { handL: { x: -18, y: -44 }, handR: { x: 18, y: -44 } }; // the STAND hands
 
-  it("reaches both hands forward into a grab when throwing", () => {
-    const pose = poseThrowing();
-
-    expect(pose.handL).toEqual(scaled({ x: 28, y: -44 }));
-    expect(pose.handR).toEqual(scaled({ x: 36, y: -44 }));
-  });
-
-  it("leaves the hands at their neutral stance when not throwing", () => {
-    const pose = scene([tickOf(0, { throwing: false }, {})], 0, VIEWPORT).a
-      .pose;
-
-    expect(pose.handL).toEqual(scaled({ x: -18, y: -44 }));
-    expect(pose.handR).toEqual(scaled({ x: 18, y: -44 }));
-  });
-
-  it("shows a grab distinct from a strike — the rear hand comes forward too", () => {
-    const grab = poseThrowing();
-
-    const strike = scene(
-      [tickOf(0, { attacking: true, attackBand: 2 }, {})],
+  // Thrower `a` faces right at x 150000; the opponent `b` sits `gap` sub-units away (front = +gap,
+  // behind = −gap) with the thrower committing a throw of world `reach` (≈ the engine's throw.reach).
+  // Returns a's pose.
+  const poseThrowing = ({
+    gap = 120_000,
+    reach = 120_000,
+    extra = {},
+  }: {
+    gap?: number;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            throwing: true,
+            attackReach: reach,
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
       0,
       VIEWPORT,
     ).a.pose;
 
-    // A strike leaves the rear hand back at the stance; a grab brings BOTH hands forward.
+  it("lands both grab hands on the opponent's near edge when in range", () => {
+    // Throw gap (120k) at throw reach (120k): the centres are 38 local px apart, the near edge one
+    // BODY_HALF_WIDTH nearer ⇒ the lead hand lands at 38 − 10 = 28; the rear hand closes 8 behind.
+    const pose = poseThrowing({ gap: 120_000, reach: 120_000 });
+
+    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y })); // lead hand ON the near edge
+    expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y })); // rear hand a spread behind
+    // ...and the lead hand lands SHORT of the opponent's centre (38), not through it.
+    expect(pose.handR.x).toBeLessThan(scaled({ x: 38, y: 0 }).x);
+  });
+
+  it("aims by the facing — a left-facing thrower grabs an opponent to its LEFT", () => {
+    // The grab reach is a fixed LOCAL +x direction; the thrower's facing decides which way it maps in
+    // the world. A left-facer (facing −1) with the opponent one gyaku gap (240k) to its LEFT reaches
+    // the SAME local landing (66) as a right-facer — the container flip turns it leftward. Kills a
+    // facing-sign / "drop facing" mutant.
+    const pose = scene(
+      [
+        tickOf(
+          0,
+          { throwing: true, attackReach: 240_000, x: 400_000, facing: -1 },
+          { x: 160_000 }, // 240k to the thrower's left = in front of a left-facer
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.handR).toEqual(scaled({ x: 66, y: GRAB_Y }));
+    expect(pose.handL).toEqual(scaled({ x: 66 - GRAB_SPREAD, y: GRAB_Y }));
+  });
+
+  it("stops both hands short at the reach cap when the opponent is beyond reach (a whiff)", () => {
+    // Opponent at a gyaku distance (240k) but only a throw reach (120k): the near edge is 66 local px
+    // away, past the cap of 120k·(76/240000) = 38 — both hands stop at 38, short of the surface.
+    const pose = poseThrowing({ gap: 240_000, reach: 120_000 });
+
+    expect(pose.handR).toEqual(scaled({ x: 38, y: GRAB_Y }));
+    expect(pose.handL).toEqual(scaled({ x: 38 - GRAB_SPREAD, y: GRAB_Y }));
+    // The in-range lead landing would be 28; a whiff extends FURTHER (to the cap) yet still short.
+    expect(pose.handR.x).toBeGreaterThan(
+      poseThrowing({ gap: 120_000, reach: 120_000 }).handR.x,
+    );
+  });
+
+  it("shows the forward floor when the fighters overlap — never grabs backward", () => {
+    // gap 0: the near edge is behind the shoulder (−10 local px). The clamp floors both hands at the
+    // point-blank STRIKE_FLOOR_X ⇒ a minimal forward grab, never a backward (−x) reach.
+    const pose = poseThrowing({ gap: 0, reach: 120_000 });
+
+    expect(pose.handR).toEqual(scaled({ x: STRIKE_FLOOR_X, y: GRAB_Y }));
+    expect(pose.handL).toEqual(
+      scaled({ x: STRIKE_FLOOR_X - GRAB_SPREAD, y: GRAB_Y }),
+    );
+    expect(pose.handR.x).toBeGreaterThan(0);
+    expect(pose.handL.x).toBeGreaterThan(0);
+  });
+
+  it("shows the forward floor when the opponent is behind the facing (never NaN, never backward)", () => {
+    // Thrower faces RIGHT but the opponent is to its LEFT: the in-front distance is negative, so both
+    // hands floor forward — the grab never swings toward −x, and the maths never divides to a NaN.
+    const pose = poseThrowing({ gap: -100_000, reach: 120_000 });
+
+    expect(pose.handR).toEqual(scaled({ x: STRIKE_FLOOR_X, y: GRAB_Y }));
+    expect(Number.isNaN(pose.handR.x)).toBe(false);
+    expect(pose.handR.x).toBeGreaterThan(0);
+  });
+
+  it("keeps the hands at their neutral stance when not throwing", () => {
+    // The `throwing` flag is the gate: an idle fighter carrying a stale reach must not throw a phantom
+    // grab (kills the "drop the throwing gate" mutant).
+    const pose = scene(
+      [tickOf(0, { throwing: false, attackReach: 120_000 }, { x: 270_000 })],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.handL).toEqual(scaled(NEUTRAL_HANDS.handL));
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HANDS.handR));
+  });
+
+  it("keeps the hands at their stance when attackReach is exactly 0 (idle value)", () => {
+    // reach 0 is the idle sentinel — a throw carrying it (⇒ no reach) keeps the stance hands, the M7
+    // idle fallback (as the strike does). Pins the `> 0` boundary (kills a `>= 0` mutant).
+    const pose = poseThrowing({ gap: 120_000, reach: 0 });
+
+    expect(pose.handL).toEqual(scaled(NEUTRAL_HANDS.handL));
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HANDS.handR));
+  });
+
+  it("keeps the hands at their stance for a NaN or absent reach (defensive → M7)", () => {
+    // A NaN or an absent attackReach from a malformed wire is rejected like reach 0 — the guard never
+    // lets it reach the maths and produce a NaN joint. Absent: the frame factory omits attackReach.
+    const nan = poseThrowing({ gap: 120_000, reach: NaN });
+
+    const absent = scene(
+      [tickOf(0, { throwing: true, x: 150_000 }, { x: 270_000 })],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(nan.handR).toEqual(scaled(NEUTRAL_HANDS.handR));
+    expect(absent.handR).toEqual(scaled(NEUTRAL_HANDS.handR));
+    expect(absent.handL).toEqual(scaled(NEUTRAL_HANDS.handL));
+  });
+
+  it("keeps the hands at their stance for a negative reach (defensive → M7)", () => {
+    const pose = poseThrowing({ gap: 120_000, reach: -5 });
+
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HANDS.handR));
+    expect(pose.handL).toEqual(scaled(NEUTRAL_HANDS.handL));
+  });
+
+  it("shows a grab distinct from a strike — the rear hand comes forward too", () => {
+    // A strike leaves the rear hand back at the stance (x < 0); a grab brings BOTH hands forward.
+    const grab = poseThrowing({ gap: 120_000, reach: 120_000 });
+
+    const strike = scene(
+      [
+        tickOf(
+          0,
+          { attacking: true, attackBand: 2, attackReach: 120_000, x: 150_000 },
+          { x: 270_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
     expect(strike.handL.x).toBeLessThan(0);
     expect(grab.handL.x).toBeGreaterThan(0);
+  });
+
+  it("wins over a strike and a guard — the grab is applied last", () => {
+    // A frame both throwing AND striking AND guarding (the engine never emits this, but /dojo can):
+    // the grab overrides BOTH hands, so both land at the grab height (−44), not the strike band (−46)
+    // or the guard reach. Pins the throw's last-applied precedence.
+    const pose = poseThrowing({
+      gap: 120_000,
+      reach: 120_000,
+      extra: { attacking: true, attackBand: 2, guardBand: 3 },
+    });
+
+    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y })); // grab, not the strike (would be y −46)
+    expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y })); // grab, not the guard
+  });
+
+  it("composes with the crouch stance — the grab reaches while the crouch feet stay planted", () => {
+    const pose = poseThrowing({
+      gap: 120_000,
+      reach: 120_000,
+      extra: { posture: 1 },
+    });
+
+    // Both hands reach the grab...
+    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y }));
+    expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y }));
+    // ...while the CROUCH stance survives (feet planted a touch wider).
+    expect(pose.footL).toEqual(scaled({ x: -16, y: 0 }));
+  });
+
+  it("is a pure function of the frame — a backward scrub re-lands the same grab", () => {
+    const tape: ReplayTape = [
+      tickOf(
+        0,
+        { throwing: true, attackReach: 120_000, x: 150_000 },
+        { x: 270_000 },
+      ),
+      tickOf(1, {}, {}),
+    ];
+
+    const atThrow = scene(tape, 0, VIEWPORT).a.pose.handR;
+
+    scene(tape, 1, VIEWPORT); // advance...
+    const backAgain = scene(tape, 0, VIEWPORT).a.pose.handR; // ...then scrub back
+
+    expect(backAgain).toEqual(atThrow);
+    expect(backAgain).toEqual(scaled({ x: 28, y: GRAB_Y }));
   });
 });
 
@@ -744,10 +934,28 @@ describe("scene — knockdown prone pose and wake-up", () => {
   });
 
   it("overrides a throw — prone wins over the grab that is otherwise applied last", () => {
-    const pose = poseDowned({ throwing: true });
+    // knockdown:true with a live, IN-RANGE throw on the same tick still renders prone (the early
+    // return), NOT a forward grab. The throw carries a real reach + an in-range opponent, so a composed
+    // grab WOULD land forward — proving the early return, not an absent reach, is what suppresses it.
+    const pose = scene(
+      [
+        tickOf(
+          0,
+          {
+            knockdown: true,
+            throwing: true,
+            attackReach: 120_000,
+            x: 150_000,
+          },
+          { x: 270_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
 
     expect(pose).toEqual(SCALED_PRONE);
-    expect(pose.handL).not.toEqual(scaled({ x: 28, y: -44 })); // the grab geometry
+    expect(pose.handL).toEqual(scaled(PRONE.handL)); // the prone hand, not a forward grab
   });
 
   it("wakes up — returns to the standing stance the tick knockdown clears", () => {
