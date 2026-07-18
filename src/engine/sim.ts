@@ -98,6 +98,10 @@ export type RenderFrame = {
   attackBand: number; // 0 none / 1 low / 2 mid / 3 high
   guardBand: number; // 0 none / 1 low / 2 mid / 3 high (the band a neutral blocker raises)
   throwing: boolean;
+  // How far (sub-units) the committed action reaches — a strike's `spec.reach`, a throw's
+  // `throw.reach`, or 0 when idle. Render-only (like `guardBand`): the viewer aims a strike/grab
+  // at its true reach; the outcome path never reads it.
+  attackReach: number;
   knockdown: boolean;
   points: number;
   stamina: number;
@@ -275,6 +279,15 @@ const renderFrameOf = (
       : 0,
   guardBand: ((b) => (b === null ? 0 : BAND_CODE[b]))(guardBandOf(f, action)),
   throwing: f.state.kind === "throwing",
+  // The committed action's reach, read from the committed STATE (not the live `action`, which may
+  // be idle during a strike's active/recovery): a strike/air-strike carries its `spec`, a throw
+  // uses the single `rules.throw`. Idle/airborne/downed ⇒ 0.
+  attackReach:
+    f.state.kind === "attacking" || f.state.kind === "air-attacking"
+      ? f.state.spec.reach
+      : f.state.kind === "throwing"
+        ? (rules.throw?.reach ?? 0)
+        : 0,
   knockdown: f.state.kind === "downed",
   points: f.points,
   stamina: f.stamina,
