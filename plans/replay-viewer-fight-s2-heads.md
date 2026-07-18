@@ -11,8 +11,12 @@
   `feat/coin-heads`, PR **#333** squashed to `main` @ `abff48a`. Extracted
   `web/src/shared/lib/brand.ts` (glyph geometry + `modelToBrand`); `BrandMark`/`ModelLogo`
   consume it; DOM marks provably unchanged (189/189 green, prerendered hero byte-identical).
-- **Slice 2 · glyph head on real replays — NEXT** (behaviour; branch `feat/replay-glyph-head`).
-- **Slice 3 · `/dojo` brand picker — not started** (behaviour).
+- **Slice 2 · glyph head on real replays — ✅ COMPLETE + MERGED** (2026-07-18). Behaviour; branch
+  `feat/replay-glyph-head`, PR **#334** squashed to `main` @ `dc8a65c`. `createStage(viewport,
+  [Brand,Brand])`; head = brand glyph via `Graphics.svg()` (label hook + counter-flip); Grok
+  inked near-white (`GROK_CANVAS_INK`); `brandsFor` resolves models; `ReplayPlayer` wires it;
+  `DojoStage` passes the M10 default pair. 2000 tests green; visual sign-off on the preview.
+- **Slice 3 · `/dojo` brand picker — NEXT** (behaviour; branch `feat/dojo-brand-picker`).
 
 Child story 2 of the replay-viewer "make it fight" arc. Design source of truth:
 `plans/replay-viewer-fight-decisions.md` (decision 6 + M5/M6/M11/M-purity) and
@@ -188,7 +192,7 @@ approves the commit.
 
 ---
 
-### Slice 3: A `/dojo` brand picker previews all five marks on the posed fighters
+### Slice 3 (NEXT): A `/dojo` brand picker previews all five marks on the posed fighters
 
 **Value** (behaviour): the developer picks each figure's brand in `/dojo` and the posed
 fighters' glyph heads update live — the tuning surface to eyeball every mark (and, later, heads at
