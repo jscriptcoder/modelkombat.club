@@ -1,7 +1,7 @@
 # Plan: Replay viewer "make it fight" — Story 5, strikes & grabs connect
 
-**Branch (Slice 1)**: `feat/fight-s5-attackreach` — PR-per-slice; later slices take their own `feat/fight-s5-*` branches.
-**Status**: Active
+**Branch (Slice 2)**: `feat/fight-s5-strike-ik` — PR-per-slice; each slice takes its own `feat/fight-s5-*` branch.
+**Status**: Active — **Slice 1 ✅ COMPLETE + MERGED (#344, `main` @ `37a636a`)**; Slice 2 next.
 
 Last (and only `src/`-touching) story of the "make it fight" arc. Design is fully
 resolved — `plans/replay-viewer-fight-decisions.md` decision 4 + M1–M12 + M-purity + the
@@ -19,12 +19,14 @@ driven by a new additive `attackReach` render field.
 
 Story-level, behavior-driven (from the decisions doc "Acceptance examples · 5" + the invariants):
 
-- [ ] The reconstructed render tape / served `GET /replay/{id}` JSON carries a per-frame
+- [x] The reconstructed render tape / served `GET /replay/{id}` JSON carries a per-frame
       `attackReach` (sub-units): a strike frame = the committed move's `spec.reach`; a throw frame =
-      `rules.throw.reach`; an idle/neutral/downed frame = `0`.
-- [ ] Adding the field is **outcome-invariant**: `runFight().events`, the fight result/`endReason`,
+      `rules.throw.reach`; an idle/neutral/downed frame = `0`. _(Slice 1, #344)_
+- [x] Adding the field is **outcome-invariant**: `runFight().events`, the fight result/`endReason`,
       `INPUT_HASH`, and every `replayId` are unchanged (the field lives only on `RenderFrame`, which
       `renderTape` derives on demand — it is not part of the event tape or the `ReproRecord` hash).
+      _(Slice 1, #344 — full determinism/byte-identity suite stayed green; Stryker on `renderFrameOf`
+      93.33%, 1 documented-equivalent survivor)_
 - [ ] In the viewer, a strike within reach draws its hand **on the opponent's near body edge**; a
       strike beyond `attackReach` draws the limb **stopping short** (a real whiff reads as a whiff).
 - [ ] A degenerate target (gap ≈ 0, or opponent on the side opposite the facing) draws the **minimal
@@ -63,7 +65,7 @@ Read `.claude/CLAUDE.md` + the design trail before each slice. `web/` is **not S
 exact-assertion browser tests + a **manual mutator scan** + a `/dojo` visual sign-off (M9) stand in
 for mutation; the engine slice **is** Stryker-reachable → real mutation testing.
 
-### Slice 1: The render tape carries each fighter's committed reach (`attackReach`)
+### Slice 1: The render tape carries each fighter's committed reach (`attackReach`) — ✅ COMPLETE (#344)
 
 **Value**: A `/replay` client (and, next, the viewer's IK) can read how far the committed action
 reaches — a strike's `spec.reach`, a throw's `throw.reach`, `0` when idle — without re-deriving it.
@@ -101,6 +103,13 @@ reachable), `refactoring` (assess; likely `N/A` — the change mirrors the exist
   approves the commit.
 
 ### Slice 2: A strike's hand lands on the opponent's near edge (and whiffs stop short)
+
+**Sub-split (the tests showed the seam):** the core reach-to-target — in-range landing, whiff cap,
+degenerate floor, direction=facing, the web `ReplayFrame` mirror + M7 fallback, and the dojo default
+landing — is **Slice 2a** (this PR). The **M2 lean** (a capped forward shoulder shift so the reach
+reads as a lunge, not a stretched arm) and the **M10 per-figure `attackReach` slider** on `/dojo`
+ride a **follow-up PR (Slice 2b)** — both are tuning/polish over the landing core, and keeping them
+separate holds this PR reviewable. Elbow re-derive came free from Story 4 (`deriveSkeleton`).
 
 **Value**: The payoff that sells "fighting" — an in-range strike visibly connects; a real whiff reads
 as a whiff. First slice the spectator sees change.

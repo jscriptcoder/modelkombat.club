@@ -131,19 +131,35 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
   });
 
   it("extends the striking arm's hand joint for an attacking fighter", () => {
-    // Applying a strike scene moves the persistent front-hand joint forward + up to the band
-    // height (scene-graph state, not pixels).
+    // Applying a strike scene moves the persistent front-hand joint forward + up toward the band
+    // height (scene-graph state, not pixels). A gyaku-reach strike at gyaku distance lands the hand
+    // on the opponent's near edge (x 66 local); the reach maths itself lives in scene.test.
     const stage = createStage(VIEWPORT, ["generic", "generic"]);
 
     stage.apply(scene([tickOf(0, { attacking: false }, {})], 0, VIEWPORT));
     const neutralHandX = stage.a.handR.x;
 
     stage.apply(
-      scene([tickOf(0, { attacking: true, attackBand: 2 }, {})], 0, VIEWPORT),
+      scene(
+        [
+          tickOf(
+            0,
+            {
+              attacking: true,
+              attackBand: 2,
+              attackReach: 240_000,
+              x: 150_000,
+            },
+            { x: 390_000 },
+          ),
+        ],
+        0,
+        VIEWPORT,
+      ),
     );
 
     expect(neutralHandX).toBe(s(18));
-    expect(stage.a.handR.x).toBe(s(40));
+    expect(stage.a.handR.x).toBe(s(66));
     expect(stage.a.handR.y).toBe(s(-46));
     expect(stage.a.handR.x).toBeGreaterThan(neutralHandX); // reached forward
   });

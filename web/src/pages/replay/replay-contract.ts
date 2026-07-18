@@ -25,6 +25,11 @@ export type ReplayFrame = {
   knockdown: boolean;
   points: number;
   stamina: number;
+  // The committed action's reach in world sub-units (a strike's `spec.reach`, a throw's
+  // `throw.reach`, 0 when idle) — the render-only engine field (src/engine/sim.ts) the viewer
+  // aims the striking limb by. Optional + read defensively: the loader casts the wire wholesale,
+  // so an absent / non-numeric / negative value is treated as 0 (⇒ no reach ⇒ stance pose, M7).
+  attackReach?: number;
 };
 
 // One tick of the tape: the engine tick number plus both fighters' frames (challenger `a`, King `b`).

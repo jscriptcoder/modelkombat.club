@@ -34,6 +34,7 @@ const controls = (overrides: Partial<FigureControls> = {}): FigureControls => ({
   guardBand: 0,
   throwing: false,
   knockdown: false,
+  attackReach: 0,
   ...overrides,
 });
 
@@ -47,6 +48,7 @@ describe("controlsToFrame — maps the lab's raw pose controls to a render frame
       guardBand: 2,
       throwing: true,
       knockdown: true,
+      attackReach: 250_000,
     });
 
     // Every tuned field survives verbatim; the render-only fields are filled with grounded, neutral
@@ -59,6 +61,7 @@ describe("controlsToFrame — maps the lab's raw pose controls to a render frame
       guardBand: 2,
       throwing: true,
       knockdown: true,
+      attackReach: 250_000,
       x: 0,
       y: 0,
       points: 0,
@@ -99,10 +102,17 @@ describe("the mapped control frame renders through the real scene()/poseFor proj
     return scene([{ tick: 0, a: frame, b: frame }], 0, VIEWPORT).a.pose;
   };
 
-  it("throws the front hand to the mid band for a standing mid strike", () => {
-    expect(poseOf(controls({ attacking: true, attackBand: 2 })).handR).toEqual(
-      scaled({ x: 40, y: -46 }),
-    );
+  it("drives the front hand forward for a standing mid strike (floored point-blank)", () => {
+    // The strike control reaches the reach-to-target solve via the shipped projection. This helper
+    // renders one figure against ITSELF (a === b), so the fighters overlap and the reach floors to
+    // the point-blank forward technique (x 24) — still forward of the neutral stance hand (x 18).
+    // The true in-range landing distance is exercised in scene.test.
+    const handR = poseOf(
+      controls({ attacking: true, attackBand: 2, attackReach: 240_000 }),
+    ).handR;
+
+    expect(handR).toEqual(scaled({ x: 24, y: -46 }));
+    expect(handR.x).toBeGreaterThan(scaled({ x: 18, y: 0 }).x);
   });
 
   it("drops the stance for a crouch (posture 1)", () => {
@@ -157,6 +167,7 @@ describe("default control states seed the pose lab's opening scene", () => {
       guardBand: 0,
       throwing: false,
       knockdown: false,
+      attackReach: 240_000, // gyaku reach — lands at the default gap
     } satisfies FigureControls);
   });
 
@@ -169,6 +180,7 @@ describe("default control states seed the pose lab's opening scene", () => {
       guardBand: 0,
       throwing: false,
       knockdown: false,
+      attackReach: 0, // idle
     } satisfies FigureControls);
   });
 });
