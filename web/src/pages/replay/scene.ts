@@ -174,6 +174,45 @@ export const WORLD_WIDTH = 600_000;
 // on both axes — so x and y share a single px-per-subunit scale and proportions hold.
 const GROUND_RATIO = 0.9;
 
+// The fighter's body height in world sub-units — the single tunable knob every body dimension
+// derives from (decision 3 / M2). Projected by the SAME pxPerSubunit that positions the fighter, so
+// the body grows with the ring instead of staying a fixed ~76px across a void of empty world. ~240k
+// ≈ a reference mid-punch reach; a starting guess, refined by eye in /dojo (M2 / M12 vertical-fit).
+// Exported so the head glyph (Slice 2) can size itself as a proportion of the same height.
+export const BODY_HEIGHT_SUB = 240_000;
+
+// The reference skeleton's head-to-foot span in local px (feet planted at y 0, head at STAND.head.y)
+// — the unit the pose constants (STAND/CROUCH/AIR/PRONE + the reach layers) are authored in. Derived
+// from STAND so it can never drift from the model it measures.
+const REF_BODY_HEIGHT_PX = STAND.footL.y - STAND.head.y;
+
+// The uniform body scale: how many screen px one reference-px becomes, chosen so a
+// REF_BODY_HEIGHT_PX-tall reference body renders at exactly BODY_HEIGHT_SUB · pxPerSubunit. ONE
+// factor scales every joint, so all proportions hold and every stance/action grows together (no
+// half-scaled figure) — the whole projection stays a pure function of (frame, viewport).
+const bodyScale = (viewport: Viewport): number =>
+  (BODY_HEIGHT_SUB * (viewport.width / WORLD_WIDTH)) / REF_BODY_HEIGHT_PX;
+
+// Scale a whole pose uniformly to screen px, rounding to whole pixels (crisp, and consistent with
+// the integer world→screen positions). Feet at y 0 stay at 0, so a bigger body grows UP from a
+// planted base rather than sinking through the ground line.
+const scalePose = (pose: Skeleton, scale: number): Skeleton => {
+  const scaleJoint = (joint: Joint): Joint => ({
+    x: Math.round(joint.x * scale),
+    y: Math.round(joint.y * scale),
+  });
+
+  return {
+    head: scaleJoint(pose.head),
+    shoulder: scaleJoint(pose.shoulder),
+    hip: scaleJoint(pose.hip),
+    handL: scaleJoint(pose.handL),
+    handR: scaleJoint(pose.handR),
+    footL: scaleJoint(pose.footL),
+    footR: scaleJoint(pose.footR),
+  };
+};
+
 // Keep the playhead inside the tape: a value past the last tick shows the final frame, a negative
 // one shows the first. The player never renders a frame off the ends of a real fight.
 const clampPlayhead = (playhead: number, length: number): number =>
@@ -186,12 +225,13 @@ export const scene = (
 ): Scene => {
   const pxPerSubunit = viewport.width / WORLD_WIDTH;
   const groundY = viewport.height * GROUND_RATIO;
+  const scale = bodyScale(viewport);
 
   const figure = (frame: ReplayFrame): Figure => ({
     x: frame.x * pxPerSubunit,
     y: groundY - frame.y * pxPerSubunit,
     facing: frame.facing,
-    pose: poseFor(frame),
+    pose: scalePose(poseFor(frame), scale),
   });
 
   const p = clampPlayhead(playhead, tape.length);

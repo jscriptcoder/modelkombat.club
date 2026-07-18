@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { createStage } from "../replay/figures";
-import { scene, type Viewport } from "../replay/scene";
+import { BODY_HEIGHT_SUB, scene, type Viewport } from "../replay/scene";
 import type { ReplayFrame } from "../replay/replay-contract";
 import { buildDojoTape, DEFAULT_CHALLENGER, DEFAULT_KING } from "./dojo-tape";
 import { DEFAULT_GAP } from "./reach-presets";
+
+// Story 3 — world scale. Pose joints render at ×(BODY_HEIGHT_SUB · pxPerSubunit / 76), rounded;
+// recomputed from the documented knob + fixed 1200-wide viewport so a scale mutant is caught.
+const s = (n: number) =>
+  Math.round((n * BODY_HEIGHT_SUB * (1200 / 600_000)) / 76);
 
 // The dojo's synthetic-tape builder centers two hand-posed fighters on the ring so the pose lab
 // renders them through the SAME scene()/createStage pipeline that /watch ships — "what you tune is
@@ -159,8 +164,8 @@ describe("the default dojo scene renders two fighters through the real scene()/c
     expect(stage.b.root.scale.x).toBe(-1);
 
     // The default poses render through the pipeline: the challenger's front hand is thrown to the
-    // mid-band strike reach (x 40); the idle king's stays at its neutral stance (x 18).
-    expect(stage.a.handR.x).toBe(40);
-    expect(stage.b.handR.x).toBe(18);
+    // mid-band strike reach (x 40, world-scaled); the idle king's stays at its neutral stance (x 18).
+    expect(stage.a.handR.x).toBe(s(40));
+    expect(stage.b.handR.x).toBe(s(18));
   });
 });

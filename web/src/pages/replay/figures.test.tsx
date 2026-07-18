@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { brandsFor, createStage, glyphSvg } from "./figures";
-import { scene, type Viewport } from "./scene";
+import { BODY_HEIGHT_SUB, scene, type Viewport } from "./scene";
 import type {
   Fighter,
   ReplayFrame,
@@ -14,6 +14,13 @@ import { BRAND_GLYPH, GROK_CANVAS_INK } from "../../shared/lib/brand";
 // scene-graph stage — no renderer, no Application — apply a Scene, and assert the figures'
 // positions / flip and the HUD text. Same 1200×600 viewport as scene.test so the pixels line up.
 const VIEWPORT: Viewport = { width: 1200, height: 600 };
+
+// Story 3 — world scale. The joint display objects carry the scene's world-scaled pose, so the
+// reference-frame constants (STAND head at −76, feet at 0, …) render at ×(BODY_HEIGHT_SUB ·
+// pxPerSubunit / 76). The scale is uniform, so one `s(n)` scales either axis; recomputed here from
+// the documented knob + fixed viewport (not the production scale fn) so a scale mutant is caught.
+const BODY_SCALE = (BODY_HEIGHT_SUB * (1200 / 600_000)) / 76;
+const s = (n: number) => Math.round(n * BODY_SCALE);
 
 const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
   x: 150_000,
@@ -104,8 +111,8 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene([tickOf(0, { posture: 1 }, {})], 0, VIEWPORT));
 
-    expect(standHeadY).toBe(-76);
-    expect(stage.a.head.y).toBe(-58);
+    expect(standHeadY).toBe(s(-76));
+    expect(stage.a.head.y).toBe(s(-58));
     expect(stage.a.head.y).toBeGreaterThan(standHeadY); // crouch head sits lower
   });
 
@@ -117,9 +124,9 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene([tickOf(0, { posture: 2 }, {})], 0, VIEWPORT));
 
-    expect(standFootY).toBe(0);
-    expect(stage.a.footL.y).toBe(-18);
-    expect(stage.a.footR.y).toBe(-18);
+    expect(standFootY).toBe(s(0));
+    expect(stage.a.footL.y).toBe(s(-18));
+    expect(stage.a.footR.y).toBe(s(-18));
     expect(stage.a.footL.y).toBeLessThan(standFootY); // tucked up off the ground
   });
 
@@ -135,9 +142,9 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
       scene([tickOf(0, { attacking: true, attackBand: 2 }, {})], 0, VIEWPORT),
     );
 
-    expect(neutralHandX).toBe(18);
-    expect(stage.a.handR.x).toBe(40);
-    expect(stage.a.handR.y).toBe(-46);
+    expect(neutralHandX).toBe(s(18));
+    expect(stage.a.handR.x).toBe(s(40));
+    expect(stage.a.handR.y).toBe(s(-46));
     expect(stage.a.handR.x).toBeGreaterThan(neutralHandX); // reached forward
   });
 
@@ -150,9 +157,9 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene([tickOf(0, { guardBand: 2 }, {})], 0, VIEWPORT));
 
-    expect(neutralGuardX).toBe(-18);
-    expect(stage.a.handL.x).toBe(8);
-    expect(stage.a.handL.y).toBe(-46);
+    expect(neutralGuardX).toBe(s(-18));
+    expect(stage.a.handL.x).toBe(s(8));
+    expect(stage.a.handL.y).toBe(s(-46));
     expect(stage.a.handL.x).toBeGreaterThan(neutralGuardX); // swung forward into a guard
   });
 
@@ -165,10 +172,10 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene([tickOf(0, { throwing: true }, {})], 0, VIEWPORT));
 
-    expect(neutralL).toBe(-18);
-    expect(neutralR).toBe(18);
-    expect(stage.a.handL.x).toBe(28);
-    expect(stage.a.handR.x).toBe(36);
+    expect(neutralL).toBe(s(-18));
+    expect(neutralR).toBe(s(18));
+    expect(stage.a.handL.x).toBe(s(28));
+    expect(stage.a.handR.x).toBe(s(36));
     expect(stage.a.handL.x).toBeGreaterThan(neutralL); // rear hand swung forward
     expect(stage.a.handR.x).toBeGreaterThan(neutralR); // front hand reached further forward
   });
@@ -228,11 +235,11 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene([tickOf(0, { knockdown: true }, {})], 0, VIEWPORT));
 
-    expect(standHeadY).toBe(-76);
-    expect(stage.a.head.x).toBe(-40);
-    expect(stage.a.head.y).toBe(-10);
+    expect(standHeadY).toBe(s(-76));
+    expect(stage.a.head.x).toBe(s(-40));
+    expect(stage.a.head.y).toBe(s(-10));
     expect(stage.a.head.y).toBeGreaterThan(standHeadY); // head dropped toward the ground
-    expect(stage.a.footL.x).toBe(36); // the body extends horizontally to the far end
+    expect(stage.a.footL.x).toBe(s(36)); // the body extends horizontally to the far end
   });
 });
 
