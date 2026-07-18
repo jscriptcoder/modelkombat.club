@@ -1,6 +1,6 @@
 # Plan: Model-identity brand-glyph heads (make-it-fight · Story 2)
 
-**Status**: Active — Slice 1 ✅ merged; Slice 2 next.
+**Status**: ✅ COMPLETE + MERGED (2026-07-18) — all 3 slices (#333 · #334 · #335). Archived.
 
 > Informally "coin heads" (the branch/memory name); the disc was dropped 2026-07-18 — the head
 > is the **bare brand glyph**, no disc. See the Design note under Goal.
@@ -16,7 +16,11 @@
   [Brand,Brand])`; head = brand glyph via `Graphics.svg()` (label hook + counter-flip); Grok
   inked near-white (`GROK_CANVAS_INK`); `brandsFor` resolves models; `ReplayPlayer` wires it;
   `DojoStage` passes the M10 default pair. 2000 tests green; visual sign-off on the preview.
-- **Slice 3 · `/dojo` brand picker — NEXT** (behaviour; branch `feat/dojo-brand-picker`).
+- **Slice 3 · `/dojo` brand picker — ✅ COMPLETE + MERGED** (2026-07-18). Behaviour; branch
+  `feat/dojo-brand-picker`, PR **#335** squashed to `main` @ `26b6908`. Per-figure Brand `<select>`
+  in `FigureControlPanel` (default challenger `claude` / king `generic`, M10); `+BRANDS` array;
+  `DojoApp` keyed-`<Show>` remounts the stage on a brand change (Q3), verified by a mount-count
+  test (brand change remounts, pose change does not). 387 web tests green.
 
 Child story 2 of the replay-viewer "make it fight" arc. Design source of truth:
 `plans/replay-viewer-fight-decisions.md` (decision 6 + M5/M6/M11/M-purity) and
@@ -192,7 +196,7 @@ approves the commit.
 
 ---
 
-### Slice 3 (NEXT): A `/dojo` brand picker previews all five marks on the posed fighters
+### Slice 3 ✅ DONE (#335): A `/dojo` brand picker previews all five marks on the posed fighters
 
 **Value** (behaviour): the developer picks each figure's brand in `/dojo` and the posed
 fighters' glyph heads update live — the tuning surface to eyeball every mark (and, later, heads at

@@ -1053,3 +1053,50 @@ with elbows/knees · strikes-connect via `attackReach` + IK).
 
 **Story 1 (`/dojo` pose lab) complete — the calibration harness is ready.** Stories 2–5 of the "make it
 fight" arc (heads · scale · bends · connect) build on it, each demoed in `/dojo`.
+
+## Model-identity brand-glyph heads — "make it fight" arc, Story 2 ✅ COMPLETE
+
+**A spectator can tell at a glance which model authored each fighter.** Each fighter's head renders
+as its authoring model's **brand glyph** — the bare logo (Claude / OpenAI / Gemini / Grok / generic)
+in the brand hue, no disc, exactly like the home hero's three logo-headed stickmen — while the body
+keeps its side colour (challenger-teal / king-amber). (The grilled M11 "coin" — a hued disc + contrast
+glyph — was dropped mid-plan: a bare glyph reads bigger/crisper and matches the shipped hero.)
+**Web-only** — identity is **off-tape** (it rides `ReplayItem.fighters[*].model`, never the render
+frame), so nothing new is imported from `src/`; **no `src/` logic / `api/` / TCB / `INPUT_HASH` /
+`BENCHMARK_VERSION` change**. `web/**` is outside Stryker → each slice recorded **Mutation: N/A
+(Stryker)** and substituted exhaustive exact-assertion scene-graph / spy-seam tests + a manual mutator
+scan + a `/dojo` (and `/watch`) visual sign-off.
+
+- **Slice 1 — shared brand source** (PR #333, `feat/coin-heads`) — a **pure refactor**: extracted
+  `web/src/shared/lib/brand.ts` as the single source of the five glyph geometries + `modelToBrand`,
+  consumed by the DOM `BrandMark`/`ModelLogo`. The exhaustive `ModelLogo.test` + `Hero.test` (accessible
+  name + `data-brand` + no-injection) stayed green **unchanged**, and the prerendered hero emitted
+  byte-identical glyph geometry — preservation evidence that no DOM mark drifted. Sets up the Pixi head
+  to draw the very same geometry.
+- **Slice 2 — glyph head on real replays** (PR #334, `feat/replay-glyph-head`) — the spectator payoff:
+  `createStage(viewport, [Brand, Brand])`; each fighter's head is its brand glyph via Pixi v8
+  `Graphics.svg()` on the shared geometry (a `label` hook tags the node; it **counter-flips** per-frame
+  so the mark never mirrors facing left), the body/limb bones keep the side colour. `brandsFor` resolves
+  each `fighters[*].model` → brand (challenger-then-King); `ReplayPlayer` wires it; `DojoStage` passes the
+  M10 default pair. GOTCHAS: Pixi's SVG parser **inherits `<g>` fill/stroke** to children (so the
+  group-styled Claude/OpenAI marks render — Q2 escape hatch unneeded) but has **no CSS `currentColor`**,
+  so Grok's monochrome glyph inks to an explicit near-white `GROK_CANVAS_INK` for the canvas (the DOM
+  mark keeps `currentColor`). `Graphics` is opaque to display assertions → a **`getLocalBounds()`
+  non-empty** check per brand guards the blank-head failure mode.
+- **Slice 3 — `/dojo` brand picker** (PR #335, `feat/dojo-brand-picker`) — each `FigureControlPanel`
+  gains a per-figure **Brand** `<select>` (default challenger `claude` / king `generic`, M10; `+BRANDS`
+  canonical-order array; `toBrand` narrows the value via `BRANDS.find` — no assertion). Because
+  `createStage` **bakes the brand at figure creation** (decision 6), a brand change **remounts** the
+  stage via a keyed `<Show>` on a `brandKey` string (Q3 — not a re-brand-in-place), while a pose/gap edit
+  keeps the mount. GOTCHA: the reactive spy-stage seam can't see the real Pixi rebuild (its `brands` prop
+  updates either way), so a **mount-count** test pins the remount contract directly (brand change
+  remounts, pose change doesn't) — proving the keyed-`Show` mechanism automatically rather than by eye.
+
+[replay-viewer-fight-s2-heads.md](replay-viewer-fight-s2-heads.md) — the plan (all 3 slices + whole-story
+acceptance criteria + the resolved open questions Q1–Q3 inline). The spanning **"make it fight" design
+trail** — `plans/replay-viewer-fight-decisions.md` + `plans/replay-viewer-fight-stories.md` — stays
+**live in `plans/`** (Stories 3–5 remain: big fighters via world-scale · bending limbs with elbows/knees
+· strikes-connect via `attackReach` + IK).
+
+**Story 2 (model-identity heads) complete — fighters now wear their author's mark on `/watch`.** Stories
+3–5 (scale · bends · connect) continue the arc, each demoed in `/dojo`.

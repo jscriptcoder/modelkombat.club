@@ -23,8 +23,12 @@ user-visible capability; they compose rather than layer.
 - **Story 1 · `/dojo` pose lab — ✅ COMPLETE + ARCHIVED** (2026-07-18). 3 slices, PR-per-slice
   (#329 · #330 · #331); plan archived at `docs/archive/replay-viewer-fight-s1-dojo.md` (archive
   PR #332, `main` @ `9ecb5f5`). The tuning harness every later slice is demoed on is live.
-- **Story 2 · coin heads — NEXT** (unplanned; see "Next step").
-- Stories 3–5 (scale · bends · connect) not started.
+- **Story 2 · model-identity heads — ✅ COMPLETE + ARCHIVED** (2026-07-18). 3 slices, PR-per-slice
+  (#333 shared source · #334 glyph heads on `/watch` · #335 `/dojo` picker); plan archived at
+  `docs/archive/replay-viewer-fight-s2-heads.md` (archive PR, `main` @ `26b6908`). The "coin" (disc)
+  was dropped mid-plan for a bare glyph head. Fighters now wear their author's mark on real replays.
+- **Story 3 · big fighters (world-scale) — NEXT** (see the split-candidates table row 3).
+- Stories 4–5 (bends · connect) not started.
 
 ## Recommended first slice
 
@@ -40,7 +44,7 @@ learning**, not spectator — stated explicitly.
 | # | Slice (actor + capability) | Value | Includes | Defers | Release |
 |---|---|---|---|---|---|
 | 1 ✅ | **Developer poses two fighters in `/dojo`** _(DONE — #329·#330·#331)_ | The isolated, deterministic surface to pose fighters and see the exact render pipeline — demo + tuning surface for every later slice; a permanent tool | Dark route `/dojo` (no nav link); two figures via real `scene()`/`createStage` from a hand-built synthetic tape; per-figure controls (posture · action · band · facing, **free combos**); world-gap slider with **move-reach snap presets**; default first-load state (gyaku 240k, one mid-strike). Renders the **current** pose model | Brand picker (ships with story 2); the visual _correctness_ of scale/bends/contact (later stories improve what `/dojo` shows) | Shippable, **dark** (no nav link), like `/watch` |
-| 2 | **Spectator sees each fighter's model as a "coin" head** | At a glance: which model authored each fighter (Claude/GPT/Gemini/Grok/generic), reusing the existing tested marks | Refactor `BrandMark` → shared glyph source (DOM behavior-preserving); Pixi head via `Graphics.svg()`; resolve brand **once per fighter** at figure creation via shared `modelToBrand`; brand-hued **coin** (disc + contrast glyph; Grok mono near-white); body keeps side color; head **counter-flips**; `brand` data hook; add the **brand picker** to `/dojo` | Per-move anything; head is **identity only** | Shippable (real replays get heads) |
+| 2 ✅ | **Spectator sees each fighter's model as a glyph head** _(DONE — #333·#334·#335)_ | At a glance: which model authored each fighter (Claude/GPT/Gemini/Grok/generic), reusing the existing tested marks | Refactor `BrandMark` → shared glyph source (DOM behavior-preserving); Pixi head via `Graphics.svg()`; resolve brand **once per fighter** at figure creation via shared `modelToBrand`; **bare brand glyph** (disc dropped mid-plan — M11 revised; Grok mono near-white); body keeps side color; head **counter-flips**; `brand` data hook (`label`); add the **brand picker** to `/dojo` | Per-move anything; head is **identity only** | Shippable (real replays get heads) |
 | 3 | **Spectator sees big fighters filling the ring** | Fighters stand at believable fighting distance — no longer tiny figures across a void (attacks problem #1: separation) | Body defined in **world sub-units** (× `pxPerSubunit`); **one tunable height knob** (~240k) with proportional derivation of all dims (head = 0.3× height); vertical-fit sanity (M12). Tune in `/dojo` | Bent limbs (story 4); reach-to-target contact precision (story 5) — **straight limbs still** | Shippable |
 | 4 | **Spectator sees limbs bend (elbows & knees)** | Limbs read as jointed, not rigid sticks (attacks problem #2: stiffness) | Skeleton → ~11 joints; bones `shoulder→elbow→hand` / `hip→knee→foot`; **derived** facing-aware bends (elbows back, knees forward) for STAND/CROUCH/AIR; **PRONE authors its own 11**; override layers set endpoints, mid-joint re-derives. Pure/scrub-safe | IK reach-to-target (story 5); per-move authored silhouettes (deferred follow-on) | Shippable |
 | 5 | **Spectator sees strikes & grabs land on contact** | A strike/grab visibly lands when in range; a real whiff reads as a whiff — the payoff that sells "fighting" (closes problem #1 at the limb level) | **[task]** additive `attackReach` on `RenderFrame` (strike=`spec.reach`, throw=`throw.reach`, 0 idle) + web mirror + defensive handling. **[story]** 2-bone IK of the striking limb (+ both grab hands) → opponent's **near edge**, clamped `[FLOOR, attackReach]` with **lean+telescope**; degenerate → forward floor; direction = facing. Pure/scrub-safe | Chamber→snap→recover animation + per-move silhouettes (deferred follow-on: needs `move` id + phase) | Shippable; engine field is **byte-identical** |
@@ -106,14 +110,13 @@ learning**, not spectator — stated explicitly.
 
 ## Next step
 
-Story 1 is done. **Load `planning` for story 2 (coin heads)** to sequence it into PR-sized TDD
-slices. Likely shape (from decision 6 + M5/M6/M11): (a) **`BrandMark` → shared glyph source**,
-a DOM-behavior-preserving extraction verified green by the existing champion-card suite (M6);
-(b) **Pixi coin head** — resolve brand once per fighter via `modelToBrand`, render the
-brand-hued disc + contrast glyph via `Graphics.svg()`, counter-flip when facing left, `brand`
-data hook (M11); (c) **`/dojo` brand picker** — per-figure brand control to preview all five
-marks. Each planned slice repeats the full cycle — `tdd` · `testing` · `mutation-testing`
-(manual scan; `web/` is not Stryker-reachable) · `refactoring`, RED→GREEN→MUTATE→KILL→REFACTOR
-— before the next begins. Story 2 is **fully independent** (no dependency on scale/attackReach),
-so it's a clean next pick; keep 3→4→5 (scale → bends → connect) in order to avoid pose-model
-churn.
+Stories 1 (`/dojo` pose lab) and 2 (model-identity heads) are done + archived. **Story 3 —
+big fighters (world-scale)** is next: **load `planning` for story 3** to sequence it into PR-sized
+TDD slices. Shape (table row 3 + M12): define the body in **world sub-units** (× `pxPerSubunit`)
+with **one tunable height knob** (~240k) that proportionally derives every dimension (head =
+0.3× height), tuned in `/dojo`, with the M12 vertical-fit sanity check — **straight limbs still**
+(bends are story 4, contact precision story 5). Each planned slice repeats the full cycle —
+`tdd` · `testing` · `mutation-testing` (manual scan; `web/` is not Stryker-reachable) ·
+`refactoring`, RED→GREEN→MUTATE→KILL→REFACTOR — before the next begins. **Keep 3 → 4 → 5 (scale →
+bends → connect) in order** — they share the pose/scale model, so reordering risks churn; 5 also
+hard-depends on 4's elbow joint + the `attackReach` task.
