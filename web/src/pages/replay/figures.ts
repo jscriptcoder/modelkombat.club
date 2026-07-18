@@ -67,16 +67,20 @@ export type FigureNodes = {
   footR: Container;
   elbowL: Container;
   elbowR: Container;
+  kneeL: Container;
+  kneeR: Container;
 };
 
 // The line segments (stroked into the `bones` Graphics) that connect the joints into a stickman:
-// torso, two straight legs, and two ARMS jointed at the elbow (shoulder→elbow→hand) so they read
-// bent, not rigid (Story 4 · Slice 1). The head is the brand glyph riding the head joint; the knees
-// (jointed legs) follow in a later slice.
+// the torso, two LEGS jointed at the knee (hip→knee→foot) and two ARMS jointed at the elbow
+// (shoulder→elbow→hand) so the limbs read bent, not rigid (Story 4). The head is the brand glyph
+// riding the head joint.
 const BONES: ReadonlyArray<readonly [keyof Skeleton, keyof Skeleton]> = [
   ["hip", "shoulder"],
-  ["hip", "footL"],
-  ["hip", "footR"],
+  ["hip", "kneeL"],
+  ["kneeL", "footL"],
+  ["hip", "kneeR"],
+  ["kneeR", "footR"],
   ["shoulder", "elbowL"],
   ["elbowL", "handL"],
   ["shoulder", "elbowR"],
@@ -111,6 +115,8 @@ const createFigure = (color: number, brand: Brand, headPx: number): Figure => {
   const footR = new Container();
   const elbowL = new Container();
   const elbowR = new Container();
+  const kneeL = new Container();
+  const kneeR = new Container();
 
   root.addChild(
     bones,
@@ -123,6 +129,8 @@ const createFigure = (color: number, brand: Brand, headPx: number): Figure => {
     footR,
     elbowL,
     elbowR,
+    kneeL,
+    kneeR,
   );
 
   return {
@@ -137,6 +145,8 @@ const createFigure = (color: number, brand: Brand, headPx: number): Figure => {
       footR,
       elbowL,
       elbowR,
+      kneeL,
+      kneeR,
     },
     bones,
     color,
@@ -170,6 +180,8 @@ const applyFigure = (figure: Figure, placement: Scene["a"]): void => {
   place(nodes.footR, pose.footR);
   place(nodes.elbowL, pose.elbowL);
   place(nodes.elbowR, pose.elbowR);
+  place(nodes.kneeL, pose.kneeL);
+  place(nodes.kneeR, pose.kneeR);
 
   bones.clear();
 

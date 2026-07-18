@@ -28,6 +28,8 @@ export type Stance = {
 export type Skeleton = Stance & {
   elbowL: Joint;
   elbowR: Joint;
+  kneeL: Joint;
+  kneeR: Joint;
 };
 
 // A fighter's on-screen placement: pixel position + facing (1 right / -1 left, passed through from
@@ -108,42 +110,61 @@ const PRONE: Skeleton = {
   handR: { x: -20, y: -18 },
   footL: { x: 36, y: -6 },
   footR: { x: 36, y: -14 },
-  // A downed body reshapes everything, so PRONE AUTHORS its own elbows (Story 4) rather than running
-  // the upright bend rule — the arms lie splayed by the shoulder, at the far end from the feet.
+  // A downed body reshapes everything, so PRONE AUTHORS its own mid-joints (Story 4) rather than
+  // running the upright bend rule — the arms lie splayed by the shoulder, the legs straight toward the
+  // feet end (each knee the midpoint of hip→foot, at the far end from the head).
   elbowL: { x: -22, y: -6 },
   elbowR: { x: -22, y: -14 },
+  kneeL: { x: 21, y: -8 },
+  kneeR: { x: 21, y: -12 },
 };
 
 // The local-px bow of a 2-bone limb's mid-joint off the straight line between its endpoints — enough
-// that a resting elbow reads jointed, not a rigid stick. Authored in LOCAL px so Story 3's scalePose
-// scales it with the body; tunable by eye in /dojo.
+// that a resting joint reads jointed, not a rigid stick. Authored in LOCAL px so Story 3's scalePose
+// scales it with the body; tunable by eye in /dojo. Elbow and knee tune independently.
 const ELBOW_BEND = 8;
+const KNEE_BEND = 8;
 
-// The mid-joint of a 2-bone limb: the midpoint of its two endpoints, offset along the bone's
-// unit-perpendicular by ELBOW_BEND toward the BACK (−x local). poseFor never reads facing, so the bow
-// is a fixed local direction; the container flip (applyFigure) carries facing, so the elbow reads
-// correctly whichever way the fighter faces. A degenerate (zero-length) bone divides by 1 instead of
-// 0 — TOTAL, like the stance/band fallbacks — and offsets purely along the perpendicular.
-const bendBack = (from: Joint, to: Joint): Joint => {
+// The bow direction of a 2-bone limb's mid-joint, in the local +x = forward frame: an elbow bends
+// BACK (toward −x), a knee bends FORWARD (toward +x). Passed to deriveBend as the sign that orients
+// the perpendicular offset.
+const BEND_BACK = -1;
+const BEND_FORWARD = 1;
+
+// The mid-joint of a 2-bone limb (elbow / knee): the midpoint of its two endpoints, offset along the
+// bone's unit-perpendicular by `dist` local px, oriented by `dir` (BEND_BACK −x / BEND_FORWARD +x).
+// poseFor never reads facing, so the bow is a fixed local direction; the container flip (applyFigure)
+// carries facing, so the joint reads correctly whichever way the fighter faces. A degenerate
+// (zero-length) bone divides by 1 instead of 0 — TOTAL, like the stance/band fallbacks — and offsets
+// purely along the perpendicular.
+const deriveBend = (
+  from: Joint,
+  to: Joint,
+  dir: number,
+  dist: number,
+): Joint => {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.hypot(dx, dy) || 1;
   const perpX = -dy / len;
   const perpY = dx / len;
-  const flip = perpX > 0 ? -1 : 1; // point the bow backward (−x local)
+  const flip = perpX * dir < 0 ? -1 : 1; // orient the bow's x toward dir
 
   return {
-    x: (from.x + to.x) / 2 + perpX * flip * ELBOW_BEND,
-    y: (from.y + to.y) / 2 + perpY * flip * ELBOW_BEND,
+    x: (from.x + to.x) / 2 + perpX * flip * dist,
+    y: (from.y + to.y) / 2 + perpY * flip * dist,
   };
 };
 
-// Grow a stance's endpoints into the full articulated pose by deriving the mid-joints. The elbows bow
-// back off the straight shoulder→hand line (Story 4 · Slice 1); the knees follow in a later slice.
+// Grow a stance's endpoints into the full articulated pose by deriving the mid-joints: the elbows bow
+// back off the straight shoulder→hand line, the knees bow forward off the straight hip→foot line
+// (Story 4) — so an arm reads shoulder→elbow→hand and a leg reads hip→knee→foot, not rigid sticks.
 const deriveSkeleton = (stance: Stance): Skeleton => ({
   ...stance,
-  elbowL: bendBack(stance.shoulder, stance.handL),
-  elbowR: bendBack(stance.shoulder, stance.handR),
+  elbowL: deriveBend(stance.shoulder, stance.handL, BEND_BACK, ELBOW_BEND),
+  elbowR: deriveBend(stance.shoulder, stance.handR, BEND_BACK, ELBOW_BEND),
+  kneeL: deriveBend(stance.hip, stance.footL, BEND_FORWARD, KNEE_BEND),
+  kneeR: deriveBend(stance.hip, stance.footR, BEND_FORWARD, KNEE_BEND),
 });
 
 // The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
@@ -268,6 +289,8 @@ const scalePose = (pose: Skeleton, scale: number): Skeleton => {
     footR: scaleJoint(pose.footR),
     elbowL: scaleJoint(pose.elbowL),
     elbowR: scaleJoint(pose.elbowR),
+    kneeL: scaleJoint(pose.kneeL),
+    kneeR: scaleJoint(pose.kneeR),
   };
 };
 

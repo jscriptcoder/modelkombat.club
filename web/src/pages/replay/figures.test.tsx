@@ -264,6 +264,27 @@ describe("figures — the arm bends at the elbow joint (Story 4 · Slice 1)", ()
   });
 });
 
+describe("figures — the leg bends at the knee joint (Story 4 · Slice 2)", () => {
+  it("places both fighters' knee joint nodes at the scene's scaled knee", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+    const sc = scene([tickOf(0, {}, {})], 0, VIEWPORT);
+
+    stage.apply(sc);
+
+    // The persistent knee joints carry the scene's derived knee (this is the wiring — scene.test
+    // pins the geometry). Reading the scene value catches a "knee placed at the foot" mutant, and
+    // asserting both L and R (distinct x-signs) catches an L/R swap.
+    expect(stage.a.kneeR.x).toBe(sc.a.pose.kneeR.x);
+    expect(stage.a.kneeR.y).toBe(sc.a.pose.kneeR.y);
+    expect(stage.a.kneeL.x).toBe(sc.a.pose.kneeL.x);
+    expect(stage.a.kneeL.y).toBe(sc.a.pose.kneeL.y);
+    expect(stage.b.kneeR.x).toBe(sc.b.pose.kneeR.x);
+    expect(stage.b.kneeL.x).toBe(sc.b.pose.kneeL.x);
+    // The knee is genuinely its own joint, not the foot it connects to.
+    expect(stage.a.kneeR.x).not.toBe(stage.a.footR.x);
+  });
+});
+
 describe("figures — the head is the fighter's brand glyph (no disc)", () => {
   it("tags each fighter's head with its resolved brand", () => {
     const stage = createStage(VIEWPORT, ["claude", "generic"]);

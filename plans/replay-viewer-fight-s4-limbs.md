@@ -28,19 +28,22 @@ back, knees bowed forward — instead of rigid single sticks, on real `/watch` r
 
 ## Acceptance Criteria (story-level)
 
-- [ ] A standing fighter's arms render `shoulder→elbow→hand` with the elbow visibly off the straight
-      shoulder–hand line, bowed **backward** (Slice 1).
-- [ ] A standing fighter's legs render `hip→knee→foot` with the knee off the straight hip–foot line,
-      bowed **forward** (Slice 2).
-- [ ] The bend reads correctly whether the fighter faces left or right (via the existing root flip).
-- [ ] Striking / guarding / throwing moves the hand endpoint and the elbow **re-derives** from it —
-      the bent limb follows the technique (no separate authored bend per action).
-- [ ] Crouch and air stances also show bent limbs (the derivation is stance-agnostic).
-- [ ] A knocked-down (PRONE) fighter renders with its **own authored** elbows and knees (all 11
-      joints), not the upright derived bend.
-- [ ] Every derived joint is a pure function of the frame — the same frame scrubbed forward then back
-      yields identical joints.
-- [ ] Replays remain byte-identical / determinism untouched — **no `src/` change** (web-only).
+- [x] A standing fighter's arms render `shoulder→elbow→hand` with the elbow visibly off the straight
+      shoulder–hand line, bowed **backward** (Slice 1). ✅ #341
+- [x] A standing fighter's legs render `hip→knee→foot` with the knee off the straight hip–foot line,
+      bowed **forward** (Slice 2). ✅ Slice 2
+- [x] The bend reads correctly whether the fighter faces left or right (via the existing root flip).
+      ✅ derived in a facing-agnostic local frame; the root flip carries facing (both arms and legs).
+- [x] Striking / guarding / throwing moves the hand endpoint and the elbow **re-derives** from it —
+      the bent limb follows the technique (no separate authored bend per action). ✅ #341 (arms)
+- [x] Crouch and air stances also show bent limbs (the derivation is stance-agnostic). ✅ arms #341 +
+      legs Slice 2.
+- [x] A knocked-down (PRONE) fighter renders with its **own authored** elbows and knees (all 11
+      joints), not the upright derived bend. ✅ Slice 2 (PRONE now authors all 11 joints).
+- [x] Every derived joint is a pure function of the frame — the same frame scrubbed forward then back
+      yields identical joints. ✅ pure `deriveBend` in `scene.ts`, no cross-frame state.
+- [x] Replays remain byte-identical / determinism untouched — **no `src/` change** (web-only). ✅
+      diff is `web/src/pages/replay/` only.
 
 ## Design notes (grounding the slices)
 
@@ -74,6 +77,11 @@ evidence = independent-recompute exact-assertion browser tests + manual mutator 
 sign-off.
 
 ### Slice 1: Arms bend — `shoulder→elbow→hand` with the elbow bowed back
+
+**Status**: ✅ **Shipped** — PR #341 (`4bb8910`), merged 2026-07-17. `Stance`/`Skeleton` split +
+pure `bendBack`/`deriveSkeleton` (elbow = midpoint + backward perpendicular offset, local-px
+constant) landed; the shared `deriveBend(a, b, sign, dist)` extraction was correctly **deferred to
+Slice 2** (arms + legs both need it). `/dojo` visual sign-off outstanding with the user.
 
 **Value**: A spectator watching any `/watch` replay (and the dev in `/dojo`) sees both arms as
 jointed limbs with the elbow off the straight line — arms stop reading as rigid sticks. Legs stay
@@ -123,6 +131,12 @@ tests), `mutation-testing` → `N/A` for Stryker (web unreachable) + manual scan
   (elbows bow back, read on both facings, strike arm bends toward the target); commit approved.
 
 ### Slice 2: Legs bend — `hip→knee→foot` with the knee bowed forward
+
+**Status**: ✅ **Implemented** (awaiting commit/PR). `Skeleton` grown 9 → 11 (`+kneeL/R`); a
+`bendForward` GREEN mirror then the planned REFACTOR collapsed both bows into one shared
+`deriveBend(from, to, dir, dist)` (`BEND_BACK` / `BEND_FORWARD`) — arms + legs share it, which also
+killed the "flip always −1" survivor the leg-only tests left. `PRONE` authors all 11 joints; `BONES`
+routes `hip→knee→foot`. `/dojo` visual sign-off outstanding with the user. **Completes Story 4.**
 
 **Value**: The spectator now sees fully jointed limbs — knees bow forward, completing the "not a stick
 figure" read. Closes Story 4's stiffness fix.
