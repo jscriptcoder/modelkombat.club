@@ -193,6 +193,13 @@ const REF_BODY_HEIGHT_PX = STAND.footL.y - STAND.head.y;
 const bodyScale = (viewport: Viewport): number =>
   (BODY_HEIGHT_SUB * (viewport.width / WORLD_WIDTH)) / REF_BODY_HEIGHT_PX;
 
+// The fighter's body height in screen px at this viewport: BODY_HEIGHT_SUB projected by the SAME
+// pxPerSubunit that scales the pose (a STAND body renders this tall, pre-rounding). Exported so the
+// head glyph (figures.ts) can size itself as a fixed proportion of the body height at any viewport,
+// growing together with the body from the one knob.
+export const bodyHeightPx = (viewport: Viewport): number =>
+  BODY_HEIGHT_SUB * (viewport.width / WORLD_WIDTH);
+
 // Scale a whole pose uniformly to screen px, rounding to whole pixels (crisp, and consistent with
 // the integer world→screen positions). Feet at y 0 stay at 0, so a bigger body grows UP from a
 // planted base rather than sinking through the ground line.

@@ -1,7 +1,7 @@
 # Plan: Replay viewer "make it fight" — Story 3 · big fighters (world-scale)
 
-**Branch**: feat/fight-s3-world-scale
-**Status**: Active
+**Branch**: feat/fight-s3-head-scale (Slice 2; Slice 1 shipped on feat/fight-s3-world-scale)
+**Status**: Active — Slice 1 merged (#338, `main` @ `6bcbdc8`); Slice 2 in progress
 
 Story 3 of the "make it fight" arc (child story from `plans/replay-viewer-fight-stories.md`,
 table row 3). Design source of truth: `plans/replay-viewer-fight-decisions.md` (decision 3 · M2 ·
@@ -54,22 +54,22 @@ void.
 
 ## Acceptance Criteria
 
-- [ ] A standing fighter's rendered head-to-foot height ≈ `BODY_HEIGHT_SUB × pxPerSubunit`
-      (world-scaled), not a fixed ~76px — verified through the pure `scene()` projection.
-- [ ] All body dimensions stay a **fixed proportion of height**: doubling the knob doubles every
-      joint offset; a crouch stays proportionally shorter than a stand at the same knob.
-- [ ] Feet stay planted on the ground line (local y 0) at any knob value; a jump lifts the (big)
-      figure up-screen without NaN. Extreme-jump clipping is accepted (M12).
-- [ ] Two fighters at a contact-distance gap (≈ the default `/dojo` 240k) occupy a large fraction
+- [x] A standing fighter's rendered head-to-foot height ≈ `BODY_HEIGHT_SUB × pxPerSubunit`
+      (world-scaled), not a fixed ~76px — verified through the pure `scene()` projection. _(Slice 1)_
+- [x] All body dimensions stay a **fixed proportion of height**: doubling the knob doubles every
+      joint offset; a crouch stays proportionally shorter than a stand at the same knob. _(Slice 1)_
+- [x] Feet stay planted on the ground line (local y 0) at any knob value; a jump lifts the (big)
+      figure up-screen without NaN. Extreme-jump clipping is accepted (M12). _(Slice 1)_
+- [x] Two fighters at a contact-distance gap (≈ the default `/dojo` 240k) occupy a large fraction
       of ring width (their combined projected extent is a large share of the viewport), no longer
-      tiny figures across a void.
+      tiny figures across a void. _(Slice 1)_
 - [ ] The brand head glyph is ≈ 0.3 × the body's rendered height (scales with the knob and the
-      viewport), not a fixed 44px dot on a big body.
-- [ ] Determinism/scrub-safety preserved: the same frame projects to identical joints forward and
-      backward. Replay rendering is unchanged in kind (still pure over the frame).
-- [ ] Per-slice **manual visual sign-off in `/dojo`** against the checklist below (M9).
-- [ ] `web/` is not Stryker-reachable → mutation `N/A`; covered by **exact-assertion browser tests + a manual mutator scan** (M9). No pixel/visual regression (agent-browser hangs on the Pixi
-      canvas — scene-graph assertions + manual scan are the guardrail).
+      viewport), not a fixed 44px dot on a big body. _(Slice 2)_
+- [x] Determinism/scrub-safety preserved: the same frame projects to identical joints forward and
+      backward. Replay rendering is unchanged in kind (still pure over the frame). _(Slice 1)_
+- [ ] Per-slice **manual visual sign-off in `/dojo`** against the checklist below (M9). _(Slice 1 ✅; Slice 2 pending)_
+- [x] `web/` is not Stryker-reachable → mutation `N/A`; covered by **exact-assertion browser tests + a manual mutator scan** (M9). No pixel/visual regression (agent-browser hangs on the Pixi
+      canvas — scene-graph assertions + manual scan are the guardrail). _(both slices)_
 
 ## Slices
 
@@ -78,7 +78,7 @@ RED → GREEN → (MUTATE `N/A` + manual scan) → REFACTOR, PR per slice. `web/
 so every slice records mutation `N/A` with proportionate alternate evidence: exact-assertion
 browser tests on the pure maths/wiring + a manual mutator scan + a `/dojo` visual sign-off.
 
-### Slice 1: A standing fighter's body scales to the ring from one height knob
+### Slice 1: A standing fighter's body scales to the ring from one height knob — ✅ MERGED (#338, `main` @ `6bcbdc8`)
 
 **Value**: Actor = a spectator on `/watch` (and the developer in `/dojo`). Observable outcome =
 fighters render **big** — a standing body ≈ `BODY_HEIGHT_SUB × pxPerSubunit` tall with all
