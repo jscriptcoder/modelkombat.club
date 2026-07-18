@@ -1,6 +1,7 @@
 import { For, type Component, type Setter } from "solid-js";
 
 import type { FigureControls } from "./controls";
+import { BRANDS, type Brand } from "../../shared/lib/brand";
 
 // One fighter's control panel: buttons + checkboxes + selects bound to that figure's raw pose fields.
 // Deliberately raw fields (no mutually-exclusive action enum), so engine-impossible combos are
@@ -30,6 +31,10 @@ type FigureControlPanelProps = {
   label: string;
   controls: FigureControls;
   onChange: Setter<FigureControls>;
+  // This figure's authoring brand — identity, kept separate from the pose `controls` (it never
+  // flows through `controlsToFrame`); it rides the item, not the render frame.
+  brand: Brand;
+  onBrandChange: Setter<Brand>;
 };
 
 const FigureControlPanel: Component<FigureControlPanelProps> = (props) => {
@@ -37,12 +42,32 @@ const FigureControlPanel: Component<FigureControlPanelProps> = (props) => {
   const patch = (partial: Partial<FigureControls>) =>
     props.onChange((prev) => ({ ...prev, ...partial }));
 
+  // Narrow the select's raw string value back to a Brand (the options ARE the brands, so a match
+  // always exists; the generic fallback keeps it total without a type assertion).
+  const toBrand = (value: string): Brand =>
+    BRANDS.find((brand) => brand === value) ?? "generic";
+
   // Unique per-panel ids so the challenger's and king's selects don't share label associations.
   const fieldId = (field: string) => `${props.label.toLowerCase()}-${field}`;
 
   return (
     <fieldset class="figure-controls">
       <legend>{props.label}</legend>
+
+      <div class="control-select">
+        {/* Identity picker: the fighter's authoring-model brand glyph (its head). Named from the
+            span via aria-labelledby, like the band selects — `<label for>` does not name a select. */}
+        <span id={fieldId("brand")}>Brand</span>
+        <select
+          aria-labelledby={fieldId("brand")}
+          value={props.brand}
+          onChange={(e) => props.onBrandChange(toBrand(e.currentTarget.value))}
+        >
+          <For each={BRANDS}>
+            {(brand) => <option value={brand}>{brand}</option>}
+          </For>
+        </select>
+      </div>
 
       <div class="control-row" role="group" aria-label="Posture">
         <For each={POSTURES}>
