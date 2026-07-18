@@ -243,6 +243,27 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
   });
 });
 
+describe("figures — the arm bends at the elbow joint (Story 4 · Slice 1)", () => {
+  it("places both fighters' elbow joint nodes at the scene's scaled elbow", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+    const sc = scene([tickOf(0, {}, {})], 0, VIEWPORT);
+
+    stage.apply(sc);
+
+    // The persistent elbow joints carry the scene's derived elbow (this is the wiring — scene.test
+    // pins the geometry). Reading the scene value catches an "elbow placed at the hand" mutant, and
+    // asserting both L and R (distinct x-signs) catches an L/R swap.
+    expect(stage.a.elbowR.x).toBe(sc.a.pose.elbowR.x);
+    expect(stage.a.elbowR.y).toBe(sc.a.pose.elbowR.y);
+    expect(stage.a.elbowL.x).toBe(sc.a.pose.elbowL.x);
+    expect(stage.a.elbowL.y).toBe(sc.a.pose.elbowL.y);
+    expect(stage.b.elbowR.x).toBe(sc.b.pose.elbowR.x);
+    expect(stage.b.elbowL.x).toBe(sc.b.pose.elbowL.x);
+    // The elbow is genuinely its own joint, not the hand it connects to.
+    expect(stage.a.elbowR.x).not.toBe(stage.a.handR.x);
+  });
+});
+
 describe("figures — the head is the fighter's brand glyph (no disc)", () => {
   it("tags each fighter's head with its resolved brand", () => {
     const stage = createStage(VIEWPORT, ["claude", "generic"]);

@@ -9,9 +9,10 @@ import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
 // container carries the whole figure to its screen position / facing.
 export type Joint = { x: number; y: number };
 
-// The articulated stickman pose: the seven joints the draw layer needs to stroke head + torso +
-// two arms + two legs. Later slices extend the hands/feet for strikes, guards, and grabs.
-export type Skeleton = {
+// The stance ENDPOINTS the draw layer's bones connect between: head + torso + two hands + two feet.
+// The stance constants and the strike/guard/throw override layers are authored in these seven joints;
+// a 2-bone limb's mid-joint (elbow / knee) is DERIVED from them, not authored here (Story 4).
+export type Stance = {
   head: Joint;
   shoulder: Joint;
   hip: Joint;
@@ -21,13 +22,21 @@ export type Skeleton = {
   footR: Joint;
 };
 
+// The full articulated pose the draw layer strokes: the stance endpoints plus the derived mid-joints,
+// so an arm reads as shoulder→elbow→hand instead of a rigid stick (Story 4 · Slice 1 adds the elbows;
+// the knees follow). PRONE authors its own mid-joints (a downed body reshapes everything).
+export type Skeleton = Stance & {
+  elbowL: Joint;
+  elbowR: Joint;
+};
+
 // A fighter's on-screen placement: pixel position + facing (1 right / -1 left, passed through from
 // the frame so the draw layer can flip the sprite) + the stance-derived skeleton to stroke.
 export type Figure = { x: number; y: number; facing: number; pose: Skeleton };
 
 // The upright default: head at the top, feet planted on the local ground line (mirrors the S1
 // fixed stickman). Crouch and air are edits of this base.
-const STAND: Skeleton = {
+const STAND: Stance = {
   head: { x: 0, y: -76 },
   shoulder: { x: 0, y: -64 },
   hip: { x: 0, y: -34 },
@@ -39,7 +48,7 @@ const STAND: Skeleton = {
 
 // Crouch: the upper body drops ~18px toward the planted, slightly wider feet — a visibly lower
 // stance that vacates the high band.
-const CROUCH: Skeleton = {
+const CROUCH: Stance = {
   head: { x: 0, y: -58 },
   shoulder: { x: 0, y: -46 },
   hip: { x: 0, y: -22 },
@@ -51,7 +60,7 @@ const CROUCH: Skeleton = {
 
 // Airborne: the upper body holds the stand while the legs tuck up toward the hip — read against
 // the y-arc the container is already lifted along (S1).
-const AIR: Skeleton = {
+const AIR: Stance = {
   head: { x: 0, y: -76 },
   shoulder: { x: 0, y: -64 },
   hip: { x: 0, y: -34 },
@@ -63,7 +72,7 @@ const AIR: Skeleton = {
 
 // posture → stance skeleton, written TOTAL: only 0/1/2 are emitted by the engine, but any other
 // code falls back to STAND so an odd frame renders a safe neutral figure rather than crashing.
-const skeletonFor = (posture: number): Skeleton =>
+const stanceFor = (posture: number): Stance =>
   posture === 1 ? CROUCH : posture === 2 ? AIR : STAND;
 
 // The screen height (local frame, up is negative) of a low / mid / high band: the shared ladder a
@@ -82,7 +91,7 @@ const GUARD_REACH_X = 8;
 
 // A throw's grab: BOTH hands reach forward and lock together at chest height — the cue that reads a
 // throw. Distinct from a strike (front hand only, at a band) and a guard (rear hand, modest reach).
-const GRAB: Pick<Skeleton, "handL" | "handR"> = {
+const GRAB: Pick<Stance, "handL" | "handR"> = {
   handL: { x: 28, y: -44 },
   handR: { x: 36, y: -44 },
 };
@@ -99,30 +108,70 @@ const PRONE: Skeleton = {
   handR: { x: -20, y: -18 },
   footL: { x: 36, y: -6 },
   footR: { x: 36, y: -14 },
+  // A downed body reshapes everything, so PRONE AUTHORS its own elbows (Story 4) rather than running
+  // the upright bend rule — the arms lie splayed by the shoulder, at the far end from the feet.
+  elbowL: { x: -22, y: -6 },
+  elbowR: { x: -22, y: -14 },
 };
+
+// The local-px bow of a 2-bone limb's mid-joint off the straight line between its endpoints — enough
+// that a resting elbow reads jointed, not a rigid stick. Authored in LOCAL px so Story 3's scalePose
+// scales it with the body; tunable by eye in /dojo.
+const ELBOW_BEND = 8;
+
+// The mid-joint of a 2-bone limb: the midpoint of its two endpoints, offset along the bone's
+// unit-perpendicular by ELBOW_BEND toward the BACK (−x local). poseFor never reads facing, so the bow
+// is a fixed local direction; the container flip (applyFigure) carries facing, so the elbow reads
+// correctly whichever way the fighter faces. A degenerate (zero-length) bone divides by 1 instead of
+// 0 — TOTAL, like the stance/band fallbacks — and offsets purely along the perpendicular.
+const bendBack = (from: Joint, to: Joint): Joint => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const perpX = -dy / len;
+  const perpY = dx / len;
+  const flip = perpX > 0 ? -1 : 1; // point the bow backward (−x local)
+
+  return {
+    x: (from.x + to.x) / 2 + perpX * flip * ELBOW_BEND,
+    y: (from.y + to.y) / 2 + perpY * flip * ELBOW_BEND,
+  };
+};
+
+// Grow a stance's endpoints into the full articulated pose by deriving the mid-joints. The elbows bow
+// back off the straight shoulder→hand line (Story 4 · Slice 1); the knees follow in a later slice.
+const deriveSkeleton = (stance: Stance): Skeleton => ({
+  ...stance,
+  elbowL: bendBack(stance.shoulder, stance.handL),
+  elbowR: bendBack(stance.shoulder, stance.handR),
+});
 
 // The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
 // over everything (highest precedence — an early return, so a downed fighter is never also striking
-// or throwing); otherwise a strike throws the front hand (handR) forward to the attacked band; a
-// guard raises the rear hand (handL) to the incoming band; a throw locks BOTH hands into a forward
-// grab. All are TOTAL — an idle fighter, or a 0 / out-of-range band, keeps the stance hand. The
-// layers are independent (and mutually exclusive in the engine), so they compose with each other and
-// with any stance (an air-attack keeps the AIR tucked legs). The throw is applied LAST of the action
-// layers, so it wins if ever combined with a strike/guard. Gates: knockdown ← `knockdown`, strike ←
+// or throwing, and it keeps its OWN authored mid-joints rather than the derived bend); otherwise a
+// strike throws the front hand (handR) forward to the attacked band; a guard raises the rear hand
+// (handL) to the incoming band; a throw locks BOTH hands into a forward grab. All are TOTAL — an idle
+// fighter, or a 0 / out-of-range band, keeps the stance hand. The layers are independent (and mutually
+// exclusive in the engine), so they compose with each other and with any stance (an air-attack keeps
+// the AIR tucked legs). The throw is applied LAST of the action layers, so it wins if ever combined
+// with a strike/guard. Finally the mid-joints are DERIVED from the resulting endpoints, so a strike /
+// guard / throw re-bends the elbow to follow the moved hand. Gates: knockdown ← `knockdown`, strike ←
 // `attacking`, guard ← `guardBand` (0 = none), throw ← `throwing`.
 const poseFor = (frame: ReplayFrame): Skeleton => {
   if (frame.knockdown) return PRONE;
 
-  const stance = skeletonFor(frame.posture);
+  const stance = stanceFor(frame.posture);
   const strikeY = frame.attacking ? bandHeight(frame.attackBand) : null;
   const guardY = bandHeight(frame.guardBand);
 
-  return {
+  const endpoints: Stance = {
     ...stance,
     ...(strikeY === null ? {} : { handR: { x: STRIKE_REACH_X, y: strikeY } }),
     ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
     ...(frame.throwing ? GRAB : {}),
   };
+
+  return deriveSkeleton(endpoints);
 };
 
 // The heads-up display for the current playhead: the engine tick number + both fighters' scores,
@@ -217,6 +266,8 @@ const scalePose = (pose: Skeleton, scale: number): Skeleton => {
     handR: scaleJoint(pose.handR),
     footL: scaleJoint(pose.footL),
     footR: scaleJoint(pose.footR),
+    elbowL: scaleJoint(pose.elbowL),
+    elbowR: scaleJoint(pose.elbowR),
   };
 };
 
