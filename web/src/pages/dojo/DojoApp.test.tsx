@@ -279,16 +279,20 @@ describe("DojoApp — world-gap spacing control", () => {
   });
 
   it("shows the current gap as a numeric read-out that tracks the slider", () => {
-    const { getByRole, getByText } = render(() => <DojoApp />);
+    const { getByRole } = render(() => <DojoApp />);
+
+    // Scope to the Spacing control — each figure now also carries a "k" reach read-out (M10), so the
+    // gap read-out must be read within its own group to stay unambiguous.
+    const spacing = getByRole("group", { name: "Spacing" });
 
     // Opens at the default 240k gap.
-    expect(getByText("240k")).toBeTruthy();
+    expect(within(spacing).getByText("240k")).toBeTruthy();
 
     fireEvent.input(getByRole("slider", { name: "Gap" }), {
       target: { value: "100000" },
     });
 
-    expect(getByText("100k")).toBeTruthy(); // the read-out follows the gap
+    expect(within(spacing).getByText("100k")).toBeTruthy(); // the read-out follows the gap
   });
 
   it("reflects the current gap in the preset selector — a matching reach, else Custom", () => {
@@ -307,5 +311,58 @@ describe("DojoApp — world-gap spacing control", () => {
     expect(
       getByRole("option", { name: "Custom", selected: true }),
     ).toBeTruthy();
+  });
+});
+
+describe("DojoApp — per-figure attack-reach control (M10)", () => {
+  it("opens each fighter at its default committed reach — challenger at gyaku, king idle", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const frame = latest()[0];
+
+    expect(frame.a.attackReach).toBe(240_000); // gyaku-zuki reach — lands at the default gap
+    expect(frame.b.attackReach).toBe(0); // idle king — no committed reach
+
+    // ...and each figure's slider read-out reflects that default (the control shows what it drives).
+    const challenger = getByRole("group", { name: "Challenger" });
+    const king = getByRole("group", { name: "King" });
+
+    expect(within(challenger).getByText("240k")).toBeTruthy();
+    expect(within(king).getByText("0k")).toBeTruthy();
+  });
+
+  it("dials a fighter's committed reach from its own slider, leaving the other untouched", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    // Dial the challenger's reach DOWN to empi (elbow) distance — short of the default gap, so it now
+    // whiffs where the opening gyaku reach landed (the contact behaviour is asserted in scene.test).
+    fireEvent.input(
+      within(challenger).getByRole("slider", { name: "Attack reach" }),
+      { target: { value: "95000" } },
+    );
+
+    expect(latest()[0].a.attackReach).toBe(95_000); // challenger's reach dialed down
+    expect(latest()[0].b.attackReach).toBe(0); // king untouched
+  });
+
+  it("dials the king's reach independently of the challenger", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const king = getByRole("group", { name: "King" });
+
+    fireEvent.input(
+      within(king).getByRole("slider", { name: "Attack reach" }),
+      {
+        target: { value: "300000" },
+      },
+    );
+
+    expect(latest()[0].b.attackReach).toBe(300_000); // king's reach set
+    expect(latest()[0].a.attackReach).toBe(240_000); // challenger unchanged from default
   });
 });

@@ -1,7 +1,7 @@
 # Plan: Replay viewer "make it fight" — Story 5, strikes & grabs connect
 
-**Branch (Slice 2)**: `feat/fight-s5-strike-ik` — PR-per-slice; each slice takes its own `feat/fight-s5-*` branch.
-**Status**: Active — **Slice 1 ✅ COMPLETE + MERGED (#344, `main` @ `37a636a`)**; Slice 2 next.
+**Branch (Slice 2b)**: `feat/fight-s5-lean-slider` — PR-per-slice; each slice takes its own `feat/fight-s5-*` branch.
+**Status**: Active — **Slice 1 ✅ MERGED (#344)**, **Slice 2a ✅ MERGED (#345)**, **Slice 2b ✅ IMPLEMENTED (M2 lean + M10 `/dojo` reach slider — pending commit + PR)**; **Slice 3 next** (throw reach) closes the arc 5/5.
 
 Last (and only `src/`-touching) story of the "make it fight" arc. Design is fully
 resolved — `plans/replay-viewer-fight-decisions.md` decision 4 + M1–M12 + M-purity + the
@@ -27,18 +27,22 @@ Story-level, behavior-driven (from the decisions doc "Acceptance examples · 5" 
       `renderTape` derives on demand — it is not part of the event tape or the `ReproRecord` hash).
       _(Slice 1, #344 — full determinism/byte-identity suite stayed green; Stryker on `renderFrameOf`
       93.33%, 1 documented-equivalent survivor)_
-- [ ] In the viewer, a strike within reach draws its hand **on the opponent's near body edge**; a
+- [x] In the viewer, a strike within reach draws its hand **on the opponent's near body edge**; a
       strike beyond `attackReach` draws the limb **stopping short** (a real whiff reads as a whiff).
-- [ ] A degenerate target (gap ≈ 0, or opponent on the side opposite the facing) draws the **minimal
-      forward technique** — never a backward limb, never a NaN.
+      _(Slice 2a, #345)_
+- [x] A degenerate target (gap ≈ 0, or opponent on the side opposite the facing) draws the **minimal
+      forward technique** — never a backward limb, never a NaN. _(Slice 2a, #345)_
 - [ ] A `throwing` frame reaches **both** grab hands to the near edge using `attackReach`
-      (= `throw.reach`).
-- [ ] The viewer treats `attackReach` **defensively at consumption** (absent / non-numeric /
-      negative → `0` ⇒ the limb keeps its stance pose).
-- [ ] Every new pose math is a **pure function of the current frame** — identical on replay, forward
-      scrub, backward scrub, restart (M-purity).
-- [ ] `/dojo` can set each figure's `attackReach` freely and its gap slider snaps to the real engine
-      reaches, so every move's contact can be signed off by eye (M9 · M10).
+      (= `throw.reach`). _(Slice 3)_
+- [x] The viewer treats `attackReach` **defensively at consumption** (absent / non-numeric /
+      negative → `0` ⇒ the limb keeps its stance pose). _(Slice 2a, #345)_
+- [x] Every new pose math is a **pure function of the current frame** — identical on replay, forward
+      scrub, backward scrub, restart (M-purity). _(Slice 2a, #345 — strike reach; Slice 3 reuses the
+      pure machinery for throws)_
+- [x] `/dojo` can set each figure's `attackReach` freely and its gap slider snaps to the real engine
+      reaches, so every move's contact can be signed off by eye (M9 · M10). _(gap-snap presets since
+      S1; the per-figure `attackReach` slider added in Slice 2b — the M9 visual sign-off is the human
+      step)_
 
 ## Scope deviation from the story-split (needs approval)
 
@@ -102,42 +106,72 @@ reachable), `refactoring` (assess; likely `N/A` — the change mirrors the exist
   **Done when**: ACs met, mutation report clean, `npm test` + 3-project `typecheck` + lint green, human
   approves the commit.
 
-### Slice 2: A strike's hand lands on the opponent's near edge (and whiffs stop short)
+### Slice 2a: A strike's hand lands on the opponent's near edge (and whiffs stop short) — ✅ COMPLETE (#345)
 
 **Sub-split (the tests showed the seam):** the core reach-to-target — in-range landing, whiff cap,
 degenerate floor, direction=facing, the web `ReplayFrame` mirror + M7 fallback, and the dojo default
-landing — is **Slice 2a** (this PR). The **M2 lean** (a capped forward shoulder shift so the reach
+landing — **was Slice 2a (#345)**. The **M2 lean** (a capped forward shoulder shift so the reach
 reads as a lunge, not a stretched arm) and the **M10 per-figure `attackReach` slider** on `/dojo`
-ride a **follow-up PR (Slice 2b)** — both are tuning/polish over the landing core, and keeping them
-separate holds this PR reviewable. Elbow re-derive came free from Story 4 (`deriveSkeleton`).
+ride **Slice 2b (next)** — both are tuning/polish over the landing core, and keeping them separate
+holds each PR reviewable. Elbow re-derive came free from Story 4 (`deriveSkeleton`).
 
 **Value**: The payoff that sells "fighting" — an in-range strike visibly connects; a real whiff reads
 as a whiff. First slice the spectator sees change.
-**Path**: `scene.ts` `poseFor`/strike layer consumes the frame's `attackReach` → 2-bone IK solves the
-striking arm (elbow from Story 4's `deriveBend`) so the hand reaches the opponent's near body edge,
-clamped to `[FLOOR, attackReach × pxPerSubunit]`, direction = facing, degenerate → forward floor;
-lean+telescope (M2) bridges the scale gap with root x truthful → `figures.ts` strokes it → `/watch`
+**Path**: `scene.ts` `strikeHandFor(striker, opponent)` solves the striking front hand toward the
+opponent's near body edge (`facing·(opp.x − self.x)·SUBUNIT_TO_LOCAL − BODY_HALF_WIDTH`), clamped to
+`[min(FLOOR, cap), cap]` with `cap = attackReach·SUBUNIT_TO_LOCAL`; the pre-solved joint is threaded
+into `poseFor`; Story 4's `deriveSkeleton` re-bends the elbow for free → `figures.ts` strokes it →
+`/watch` + `/dojo`.
+**Class**: Behavior change (`web/` only — no `src/`).
+**Delivered**: `ReplayFrame` gained `attackReach?: number`; `scene.ts` reads it with the **M7 gate**
+(`typeof reach !== "number" || !(reach > 0)` → stance, NaN-safe); `dojo-tape.ts`/`controls.ts` set it
+on the synthetic frames (challenger 240k lands, king 0 idle); the viewport-independent ratio
+`SUBUNIT_TO_LOCAL = 76/240000` keeps the solve in local px. RED (12 tests) → GREEN (2037 pass) →
+manual mutator scan (added `facing:-1`, `attackReach===0` boundary, NaN killers; consolidated the
+redundant reach gate) → REFACTOR. **The M10 `/dojo` `attackReach` slider was carried to Slice 2b.**
 
-- `/dojo`.
-  **Class**: Behavior change (`web/` only — no `src/`).
-  **Required implementation skills**: `tdd`, `testing`, `front-end-testing`, `refactoring`;
-  `mutation-testing` = manual scan (`web/` not Stryker-reachable) per M9.
-  **Includes** (the relocated web contract work): `ReplayFrame` gains `attackReach?: number`;
-  `scene.ts` reads it with the **M7 fallback** (`attackReach ?? 0`, non-numeric/negative → `0`);
-  `dojo-tape.ts` sets it on its synthetic frames; a per-figure `attackReach` control on `/dojo` (M10);
-  the gap slider's reach snap-presets already exist (S1) — verify they line up with contact.
-  **Acceptance criteria** (present for approval before code): in range → hand on near edge; beyond
-  reach → limb stops short at the cap; gap ≈ 0 / opponent behind facing → minimal forward floor, never
-  backward, never NaN; `attackReach` absent/negative → stance pose (M7); scrub forward/back → identical
-  joints (M-purity).
-  **RED**: exact-assertion `scene.test.tsx` cases (in-range hand x = near-edge target; out-of-range
-  hand x = shoulder + cap; degenerate = forward floor; absent → stance) recomputed independently per
-  the mutation-safe pattern.
-  **GREEN / MUTATE / KILL / REFACTOR**: minimum IK math; manual mutator scan; `/dojo` visual sign-off.
-  **Done when**: ACs met, manual scan done, `/dojo` sign-off, checks green, human approves.
-  **Note**: this is the largest slice — if it grows past one reviewable PR during TDD, sub-split as
-  2a (in-range land + elbow re-derive), 2b (clamp/whiff + degenerate floor), 2c (lean+telescope). Do
-  not pre-split; let the tests show the seam.
+### Slice 2b: A strike leans into its reach, and `/dojo` can dial each fighter's `attackReach` (M2 · M10) — ✅ IMPLEMENTED (pending commit + PR)
+
+**Value**: Two finishing touches on the landing core. **M2 lean** — a long reach currently reads as a
+single over-stretched arm; a small, capped forward shift of the striking shoulder (root x untouched,
+so world position stays truthful) makes the same reach read as a _lunge into the technique_. **M10
+slider** — `/dojo` gets a per-figure `attackReach` control so every move's contact (short jab →
+long thrust kick) can be dialled and signed off by eye, not just the two defaults 2a baked in.
+**Path**: `scene.ts` — after `strikeHandFor` picks the hand target, shift the striking shoulder (and
+only the shoulder) forward by a capped fraction of the reached distance so the arm isn't the sole
+source of extension; `deriveSkeleton` re-bends the elbow from the new shoulder for free. Root x and
+every other joint stay put (M2: "root x truthful"). `/dojo`: `FigureControlPanel.tsx` gains an
+`attackReach` range input wired through `DojoApp` state into `controlsToFrame` (the data field already
+flows since 2a); a11y label via aria-labelledby-from-span, matching the existing band/posture controls.
+**Class**: Behavior change (`web/` only — no `src/`).
+**Required implementation skills**: `tdd`, `testing`, `front-end-testing`, `refactoring`;
+`mutation-testing` = manual scan (`web/` not Stryker-reachable) per M9.
+**Acceptance criteria** (present for approval before code):
+
+- **M2 lean**: an in-range strike shifts the **upper body** (head + shoulder) forward by a **capped**
+  amount (a longer reach → a larger, still-capped lean; the cap holds the plateau); an
+  idle/guard/downed frame → **no** shift. The **lower body (hip + both feet) stays planted** and the
+  **rear hand keeps its endpoint** — only the shared `shoulder` anchor leans, so the derived elbows
+  re-bend from it (M2: "only the upper body leans"). The fighter's **root x is untouched** (world
+  position stays truthful). Fixed local +x (facing carried by the flip); pure function of the frame.
+- **M10 slider**: `/dojo` renders a per-figure `attackReach` control; dragging it changes that
+  figure's committed reach so the strike lands at short vs long gaps (a dialled-down reach whiffs at a
+  gap 2a's default would land); the control has an accessible name; the King's control defaults to `0`.
+
+**Delivered**: `scene.ts` — a `strikeLean(handX) = min(CAP 16, handX × RATIO 0.5)` helper; `poseFor`
+shifts `head.x` + `shoulder.x` forward by the lean only when a strike is drawn (same gate as the
+reach), so `deriveSkeleton` re-bends both elbows from the leaned shoulder for free; lower body + rear
+hand endpoint + root x all untouched. `FigureControlPanel.tsx` — an `attackReach` range input
+(`[MIN_GAP, MAX_GAP]`, step 1k, aria-labelledby-from-span, `k` read-out) patching the figure's
+`FigureControls` signal (the data field already flowed since 2a; no `DojoApp`/`controls.ts` change).
+Tested through `DojoApp.test.tsx` (the panel has no separate test file). RED (7 lean + 2 slider drive
+tests) → GREEN (2047 pass) → updated 2 elbow-strike expectations to the leaned shoulder `{16,-64}` +
+scoped the gap read-out to its group (the reach read-out now also shows a `k`) → manual mutator scan
+(min↔max, cap/ratio retune, ±lean, drop-head/shoulder lean, facing-sign, root-x, wrong patch field,
+`Number()` drop — all killed; added a facing-local lean test, a root-x-truthful test, and per-figure
+read-out pins) → REFACTOR `N/A` (the 2-line lean spread is inline-clear). **`/dojo` visual sign-off
+(M9) is the human step.**
+**Done when**: ACs met, manual scan done, `/dojo` sign-off, checks green, human approves.
 
 ### Slice 3: A throw reaches both grab hands to the opponent (M8)
 

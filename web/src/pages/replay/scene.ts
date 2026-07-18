@@ -163,11 +163,28 @@ const deriveSkeleton = (stance: Stance): Skeleton => ({
   kneeR: deriveBend(stance.hip, stance.footR, BEND_FORWARD, KNEE_BEND),
 });
 
+// ─── M2 lean: a committed strike leans the upper body forward INTO the reach ──────────────────────
+// The arm alone can't span the engine's reach at this body scale, so a drawn strike shifts the upper
+// body (head + shoulder) FORWARD toward the target — a lunge — and the arm telescopes for the
+// remainder, reading as a committed step-in rather than one over-stretched limb. Viewer-only cosmetic:
+// the fighter's root x (its truthful tape position) is untouched; only the local pose leans. The shift
+// is a fraction of the hand's forward reach, CAPPED so a long technique lunges but never topples, in
+// local +x (the container flip carries facing). Both constants are tuned by eye in /dojo.
+const STRIKE_LEAN_RATIO = 0.5;
+const STRIKE_LEAN_CAP = 16;
+
+// The upper-body forward shift for a strike whose hand reaches `handX` local px: a fraction of that
+// reach, bounded by the cap. Only a positive handX ever reaches here (a drawn strike always floors
+// forward), so no lower bound is needed.
+const strikeLean = (handX: number): number =>
+  Math.min(STRIKE_LEAN_CAP, handX * STRIKE_LEAN_RATIO);
+
 // The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
 // over everything (highest precedence — an early return, so a downed fighter is never also striking
 // or throwing, and it keeps its OWN authored mid-joints rather than the derived bend); otherwise the
 // striking hand (`strikeHand` — already solved toward the opponent by strikeHandFor, or `null` for no
-// strike to draw) takes the front hand (handR); a guard raises the rear hand (handL) to the incoming
+// strike to draw) takes the front hand (handR) AND leans the upper body (head + shoulder) forward into
+// the reach (M2 lean, strike-only); a guard raises the rear hand (handL) to the incoming
 // band; a throw locks BOTH hands into a forward grab. All are TOTAL — an idle fighter, a 0 /
 // out-of-range band, or a defensively-zeroed reach keeps the stance hand. The layers are independent
 // (and mutually exclusive in the engine), so they compose with each other and with any stance (an
@@ -180,10 +197,18 @@ const poseFor = (frame: ReplayFrame, strikeHand: Joint | null): Skeleton => {
 
   const stance = stanceFor(frame.posture);
   const guardY = bandHeight(frame.guardBand);
+  // A drawn strike leans the upper body forward into the reach (M2); no strike ⇒ no lean.
+  const lean = strikeHand === null ? 0 : strikeLean(strikeHand.x);
 
   const endpoints: Stance = {
     ...stance,
-    ...(strikeHand === null ? {} : { handR: strikeHand }),
+    ...(strikeHand === null
+      ? {}
+      : {
+          head: { x: stance.head.x + lean, y: stance.head.y },
+          shoulder: { x: stance.shoulder.x + lean, y: stance.shoulder.y },
+          handR: strikeHand,
+        }),
     ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
     ...(frame.throwing ? GRAB : {}),
   };
