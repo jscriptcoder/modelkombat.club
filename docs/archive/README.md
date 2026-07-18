@@ -985,7 +985,7 @@ the "Fight replays — in development" teaser stays a non-link).
 - **Slice 1 — a scrub bar seeks to any tick + end-of-fight auto-pause** (PR #325, `feat/replay-transport-scrub`)
   — the `transport` model gained two behaviors: `advance` now **auto-pauses** at `lastTick` (the toggle
   returns to Play instead of freezing on Pause over the final frame), and a new pure `seek(t, tick,
-  lastTick)` (clamp into `[0, lastTick]`, always pause). `ReplayPlayer` renders a native
+lastTick)` (clamp into `[0, lastTick]`, always pause). `ReplayPlayer` renders a native
   `<input type=range>` bound to `round(playhead)` (live-tracks during play; `onInput` → `seek` pauses so
   the per-frame write stops fighting the drag), plus a muted-mono **`tick N / M`** readout + `aria-valuetext`
   sourced from the tape exactly like the HUD, so the two always agree.
@@ -1008,3 +1008,48 @@ inline). Shared story-split docs — [replay-viewer-decisions.md](replay-viewer-
 **S4 (transport) complete — the entire replay-viewer roadmap is done (S1 skeleton → S2 postures →
 S3 browse → S4 transport, 4 of 4 stories).** The `/watch` viewer now browses the King's fights, plays
 any one back as karate-doing stickmen, and gives full transport control. No replay-viewer work remains.
+
+## `/dojo` pose lab — "make it fight" arc, Story 1 ✅ COMPLETE
+
+**Tune the pose model in isolation.** A follow-on arc to the `/watch` viewer above: make the stickmen
+actually look like they're fighting (heads · scale · bending limbs · strikes-connect — Stories 2–5).
+Story 1 builds the **harness** those later slices are demoed on — a permanent **dark** dev route
+`/dojo` that renders two fighters through the **real** `scene()`/`createStage` pipeline (a hand-built
+synthetic tape, not a replay), with live controls. **Web-only** — the lab drives the identical
+projection `/watch` ships and imports nothing new from `src/` (only `scene.ts` gained a `WORLD_WIDTH`
+export in Slice 1); **no `src/` logic / `api/` / TCB / `INPUT_HASH` / `BENCHMARK_VERSION` change**.
+`web/**` is outside Stryker → each slice recorded **Mutation: N/A (Stryker)** and substituted
+exhaustive exact-assertion tests (pure builder + mapper + preset table through the real projection) +
+a manual mutator scan + a `/dojo` visual sign-off. The route stays dark (no Nav link, noindex, off the
+sitemap).
+
+- **Slice 1 — two default-posed fighters through the real pipeline** (PR #329, `feat/dojo-pose-lab`) —
+  the walking skeleton: `dojo.html` + `dojo.tsx` entry → a pure synthetic-tape builder (default
+  `FigureControls` + default gap) → `scene()` → `createStage().apply()` mounts two figure roots
+  (challenger mid-strike vs idle king at gyaku reach), asserted via the scene graph like `figures.test`.
+  Vite input + Vercel `/dojo` rewrite; `scene.ts` gains a behavior-preserving `WORLD_WIDTH` export the
+  builder reuses.
+- **Slice 2 — per-figure controls re-pose each fighter (free combos)** (PR #330,
+  `feat/dojo-figure-controls`) — each fighter gets a `FigureControlPanel` over its RAW frame pose fields
+  (posture · facing · attacking · attack/guard band · throwing · knockdown) — deliberately the raw fields
+  (no action enum), so engine-impossible combos are reachable by design (M10) and `poseFor` resolves
+  precedence (knockdown + throwing → PRONE). A pure `controlsToFrame` mapper + per-figure reactive signals
+  feed the builder; an injectable spy-stage seam asserts the control→tape wiring without a WebGL canvas.
+- **Slice 3 — world-gap slider with move-reach snap presets** (PR #331, `feat/dojo-gap-presets`) — a
+  shared **Spacing** control sets the distance between the two fighters: a reach-preset dropdown snaps the
+  gap to any of the **13** engine move reaches (`reach-presets.ts` — a documented mirror of `rules.ts`,
+  like `WORLD_WIDTH`; the plan's earlier 12-list omitted `hiza-geri`, corrected to the full arsenal) + a
+  free slider (`0 … 330k`, step 1k) with a live `k`-shorthand read-out. A reactive `gap` signal feeds the
+  existing builder (separation math already covered by `dojo-tape.test`). REFACTOR folded the default gap
+  onto the preset table (the opening gap IS the gyaku preset). GOTCHA: `<label for>` doesn't associate an
+  accessible name for a range `<input>` in this testing stack either (not just `<select>`) →
+  `aria-labelledby` from a span.
+
+[replay-viewer-fight-s1-dojo.md](replay-viewer-fight-s1-dojo.md) — the plan (all 3 slices + whole-story
+acceptance criteria inline). The spanning **"make it fight" design trail** —
+`plans/replay-viewer-fight-decisions.md` + `plans/replay-viewer-fight-stories.md` — stays **live in
+`plans/`** (Stories 2–5 remain: model-identity coin heads · big fighters via world-scale · bending limbs
+with elbows/knees · strikes-connect via `attackReach` + IK).
+
+**Story 1 (`/dojo` pose lab) complete — the calibration harness is ready.** Stories 2–5 of the "make it
+fight" arc (heads · scale · bends · connect) build on it, each demoed in `/dojo`.
