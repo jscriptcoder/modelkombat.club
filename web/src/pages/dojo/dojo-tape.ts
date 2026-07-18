@@ -31,8 +31,8 @@ export const buildDojoTape = ({ a, b, gap }: DojoTapeInput): ReplayTape => [
   },
 ];
 
-// The default first-load spacing: gyaku-zuki reach, so the pair opens at a real striking distance.
-export const DEFAULT_GAP = 240_000;
+// The default first-load spacing (gyaku-zuki reach) lives with the preset table in reach-presets.ts —
+// the opening gap IS one of the snap presets, so there is one source of truth (see DEFAULT_GAP there).
 
 // The default fighter frames are DERIVED from the pose-lab's default control states (controls.ts) —
 // one source of truth for the opening scene, so Slice 1's first-load pose can't drift from the control

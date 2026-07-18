@@ -27,6 +27,50 @@
   border-radius: 12px;
 }
 
+/* The shared spacing control sits between the stage and the per-figure panels: a reach-preset
+   dropdown + a free gap slider that set the world distance between the two fighters. */
+.spacing-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.spacing-controls legend {
+  font-weight: 600;
+  padding: 0 0.5rem;
+}
+
+.control-slider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 14rem;
+}
+
+.control-slider label {
+  color: var(--muted);
+}
+
+.control-slider input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* A fixed-width, tabular read-out so the number doesn't jitter the slider as the gap changes. */
+.control-gap-value {
+  min-width: 3.5rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--accent);
+}
+
 /* Two panels side by side (challenger | king), wrapping to a stack on narrow viewports. */
 .dojo-controls {
   display: flex;
