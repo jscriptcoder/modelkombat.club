@@ -216,51 +216,191 @@ describe("scene — stance geometry by posture", () => {
   });
 });
 
-describe("scene — strike extension by band", () => {
-  // An attacking fighter throws its front arm (handR) forward to the strike's band height. The
-  // reach is in the figure's LOCAL frame (x forward), so the container flip (S1 facing) turns it
-  // into the correct on-screen direction — the strike geometry never needs to know the facing.
-  // Neutral front hand: { x: 18, y: -44 } (the STAND handR). Bands sit ascending up the screen
-  // (up is negative): low -24, mid -46, high -68.
-  const NEUTRAL_HAND = { x: 18, y: -44 };
+describe("scene — strike reach-to-target", () => {
+  // A committed strike AIMS its front arm (handR) at the OPPONENT's near body edge, clamped to the
+  // move's true reach — not a fixed forward stub (Story 5). The reach is viewport-independent in
+  // LOCAL px: the reference body is 76px tall (STAND: head −76, feet 0) and that height is projected
+  // to BODY_HEIGHT_SUB (240k) world sub-units, so one sub-unit is exactly 76/240000 local px — a
+  // world gap of 240k is one body height (76 local px) between centres. The near edge is one body
+  // half-width (10) nearer, so an in-range gyaku strike lands at 76 − 10 = 66; the reach clamps to
+  // [STRIKE_FLOOR_X (24), attackReach·(76/240000)]. The y is the band height (low −24 / mid −46 /
+  // high −68), unchanged. Every expected x below is that physical anchor, recomputed independently
+  // of the production formula. Reach is a fixed LOCAL direction (+x forward); the container flip
+  // (S1 facing) turns it on-screen — the geometry never reads facing itself.
+  const STRIKE_FLOOR_X = 24; // point-blank floor (a minimal forward technique), mirrors scene.ts
+  const NEUTRAL_HAND = { x: 18, y: -44 }; // the STAND front hand (the no-reach fallback)
 
-  const poseAttacking = (
-    attackBand: number,
-    extra: Partial<ReplayFrame> = {},
-  ) =>
+  // Striker `a` faces right at x 150000; the opponent `b` sits `gap` sub-units away (front = +gap,
+  // behind = −gap) with the striker committing a `band` strike of world `reach`. Returns a's pose.
+  const poseStriking = ({
+    gap,
+    band = 2,
+    reach = 240_000,
+    extra = {},
+  }: {
+    gap: number;
+    band?: number;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  }) =>
     scene(
-      [tickOf(0, { attacking: true, attackBand, ...extra }, {})],
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: reach,
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
       0,
       VIEWPORT,
     ).a.pose;
 
-  it("extends the striking hand forward to the low band height", () => {
-    expect(poseAttacking(1).handR).toEqual(scaled({ x: 40, y: -24 }));
+  it("lands the front hand on the opponent's near edge when in range", () => {
+    // gyaku gap (240k) at gyaku reach (240k): the centres are 76 local px apart (one body height),
+    // the near edge one BODY_HALF_WIDTH nearer ⇒ the fist lands at 76 − 10 = 66 local px forward.
+    const handR = poseStriking({ gap: 240_000, band: 2 }).handR;
+
+    expect(handR).toEqual(scaled({ x: 66, y: -46 }));
+    // ...and it lands ON the near edge, short of the opponent's centre (76), not through it.
+    expect(handR.x).toBeLessThan(scaled({ x: 76, y: 0 }).x);
   });
 
-  it("extends the striking hand forward to the mid band height", () => {
-    expect(poseAttacking(2).handR).toEqual(scaled({ x: 40, y: -46 }));
-  });
-
-  it("extends the striking hand forward to the high band height", () => {
-    expect(poseAttacking(3).handR).toEqual(scaled({ x: 40, y: -68 }));
-  });
-
-  it("stacks the three bands as distinct heights ascending up the screen", () => {
-    // Higher band ⇒ higher on screen ⇒ more negative y. A collapsed or mis-ordered map fails here.
-    const low = poseAttacking(1).handR.y;
-    const mid = poseAttacking(2).handR.y;
-    const high = poseAttacking(3).handR.y;
-
-    expect(low).toBeGreaterThan(mid);
-    expect(mid).toBeGreaterThan(high);
-  });
-
-  it("leaves the front hand neutral when not attacking, even with a stale band", () => {
-    // The `attacking` flag is the gate, not the band: an idle fighter carrying a non-zero band must
-    // not throw a phantom strike (kills the "drop the attacking gate" mutant).
+  it("aims by the facing — a left-facing striker lands on an opponent to its LEFT", () => {
+    // Reach is a fixed LOCAL +x direction; the striker's facing decides which way that maps in the
+    // world. A left-facer (facing −1) with the opponent one gyaku gap to its LEFT reaches the SAME
+    // local landing (66) — the container flip turns it leftward on screen. Kills a "drop facing" or
+    // facing-sign mutant that all the facing-right cases miss.
     const pose = scene(
-      [tickOf(0, { attacking: false, attackBand: 2 }, {})],
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: 240_000,
+            x: 400_000,
+            facing: -1,
+          },
+          { x: 160_000 }, // 240k to the striker's left = in front of a left-facer
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.handR).toEqual(scaled({ x: 66, y: -46 }));
+  });
+
+  it("keeps the striking hand at its stance pose when attackReach is exactly 0 (idle value)", () => {
+    // reach 0 is the idle sentinel — a committed strike carrying it (⇒ no reach) keeps the stance
+    // hand, distinct from a positive reach. Pins the `> 0` boundary (kills a `>= 0` mutant that would
+    // let a 0-reach strike solve to the shoulder).
+    expect(poseStriking({ gap: 240_000, reach: 0 }).handR).toEqual(
+      scaled(NEUTRAL_HAND),
+    );
+  });
+
+  it("keeps the striking hand at its stance pose for a non-numeric (NaN) reach (defensive)", () => {
+    // A NaN from a malformed wire is rejected like an absent reach — the guard never lets a NaN reach
+    // the maths and produce a NaN joint (M7).
+    expect(poseStriking({ gap: 240_000, reach: NaN }).handR).toEqual(
+      scaled(NEUTRAL_HAND),
+    );
+  });
+
+  it("carries the strike to whichever band it targets — low, mid, high", () => {
+    // The reach x is the same in-range landing (66); the y is the band ladder, ascending up-screen.
+    expect(poseStriking({ gap: 240_000, band: 1 }).handR).toEqual(
+      scaled({ x: 66, y: -24 }),
+    );
+    expect(poseStriking({ gap: 240_000, band: 2 }).handR).toEqual(
+      scaled({ x: 66, y: -46 }),
+    );
+    expect(poseStriking({ gap: 240_000, band: 3 }).handR).toEqual(
+      scaled({ x: 66, y: -68 }),
+    );
+  });
+
+  it("stops the hand short at the reach cap when the opponent is beyond reach (a whiff)", () => {
+    // Opponent at ushiro distance (330k) but only a gyaku reach (240k): the near edge is 94.5 local
+    // px away, past the cap of 240k·(76/240000) = 76 — the hand stops at 76, short of the surface.
+    const handR = poseStriking({ gap: 330_000, band: 2, reach: 240_000 }).handR;
+
+    expect(handR).toEqual(scaled({ x: 76, y: -46 }));
+    // The in-range landing would have been 66; a whiff extends FURTHER (to the cap) yet still short.
+    expect(handR.x).toBeGreaterThan(poseStriking({ gap: 240_000 }).handR.x);
+  });
+
+  it("shows the forward floor when the fighters overlap — never reaches backward", () => {
+    // gap 0: the near edge is behind the shoulder (−10 local px). The clamp floors the reach at the
+    // point-blank STRIKE_FLOOR_X ⇒ a minimal forward technique, never a backward (−x) arm.
+    const handR = poseStriking({ gap: 0, band: 2 }).handR;
+
+    expect(handR).toEqual(scaled({ x: STRIKE_FLOOR_X, y: -46 }));
+    expect(handR.x).toBeGreaterThan(0);
+  });
+
+  it("shows the forward floor when the opponent is behind the facing (never NaN, never backward)", () => {
+    // Striker faces RIGHT but the opponent is to its LEFT: the in-front distance is negative, so the
+    // reach floors forward — the hand never swings toward −x, and the maths never divides to a NaN.
+    const handR = poseStriking({ gap: -100_000, band: 2 }).handR;
+
+    expect(handR).toEqual(scaled({ x: STRIKE_FLOOR_X, y: -46 }));
+    expect(Number.isNaN(handR.x)).toBe(false);
+  });
+
+  it("never reaches past its own attackReach cap, even point-blank (short move)", () => {
+    // A reach whose whole projection (60000·76/240000 = 19 local px) is SHORTER than the floor:
+    // point-blank, the hand stops at the cap (19), not the floor (24) — reach bounds the floor.
+    const handR = poseStriking({ gap: 0, band: 2, reach: 60_000 }).handR;
+
+    expect(handR).toEqual(scaled({ x: 19, y: -46 }));
+    expect(handR.x).toBeLessThan(scaled({ x: STRIKE_FLOOR_X, y: 0 }).x);
+  });
+
+  it("keeps the striking hand at its stance pose when attackReach is absent (defensive → 0)", () => {
+    // A malformed wire frame with NO attackReach field at all ⇒ treated as 0 ⇒ no reach ⇒ the hand
+    // stays at the stance neutral pose, exactly as an idle fighter (M7). The frame factory omits
+    // attackReach, so this is the genuinely-absent wire (in range at 240k, so a reach WOULD land).
+    const pose = scene(
+      [
+        tickOf(
+          0,
+          { attacking: true, attackBand: 2, x: 150_000, facing: 1 },
+          { x: 390_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND));
+  });
+
+  it("keeps the striking hand at its stance pose when attackReach is negative (defensive → 0)", () => {
+    expect(poseStriking({ gap: 240_000, reach: -5 }).handR).toEqual(
+      scaled(NEUTRAL_HAND),
+    );
+  });
+
+  it("leaves the front hand neutral when not attacking, even with a stale band and reach", () => {
+    // The `attacking` flag is the gate, not the band: an idle fighter carrying a non-zero band +
+    // reach must not throw a phantom strike (kills the "drop the attacking gate" mutant).
+    const pose = scene(
+      [
+        tickOf(
+          0,
+          { attacking: false, attackBand: 2, attackReach: 240_000 },
+          { x: 390_000 },
+        ),
+      ],
       0,
       VIEWPORT,
     ).a.pose;
@@ -269,21 +409,44 @@ describe("scene — strike extension by band", () => {
   });
 
   it("does not extend when attacking with a zero band", () => {
-    expect(poseAttacking(0).handR).toEqual(scaled(NEUTRAL_HAND));
+    expect(poseStriking({ gap: 240_000, band: 0 }).handR).toEqual(
+      scaled(NEUTRAL_HAND),
+    );
   });
 
   it("does not extend for an out-of-range attack band (total fallback)", () => {
-    expect(poseAttacking(9).handR).toEqual(scaled(NEUTRAL_HAND));
+    expect(poseStriking({ gap: 240_000, band: 9 }).handR).toEqual(
+      scaled(NEUTRAL_HAND),
+    );
   });
 
   it("draws both the airborne stance and the strike for an air attack", () => {
-    const pose = poseAttacking(2, { posture: 2 });
+    const pose = poseStriking({ gap: 240_000, band: 2, extra: { posture: 2 } });
 
     // The air stance still tucks the legs...
     expect(pose.footL).toEqual(scaled({ x: -10, y: -18 }));
     expect(pose.footR).toEqual(scaled({ x: 10, y: -18 }));
-    // ...while the strike extends the front hand on the same tick.
-    expect(pose.handR).toEqual(scaled({ x: 40, y: -46 }));
+    // ...while the strike lands the front hand on the near edge on the same tick.
+    expect(pose.handR).toEqual(scaled({ x: 66, y: -46 }));
+  });
+
+  it("is a pure function of the frame — a backward scrub re-lands the same hand", () => {
+    const tape: ReplayTape = [
+      tickOf(
+        0,
+        { attacking: true, attackBand: 2, attackReach: 240_000, x: 150_000 },
+        { x: 390_000 },
+      ),
+      tickOf(1, {}, {}),
+    ];
+
+    const atStrike = scene(tape, 0, VIEWPORT).a.pose.handR;
+
+    scene(tape, 1, VIEWPORT); // advance...
+    const backAgain = scene(tape, 0, VIEWPORT).a.pose.handR; // ...then scrub back
+
+    expect(backAgain).toEqual(atStrike);
+    expect(backAgain).toEqual(scaled({ x: 66, y: -46 }));
   });
 });
 
@@ -435,12 +598,30 @@ describe("scene — knockdown prone pose and wake-up", () => {
   });
 
   it("overrides a strike — a downed fighter is not also striking", () => {
-    // knockdown:true with a live attack on the same tick still renders prone; the front hand is
-    // NOT thrown to the strike reach (kills a "compose knockdown with the action layers" mutant).
-    const pose = poseDowned({ attacking: true, attackBand: 3 });
+    // knockdown:true with a live, IN-RANGE attack on the same tick still renders prone; the front
+    // hand stays prone, NOT reached toward the opponent (kills a "compose knockdown with the action
+    // layers" mutant). The attack carries a real reach + an in-range opponent, so a composed strike
+    // WOULD land forward — proving the early return, not an absent reach, is what suppresses it.
+    const pose = scene(
+      [
+        tickOf(
+          0,
+          {
+            knockdown: true,
+            attacking: true,
+            attackBand: 3,
+            attackReach: 240_000,
+            x: 150_000,
+          },
+          { x: 390_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
 
     expect(pose).toEqual(SCALED_PRONE);
-    expect(pose.handR).not.toEqual(scaled({ x: 40, y: -68 })); // the high-band strike geometry
+    expect(pose.handR).toEqual(scaled(PRONE.handR)); // the prone hand, not a forward strike landing
   });
 
   it("overrides a throw — prone wins over the grab that is otherwise applied last", () => {
@@ -528,15 +709,22 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
   });
 
   it("re-derives the elbow from a thrown strike hand (the bend follows the technique)", () => {
-    // A mid strike throws handR to (40,-46); the elbow re-derives from the MOVED endpoint.
+    // A mid strike lands handR on the opponent's near edge (66,-46) at gyaku distance; the elbow
+    // re-derives from the MOVED endpoint.
     const pose = scene(
-      [tickOf(0, { attacking: true, attackBand: 2 }, {})],
+      [
+        tickOf(
+          0,
+          { attacking: true, attackBand: 2, attackReach: 240_000, x: 150_000 },
+          { x: 390_000 },
+        ),
+      ],
       0,
       VIEWPORT,
     ).a.pose;
 
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 0, y: -64 }, { x: 40, y: -46 }),
+      scaledElbow({ x: 0, y: -64 }, { x: 66, y: -46 }),
     );
     // ...distinct from the resting-stance elbow (proves it tracked the hand, not a fixed value).
     expect(pose.elbowR).not.toEqual(
@@ -557,15 +745,22 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
   it("bows the elbow correctly for a high strike, where the hand rises above the shoulder", () => {
     // A high-band strike lifts handR ABOVE the shoulder (y −68 vs −64), which flips which
     // perpendicular side counts as "backward" — this exercises the opposite bow-direction branch
-    // from the resting/mid-strike arms (where the hand hangs below the shoulder).
+    // from the resting/mid-strike arms (where the hand hangs below the shoulder). The hand lands on
+    // the near edge (66,−68) at gyaku distance.
     const pose = scene(
-      [tickOf(0, { attacking: true, attackBand: 3 }, {})],
+      [
+        tickOf(
+          0,
+          { attacking: true, attackBand: 3, attackReach: 240_000, x: 150_000 },
+          { x: 390_000 },
+        ),
+      ],
       0,
       VIEWPORT,
     ).a.pose;
 
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 0, y: -64 }, { x: 40, y: -68 }),
+      scaledElbow({ x: 0, y: -64 }, { x: 66, y: -68 }),
     );
   });
 
@@ -584,7 +779,11 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
 
   it("is a pure function of the frame — a backward scrub re-derives the same elbow", () => {
     const tape: ReplayTape = [
-      tickOf(0, { attacking: true, attackBand: 2 }, {}),
+      tickOf(
+        0,
+        { attacking: true, attackBand: 2, attackReach: 240_000, x: 150_000 },
+        { x: 390_000 },
+      ),
       tickOf(1, {}, {}),
     ];
 

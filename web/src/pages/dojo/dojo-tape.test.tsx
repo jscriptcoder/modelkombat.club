@@ -116,6 +116,7 @@ describe("the default dojo scene — challenger mid-strike vs an idle king, faci
 
     expect(a.attacking).toBe(true);
     expect(a.attackBand).toBe(2); // mid band
+    expect(a.attackReach).toBe(240_000); // gyaku reach — lands at the default gap
     expect(a.facing).toBe(1); // faces the king on its right
     expect(a.posture).toBe(0); // a standing strike — not a crouch
     expect(a.guardBand).toBe(0); // not guarding
@@ -128,6 +129,7 @@ describe("the default dojo scene — challenger mid-strike vs an idle king, faci
 
     expect(b.attacking).toBe(false);
     expect(b.attackBand).toBe(0); // no strike queued
+    expect(b.attackReach).toBe(0); // idle — no committed reach
     expect(b.facing).toBe(-1); // faces the challenger on its left
     expect(b.posture).toBe(0); // standing
     expect(b.guardBand).toBe(0); // not guarding
@@ -163,9 +165,10 @@ describe("the default dojo scene renders two fighters through the real scene()/c
     expect(stage.a.root.scale.x).toBe(1);
     expect(stage.b.root.scale.x).toBe(-1);
 
-    // The default poses render through the pipeline: the challenger's front hand is thrown to the
-    // mid-band strike reach (x 40, world-scaled); the idle king's stays at its neutral stance (x 18).
-    expect(stage.a.handR.x).toBe(s(40));
+    // The default poses render through the pipeline: the challenger's front hand LANDS on the king's
+    // near edge (x 66 local, world-scaled) at the gyaku-reach gap; the idle king's stays at its
+    // neutral stance (x 18).
+    expect(stage.a.handR.x).toBe(s(66));
     expect(stage.b.handR.x).toBe(s(18));
   });
 });

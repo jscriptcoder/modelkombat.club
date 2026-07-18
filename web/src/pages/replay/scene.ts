@@ -83,10 +83,6 @@ const stanceFor = (posture: number): Stance =>
 const bandHeight = (band: number): number | null =>
   band === 1 ? -24 : band === 2 ? -46 : band === 3 ? -68 : null;
 
-// How far forward (local +x) a striking hand reaches — past the neutral front hand at x 18. The
-// container flip (S1 facing) turns this local reach into the correct on-screen direction.
-const STRIKE_REACH_X = 40;
-
 // How far forward a raised guard sits — modest (protective) vs the strike's committed reach, and on
 // the rear hand (handL), so a strike and a guard never fight over the same arm.
 const GUARD_REACH_X = 8;
@@ -169,25 +165,25 @@ const deriveSkeleton = (stance: Stance): Skeleton => ({
 
 // The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
 // over everything (highest precedence — an early return, so a downed fighter is never also striking
-// or throwing, and it keeps its OWN authored mid-joints rather than the derived bend); otherwise a
-// strike throws the front hand (handR) forward to the attacked band; a guard raises the rear hand
-// (handL) to the incoming band; a throw locks BOTH hands into a forward grab. All are TOTAL — an idle
-// fighter, or a 0 / out-of-range band, keeps the stance hand. The layers are independent (and mutually
-// exclusive in the engine), so they compose with each other and with any stance (an air-attack keeps
-// the AIR tucked legs). The throw is applied LAST of the action layers, so it wins if ever combined
-// with a strike/guard. Finally the mid-joints are DERIVED from the resulting endpoints, so a strike /
-// guard / throw re-bends the elbow to follow the moved hand. Gates: knockdown ← `knockdown`, strike ←
-// `attacking`, guard ← `guardBand` (0 = none), throw ← `throwing`.
-const poseFor = (frame: ReplayFrame): Skeleton => {
+// or throwing, and it keeps its OWN authored mid-joints rather than the derived bend); otherwise the
+// striking hand (`strikeHand` — already solved toward the opponent by strikeHandFor, or `null` for no
+// strike to draw) takes the front hand (handR); a guard raises the rear hand (handL) to the incoming
+// band; a throw locks BOTH hands into a forward grab. All are TOTAL — an idle fighter, a 0 /
+// out-of-range band, or a defensively-zeroed reach keeps the stance hand. The layers are independent
+// (and mutually exclusive in the engine), so they compose with each other and with any stance (an
+// air-attack keeps the AIR tucked legs). The throw is applied LAST of the action layers, so it wins if
+// ever combined with a strike/guard. Finally the mid-joints are DERIVED from the resulting endpoints,
+// so a strike / guard / throw re-bends the elbow to follow the moved hand. Gates: knockdown ←
+// `knockdown`, strike ← `strikeHand` (non-null), guard ← `guardBand` (0 = none), throw ← `throwing`.
+const poseFor = (frame: ReplayFrame, strikeHand: Joint | null): Skeleton => {
   if (frame.knockdown) return PRONE;
 
   const stance = stanceFor(frame.posture);
-  const strikeY = frame.attacking ? bandHeight(frame.attackBand) : null;
   const guardY = bandHeight(frame.guardBand);
 
   const endpoints: Stance = {
     ...stance,
-    ...(strikeY === null ? {} : { handR: { x: STRIKE_REACH_X, y: strikeY } }),
+    ...(strikeHand === null ? {} : { handR: strikeHand }),
     ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
     ...(frame.throwing ? GRAB : {}),
   };
@@ -256,6 +252,62 @@ export const BODY_HEIGHT_SUB = 240_000;
 // from STAND so it can never drift from the model it measures.
 const REF_BODY_HEIGHT_PX = STAND.footL.y - STAND.head.y;
 
+// ─── strike reach-to-target (Story 5) ────────────────────────────────────────────────────────────
+// One world sub-unit as a length in the pose's LOCAL-px frame. Because the body is projected by the
+// SAME pxPerSubunit that positions it (decision 3), this ratio is viewport-INDEPENDENT — the reference
+// body height in px over the world height it fills. The whole reach solve works in local px through
+// this ratio, so it composes with scalePose exactly like every other authored pose coordinate.
+const SUBUNIT_TO_LOCAL = REF_BODY_HEIGHT_PX / BODY_HEIGHT_SUB;
+
+// The opponent's body half-width in local px: how far their near surface sits in front of their
+// centre. `attackReach` is the engine's centre-to-centre contact distance, so the drawn fist aims one
+// half-width short of the centre to land ON the surface, not inside the torso (M1). Tuned by eye in
+// /dojo.
+const BODY_HALF_WIDTH = 10;
+
+// The point-blank floor (local px): the minimal forward extension a committed strike shows when the
+// opponent is overlapping or behind the facing (M3) — a jab into space rather than a retracted or
+// backward arm. Bounded by the move's own reach cap, so a very short technique never out-reaches it.
+const STRIKE_FLOOR_X = 24;
+
+// The reach-to-target solve: where the striking hand lands. Returns the front-hand endpoint aimed at
+// the opponent's near body edge, clamped to the move's true reach — or `null` when there is no strike
+// to draw (not attacking, an unmapped band, or a defensively-rejected reach ⇒ the stance hand stays).
+// The y is the band height; only the x reaches. Pure in the two frames' fields + the constants above
+// — no viewport, no cross-frame state — so it is identical on replay and any scrub (M-purity).
+const strikeHandFor = (
+  striker: ReplayFrame,
+  opponent: ReplayFrame,
+): Joint | null => {
+  if (!striker.attacking) return null;
+
+  const y = bandHeight(striker.attackBand);
+
+  if (y === null) return null;
+
+  // The committed reach, read defensively (M7): the tape always carries `attackReach`, but the loader
+  // casts the JSON wholesale, so an absent / non-numeric / non-positive value means "no reach" ⇒ the
+  // striking hand keeps its stance pose (the idle fallback). `!(reach > 0)` rejects NaN as well as ≤0.
+  const reach = striker.attackReach;
+
+  if (typeof reach !== "number" || !(reach > 0)) return null;
+
+  // In-front (facing-relative) distance to the opponent's near edge, in local px. The strike
+  // direction is ALWAYS the facing, so a negative in-front distance (opponent behind / overlapping)
+  // just floors forward — the hand never swings backward, and the arithmetic never divides to a NaN.
+  const centerGap =
+    striker.facing * (opponent.x - striker.x) * SUBUNIT_TO_LOCAL;
+
+  const edgeGap = centerGap - BODY_HALF_WIDTH;
+  const cap = reach * SUBUNIT_TO_LOCAL;
+  // Clamp forward into [floor, cap]: never past the move's reach, never below the point-blank floor,
+  // and the floor itself never exceeds the cap (a short move can't out-reach its own range).
+  const floor = Math.min(STRIKE_FLOOR_X, cap);
+  const x = Math.max(floor, Math.min(edgeGap, cap));
+
+  return { x, y };
+};
+
 // The uniform body scale: how many screen px one reference-px becomes, chosen so a
 // REF_BODY_HEIGHT_PX-tall reference body renders at exactly BODY_HEIGHT_SUB · pxPerSubunit. ONE
 // factor scales every joint, so all proportions hold and every stance/action grows together (no
@@ -308,19 +360,22 @@ export const scene = (
   const groundY = viewport.height * GROUND_RATIO;
   const scale = bodyScale(viewport);
 
-  const figure = (frame: ReplayFrame): Figure => ({
+  // Each fighter's pose needs the OTHER's frame: the strike reach-to-target solve aims the striking
+  // hand at the opponent's near edge (strikeHandFor). Everything else is a pure function of the one
+  // frame; the opponent only feeds the strike layer.
+  const figure = (frame: ReplayFrame, opponent: ReplayFrame): Figure => ({
     x: frame.x * pxPerSubunit,
     y: groundY - frame.y * pxPerSubunit,
     facing: frame.facing,
-    pose: scalePose(poseFor(frame), scale),
+    pose: scalePose(poseFor(frame, strikeHandFor(frame, opponent)), scale),
   });
 
   const p = clampPlayhead(playhead, tape.length);
   const at = tape[p];
 
   return {
-    a: figure(at.a),
-    b: figure(at.b),
+    a: figure(at.a, at.b),
+    b: figure(at.b, at.a),
     hud: {
       tick: at.tick,
       scoreA: at.a.points,

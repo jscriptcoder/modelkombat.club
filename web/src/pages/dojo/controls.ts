@@ -12,6 +12,10 @@ export type FigureControls = {
   guardBand: number;
   throwing: boolean;
   knockdown: boolean;
+  // The committed action's reach in world sub-units (Story 5): how far the strike reaches toward the
+  // opponent. 0 for an idle fighter. The default challenger carries a gyaku-zuki reach so the opening
+  // strike lands at the default gap; a future control lets it be tuned per figure (M10).
+  attackReach: number;
 };
 
 // controlsToFrame: the pure mapper from control state to a render `ReplayFrame`. Passes every pose
@@ -37,6 +41,7 @@ export const DEFAULT_CHALLENGER_CONTROLS: FigureControls = {
   guardBand: 0,
   throwing: false,
   knockdown: false,
+  attackReach: 240_000, // gyaku-zuki reach — lands on the king at the default (gyaku) gap
 };
 
 export const DEFAULT_KING_CONTROLS: FigureControls = {
@@ -47,4 +52,5 @@ export const DEFAULT_KING_CONTROLS: FigureControls = {
   guardBand: 0,
   throwing: false,
   knockdown: false,
+  attackReach: 0, // idle — no committed reach
 };
