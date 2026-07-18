@@ -25,9 +25,10 @@ user-visible capability; they compose rather than layer.
   PR #332, `main` @ `9ecb5f5`). The tuning harness every later slice is demoed on is live.
 - **Story 2 · model-identity heads — ✅ COMPLETE + ARCHIVED** (2026-07-18). 3 slices, PR-per-slice
   (#333 shared source · #334 glyph heads on `/watch` · #335 `/dojo` picker); plan archived at
-  `docs/archive/replay-viewer-fight-s2-heads.md` (archive PR, `main` @ `26b6908`). The "coin" (disc)
+  `docs/archive/replay-viewer-fight-s2-heads.md` (archive PR #336, `main` @ `eff2c36`). The "coin" (disc)
   was dropped mid-plan for a bare glyph head. Fighters now wear their author's mark on real replays.
-- **Story 3 · big fighters (world-scale) — NEXT** (see the split-candidates table row 3).
+- **Story 3 · big fighters (world-scale) — NEXT** (see the split-candidates table row 3). Needs
+  `planning` to slice it; its plan file lands with Slice 1's PR (the S2 pattern — plan shipped in #333).
 - Stories 4–5 (bends · connect) not started.
 
 ## Recommended first slice
