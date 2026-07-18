@@ -3,12 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createStage } from "../replay/figures";
 import { scene, type Viewport } from "../replay/scene";
 import type { ReplayFrame } from "../replay/replay-contract";
-import {
-  buildDojoTape,
-  DEFAULT_CHALLENGER,
-  DEFAULT_GAP,
-  DEFAULT_KING,
-} from "./dojo-tape";
+import { buildDojoTape, DEFAULT_CHALLENGER, DEFAULT_KING } from "./dojo-tape";
+import { DEFAULT_GAP } from "./reach-presets";
 
 // The dojo's synthetic-tape builder centers two hand-posed fighters on the ring so the pose lab
 // renders them through the SAME scene()/createStage pipeline that /watch ships — "what you tune is

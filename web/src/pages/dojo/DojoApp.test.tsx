@@ -138,3 +138,63 @@ describe("DojoApp — per-figure pose controls", () => {
     ).toBeTruthy();
   });
 });
+
+describe("DojoApp — world-gap spacing control", () => {
+  it("snaps the fighter gap to a preset move's reach, repositioning both fighters", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    // Snap to the longest reach in the arsenal.
+    fireEvent.change(getByRole("combobox", { name: "Reach preset" }), {
+      target: { value: "ushiro-geri" },
+    });
+
+    const frame = latest()[0];
+
+    expect(frame.b.x - frame.a.x).toBe(330_000); // ushiro-geri reach
+    expect((frame.a.x + frame.b.x) / 2).toBe(300_000); // still centered on the ring
+  });
+
+  it("sets a free gap from the slider, repositioning both fighters symmetrically", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    fireEvent.input(getByRole("slider", { name: "Gap" }), {
+      target: { value: "100000" },
+    });
+
+    const frame = latest()[0];
+
+    expect(frame.b.x - frame.a.x).toBe(100_000);
+    expect((frame.a.x + frame.b.x) / 2).toBe(300_000);
+  });
+
+  it("shows the current gap as a numeric read-out that tracks the slider", () => {
+    const { getByRole, getByText } = render(() => <DojoApp />);
+
+    // Opens at the default 240k gap.
+    expect(getByText("240k")).toBeTruthy();
+
+    fireEvent.input(getByRole("slider", { name: "Gap" }), {
+      target: { value: "100000" },
+    });
+
+    expect(getByText("100k")).toBeTruthy(); // the read-out follows the gap
+  });
+
+  it("reflects the current gap in the preset selector — a matching reach, else Custom", () => {
+    const { getByRole } = render(() => <DojoApp />);
+
+    // The lab opens at the default 240k gap, which IS gyaku-zuki's reach.
+    expect(
+      getByRole("option", { name: /gyaku-zuki/, selected: true }),
+    ).toBeTruthy();
+
+    // Drag to a value that matches no preset → the selector falls back to Custom.
+    fireEvent.input(getByRole("slider", { name: "Gap" }), {
+      target: { value: "123000" },
+    });
+
+    expect(getByRole("option", { name: "Custom", selected: true })).toBeTruthy();
+  });
+});

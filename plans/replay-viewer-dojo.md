@@ -18,10 +18,10 @@ current pose model in isolation.
 - [x] Navigating to `/dojo` renders **two stickmen** on the dark canvas via the real
   `scene()` + `createStage` pipeline (a synthetic tape, not a real replay). Route ships
   **dark**: no `Nav` link, `noindex,nofollow`, absent from the sitemap. *(Slice 1 · #329)*
-- [ ] **Per-figure controls** set the frame's pose fields **freely** — posture, facing,
+- [x] **Per-figure controls** set the frame's pose fields **freely** — posture, facing,
   attacking, attackBand, guardBand, throwing, knockdown — with **no valid-combo constraint**;
   an engine-impossible combo (e.g. knockdown + throwing) renders per `poseFor` precedence
-  without error.
+  without error. *(Slice 2 · #330)*
 - [ ] A **world-gap slider with move-reach snap presets** (empi 95k … ushiro 330k) sets the
   distance between the two figures; the two roots sit `gap` sub-units apart.
 - [ ] **No `src/` change.** All existing suites stay green. New pure modules covered by
@@ -91,7 +91,7 @@ every builder field + a manual mutator scan of the builder + `DojoStage`; visual
 **Done when**: all criteria met, existing suites green, manual scan + visual sign-off done,
 human approves the commit.
 
-### Slice 2: Per-figure controls re-pose each fighter (free combos)
+### Slice 2: Per-figure controls re-pose each fighter (free combos) — ✅ MERGED (#330)
 
 **Value**: Developer changes a figure's pose fields (posture · facing · attacking · attackBand ·
 guardBand · throwing · knockdown) and that figure re-poses live — the articulation/heads tuning
@@ -132,13 +132,17 @@ pair at `world-mid ± gap/2` → `scene()` → `DojoStage.apply()` repositions b
 N/A → manual scan. `refactoring`: assess.
 **Reduction program**: N/A.
 **Acceptance criteria** (confirm before code):
-- The **reach-preset table** exactly mirrors the M10 engine reaches (empi 95k, throw 120k,
-  sweep 180k, uraken 200k, kizami 210k, gyaku 240k, tobi 250k, shuto 260k, mae 270k,
-  mawashi 300k, yoko 315k, ushiro 330k) — asserted value-by-value (mirror, documented like
-  `WORLD_WIDTH`).
+- The **reach-preset table** exactly mirrors the engine (`rules.ts`) reaches for all **13**
+  techniques (empi 95k, hiza-geri 110k, throw 120k, sweep 180k, uraken 200k, kizami 210k,
+  gyaku 240k, tobi 250k, shuto 260k, mae 270k, mawashi 300k, yoko 315k, ushiro 330k) — asserted
+  value-by-value (mirror, documented like `WORLD_WIDTH`; the plan's earlier 12-item list omitted
+  hiza-geri — corrected to the full arsenal).
 - Given a chosen `gap`, the builder places the two roots exactly `gap` sub-units apart, centered
-  on the world midpoint — asserted on the pure builder (projected `scene` positions).
-- Moving the slider / selecting a preset in the browser repositions both figures live.
+  on the world midpoint — **already covered by `dojo-tape.test`** (Slice 1, exhaustively); Slice 3
+  only makes `gap` reactive rather than the fixed `DEFAULT_GAP`.
+- The spacing control is a **reach-preset dropdown** (snaps `gap` to a move's reach) **+ a free
+  slider** (`0 … MAX_GAP` = ushiro 330k, step 1k) with the current gap shown numerically; moving
+  either repositions both figures live (asserted via the spy-stage tape seam).
 **RED**: `.test.tsx` asserting (a) the preset table values and (b) `buildTape(..., gap)` root
 separation = `gap` centered — fail.
 **GREEN**: The preset table + gap→positions in the builder + the slider/preset controls wired to
