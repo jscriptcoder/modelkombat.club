@@ -141,19 +141,24 @@ describe("the mapped control frame renders through the real scene()/poseFor proj
     );
   });
 
-  it("locks both hands into a forward grab for a throw", () => {
-    const pose = poseOf(controls({ throwing: true }));
+  it("reaches both grab hands forward for a throw (floored point-blank)", () => {
+    // The throw control reaches the same reach-to-target solve as a strike (M8). a === b here, so the
+    // fighters overlap and both grab hands floor to the point-blank forward technique: the lead hand at
+    // x 24, the rear hand a spread (8) behind at 16 — the in-range landing is exercised in scene.test.
+    const pose = poseOf(controls({ throwing: true, attackReach: 120_000 }));
 
-    expect(pose.handL).toEqual(scaled({ x: 28, y: -44 }));
-    expect(pose.handR).toEqual(scaled({ x: 36, y: -44 }));
+    expect(pose.handR).toEqual(scaled({ x: 24, y: -44 })); // lead hand, floored forward
+    expect(pose.handL).toEqual(scaled({ x: 16, y: -44 })); // rear hand a spread behind
   });
 
   it("lays the fighter prone for a knockdown, overriding a simultaneous throw (precedence)", () => {
-    const pose = poseOf(controls({ knockdown: true, throwing: true }));
+    // PRONE wins by poseFor precedence (an early return) — even a live, reachable throw renders prone.
+    const pose = poseOf(
+      controls({ knockdown: true, throwing: true, attackReach: 120_000 }),
+    );
 
-    // PRONE wins by poseFor precedence — the head lies at the ground, NOT a standing grab.
-    expect(pose.head).toEqual(scaled({ x: -40, y: -10 }));
-    expect(pose.handR).not.toEqual(scaled({ x: 36, y: -44 })); // not the throw grab
+    expect(pose.head).toEqual(scaled({ x: -40, y: -10 })); // PRONE head at the ground, not a grab
+    expect(pose.handR).toEqual(scaled({ x: -20, y: -18 })); // the prone hand, not a forward grab
   });
 });
 

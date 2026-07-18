@@ -1,7 +1,7 @@
 # Plan: Replay viewer "make it fight" — Story 5, strikes & grabs connect
 
-**Branch (Slice 2b)**: `feat/fight-s5-lean-slider` — PR-per-slice; each slice takes its own `feat/fight-s5-*` branch.
-**Status**: Active — **Slice 1 ✅ MERGED (#344)**, **Slice 2a ✅ MERGED (#345)**, **Slice 2b ✅ IMPLEMENTED (M2 lean + M10 `/dojo` reach slider — pending commit + PR)**; **Slice 3 next** (throw reach) closes the arc 5/5.
+**Branch (Slice 3)**: `feat/fight-s5-throw-reach` — PR-per-slice; each slice takes its own `feat/fight-s5-*` branch.
+**Status**: Active — **Slice 1 ✅ MERGED (#344)**, **Slice 2a ✅ MERGED (#345)**, **Slice 2b ✅ MERGED (#346 · M2 lean + M10 `/dojo` reach slider)**; **Slice 3 active** (throw reach) — the final slice, closes the arc 5/5.
 
 Last (and only `src/`-touching) story of the "make it fight" arc. Design is fully
 resolved — `plans/replay-viewer-fight-decisions.md` decision 4 + M1–M12 + M-purity + the
@@ -32,7 +32,7 @@ Story-level, behavior-driven (from the decisions doc "Acceptance examples · 5" 
       _(Slice 2a, #345)_
 - [x] A degenerate target (gap ≈ 0, or opponent on the side opposite the facing) draws the **minimal
       forward technique** — never a backward limb, never a NaN. _(Slice 2a, #345)_
-- [ ] A `throwing` frame reaches **both** grab hands to the near edge using `attackReach`
+- [x] A `throwing` frame reaches **both** grab hands to the near edge using `attackReach`
       (= `throw.reach`). _(Slice 3)_
 - [x] The viewer treats `attackReach` **defensively at consumption** (absent / non-numeric /
       negative → `0` ⇒ the limb keeps its stance pose). _(Slice 2a, #345)_
@@ -130,7 +130,7 @@ on the synthetic frames (challenger 240k lands, king 0 idle); the viewport-indep
 manual mutator scan (added `facing:-1`, `attackReach===0` boundary, NaN killers; consolidated the
 redundant reach gate) → REFACTOR. **The M10 `/dojo` `attackReach` slider was carried to Slice 2b.**
 
-### Slice 2b: A strike leans into its reach, and `/dojo` can dial each fighter's `attackReach` (M2 · M10) — ✅ IMPLEMENTED (pending commit + PR)
+### Slice 2b: A strike leans into its reach, and `/dojo` can dial each fighter's `attackReach` (M2 · M10) — ✅ COMPLETE (#346)
 
 **Value**: Two finishing touches on the landing core. **M2 lean** — a long reach currently reads as a
 single over-stretched arm; a small, capped forward shift of the striking shoulder (root x untouched,
@@ -173,7 +173,7 @@ read-out pins) → REFACTOR `N/A` (the 2-line lean spread is inline-clear). **`/
 (M9) is the human step.**
 **Done when**: ACs met, manual scan done, `/dojo` sign-off, checks green, human approves.
 
-### Slice 3: A throw reaches both grab hands to the opponent (M8)
+### Slice 3: A throw reaches both grab hands to the opponent (M8) — ✅ IMPLEMENTED (pending commit + PR)
 
 **Value**: A grab lands on the opponent instead of grabbing air — one targeting path for every
 committed action.
@@ -186,8 +186,23 @@ purity machinery → `figures.ts` → `/watch` + `/dojo`.
 **Acceptance criteria** (present for approval before code): `throwing` frame with `attackReach` in
 range → both grab hands on the near edge; beyond reach → both stop short; degenerate → forward floor;
 scrub-safe.
-**RED / GREEN / MUTATE / KILL / REFACTOR**: exact-assertion `scene.test.tsx`/`figures.test.tsx`;
-manual scan; `/dojo` sign-off.
+
+**Delivered**: `scene.ts` — the strike's clamp machinery was extracted to a shared pure
+`reachTargetX(self, opponent)` (the reach-to-target x: near-edge target clamped to `[floor, reach cap]`,
+direction = facing, M7-defensive → `null`); `strikeHandFor` now delegates to it (behavior-preserving,
+guarded by the full strike suite). A new `throwGrabFor(thrower, opponent)` uses it to place **both**
+grab hands at chest height (`GRAB_Y −44`): the front hand (handR) leads onto the near edge, the rear
+hand (handL) closes a `GRAB_SPREAD` (8) behind, so two arms read as a two-handed grab. `poseFor` gained
+a pre-solved `grab` param (mirroring `strikeHand`); the old static `GRAB` constant is gone. Story 4's
+`deriveSkeleton` re-bends both elbows off the moved hands for free. An invalid/absent/non-positive
+reach on a throwing frame → stance hands (the M7 idle fallback, exactly as the strike) — in a real
+fight `throw.reach` is always positive so the grab always draws. RED (13 throw tests: in-range near-edge
+landing, facing-local, whiff cap, overlap/behind-facing floor, throwing-gate, M7 0/NaN/absent/negative,
+distinct-from-strike, throw-wins-last precedence, crouch compose, scrub purity) → GREEN (2057 pass) →
+updated the figures.ts + controls.ts + knockdown-override throw tests to the reach-to-target grab →
+manual mutator scan (guard boundary, facing sign, edge/cap/floor clamps, spread ±/drop/swap, throwing
+gate, null guard, grab wiring/precedence — all killed) → REFACTOR = the shared-`reachTargetX`
+extraction (DRY). **`/dojo` visual sign-off (M9) is the human step.**
 **Done when**: ACs met, manual scan, `/dojo` sign-off, checks green, human approves. **Closes the
 arc 5/5** → archive the plan (archive-don't-delete) + update `plans/replay-viewer-fight-stories.md`,
 the arc memory, and `docs/archive/README.md`.

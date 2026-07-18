@@ -180,18 +180,33 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
   });
 
   it("reaches both hands forward into a grab for a throwing fighter", () => {
+    // A throwing fighter reaches BOTH grab hands to the opponent's near edge (M8): an in-range throw
+    // (gap 120k at reach 120k) lands the lead hand ON the near edge (28) and the rear hand a spread
+    // behind (20) — proven through the persistent hand joints the draw layer swings.
     const stage = createStage(VIEWPORT, ["generic", "generic"]);
 
     stage.apply(scene([tickOf(0, { throwing: false }, {})], 0, VIEWPORT));
     const neutralL = stage.a.handL.x;
     const neutralR = stage.a.handR.x;
 
-    stage.apply(scene([tickOf(0, { throwing: true }, {})], 0, VIEWPORT));
+    stage.apply(
+      scene(
+        [
+          tickOf(
+            0,
+            { throwing: true, attackReach: 120_000, x: 150_000 },
+            { x: 270_000 },
+          ),
+        ],
+        0,
+        VIEWPORT,
+      ),
+    );
 
     expect(neutralL).toBe(s(-18));
     expect(neutralR).toBe(s(18));
-    expect(stage.a.handL.x).toBe(s(28));
-    expect(stage.a.handR.x).toBe(s(36));
+    expect(stage.a.handR.x).toBe(s(28)); // front hand on the opponent's near edge
+    expect(stage.a.handL.x).toBe(s(20)); // rear hand on the grab, a spread behind the lead
     expect(stage.a.handL.x).toBeGreaterThan(neutralL); // rear hand swung forward
     expect(stage.a.handR.x).toBeGreaterThan(neutralR); // front hand reached further forward
   });
