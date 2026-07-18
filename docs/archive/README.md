@@ -1174,3 +1174,54 @@ acceptance criteria inline). The spanning **"make it fight" design trail** —
 
 **Story 4 (limbs bend) complete — fighters now read as jointed figures, arms and legs both.** Story 5
 (strikes connect) is the last of the arc and the only one that touches `src/`.
+
+## Strikes & grabs connect (reach-to-target) — "make it fight" arc, Story 5 ✅ COMPLETE (closes the arc 5/5)
+
+**A spectator sees a strike or grab land on the opponent when in range, and stop short when it whiffs** — no
+longer hitting the air. The gap between fighters varies every tick, so a fixed-length limb only "touches" at
+one distance; instead the striking hand (and both grab hands) **aim at the opponent's real position, clamped to
+the committed move's true reach**. This is the **only `src/`-touching story** of the arc — an additive render
+field — and everything else stays in `web/`. Each slice was demoed + signed off in `/dojo` (M9).
+
+- **Slice 1 — the render tape carries `attackReach`** (PR #344, `feat/fight-s5-attack-reach`) — an additive
+  `RenderFrame.attackReach` (sub-units): a strike frame = the committed move's `spec.reach`, a throw frame =
+  `rules.throw.reach`, idle = `0`, read from the **committed state** (like `attackBand`). The **one `src/`/TCB
+  touch** of the arc — **byte-identical**: `runFight().events`, `endReason`, `INPUT_HASH`, and every `replayId`
+  unchanged (the field lives only on the derived render tape, not the event tape or the `ReproRecord` hash).
+  Real Stryker on `renderFrameOf` (engine is reachable); the web contract needs no change (the loader casts the
+  wire wholesale, so a viewer ignores the extra field until Slice 2 reads it).
+- **Slice 2a — a strike's hand lands on the near edge** (PR #345, `feat/fight-s5-reach-to-target`) — `scene.ts`
+  `strikeHandFor` solves the front hand toward the opponent's near body edge
+  (`facing·(opp.x − self.x)·SUBUNIT_TO_LOCAL − BODY_HALF_WIDTH`), clamped to `[min(FLOOR, cap), cap]` with
+  `cap = attackReach·SUBUNIT_TO_LOCAL` (viewport-**independent** local-px ratio `76/240000`). In range → the
+  fist lands ON the surface; beyond → it stops short (a whiff reads as a whiff); degenerate (gap ≈ 0 / opponent
+  behind facing) → a forward floor, never backward, never NaN. The web `ReplayFrame` gains `attackReach?` with
+  the **M7 defensive gate** (absent / non-numeric / non-positive → stance). Story 4's `deriveSkeleton` re-bends
+  the elbow onto the moved hand for free.
+- **Slice 2b — the strike leans into its reach + `/dojo` reach slider** (PR #346, `feat/fight-s5-lean-slider`) —
+  **M2 lean**: a drawn strike shifts the **upper body** (head + shoulder) forward by `min(CAP 16, handX×0.5)`
+  local px — a committed lunge, the arm telescoping for the remainder — while the **root x stays truthful** (the
+  lean is a viewer-only cosmetic) and the lower body + rear hand stay planted; the shared shoulder leans, so the
+  derived elbows follow it. **M10**: `/dojo`'s `FigureControlPanel` gains a per-figure `attackReach` range slider
+  so every move's contact (short jab → long thrust kick) can be dialled and signed off by eye.
+- **Slice 3 — a throw's grab lands on the opponent, closes the arc** (PR #347, `feat/fight-s5-throw-reach`) — the
+  strike's clamp was extracted to a shared pure **`reachTargetX(self, opponent)`** (near-edge target clamped to
+  `[floor, reach cap]`, direction = facing, M7-defensive → `null`); `strikeHandFor` delegates to it
+  (behaviour-preserving). A new `throwGrabFor` reaches **both** grab hands to the near edge at chest height using
+  the frame's `attackReach` (= `throw.reach`): the front hand leads onto the edge, the rear closes a
+  `GRAB_SPREAD` behind, so two arms read as a two-handed grab. **One targeting path for every committed action
+  (M8).** An invalid/absent reach on a throwing frame → stance hands (the M7 idle fallback, as the strike; in a
+  real fight `throw.reach` is always positive so the grab always draws).
+
+[replay-viewer-fight-s5-connect.md](replay-viewer-fight-s5-connect.md) — the plan (4 slices + whole-story
+acceptance criteria inline). With Story 5 shipped, the spanning **"make it fight" design trail** is now archived
+alongside the story plans: [replay-viewer-fight-decisions.md](replay-viewer-fight-decisions.md) (the grilled +
+gap-tightened design — decision table + M1–M12 + M-purity) and
+[replay-viewer-fight-stories.md](replay-viewer-fight-stories.md) (the `story-splitting` child-story split).
+
+**Story 5 (strikes connect) complete — this closes the whole "make it fight" arc 5/5.** Fighters now read as
+_actually fighting_: big and engaged at believable distances (S3), with jointed limbs (S4), model-identity
+heads (S2), and strikes + grabs that land on contact and whiff short (S5) — every capability demoed and tuned
+in the permanent `/dojo` pose lab (S1). The only `src/` change in the entire arc was Story 5's additive
+byte-identical `attackReach` render field. **Deferred follow-on** (decided later in `/dojo`): per-move signature
+silhouettes + a chamber→snap→recover strike animation — both need a `move` id + move-phase render fields.

@@ -1,7 +1,7 @@
 # Plan: Replay viewer "make it fight" — Story 5, strikes & grabs connect
 
 **Branch (Slice 3)**: `feat/fight-s5-throw-reach` — PR-per-slice; each slice takes its own `feat/fight-s5-*` branch.
-**Status**: Active — **Slice 1 ✅ MERGED (#344)**, **Slice 2a ✅ MERGED (#345)**, **Slice 2b ✅ MERGED (#346 · M2 lean + M10 `/dojo` reach slider)**; **Slice 3 active** (throw reach) — the final slice, closes the arc 5/5.
+**Status**: ✅ **COMPLETE** — **Slice 1 ✅ MERGED (#344)**, **Slice 2a ✅ MERGED (#345)**, **Slice 2b ✅ MERGED (#346 · M2 lean + M10 `/dojo` reach slider)**, **Slice 3 ✅ MERGED (#347 · throw reach-to-target)**. Closes the "make it fight" arc **5/5**. Archived at `docs/archive/replay-viewer-fight-s5-connect.md`.
 
 Last (and only `src/`-touching) story of the "make it fight" arc. Design is fully
 resolved — `plans/replay-viewer-fight-decisions.md` decision 4 + M1–M12 + M-purity + the
@@ -173,7 +173,7 @@ read-out pins) → REFACTOR `N/A` (the 2-line lean spread is inline-clear). **`/
 (M9) is the human step.**
 **Done when**: ACs met, manual scan done, `/dojo` sign-off, checks green, human approves.
 
-### Slice 3: A throw reaches both grab hands to the opponent (M8) — ✅ IMPLEMENTED (pending commit + PR)
+### Slice 3: A throw reaches both grab hands to the opponent (M8) — ✅ COMPLETE (#347)
 
 **Value**: A grab lands on the opponent instead of grabbing air — one targeting path for every
 committed action.

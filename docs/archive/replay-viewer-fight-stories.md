@@ -36,9 +36,13 @@ user-visible capability; they compose rather than layer.
   `docs/archive/replay-viewer-fight-s4-limbs.md` (archive PR #343, `main` @ `31547ee`). Mid-joints are a pure
   `deriveBend(from, to, dir, dist)` derivation in `scene.ts` (`Skeleton` 7→11 joints, `PRONE` authors its own);
   `BEND_BACK`/`BEND_FORWARD` share one rule. **Limbs now read jointed. Web-only — no `src/` change.**
-- **Story 5 · strikes connect (`attackReach` engine field + 2-bone IK) — NEXT** (split-candidates row 5).
-  Needs `planning` to slice it. The one Story in this arc that touches `src/` — the engine `attackReach` field
-  drives an IK reach onto the striking arm's elbow (introduced in Story 4). Keep 4 → 5 order (done).
+- **Story 5 · strikes connect (`attackReach` engine field + 2-bone IK) — ✅ COMPLETE + ARCHIVED** (2026-07-18).
+  4 slices, PR-per-slice (#344 additive `attackReach` render field, byte-identical — the one `src/` touch ·
+  #345 strike hand reach-to-target onto the near edge · #346 M2 lean + M10 `/dojo` reach slider · #347 throw
+  reaches both grab hands, closes the arc); plan archived at `docs/archive/replay-viewer-fight-s5-connect.md`
+  (archive PR TBD, `main` @ `bbbe58b`). A shared pure `reachTargetX` clamps the striking hand + both grab hands
+  to the opponent's near edge; `deriveSkeleton` (Story 4) re-bends the elbows onto the moved hands for free.
+  **Strikes and grabs now land on contact and whiff short. Closes the "make it fight" arc 5/5.**
 
 ## Recommended first slice
 
@@ -57,7 +61,7 @@ learning**, not spectator — stated explicitly.
 | 2 ✅ | **Spectator sees each fighter's model as a glyph head** _(DONE — #333·#334·#335)_ | At a glance: which model authored each fighter (Claude/GPT/Gemini/Grok/generic), reusing the existing tested marks                                     | Refactor `BrandMark` → shared glyph source (DOM behavior-preserving); Pixi head via `Graphics.svg()`; resolve brand **once per fighter** at figure creation via shared `modelToBrand`; **bare brand glyph** (disc dropped mid-plan — M11 revised; Grok mono near-white); body keeps side color; head **counter-flips**; `brand` data hook (`label`); add the **brand picker** to `/dojo` | Per-move anything; head is **identity only**                                                                                  | Shippable (real replays get heads)               |
 | 3    | **Spectator sees big fighters filling the ring**                                  | Fighters stand at believable fighting distance — no longer tiny figures across a void (attacks problem #1: separation)                                 | Body defined in **world sub-units** (× `pxPerSubunit`); **one tunable height knob** (~240k) with proportional derivation of all dims (head = 0.3× height); vertical-fit sanity (M12). Tune in `/dojo`                                                                                                                                                                                    | Bent limbs (story 4); reach-to-target contact precision (story 5) — **straight limbs still**                                  | Shippable                                        |
 | 4    | **Spectator sees limbs bend (elbows & knees)**                                    | Limbs read as jointed, not rigid sticks (attacks problem #2: stiffness)                                                                                | Skeleton → ~11 joints; bones `shoulder→elbow→hand` / `hip→knee→foot`; **derived** facing-aware bends (elbows back, knees forward) for STAND/CROUCH/AIR; **PRONE authors its own 11**; override layers set endpoints, mid-joint re-derives. Pure/scrub-safe                                                                                                                               | IK reach-to-target (story 5); per-move authored silhouettes (deferred follow-on)                                              | Shippable                                        |
-| 5    | **Spectator sees strikes & grabs land on contact**                                | A strike/grab visibly lands when in range; a real whiff reads as a whiff — the payoff that sells "fighting" (closes problem #1 at the limb level)      | **[task]** additive `attackReach` on `RenderFrame` (strike=`spec.reach`, throw=`throw.reach`, 0 idle) + web mirror + defensive handling. **[story]** 2-bone IK of the striking limb (+ both grab hands) → opponent's **near edge**, clamped `[FLOOR, attackReach]` with **lean+telescope**; degenerate → forward floor; direction = facing. Pure/scrub-safe                              | Chamber→snap→recover animation + per-move silhouettes (deferred follow-on: needs `move` id + phase)                           | Shippable; engine field is **byte-identical**    |
+| 5 ✅ | **Spectator sees strikes & grabs land on contact** _(DONE — #344·#345·#346·#347)_ | A strike/grab visibly lands when in range; a real whiff reads as a whiff — the payoff that sells "fighting" (closes problem #1 at the limb level)      | **[task]** additive `attackReach` on `RenderFrame` (strike=`spec.reach`, throw=`throw.reach`, 0 idle) + web mirror + defensive handling. **[story]** 2-bone IK of the striking limb (+ both grab hands) → opponent's **near edge**, clamped `[FLOOR, attackReach]` with **lean+telescope**; degenerate → forward floor; direction = facing. Pure/scrub-safe                              | Chamber→snap→recover animation + per-move silhouettes (deferred follow-on: needs `move` id + phase)                           | Shippable; engine field is **byte-identical**    |
 
 ## Acceptance examples (per story — precondition → trigger → observable)
 
@@ -125,14 +129,11 @@ learning**, not spectator — stated explicitly.
 
 ## Next step
 
-Stories 1–4 (`/dojo` pose lab · model-identity heads · big fighters/world-scale · limbs bend) are
-done + archived. **Story 5 — strikes connect (`attackReach` + 2-bone IK)** is next and LAST: **load
-`planning` for story 5** to sequence it into PR-sized TDD slices. Shape (table row 5 + M10): an
-engine `attackReach` field (the first `src/` touch in this arc — behind the validator gate, TCB /
-`INPUT_HASH` / `BENCHMARK_VERSION` implications to weigh) reports how far a strike reaches; the viewer
-runs a 2-bone **IK** solve so the striking arm's **elbow** (introduced in Story 4) bends to plant the
-hand on the target, so a strike reads as _contact_, not a swing into space. Each planned slice repeats
-the full cycle — `tdd` · `testing` · `mutation-testing` (manual scan for `web/`; real Stryker if the
-engine field is touched) · `refactoring`, RED→GREEN→MUTATE→KILL→REFACTOR — before the next begins.
-Because Story 5 crosses into `src/`, run `grill-me` on the `attackReach` determinism/TCB questions
-before planning. This closes the "make it fight" arc (5/5).
+**All five stories are done + archived — the "make it fight" arc is COMPLETE (5/5).** `/dojo` pose lab ·
+model-identity heads · big fighters/world-scale · limbs bend · strikes & grabs connect. Fighters now read
+as _actually fighting_: big and engaged at believable distances, jointed limbs, model-identity heads, and
+strikes + grabs that land on contact (and whiff short) — every capability demoed and tuned in `/dojo`. The
+only `src/` touch was Story 5's additive byte-identical `attackReach` render field; everything else lives in
+`web/`. **Deferred follow-on** (parking lot, decided later in `/dojo`): per-move signature silhouettes +
+chamber→snap→recover animation — both need a `move` id + move-phase render fields. No further slices remain
+in this arc.
