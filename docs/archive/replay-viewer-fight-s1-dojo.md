@@ -1,7 +1,7 @@
 # Plan: `/dojo` pose lab (replay-viewer "make it fight" — Story 1)
 
 **Branch**: feat/dojo-pose-lab
-**Status**: Active
+**Status**: ✅ Complete — archived (all 3 slices merged: #329 · #330 · #331)
 
 Story 1 of the "make it fight" arc (`plans/replay-viewer-fight-stories.md`); design source
 `plans/replay-viewer-fight-decisions.md` (esp. **M9** acceptance/DoD, **M10** control surface).
@@ -16,17 +16,18 @@ current pose model in isolation.
 ## Acceptance Criteria
 
 - [x] Navigating to `/dojo` renders **two stickmen** on the dark canvas via the real
-  `scene()` + `createStage` pipeline (a synthetic tape, not a real replay). Route ships
-  **dark**: no `Nav` link, `noindex,nofollow`, absent from the sitemap. *(Slice 1 · #329)*
+      `scene()` + `createStage` pipeline (a synthetic tape, not a real replay). Route ships
+      **dark**: no `Nav` link, `noindex,nofollow`, absent from the sitemap. _(Slice 1 · #329)_
 - [x] **Per-figure controls** set the frame's pose fields **freely** — posture, facing,
-  attacking, attackBand, guardBand, throwing, knockdown — with **no valid-combo constraint**;
-  an engine-impossible combo (e.g. knockdown + throwing) renders per `poseFor` precedence
-  without error. *(Slice 2 · #330)*
-- [ ] A **world-gap slider with move-reach snap presets** (empi 95k … ushiro 330k) sets the
-  distance between the two figures; the two roots sit `gap` sub-units apart.
-- [ ] **No `src/` change.** All existing suites stay green. New pure modules covered by
-  exhaustive **exact-assertion** tests (`.test.tsx`) + a **manual mutator scan** (`web/` is not
-  Stryker-reachable — Stryker is node-only); a per-slice **manual visual sign-off in `/dojo`**.
+      attacking, attackBand, guardBand, throwing, knockdown — with **no valid-combo constraint**;
+      an engine-impossible combo (e.g. knockdown + throwing) renders per `poseFor` precedence
+      without error. _(Slice 2 · #330)_
+- [x] A **world-gap slider with move-reach snap presets** (empi 95k … ushiro 330k) sets the
+      distance between the two figures; the two roots sit `gap` sub-units apart. _(Slice 3 · #331)_
+- [x] **No `src/` change.** All existing suites stay green. New pure modules covered by
+      exhaustive **exact-assertion** tests (`.test.tsx`) + a **manual mutator scan** (`web/` is not
+      Stryker-reachable — Stryker is node-only); a per-slice **manual visual sign-off in `/dojo`**.
+      _(held across all 3 slices)_
 
 ## Cross-cutting notes
 
@@ -41,7 +42,7 @@ current pose model in isolation.
   but **no ticker/transport** (static per control state); asserted via scene-graph, like
   `figures.test`.
 - **Positioning**: figures are centered on the world midpoint (`WORLD_WIDTH/2`); `a.x = mid −
-  gap/2`, `b.x = mid + gap/2`, projected by `scene` via `pxPerSubunit`. Export `WORLD_WIDTH`
+gap/2`, `b.x = mid + gap/2`, projected by `scene` via `pxPerSubunit`. Export `WORLD_WIDTH`
   from `scene.ts` (behavior-preserving) so the builder reuses it rather than re-mirroring.
 - **Free combos** ⇒ the controls expose the raw `ReplayFrame` pose fields (not a single
   mutually-exclusive action enum), so nonsensical combinations are reachable by design (M10).
@@ -69,6 +70,7 @@ mount). `mutation-testing`: N/A (`web/` not Stryker-reachable) → manual mutato
 `refactoring`: the `WORLD_WIDTH` export is a tiny behavior-preserving extraction — assess only.
 **Reduction program**: N/A.
 **Acceptance criteria** (confirm before code):
+
 - Rendering `DojoApp` mounts a Pixi stage whose scene graph holds **two figure roots** (assert
   via the returned nodes, like `figures.test` — not pixels).
 - The default synthetic tape encodes challenger `attacking` at `attackBand` mid + king idle,
@@ -77,19 +79,19 @@ mount). `mutation-testing`: N/A (`web/` not Stryker-reachable) → manual mutato
 - `/dojo` route resolves in the built app (html shell + vite input + vercel rewrite); it is
   **not** linked from `Nav`, is `noindex,nofollow`, and is **not** in the sitemap.
 - All existing suites green; **no `src/` change** (only `WORLD_WIDTH` gains an `export`).
-**RED**: A `.test.tsx` asserting the pure builder returns the exact default two-fighter
-`ReplayTape` (fields + positions) — fails (builder absent). Then a browser test asserting
-`DojoApp` mounts a stage with two figure roots — fails (component absent).
-**GREEN**: Minimum: the builder returning the default tape; `dojo.html` + `dojo.tsx` + the
-`DojoStage`/`DojoApp` mount reusing `createStage`/`scene`; vite input + vercel rewrite; export
-`WORLD_WIDTH`.
-**MUTATE or alternate evidence**: N/A (Stryker node-only). Alternate: exact-assertion tests on
-every builder field + a manual mutator scan of the builder + `DojoStage`; visual sign-off in
-`/dojo`.
-**KILL MUTANTS**: N/A → manual scan addresses any weak assertion.
-**REFACTOR**: Assess the `WORLD_WIDTH` export + any shared centering helper; only if it adds value.
-**Done when**: all criteria met, existing suites green, manual scan + visual sign-off done,
-human approves the commit.
+  **RED**: A `.test.tsx` asserting the pure builder returns the exact default two-fighter
+  `ReplayTape` (fields + positions) — fails (builder absent). Then a browser test asserting
+  `DojoApp` mounts a stage with two figure roots — fails (component absent).
+  **GREEN**: Minimum: the builder returning the default tape; `dojo.html` + `dojo.tsx` + the
+  `DojoStage`/`DojoApp` mount reusing `createStage`/`scene`; vite input + vercel rewrite; export
+  `WORLD_WIDTH`.
+  **MUTATE or alternate evidence**: N/A (Stryker node-only). Alternate: exact-assertion tests on
+  every builder field + a manual mutator scan of the builder + `DojoStage`; visual sign-off in
+  `/dojo`.
+  **KILL MUTANTS**: N/A → manual scan addresses any weak assertion.
+  **REFACTOR**: Assess the `WORLD_WIDTH` export + any shared centering helper; only if it adds value.
+  **Done when**: all criteria met, existing suites green, manual scan + visual sign-off done,
+  human approves the commit.
 
 ### Slice 2: Per-figure controls re-pose each fighter (free combos) — ✅ MERGED (#330)
 
@@ -103,6 +105,7 @@ synthetic-tape builder → `scene()` → `DojoStage.apply()` re-renders the figu
 N/A → manual scan. `refactoring`: assess.
 **Reduction program**: N/A.
 **Acceptance criteria** (confirm before code):
+
 - The controls→frame mapper is **total and exhaustive**: each posture (0/1/2 + out-of-range →
   STAND fallback via `poseFor`), each action field, and **free combos** (e.g. `knockdown` +
   `throwing` → PRONE wins by precedence) map to the exact `ReplayFrame` — asserted on the pure
@@ -110,17 +113,17 @@ N/A → manual scan. `refactoring`: assess.
 - Changing a control in the browser updates the rendered figure's scene-graph joints (assert
   the pose via the pure path; a representative browser interaction proves the wiring).
 - Both figures are independently controllable (challenger vs king).
-**RED**: `.test.tsx` cases asserting the mapper's `FigureControls → ReplayFrame` output for each
-field + the free-combo cases — fail (mapper absent).
-**GREEN**: The pure mapper + the control components wired to per-figure reactive state feeding
-the builder.
-**MUTATE or alternate evidence**: N/A → exhaustive exact-assertion tests (every field, every
-posture, the precedence combos) + manual mutator scan + visual sign-off.
-**KILL MUTANTS**: N/A → manual scan.
-**REFACTOR**: Assess control-component duplication (challenger/king share one control group).
-**Done when**: all criteria met, suites green, manual scan + visual sign-off, human approves.
+  **RED**: `.test.tsx` cases asserting the mapper's `FigureControls → ReplayFrame` output for each
+  field + the free-combo cases — fail (mapper absent).
+  **GREEN**: The pure mapper + the control components wired to per-figure reactive state feeding
+  the builder.
+  **MUTATE or alternate evidence**: N/A → exhaustive exact-assertion tests (every field, every
+  posture, the precedence combos) + manual mutator scan + visual sign-off.
+  **KILL MUTANTS**: N/A → manual scan.
+  **REFACTOR**: Assess control-component duplication (challenger/king share one control group).
+  **Done when**: all criteria met, suites green, manual scan + visual sign-off, human approves.
 
-### Slice 3: World-gap slider with move-reach snap presets sets the distance
+### Slice 3: World-gap slider with move-reach snap presets sets the distance — ✅ MERGED (#331)
 
 **Value**: Developer sets the distance between the two fighters — snapping to any real move's
 engine reach (empi 95k … ushiro 330k) or dragging freely — to verify spacing/contact at true
@@ -132,6 +135,7 @@ pair at `world-mid ± gap/2` → `scene()` → `DojoStage.apply()` repositions b
 N/A → manual scan. `refactoring`: assess.
 **Reduction program**: N/A.
 **Acceptance criteria** (confirm before code):
+
 - The **reach-preset table** exactly mirrors the engine (`rules.ts`) reaches for all **13**
   techniques (empi 95k, hiza-geri 110k, throw 120k, sweep 180k, uraken 200k, kizami 210k,
   gyaku 240k, tobi 250k, shuto 260k, mae 270k, mawashi 300k, yoko 315k, ushiro 330k) — asserted
@@ -143,16 +147,16 @@ N/A → manual scan. `refactoring`: assess.
 - The spacing control is a **reach-preset dropdown** (snaps `gap` to a move's reach) **+ a free
   slider** (`0 … MAX_GAP` = ushiro 330k, step 1k) with the current gap shown numerically; moving
   either repositions both figures live (asserted via the spy-stage tape seam).
-**RED**: `.test.tsx` asserting (a) the preset table values and (b) `buildTape(..., gap)` root
-separation = `gap` centered — fail.
-**GREEN**: The preset table + gap→positions in the builder + the slider/preset controls wired to
-reactive `gap`.
-**MUTATE or alternate evidence**: N/A → exact-assertion tests (each preset value; separation
-math for several gaps incl. 0 and max) + manual mutator scan + visual sign-off (jump to
-"gyaku 240k", confirm the pair sits at that world distance).
-**KILL MUTANTS**: N/A → manual scan.
-**REFACTOR**: Assess; fold the default gap (Slice 1) onto the preset table.
-**Done when**: all criteria met, suites green, manual scan + visual sign-off, human approves.
+  **RED**: `.test.tsx` asserting (a) the preset table values and (b) `buildTape(..., gap)` root
+  separation = `gap` centered — fail.
+  **GREEN**: The preset table + gap→positions in the builder + the slider/preset controls wired to
+  reactive `gap`.
+  **MUTATE or alternate evidence**: N/A → exact-assertion tests (each preset value; separation
+  math for several gaps incl. 0 and max) + manual mutator scan + visual sign-off (jump to
+  "gyaku 240k", confirm the pair sits at that world distance).
+  **KILL MUTANTS**: N/A → manual scan.
+  **REFACTOR**: Assess; fold the default gap (Slice 1) onto the preset table.
+  **Done when**: all criteria met, suites green, manual scan + visual sign-off, human approves.
 
 ## Pre-PR Quality Gate (every slice)
 
@@ -165,4 +169,5 @@ math for several gaps incl. 0 and max) + manual mutator scan + visual sign-off (
    (agent-browser hangs on the Pixi page); the scene-graph assertions + manual scan are the guard.
 
 ---
-*Delete this file when the plan is complete. If `plans/` is empty, delete the directory.*
+
+_Delete this file when the plan is complete. If `plans/` is empty, delete the directory._
