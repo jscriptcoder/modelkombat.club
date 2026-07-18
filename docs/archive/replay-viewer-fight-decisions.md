@@ -23,14 +23,14 @@ tuned by eye against the real render pipeline.
 
 ## Resolved decisions
 
-| #   | Decision | Choice | Rationale |
-| --- | -------- | ------ | --------- |
-| 1 | **Showcase nature** | A **permanent dark route** `/dojo` — no nav link, shipped like `/watch`. Full TDD: exact-assertion browser tests + a manual mutator scan (`web/` is not Stryker-reachable). | A reproducible tuning harness that never rots; retune any time a move changes. Consistent with how `/watch` shipped dark. |
-| 2 | **Showcase interaction** | A **two-figure live sandbox**: challenger + king rendered together; per-figure controls (posture, action, band, facing, brand, reach) + a world-gap slider. Drives the **real `scene()`/`createStage` pipeline** via a hand-built synthetic tape. | One surface that covers articulation (study one figure), spacing (adjust the gap, fire a strike, see it connect), and heads (set each side's brand). "What you tune is what ships" — no divergence from production rendering. |
-| 3 | **Body scale** | **Big fighters, scaled to world.** Define the body in world sub-units (scaled by the same `pxPerSubunit` that positions it), sized so an extended strike ≈ the engine's reach. Two fighters nearly fill the ring at contact. | Unifies body + reach + head into one scale; contact reads true at any viewport. A deliberate aesthetic shift away from tiny stickmen toward a fighting-game frame. |
-| 4 | **Strike targeting** | The striking limb **aims at the opponent's real position, clamped to the move's true reach.** In range → the limb lands; beyond → it stops short as a true whiff. Requires an additive **`attackReach`** field on `RenderFrame` (sub-units, `0` when idle, sourced from the committed move's `spec.reach`), mirrored into the web `ReplayFrame` contract. | The gap between fighters varies every tick, so a fixed-length arm only "touches" at one distance. Aiming at the real position (truthful in the tape) makes contact and whiff both read faithfully for **every** move. `attackReach` is a render-only field — same invariant-safe pattern as `guardBand` in S2. |
-| 5 | **Articulation** | **Derived bends + IK.** Grow the skeleton to ~11 joints (add `elbow L/R`, `knee L/R`); limbs become `shoulder→elbow→hand` / `hip→knee→foot`. Joints are **derived** from endpoints + a facing-aware bend rule (elbows bow back, knees forward); the **striking limb 2-bone-solves** toward the opponent, clamped to `attackReach`. Per-move authored overrides are the end-state design but **deferred** (see below). | Kills stiffness everywhere for cheap (derived), and the IK solve is what makes reach-to-target look natural. Investing hand-tuning only where it reads. |
-| 6 | **Heads** | **Model-identity heads from a shared glyph source → Pixi `svg()`.** Refactor `BrandMark` to a shared SVG-path source consumed by both the DOM champion cards and the Pixi head (via Pixi v8 `Graphics.svg()`). Resolve brand **once per fighter at figure creation** via the shared `modelToBrand`. The head **counter-flips** so the mark is never mirrored when a fighter faces left. **Body/limbs keep the side color** (challenger-teal / king-amber); the **head carries the brand**. A `brand` data hook on the head node for exact-assertion tests. | Reuses the five existing, tested brand marks (`claude`/`openai`/`gemini`/`grok`/`generic`) and the tested `modelToBrand` mapping — no new design, no drift. "Which side" and "which model" are both legible. |
+| #   | Decision                 | Choice                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Rationale                                                                                                                                                                                                                                                                                                      |
+| --- | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Showcase nature**      | A **permanent dark route** `/dojo` — no nav link, shipped like `/watch`. Full TDD: exact-assertion browser tests + a manual mutator scan (`web/` is not Stryker-reachable).                                                                                                                                                                                                                                                                                                                                                                                | A reproducible tuning harness that never rots; retune any time a move changes. Consistent with how `/watch` shipped dark.                                                                                                                                                                                      |
+| 2   | **Showcase interaction** | A **two-figure live sandbox**: challenger + king rendered together; per-figure controls (posture, action, band, facing, brand, reach) + a world-gap slider. Drives the **real `scene()`/`createStage` pipeline** via a hand-built synthetic tape.                                                                                                                                                                                                                                                                                                          | One surface that covers articulation (study one figure), spacing (adjust the gap, fire a strike, see it connect), and heads (set each side's brand). "What you tune is what ships" — no divergence from production rendering.                                                                                  |
+| 3   | **Body scale**           | **Big fighters, scaled to world.** Define the body in world sub-units (scaled by the same `pxPerSubunit` that positions it), sized so an extended strike ≈ the engine's reach. Two fighters nearly fill the ring at contact.                                                                                                                                                                                                                                                                                                                               | Unifies body + reach + head into one scale; contact reads true at any viewport. A deliberate aesthetic shift away from tiny stickmen toward a fighting-game frame.                                                                                                                                             |
+| 4   | **Strike targeting**     | The striking limb **aims at the opponent's real position, clamped to the move's true reach.** In range → the limb lands; beyond → it stops short as a true whiff. Requires an additive **`attackReach`** field on `RenderFrame` (sub-units, `0` when idle, sourced from the committed move's `spec.reach`), mirrored into the web `ReplayFrame` contract.                                                                                                                                                                                                  | The gap between fighters varies every tick, so a fixed-length arm only "touches" at one distance. Aiming at the real position (truthful in the tape) makes contact and whiff both read faithfully for **every** move. `attackReach` is a render-only field — same invariant-safe pattern as `guardBand` in S2. |
+| 5   | **Articulation**         | **Derived bends + IK.** Grow the skeleton to ~11 joints (add `elbow L/R`, `knee L/R`); limbs become `shoulder→elbow→hand` / `hip→knee→foot`. Joints are **derived** from endpoints + a facing-aware bend rule (elbows bow back, knees forward); the **striking limb 2-bone-solves** toward the opponent, clamped to `attackReach`. Per-move authored overrides are the end-state design but **deferred** (see below).                                                                                                                                      | Kills stiffness everywhere for cheap (derived), and the IK solve is what makes reach-to-target look natural. Investing hand-tuning only where it reads.                                                                                                                                                        |
+| 6   | **Heads**                | **Model-identity heads from a shared glyph source → Pixi `svg()`.** Refactor `BrandMark` to a shared SVG-path source consumed by both the DOM champion cards and the Pixi head (via Pixi v8 `Graphics.svg()`). Resolve brand **once per fighter at figure creation** via the shared `modelToBrand`. The head **counter-flips** so the mark is never mirrored when a fighter faces left. **Body/limbs keep the side color** (challenger-teal / king-amber); the **head carries the brand**. A `brand` data hook on the head node for exact-assertion tests. | Reuses the five existing, tested brand marks (`claude`/`openai`/`gemini`/`grok`/`generic`) and the tested `modelToBrand` mapping — no new design, no drift. "Which side" and "which model" are both legible.                                                                                                   |
 
 ## Resolved mechanics (find-gaps, 2026-07-18)
 
@@ -40,7 +40,7 @@ Decisions that tighten the table above into something implementable without re-a
   **center-to-center** contact distance. The drawn limb is **shoulder-anchored**, so the
   viewer maps engine reach → a screen target by aiming the striking hand/foot at the
   **opponent's near body edge** (their root x offset toward the striker by their body
-  half-width), never their center — the fist lands *on* the opponent's surface, not inside
+  half-width), never their center — the fist lands _on_ the opponent's surface, not inside
   their torso. The limb's full extension is still bounded by `attackReach × pxPerSubunit`
   (measured from the shoulder, after subtracting the striker's own shoulder-to-center
   offset), so a real whiff (opponent beyond reach) draws as a limb stopping short of the
@@ -59,7 +59,7 @@ Decisions that tighten the table above into something implementable without re-a
   Both the lean cap and the max telescope are `/dojo`-tuned constants.
 
 - **M3 — Degenerate targeting (TOTAL, like the posture/band fallbacks).** The strike
-  **direction is always the fighter's facing**. The reach distance is the *in-front* distance
+  **direction is always the fighter's facing**. The reach distance is the _in-front_ distance
   to the opponent's near edge, **clamped to `[FLOOR, attackReach]`** where `FLOOR` is a
   minimum forward extension (a point-blank strike). If the opponent is overlapping (gap ≈ 0)
   or on the side opposite the facing, the limb shows the minimal forward technique — it
@@ -92,7 +92,7 @@ Decisions that tighten the table above into something implementable without re-a
   **all pure maths + wiring** (body-scale projection, IK solve, lean, bend derivation, brand
   resolution, pose fields) + a **manual mutator scan** (`web/` is not Stryker-reachable). (2) A
   per-slice **manual visual sign-off in `/dojo`** against a documented pose checklist — `/dojo`
-  *is* the curated visual-check surface. (3) **Explicitly NOT** automated pixel/visual
+  _is_ the curated visual-check surface. (3) **Explicitly NOT** automated pixel/visual
   regression: agent-browser hangs on the Pixi canvas page, so screenshot diffing is out — the
   scene-graph assertions + manual scan are the guardrail (consistent with S1–S2). The engine
   `attackReach` slice keeps the **byte-identical replay** check (additive render field).
@@ -132,6 +132,7 @@ Decisions that tighten the table above into something implementable without re-a
   the head render: no disc `Graphics`, no contrast-knockout colour rule (the M11-original "glyph
   must not match its disc or it vanishes" concern is now moot) — the glyph renders in its own
   brand hue, and only Grok needs an explicit canvas ink.
+
 - **M12 — Vertical fit (tuning note).** Big fighters (~480px at the initial height guess) plus
   jump displacement could clip the top of the 1200×600 canvas. This is an **outcome of the M2
   height knob**, resolved by eye in `/dojo`: if extreme jumps clip, lower the height constant
@@ -159,14 +160,14 @@ Decisions that tighten the table above into something implementable without re-a
 Each is its own PR-sized slice (or slices); each leaves a working, improved state.
 
 1. **`attackReach` engine field** — additive `RenderFrame` field; byte-identical outcome path; mirror into the web contract. The contract is ready before reach-to-target consumes it.
-2. **`/dojo` showcase** — the harness; renders the *current* model via a synthetic tape so it stays valid as the pose model evolves.
+2. **`/dojo` showcase** — the harness; renders the _current_ model via a synthetic tape so it stays valid as the pose model evolves.
 3. **Model-identity heads** — shared glyph source + Pixi head; preview all five brands in the sandbox.
 4. **World-scale calibration** — big fighters, body in sub-units.
 5. **Articulation** — elbows/knees derived + IK reach-to-target (consumes `attackReach`).
 
 ## Non-negotiable invariants held
 
-- **Determinism / TCB / bounded DSL untouched.** The *only* `src/` change is the additive
+- **Determinism / TCB / bounded DSL untouched.** The _only_ `src/` change is the additive
   `attackReach` render field (the render tape, **not** the outcome path); it sources from the
   committed move's already-resolved `spec.reach`. No DSL op, no allowlist change, absent-field
   byte-identical. Everything else lives in `web/`.
