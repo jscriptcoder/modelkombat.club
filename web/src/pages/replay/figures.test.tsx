@@ -462,4 +462,20 @@ describe("glyphSvg — canvas-ready brand-glyph markup for Pixi's Graphics.svg()
   it("passes a hued brand's baked colour straight through", () => {
     expect(glyphSvg("gemini")).toContain("#4285f4");
   });
+
+  it("keeps Grok's ring hollow — no colour-filled group for Pixi to flood the ring with", () => {
+    // Grok is a hollow ring + a filled slash. Pixi's Graphics.svg() inherits a <g fill> onto its
+    // children and overrides a child's own fill="none" (Story 2 gotcha), so a COLOUR fill on the
+    // wrapping group floods the fill=none ring into a solid disc on the canvas (correct in the DOM,
+    // wrong in Pixi). Guard: the group Pixi parses carries no colour fill — fill="none" (or none at
+    // all) — while the slash <path> sets its own fill. Assert on glyphSvg (the exact post-ink string
+    // Pixi receives), so the group's fill is either absent or "none", never the ink colour.
+    const grok = glyphSvg("grok");
+    const groupFill = grok.match(/<g[^>]*\bfill="([^"]*)"/);
+
+    expect(groupFill?.[1] ?? "none").toBe("none");
+    // The slash is still explicitly inked (a filled streak), and the ring is a stroked circle.
+    expect(grok).toContain(`<path`);
+    expect(grok).toContain(`stroke="${GROK_CANVAS_INK}"`);
+  });
 });

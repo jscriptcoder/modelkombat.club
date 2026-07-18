@@ -29,7 +29,7 @@ export const BRAND_GLYPH: Record<Brand, string> = {
     '<g fill="none" stroke="#10a37f" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.5 L20.4 7.25 L20.4 16.75 L12 21.5 L3.6 16.75 L3.6 7.25 Z" stroke-width="2.2"/><g stroke-width="1.5"><path d="M12 8.2 L15.36 10.1 L15.36 13.9 L12 15.8 L8.64 13.9 L8.64 10.1 Z"/><line x1="12" y1="2.5" x2="15.36" y2="10.1"/><line x1="20.4" y1="7.25" x2="15.36" y2="13.9"/><line x1="20.4" y1="16.75" x2="12" y2="15.8"/><line x1="12" y1="21.5" x2="8.64" y2="13.9"/><line x1="3.6" y1="16.75" x2="8.64" y2="10.1"/><line x1="3.6" y1="7.25" x2="12" y2="8.2"/></g></g>',
   gemini:
     '<path d="M12 1 C12 8 16 12 23 12 C16 12 12 16 12 23 C12 16 8 12 1 12 C8 12 12 8 12 1 Z" fill="#4285f4"/>',
-  grok: '<g fill="currentColor"><circle cx="12" cy="12" r="6.3" fill="none" stroke="currentColor" stroke-width="2.3"/><path d="M3 21 Q14 14 21 3 Q10 10 3 21 Z"/></g>',
+  grok: '<g fill="none"><circle cx="12" cy="12" r="6.3" stroke="currentColor" stroke-width="2.3"/><path d="M3 21 Q14 14 21 3 Q10 10 3 21 Z" fill="currentColor"/></g>',
   generic:
     '<g fill="none" stroke="#aab2c0" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.4 C9.2 7.5 10.6 6.4 12 6.4 C13.5 6.4 14.8 7.4 14.8 9 C14.8 10.9 12 11 12 13.2" stroke-linecap="round"/><circle cx="12" cy="16.6" r="0.5" fill="#aab2c0" stroke="none"/></g>',
 };
