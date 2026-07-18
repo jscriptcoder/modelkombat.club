@@ -1,21 +1,28 @@
-import { onCleanup, onMount, type Component } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+  type Component,
+} from "solid-js";
 import { Application } from "pixi.js";
 
-import { createStage } from "../replay/figures";
+import { createStage, type Stage } from "../replay/figures";
 import { scene, type Viewport } from "../replay/scene";
 import type { ReplayTape } from "../replay/replay-contract";
 
 // The pose lab's Pixi mount: like ReplayPlayer's, it attaches an Application and draws the two
 // stickmen through the pure `createStage` + `scene` — but with NO ticker/transport. A pose is static,
-// so it renders the single tape frame once on mount. The Scene→display mapping is unit-tested in
-// figures.test and the dojo tape in dojo-tape.test; here we keep only the renderer wiring.
+// so it renders tick 0; when a control edit rebuilds the tape (props.tape), the effect re-applies the
+// shipped projection. The Scene→display mapping is unit-tested in figures.test and the control→tape
+// wiring in DojoApp.test; here we keep only the renderer wiring.
 
 const DEFAULT_VIEWPORT: Viewport = { width: 1200, height: 600 };
 
 // The site's dark canvas background (matches the theme-color in the page shells).
 const BACKGROUND = 0x0b0e14;
 
-type DojoStageProps = {
+export type DojoStageProps = {
   tape: ReplayTape;
   viewport?: Viewport;
 };
@@ -26,6 +33,10 @@ const DojoStage: Component<DojoStageProps> = (props) => {
   let host: HTMLDivElement | undefined;
   let app: Application | undefined;
   let disposed = false;
+
+  // The mounted stage as reactive state so the draw effect below fires once it exists AND whenever the
+  // tape changes — the async init means the stage isn't ready when the effect first runs.
+  const [stage, setStage] = createSignal<Stage>();
 
   // Registered synchronously so teardown works even if the async init below is still in flight.
   onCleanup(() => {
@@ -53,12 +64,20 @@ const DojoStage: Component<DojoStageProps> = (props) => {
     app = created;
     host.appendChild(created.canvas);
 
-    const stage = createStage(viewport);
+    const mounted = createStage(viewport);
 
-    created.stage.addChild(stage.root);
+    created.stage.addChild(mounted.root);
+    setStage(mounted);
+  });
 
-    // A pose is static: draw the single tape frame once (no clock).
-    stage.apply(scene(props.tape, 0, viewport));
+  // Draw tick 0 of the current pose. Re-runs when the stage mounts and whenever a control edit rebuilds
+  // the tape — no clock, since a pose is static (unlike the /watch player's ticker-driven playback).
+  createEffect(() => {
+    const mounted = stage();
+
+    if (mounted) {
+      mounted.apply(scene(props.tape, 0, viewport));
+    }
   });
 
   return (

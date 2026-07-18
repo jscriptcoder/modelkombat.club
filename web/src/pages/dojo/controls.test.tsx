@@ -1,0 +1,159 @@
+import { describe, expect, it } from "vitest";
+
+import { scene, type Viewport } from "../replay/scene";
+import type { ReplayFrame } from "../replay/replay-contract";
+import {
+  controlsToFrame,
+  DEFAULT_CHALLENGER_CONTROLS,
+  DEFAULT_KING_CONTROLS,
+  type FigureControls,
+} from "./controls";
+
+// The pose lab exposes the RAW frame pose fields as controls (not a mutually-exclusive action enum),
+// so engine-impossible combos are reachable by design and `poseFor` resolves precedence. `controlsToFrame`
+// is the pure mapper from that control state to a render `ReplayFrame`; the lab feeds it through the SAME
+// scene()/poseFor projection /watch ships. web/ is not Stryker-reachable, so exact cases stand in for
+// mutation coverage.
+
+// A neutral control state — override only the fields a case exercises.
+const controls = (overrides: Partial<FigureControls> = {}): FigureControls => ({
+  posture: 0,
+  facing: 1,
+  attacking: false,
+  attackBand: 0,
+  guardBand: 0,
+  throwing: false,
+  knockdown: false,
+  ...overrides,
+});
+
+describe("controlsToFrame — maps the lab's raw pose controls to a render frame", () => {
+  it("passes every pose field straight through, unclamped (free combos)", () => {
+    const frame = controlsToFrame({
+      posture: 1,
+      facing: -1,
+      attacking: true,
+      attackBand: 3,
+      guardBand: 2,
+      throwing: true,
+      knockdown: true,
+    });
+
+    // Every tuned field survives verbatim; the render-only fields are filled with grounded, neutral
+    // defaults (x is owned by the builder's centering, y 0 plants the fighter on the ring floor).
+    expect(frame).toEqual({
+      posture: 1,
+      facing: -1,
+      attacking: true,
+      attackBand: 3,
+      guardBand: 2,
+      throwing: true,
+      knockdown: true,
+      x: 0,
+      y: 0,
+      points: 0,
+      stamina: 100,
+    } satisfies ReplayFrame);
+  });
+
+  it("grounds the fighter and fills render-neutral score/stamina for a minimal control state", () => {
+    const frame = controlsToFrame(controls());
+
+    expect(frame.x).toBe(0);
+    expect(frame.y).toBe(0); // grounded on the ring floor
+    expect(frame.points).toBe(0);
+    expect(frame.stamina).toBe(100);
+  });
+
+  it("passes an out-of-range posture through unclamped (poseFor owns the STAND fallback)", () => {
+    expect(controlsToFrame(controls({ posture: 5 })).posture).toBe(5);
+  });
+
+  it("passes an engine-impossible knockdown+throwing combo through unchanged", () => {
+    const frame = controlsToFrame(controls({ knockdown: true, throwing: true }));
+
+    expect(frame.knockdown).toBe(true);
+    expect(frame.throwing).toBe(true);
+  });
+});
+
+describe("the mapped control frame renders through the real scene()/poseFor projection", () => {
+  const VIEWPORT: Viewport = { width: 1200, height: 600 };
+
+  // The pose the shipped projection derives for a given control state (challenger slot).
+  const poseOf = (c: FigureControls) => {
+    const frame = controlsToFrame(c);
+
+    return scene([{ tick: 0, a: frame, b: frame }], 0, VIEWPORT).a.pose;
+  };
+
+  it("throws the front hand to the mid band for a standing mid strike", () => {
+    expect(poseOf(controls({ attacking: true, attackBand: 2 })).handR).toEqual({
+      x: 40,
+      y: -46,
+    });
+  });
+
+  it("drops the stance for a crouch (posture 1)", () => {
+    const pose = poseOf(controls({ posture: 1 }));
+
+    expect(pose.head).toEqual({ x: 0, y: -58 }); // CROUCH head sits lower than STAND (-76)
+    expect(pose.shoulder).toEqual({ x: 0, y: -46 });
+  });
+
+  it("tucks the legs for an air posture (posture 2)", () => {
+    expect(poseOf(controls({ posture: 2 })).footL).toEqual({ x: -10, y: -18 });
+  });
+
+  it("falls back to the standing skeleton for an out-of-range posture", () => {
+    const pose = poseOf(controls({ posture: 7 }));
+
+    expect(pose.head).toEqual({ x: 0, y: -76 }); // STAND
+    expect(pose.footL).toEqual({ x: -14, y: 0 }); // planted, not tucked
+  });
+
+  it("lifts the rear hand to the incoming band for a raised guard", () => {
+    expect(poseOf(controls({ guardBand: 3 })).handL).toEqual({ x: 8, y: -68 });
+  });
+
+  it("locks both hands into a forward grab for a throw", () => {
+    const pose = poseOf(controls({ throwing: true }));
+
+    expect(pose.handL).toEqual({ x: 28, y: -44 });
+    expect(pose.handR).toEqual({ x: 36, y: -44 });
+  });
+
+  it("lays the fighter prone for a knockdown, overriding a simultaneous throw (precedence)", () => {
+    const pose = poseOf(controls({ knockdown: true, throwing: true }));
+
+    // PRONE wins by poseFor precedence — the head lies at the ground, NOT a standing grab.
+    expect(pose.head).toEqual({ x: -40, y: -10 });
+    expect(pose.handR).not.toEqual({ x: 36, y: -44 }); // not the throw grab
+  });
+});
+
+describe("default control states seed the pose lab's opening scene", () => {
+  it("poses the default challenger as a standing mid-strike facing right", () => {
+    expect(DEFAULT_CHALLENGER_CONTROLS).toEqual({
+      posture: 0,
+      facing: 1,
+      attacking: true,
+      attackBand: 2,
+      guardBand: 0,
+      throwing: false,
+      knockdown: false,
+    } satisfies FigureControls);
+  });
+
+  it("poses the default king as a fully idle stand facing left", () => {
+    expect(DEFAULT_KING_CONTROLS).toEqual({
+      posture: 0,
+      facing: -1,
+      attacking: false,
+      attackBand: 0,
+      guardBand: 0,
+      throwing: false,
+      knockdown: false,
+    } satisfies FigureControls);
+  });
+});

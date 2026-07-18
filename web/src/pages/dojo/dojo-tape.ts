@@ -1,4 +1,9 @@
 import { WORLD_WIDTH } from "../replay/scene";
+import {
+  controlsToFrame,
+  DEFAULT_CHALLENGER_CONTROLS,
+  DEFAULT_KING_CONTROLS,
+} from "./controls";
 import type { ReplayFrame, ReplayTape } from "../replay/replay-contract";
 
 // The dojo's synthetic-tape builder: it takes two hand-posed fighters and a world gap and produces a
@@ -29,34 +34,12 @@ export const buildDojoTape = ({ a, b, gap }: DojoTapeInput): ReplayTape => [
 // The default first-load spacing: gyaku-zuki reach, so the pair opens at a real striking distance.
 export const DEFAULT_GAP = 240_000;
 
-// The default challenger: throwing a mid-band strike, facing right toward the king. Its x is set by
-// the builder from the gap; y 0 grounds it on the ring floor.
-export const DEFAULT_CHALLENGER: ReplayFrame = {
-  x: 0,
-  y: 0,
-  facing: 1,
-  posture: 0,
-  attacking: true,
-  attackBand: 2,
-  guardBand: 0,
-  throwing: false,
-  knockdown: false,
-  points: 0,
-  stamina: 100,
-};
+// The default fighter frames are DERIVED from the pose-lab's default control states (controls.ts) —
+// one source of truth for the opening scene, so Slice 1's first-load pose can't drift from the control
+// defaults Slice 2 seeds the panels with. The challenger throws a standing mid-band strike facing the
+// king; the king is idle facing back. `x` is set by the builder from the gap; `y` 0 grounds them.
+export const DEFAULT_CHALLENGER: ReplayFrame = controlsToFrame(
+  DEFAULT_CHALLENGER_CONTROLS,
+);
 
-// The default king: idle, facing left toward the incoming challenger — the still target the pose lab
-// opens against.
-export const DEFAULT_KING: ReplayFrame = {
-  x: 0,
-  y: 0,
-  facing: -1,
-  posture: 0,
-  attacking: false,
-  attackBand: 0,
-  guardBand: 0,
-  throwing: false,
-  knockdown: false,
-  points: 0,
-  stamina: 100,
-};
+export const DEFAULT_KING: ReplayFrame = controlsToFrame(DEFAULT_KING_CONTROLS);
