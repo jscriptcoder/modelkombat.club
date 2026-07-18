@@ -955,6 +955,28 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   `/spec-guide` rendered page #223–#224, the SSG/prerender #231–#233, and `/llms.txt` + raw `/spec.md`
   #235–#236) shipped between the Gauntlet section (#220) and `/ring` but were never logged here; they
   remain a pending backfill.
+- DONE (**replay viewer — watch the King's fights as stickmen (`/replay` + the Pixi `/watch` viewer) +
+  the "make it fight" polish arc, PRs #306–#349**): the fights teaser is now real — a spectator watches
+  any archived title fight play back as animated stickmen. Built as two arcs. **The viewer roadmap
+  (S1–S4, PRs #306–#327):** an additive engine **`renderTape`** (per-tick render tape, byte-identical
+  outcome path — invariant #1) → **`GET /replay/{id}`** serving the King's title-fight archive as
+  reconstructed tapes (tape-only, no bot docs; content-hash id) → the Pixi **`/watch`** page (S1 autoplay
+  - play/pause/restart over a pure clock; S2 postures — stances, strikes, guards, throws, knockdown, a
+    colourblind-safe score-pop `★`; S3 a browsable card list + `/watch/{id}` permalinks; S4 transport — a
+    scrub bar, 0.5×/1×/2× speed, frame-step ◀/▶). **The "make it fight" arc (S1–S5, PRs #329–#349):** a
+    permanent dark **`/dojo`** pose-lab harness → model-identity **glyph heads** (shared `BrandMark` source
+    → Pixi `Graphics.svg()`) → **world-scale** big fighters (body in sub-units from one height knob) →
+    **bending limbs** (derived elbows/knees) → **strikes & grabs connect** (an additive byte-identical
+    **`attackReach`** render field + a reach-to-target solve so the striking hand and both grab hands land
+    on the opponent's near edge and whiff short); closed out by a Grok hollow-ring head fix (#349). The
+    `/watch` roadmap's only `src/` touch was the additive `renderTape`, and the whole make-it-fight arc's
+    only `src/` touch was the additive byte-identical `attackReach` field — **no `INPUT_HASH` /
+    `BENCHMARK_VERSION` ("v19") / TCB change** across either arc; everything else lives in `web/`. `web/src`
+    logic is outside the Node/Stryker scope ⇒ exact-assertion browser-mode tests + a manual mutator scan +
+    a `/dojo` · `/watch` visual sign-off (agent-browser hangs on the Pixi canvas, so no pixel-regression).
+    Design trails + slice plans archived under `docs/archive/replay-viewer-*` and
+    `docs/archive/replay-viewer-fight-*` (see the archive [`README.md`](archive/README.md)). **The replay
+    viewer is COMPLETE.**
 
 ### §7 match structure built between C9 and Capability D
 
@@ -1050,10 +1072,12 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    untouched throughout. See the build-log entries above. Design source: `plans/platform-http-api-{decisions,
 stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-api-s{1,2,3}-*.md` +
    `platform-http-api-s4-throne.md`. **S4 durable persistence is LIVE** (Upstash provisioned on the Vercel
-   Marketplace; `selectThroneStore` resolves the injected prefixed env-var names — PR #190). **Next platform
-   work: the KotH ladder** (multi-champion / tournament
-   bracket beyond the single throne), **`/replay`** + a champions-history read surface, and the **Pixi
-   viewer** — each `grill-me`/`find-gaps` → `planning` → TDD, PR per slice.
+   Marketplace; `selectThroneStore` resolves the injected prefixed env-var names — PR #190). **The platform
+   items once listed as next here have all since shipped:** the **KotH ladder** (top-N ranked arena, PRs
+   #251–#266), **`/replay`** + the Pixi **`/watch`** viewer (PRs #306–#327), and the **"make it fight"**
+   viewer polish arc (PRs #329–#349) — see the replay-viewer build-log entry above. (Several post-#240
+   features, including the ladder, are recorded fully only under `docs/archive/`; a complete build-log
+   backfill remains pending.)
 7. **Public page — the newcomer front door — ✅ COMPLETE (first web-UI feature, PRs #195–#213).** A
    top-level `web/` Vite + SolidJS site **LIVE at `https://modelkombat.club/`**: a face-off hero, the Current
    King + Hall of Kings (on the new identity-only **`GET /king`** + recent-lineage reads), a `modelToBrand`
@@ -1078,6 +1102,9 @@ title fight persisted on Upstash Redis), and the **public page — the newcomer 
 identity-only **`GET /king`** reads + an honest fights "coming soon" teaser). The **`/ring` browser
 bot-submit loop** is now LIVE too (PRs #237–#240): a human courier pastes LLM-authored JSON, POSTs it to
 the live `/fight`, reads the full fight card, and hands the raw result back to the LLM to iterate —
-closing the authoring loop in the browser. Remaining in the platform layer: the **KotH ladder** (the
-tournament-_bracket_ sense of "rounds" beyond the single throne), **`/replay`** + a champions-history
-read surface, and the **Pixi viewer**.
+closing the authoring loop in the browser. The **KotH ladder** (the top-N ranked arena, PRs #251–#266),
+the **`/replay` API + the Pixi `/watch` viewer** (PRs #306–#327), and the **"make it fight" viewer polish
+arc** (PRs #329–#349 — big jointed model-identity fighters whose strikes and grabs connect) have all since
+shipped: **you can now watch the King's fights play back as animated stickmen.** See the replay-viewer
+build-log entry above. (Several of these post-#240 features are logged only in `docs/archive/`; a full
+build-log backfill remains pending.)
