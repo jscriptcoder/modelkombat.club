@@ -389,10 +389,13 @@ describe("scene — knockdown prone pose and wake-up", () => {
     handR: { x: -20, y: -18 },
     footL: { x: 36, y: -6 },
     footR: { x: 36, y: -14 },
-    // A downed body reshapes everything, so PRONE AUTHORS its own elbows (Story 4) rather than
-    // running the upright bend rule — the arms lie splayed by the shoulder.
+    // A downed body reshapes everything, so PRONE AUTHORS its own mid-joints (Story 4) rather than
+    // running the upright bend rule — the arms lie splayed by the shoulder, the legs straight toward
+    // the feet end (each knee the midpoint of hip→foot, not the upright forward bow).
     elbowL: { x: -22, y: -6 },
     elbowR: { x: -22, y: -14 },
+    kneeL: { x: 21, y: -8 },
+    kneeR: { x: 21, y: -12 },
   };
 
   // The prone body world-scaled the same way as every other pose (each authored joint ×BODY_SCALE).
@@ -406,6 +409,8 @@ describe("scene — knockdown prone pose and wake-up", () => {
     footR: scaled(PRONE.footR),
     elbowL: scaled(PRONE.elbowL),
     elbowR: scaled(PRONE.elbowR),
+    kneeL: scaled(PRONE.kneeL),
+    kneeR: scaled(PRONE.kneeR),
   };
 
   const poseDowned = (extra: Partial<ReplayFrame> = {}) =>
@@ -589,6 +594,97 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     const backAgain = scene(tape, 0, VIEWPORT).a.pose.elbowR; // ...then scrub back
 
     expect(backAgain).toEqual(atStrike);
+  });
+});
+
+describe("scene — legs bend at the knee (Story 4 · Slice 2)", () => {
+  // The leg is a 2-bone limb hip→knee→foot, mirroring the arm. The knee is DERIVED from the two
+  // endpoints (no authored constant): the midpoint of hip→foot, offset along the bone's perpendicular
+  // by a fixed local-px bow toward the FRONT (+x local) — a knee bows forward where an elbow bows
+  // back. poseFor never reads facing (the container flip carries it), so the bow is a fixed local
+  // direction that reads correctly for both facings; it is authored in local px so Story 3's scalePose
+  // scales it with the body. bendForward is recomputed here from the documented rule (NOT the
+  // production fn) so a formula / sign / magnitude mutant makes production disagree with these
+  // expectations.
+  const KNEE_BEND = 8;
+
+  const bendForward = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+  ) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const perpX = -dy / len;
+    const perpY = dx / len;
+    const flip = perpX < 0 ? -1 : 1; // force the bow FORWARD (+x local)
+
+    return {
+      x: (from.x + to.x) / 2 + perpX * flip * KNEE_BEND,
+      y: (from.y + to.y) / 2 + perpY * flip * KNEE_BEND,
+    };
+  };
+
+  const scaledKnee = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+  ) => scaled(bendForward(from, to));
+
+  const poseAt = (posture: number) =>
+    scene([tickOf(0, { posture }, {})], 0, VIEWPORT).a.pose;
+
+  it("bends the front leg — the knee sits off the straight hip→foot line", () => {
+    const pose = poseAt(0);
+
+    // STAND: hip (0,-34) → front foot (14,0).
+    expect(pose.kneeR).toEqual(scaledKnee({ x: 0, y: -34 }, { x: 14, y: 0 }));
+    // ...and it bows FORWARD: the knee sits ahead of the straight-line midpoint (x 7 local) — a
+    // formula-independent check that kills a bow-sign flip.
+    expect(pose.kneeR.x).toBeGreaterThan(scaled({ x: 7, y: 0 }).x);
+  });
+
+  it("bends the rear leg at the knee too", () => {
+    // STAND: hip (0,-34) → rear foot (-14,0).
+    expect(poseAt(0).kneeL).toEqual(
+      scaledKnee({ x: 0, y: -34 }, { x: -14, y: 0 }),
+    );
+  });
+
+  it("derives bent knees for the crouch and air stances (stance-agnostic)", () => {
+    // CROUCH: hip (0,-22) → footR (16,0). AIR: hip (0,-34) → footR (10,-18) (tucked leg).
+    expect(poseAt(1).kneeR).toEqual(
+      scaledKnee({ x: 0, y: -22 }, { x: 16, y: 0 }),
+    );
+    expect(poseAt(2).kneeR).toEqual(
+      scaledKnee({ x: 0, y: -34 }, { x: 10, y: -18 }),
+    );
+  });
+
+  it("authors its own knees when prone — not the upright derivation", () => {
+    // PRONE authors all 11 joints (a downed body reshapes everything); the knee is NOT the value the
+    // upright forward-bend rule would derive from the prone hip/foot.
+    const prone = scene([tickOf(0, { knockdown: true }, {})], 0, VIEWPORT).a
+      .pose;
+
+    expect(prone.kneeL).toEqual(scaled({ x: 21, y: -8 }));
+    expect(prone.kneeR).toEqual(scaled({ x: 21, y: -12 }));
+    expect(prone.kneeR).not.toEqual(
+      scaledKnee({ x: 6, y: -10 }, { x: 36, y: -14 }),
+    );
+  });
+
+  it("is a pure function of the frame — a backward scrub re-derives the same knee", () => {
+    const tape: ReplayTape = [
+      tickOf(0, { posture: 1 }, {}), // crouch
+      tickOf(1, {}, {}), // stand
+    ];
+
+    const atCrouch = scene(tape, 0, VIEWPORT).a.pose.kneeR;
+
+    scene(tape, 1, VIEWPORT); // advance...
+    const backAgain = scene(tape, 0, VIEWPORT).a.pose.kneeR; // ...then scrub back
+
+    expect(backAgain).toEqual(atCrouch);
   });
 });
 
