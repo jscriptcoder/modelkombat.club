@@ -297,6 +297,57 @@ describe("figures — the head is the fighter's brand glyph (no disc)", () => {
   });
 });
 
+// Story 3 · Slice 2 — the head glyph scales to 0.3× the world-scaled body height, so the brand mark
+// grows WITH the big body instead of staying a fixed dot. The 24-unit glyph geometry is scaled by
+// (0.3 · BODY_HEIGHT_SUB · pxPerSubunit) / 24; recomputed here from the documented ratio + knob +
+// literal viewport (NOT the production helper) so a ratio / size / viewport-dependence mutant is
+// caught. Same operation order as production so the floats are bit-identical under `toBe`.
+const HEAD_HEIGHT_RATIO = 0.3;
+
+const headGlyphScale = (width: number): number =>
+  (HEAD_HEIGHT_RATIO * (BODY_HEIGHT_SUB * (width / 600_000))) / 24;
+
+describe("figures — the head glyph scales to 0.3× the body height (Story 3 · Slice 2)", () => {
+  it("sizes the head glyph to 0.3× the world-scaled body height, not a fixed dot", () => {
+    const stage = createStage(VIEWPORT, ["claude", "generic"]);
+
+    // The glyph is the head container's sole child; its uniform scale expresses head px box / 24.
+    const glyphA = stage.a.head.children[0];
+    const glyphB = stage.b.head.children[0];
+
+    // 1200-wide viewport: 0.3 × (240k × 0.002 = 480px body) = 144px head → scale 144/24 = 6.
+    expect(glyphA.scale.x).toBe(6);
+    expect(glyphA.scale.x).toBe(headGlyphScale(1200));
+    expect(glyphA.scale.y).toBe(headGlyphScale(1200)); // uniform on both axes
+    expect(glyphB.scale.x).toBe(6); // BOTH fighters sized, not just the challenger
+
+    // The head box is exactly 0.3 × the rendered STAND body span (s(76) = 480px) — a fixed
+    // proportion of the SAME height knob the body scales from, so the two grow together.
+    expect(glyphA.scale.x * 24).toBe(0.3 * s(76));
+  });
+
+  it("grows the head glyph with the viewport (scales by pxPerSubunit, not a fixed px box)", () => {
+    const wide = createStage({ width: 2400, height: 600 }, [
+      "claude",
+      "generic",
+    ]);
+
+    const narrow = createStage({ width: 600, height: 600 }, [
+      "claude",
+      "generic",
+    ]);
+
+    // Doubling the viewport doubles the head box (6 → 12); halving halves it (6 → 3).
+    expect(wide.a.head.children[0].scale.x).toBe(12);
+    expect(wide.a.head.children[0].scale.x).toBe(headGlyphScale(2400));
+    expect(narrow.a.head.children[0].scale.x).toBe(3);
+    expect(narrow.a.head.children[0].scale.x).toBe(headGlyphScale(600));
+
+    // Linear in viewport width — a fixed-px head (dropping pxPerSubunit) would be equal, not 2×.
+    expect(wide.a.head.children[0].scale.x).toBe(2 * headGlyphScale(1200));
+  });
+});
+
 const fighter = (model: string): Fighter => ({ name: "f", model });
 
 describe("brandsFor — a fighter pair's authoring brands (challenger, King)", () => {

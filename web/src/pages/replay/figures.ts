@@ -1,6 +1,11 @@
 import { Container, Graphics, Text } from "pixi.js";
 
-import type { Scene, Skeleton, Viewport } from "./scene";
+import {
+  bodyHeightPx,
+  type Scene,
+  type Skeleton,
+  type Viewport,
+} from "./scene";
 import type { Fighter } from "./replay-contract";
 import {
   BRAND_GLYPH,
@@ -19,9 +24,10 @@ import {
 const CHALLENGER_COLOR = 0x4fd1c5;
 const KING_COLOR = 0xf6ad55;
 
-// The head glyph's box in px — noticeably larger than the old 24px head circle so the mark reads
-// clearly (M11: "bigger and more defined"); the shared 24-unit geometry scales up to fill it.
-const HEAD_GLYPH_PX = 44;
+// The head glyph is a fixed proportion of the body's height (M11: 0.3× body height), so the brand
+// mark grows WITH the world-scaled body instead of staying a fixed dot. Sized per-viewport in
+// `createStage` from `bodyHeightPx`; the shared 24-unit geometry scales up to fill the head box.
+const HEAD_HEIGHT_RATIO = 0.3;
 
 // The canvas-ready SVG string for a brand's head glyph: the shared 0..24 geometry wrapped in an
 // `<svg>` element Pixi's `Graphics.svg()` parses. Grok's geometry inks to `currentColor` (theme-aware
@@ -73,7 +79,7 @@ const BONES: ReadonlyArray<readonly [keyof Skeleton, keyof Skeleton]> = [
 
 type Figure = { nodes: FigureNodes; bones: Graphics; color: number };
 
-const createFigure = (color: number, brand: Brand): Figure => {
+const createFigure = (color: number, brand: Brand, headPx: number): Figure => {
   const root = new Container();
   const bones = new Graphics();
 
@@ -88,7 +94,7 @@ const createFigure = (color: number, brand: Brand): Figure => {
   const glyph = new Graphics().svg(glyphSvg(brand));
 
   glyph.pivot.set(12, 12);
-  glyph.scale.set(HEAD_GLYPH_PX / 24);
+  glyph.scale.set(headPx / 24);
   head.addChild(glyph);
 
   const shoulder = new Container();
@@ -164,8 +170,10 @@ export const createStage = (
   viewport: Viewport,
   brands: readonly [Brand, Brand],
 ): Stage => {
-  const a = createFigure(CHALLENGER_COLOR, brands[0]);
-  const b = createFigure(KING_COLOR, brands[1]);
+  const headPx = HEAD_HEIGHT_RATIO * bodyHeightPx(viewport);
+
+  const a = createFigure(CHALLENGER_COLOR, brands[0], headPx);
+  const b = createFigure(KING_COLOR, brands[1], headPx);
 
   const hud = new Text({
     text: "",
