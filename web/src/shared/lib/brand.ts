@@ -24,6 +24,12 @@ export const BRAND_GLYPH: Record<Brand, string> = {
     '<g fill="none" stroke="#aab2c0" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.2 9.4 C9.2 7.5 10.6 6.4 12 6.4 C13.5 6.4 14.8 7.4 14.8 9 C14.8 10.9 12 11 12 13.2" stroke-linecap="round"/><circle cx="12" cy="16.6" r="0.5" fill="#aab2c0" stroke="none"/></g>',
 };
 
+// Grok's mark is monochrome — its DOM glyph inks to `currentColor` so it follows the theme. The
+// Pixi replay canvas has no CSS `currentColor` to resolve, so the viewer substitutes this explicit
+// near-white ink, keeping Grok's ring/slash legible on the dark ring. Canvas-only: the DOM mark is
+// unchanged (it keeps `currentColor`).
+export const GROK_CANVAS_INK = "#e8eaed";
+
 // AC-L2: lowercase the free-text model, then substring-match in a FIXED priority order, first
 // match wins; no match / empty / absent → generic. Lives here (not in `ModelLogo`) so the resolver
 // is shareable by the viewer head, which also maps a fighter's model to its authoring brand.

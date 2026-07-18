@@ -141,7 +141,7 @@ describe("the default dojo scene renders two fighters through the real scene()/c
       gap: DEFAULT_GAP,
     });
 
-    const stage = createStage(VIEWPORT);
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
 
     stage.apply(scene(tape, 0, VIEWPORT));
 

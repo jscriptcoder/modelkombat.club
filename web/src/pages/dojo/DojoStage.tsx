@@ -64,7 +64,9 @@ const DojoStage: Component<DojoStageProps> = (props) => {
     app = created;
     host.appendChild(created.canvas);
 
-    const mounted = createStage(viewport);
+    // A default brand pair (challenger Claude vs a generic king — the M10 opening identities) so the
+    // pose lab shows real glyph heads; the interactive per-figure brand picker arrives in Slice 3.
+    const mounted = createStage(viewport, ["claude", "generic"]);
 
     created.stage.addChild(mounted.root);
     setStage(mounted);
