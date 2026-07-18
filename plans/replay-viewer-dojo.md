@@ -15,9 +15,9 @@ current pose model in isolation.
 
 ## Acceptance Criteria
 
-- [ ] Navigating to `/dojo` renders **two stickmen** on the dark canvas via the real
+- [x] Navigating to `/dojo` renders **two stickmen** on the dark canvas via the real
   `scene()` + `createStage` pipeline (a synthetic tape, not a real replay). Route ships
-  **dark**: no `Nav` link, `noindex,nofollow`, absent from the sitemap.
+  **dark**: no `Nav` link, `noindex,nofollow`, absent from the sitemap. *(Slice 1 · #329)*
 - [ ] **Per-figure controls** set the frame's pose fields **freely** — posture, facing,
   attacking, attackBand, guardBand, throwing, knockdown — with **no valid-combo constraint**;
   an engine-impossible combo (e.g. knockdown + throwing) renders per `poseFor` precedence
@@ -54,7 +54,7 @@ Three behavior-change slices, each one PR. `mutation-testing` is **N/A** on ever
 is not Stryker-reachable); the proportionate alternate evidence is exhaustive exact-assertion
 tests + a mandatory manual mutator scan + a `/dojo` visual sign-off (M9). No reduction program.
 
-### Slice 1: `/dojo` renders two default-posed fighters through the real pipeline
+### Slice 1: `/dojo` renders two default-posed fighters through the real pipeline — ✅ MERGED (#329)
 
 **Value**: Developer navigates to `/dojo` and sees two stickmen (challenger mid-strike vs king
 idle, at gyaku-zuki reach) on the dark canvas — proving the new route + synthetic tape + real
