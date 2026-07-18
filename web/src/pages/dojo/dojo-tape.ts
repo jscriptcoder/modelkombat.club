@@ -1,0 +1,62 @@
+import { WORLD_WIDTH } from "../replay/scene";
+import type { ReplayFrame, ReplayTape } from "../replay/replay-contract";
+
+// The dojo's synthetic-tape builder: it takes two hand-posed fighters and a world gap and produces a
+// single-tick ReplayTape centered on the ring, so the pose lab drives the SAME scene()/createStage
+// pipeline that /watch ships — "what you tune is what ships". Pure: no Pixi, no engine import (the
+// pose lab tunes the render model, never an outcome).
+
+// The ring midpoint the pair is centered on. The builder OWNS position (derived from the gap), so a
+// control-supplied frame x is replaced — the two roots sit `gap` sub-units apart, symmetric about it.
+const WORLD_MID = WORLD_WIDTH / 2;
+
+type DojoTapeInput = {
+  a: ReplayFrame;
+  b: ReplayFrame;
+  gap: number;
+};
+
+// Center the challenger (a) and king (b) `gap` apart about the ring midpoint: a to the left, b to the
+// right, every other pose field passed through untouched. One static tick numbered 0 — a still pose.
+export const buildDojoTape = ({ a, b, gap }: DojoTapeInput): ReplayTape => [
+  {
+    tick: 0,
+    a: { ...a, x: WORLD_MID - gap / 2 },
+    b: { ...b, x: WORLD_MID + gap / 2 },
+  },
+];
+
+// The default first-load spacing: gyaku-zuki reach, so the pair opens at a real striking distance.
+export const DEFAULT_GAP = 240_000;
+
+// The default challenger: throwing a mid-band strike, facing right toward the king. Its x is set by
+// the builder from the gap; y 0 grounds it on the ring floor.
+export const DEFAULT_CHALLENGER: ReplayFrame = {
+  x: 0,
+  y: 0,
+  facing: 1,
+  posture: 0,
+  attacking: true,
+  attackBand: 2,
+  guardBand: 0,
+  throwing: false,
+  knockdown: false,
+  points: 0,
+  stamina: 100,
+};
+
+// The default king: idle, facing left toward the incoming challenger — the still target the pose lab
+// opens against.
+export const DEFAULT_KING: ReplayFrame = {
+  x: 0,
+  y: 0,
+  facing: -1,
+  posture: 0,
+  attacking: false,
+  attackBand: 0,
+  guardBand: 0,
+  throwing: false,
+  knockdown: false,
+  points: 0,
+  stamina: 100,
+};

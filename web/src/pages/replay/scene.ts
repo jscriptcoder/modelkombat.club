@@ -165,8 +165,9 @@ export type Viewport = { width: number; height: number };
 
 // The engine ring spans [0, WORLD_WIDTH] fixed-point sub-units (mirrors rules.ts `ring.width`,
 // SCALE=1000 ⇒ 600 units). web/src can't import src/, so the bound is mirrored here exactly as the
-// tape types mirror the wire contract; it only scales the drawing, never an outcome.
-const WORLD_WIDTH = 600_000;
+// tape types mirror the wire contract; it only scales the drawing, never an outcome. Exported so the
+// dojo pose lab centers its synthetic pair on the same ring the projection assumes.
+export const WORLD_WIDTH = 600_000;
 
 // The ground line sits at 90% of the viewport height: a grounded fighter (worldY 0) stands on it,
 // a jump (worldY > 0) lifts up the screen. The world is isotropic — one sub-unit is the same length

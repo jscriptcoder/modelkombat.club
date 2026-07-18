@@ -10,9 +10,10 @@ import { defineConfig } from "vite";
 export default defineConfig(({ isSsrBuild }) => ({
   plugins: [solid({ ssr: Boolean(isSsrBuild), solid: { hydratable: true } })],
   // The client build is multi-page: the marketing home (`index.html`, prerendered + hydrated), the
-  // client-rendered `/ring` submit page (`ring.html`), and the client-rendered `/watch` fight
-  // viewer (`replay.html`, its own `replay.tsx` entry). The SSR build takes its input from the
-  // `--ssr` entry flag instead, so the multi-page input is applied to the client build only.
+  // client-rendered `/ring` submit page (`ring.html`), the client-rendered `/watch` fight viewer
+  // (`replay.html`), and the dark `/dojo` pose lab (`dojo.html`, its own `dojo.tsx` entry). The SSR
+  // build takes its input from the `--ssr` entry flag instead, so the multi-page input is applied to
+  // the client build only.
   build: isSsrBuild
     ? undefined
     : {
@@ -21,6 +22,7 @@ export default defineConfig(({ isSsrBuild }) => ({
             main: "index.html",
             ring: "ring.html",
             replay: "replay.html",
+            dojo: "dojo.html",
           },
         },
       },
