@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scene, type Scene, type Viewport } from "./scene";
+import { BODY_HEIGHT_SUB, scene, type Scene, type Viewport } from "./scene";
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
 
 // A 1200×600 viewport makes the world→screen maths land on whole pixels: the world is 600000
@@ -8,6 +8,21 @@ import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
 // stances (challenger 150000, King 450000) therefore map to 300 and 900; the ground line sits at
 // 90% of height = 540. Every expected number below is derived from those two facts.
 const VIEWPORT: Viewport = { width: 1200, height: 600 };
+
+// Story 3 — world scale. The body is authored in a reference frame whose head-to-foot span is 76px
+// (STAND: head at −76, feet at 0); the projection scales it so that span becomes the height knob
+// projected to screen, i.e. BODY_HEIGHT_SUB · pxPerSubunit. At the test viewport that is
+// 240000 · 0.002 = 480px, so every reference coordinate renders at ×(480/76), rounded to whole px.
+// BODY_SCALE is recomputed here from the documented knob + fixed viewport (NOT from the production
+// scale fn), so a scale-formula mutant makes production disagree with these `scaled(...)` expectations
+// while a deliberate knob re-tune re-flows them (only the literal-480 magnitude tests above pin the
+// knob itself).
+const BODY_SCALE = (BODY_HEIGHT_SUB * (1200 / 600_000)) / 76;
+
+const scaled = (joint: { x: number; y: number }) => ({
+  x: Math.round(joint.x * BODY_SCALE),
+  y: Math.round(joint.y * BODY_SCALE),
+});
 
 // A complete render frame with neutral defaults — override only the fields a case exercises.
 const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
@@ -114,6 +129,37 @@ describe("scene — the pure tape → screen projection", () => {
   });
 });
 
+describe("scene — world-scaled body (Story 3)", () => {
+  // The body is defined in world sub-units and projected by the SAME pxPerSubunit that positions
+  // the fighter, so it grows with the ring instead of staying a fixed ~76px. At the test viewport
+  // (1200 wide, pxPerSubunit = 1200/600000 = 0.002) the height knob BODY_HEIGHT_SUB = 240000
+  // sub-units projects to 240000 · 0.002 = 480px tall. Every expected number below is derived from
+  // those documented facts, not from the production scale — so a scale mutant is caught.
+  const poseAt = (posture: number, viewport: Viewport = VIEWPORT) =>
+    scene([tickOf(0, { posture }, {})], 0, viewport).a.pose;
+
+  it("scales a standing body to the world height knob, not a fixed ~76px", () => {
+    const pose = poseAt(0);
+
+    // Head-to-foot span is the projected knob height (240000 · 0.002 = 480), a big fighter.
+    expect(pose.footL.y - pose.head.y).toBe(480);
+    expect(pose.head).toEqual({ x: 0, y: -480 });
+    // Feet stay planted on the local ground line (y 0) at any scale.
+    expect(pose.footL.y).toBe(0);
+    expect(pose.footR.y).toBe(0);
+  });
+
+  it("scales the body linearly with pxPerSubunit — double the viewport, double the body", () => {
+    const small = poseAt(0, { width: 1200, height: 600 });
+    const big = poseAt(0, { width: 2400, height: 600 });
+
+    const spanOf = (p: typeof small) => p.footL.y - p.head.y;
+
+    expect(spanOf(small)).toBe(480); // 240000 · (1200/600000)
+    expect(spanOf(big)).toBe(960); // 240000 · (2400/600000) — exactly twice
+  });
+});
+
 describe("scene — stance geometry by posture", () => {
   // The pose is a skeleton of local joints (feet at the local ground line y=0, up is negative),
   // carried on `Figure.pose`. The container position/facing (S1) still places the whole figure;
@@ -124,11 +170,11 @@ describe("scene — stance geometry by posture", () => {
   it("stands upright at posture 0 — head at the top, feet on the local ground line", () => {
     const pose = poseAt(0);
 
-    expect(pose.head).toEqual({ x: 0, y: -76 });
-    expect(pose.shoulder).toEqual({ x: 0, y: -64 });
-    expect(pose.hip).toEqual({ x: 0, y: -34 });
-    expect(pose.footL).toEqual({ x: -14, y: 0 });
-    expect(pose.footR).toEqual({ x: 14, y: 0 });
+    expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
+    expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+    expect(pose.hip).toEqual(scaled({ x: 0, y: -34 }));
+    expect(pose.footL).toEqual(scaled({ x: -14, y: 0 }));
+    expect(pose.footR).toEqual(scaled({ x: 14, y: 0 }));
   });
 
   it("crouches lower than a stand — the upper body drops while the feet stay planted", () => {
@@ -139,12 +185,12 @@ describe("scene — stance geometry by posture", () => {
     expect(crouch.head.y).toBeGreaterThan(stand.head.y);
     expect(crouch.shoulder.y).toBeGreaterThan(stand.shoulder.y);
     expect(crouch.hip.y).toBeGreaterThan(stand.hip.y);
-    // Exact drop distances (pins the geometry against off-by mutants).
-    expect(crouch.head).toEqual({ x: 0, y: -58 });
-    expect(crouch.hip).toEqual({ x: 0, y: -22 });
+    // Exact drop distances (pins the geometry against off-by mutants), now world-scaled.
+    expect(crouch.head).toEqual(scaled({ x: 0, y: -58 }));
+    expect(crouch.hip).toEqual(scaled({ x: 0, y: -22 }));
     // Feet stay on the ground line (y 0), planted a touch wider.
-    expect(crouch.footL).toEqual({ x: -16, y: 0 });
-    expect(crouch.footR).toEqual({ x: 16, y: 0 });
+    expect(crouch.footL).toEqual(scaled({ x: -16, y: 0 }));
+    expect(crouch.footR).toEqual(scaled({ x: 16, y: 0 }));
   });
 
   it("tucks the legs for an airborne fighter while the upper body holds", () => {
@@ -154,8 +200,8 @@ describe("scene — stance geometry by posture", () => {
     // Feet lift toward the hip (tucked), distinct from the planted stand feet.
     expect(air.footL.y).toBeLessThan(stand.footL.y);
     expect(air.footR.y).toBeLessThan(stand.footR.y);
-    expect(air.footL).toEqual({ x: -10, y: -18 });
-    expect(air.footR).toEqual({ x: 10, y: -18 });
+    expect(air.footL).toEqual(scaled({ x: -10, y: -18 }));
+    expect(air.footR).toEqual(scaled({ x: 10, y: -18 }));
     // The upper body is unchanged from the stand — only the legs tuck.
     expect(air.head).toEqual(stand.head);
     expect(air.hip).toEqual(stand.hip);
@@ -166,7 +212,7 @@ describe("scene — stance geometry by posture", () => {
     const odd = poseAt(9);
 
     expect(odd).toEqual(poseAt(0));
-    expect(odd.head).toEqual({ x: 0, y: -76 }); // a real stand, not an empty/garbage pose
+    expect(odd.head).toEqual(scaled({ x: 0, y: -76 })); // a real stand, not an empty/garbage pose
   });
 });
 
@@ -189,15 +235,15 @@ describe("scene — strike extension by band", () => {
     ).a.pose;
 
   it("extends the striking hand forward to the low band height", () => {
-    expect(poseAttacking(1).handR).toEqual({ x: 40, y: -24 });
+    expect(poseAttacking(1).handR).toEqual(scaled({ x: 40, y: -24 }));
   });
 
   it("extends the striking hand forward to the mid band height", () => {
-    expect(poseAttacking(2).handR).toEqual({ x: 40, y: -46 });
+    expect(poseAttacking(2).handR).toEqual(scaled({ x: 40, y: -46 }));
   });
 
   it("extends the striking hand forward to the high band height", () => {
-    expect(poseAttacking(3).handR).toEqual({ x: 40, y: -68 });
+    expect(poseAttacking(3).handR).toEqual(scaled({ x: 40, y: -68 }));
   });
 
   it("stacks the three bands as distinct heights ascending up the screen", () => {
@@ -219,25 +265,25 @@ describe("scene — strike extension by band", () => {
       VIEWPORT,
     ).a.pose;
 
-    expect(pose.handR).toEqual(NEUTRAL_HAND);
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND));
   });
 
   it("does not extend when attacking with a zero band", () => {
-    expect(poseAttacking(0).handR).toEqual(NEUTRAL_HAND);
+    expect(poseAttacking(0).handR).toEqual(scaled(NEUTRAL_HAND));
   });
 
   it("does not extend for an out-of-range attack band (total fallback)", () => {
-    expect(poseAttacking(9).handR).toEqual(NEUTRAL_HAND);
+    expect(poseAttacking(9).handR).toEqual(scaled(NEUTRAL_HAND));
   });
 
   it("draws both the airborne stance and the strike for an air attack", () => {
     const pose = poseAttacking(2, { posture: 2 });
 
     // The air stance still tucks the legs...
-    expect(pose.footL).toEqual({ x: -10, y: -18 });
-    expect(pose.footR).toEqual({ x: 10, y: -18 });
+    expect(pose.footL).toEqual(scaled({ x: -10, y: -18 }));
+    expect(pose.footR).toEqual(scaled({ x: 10, y: -18 }));
     // ...while the strike extends the front hand on the same tick.
-    expect(pose.handR).toEqual({ x: 40, y: -46 });
+    expect(pose.handR).toEqual(scaled({ x: 40, y: -46 }));
   });
 });
 
@@ -252,15 +298,15 @@ describe("scene — guard raised to the incoming band", () => {
     scene([tickOf(0, { guardBand, ...extra }, {})], 0, VIEWPORT).a.pose;
 
   it("raises the guard arm to the low band height", () => {
-    expect(poseGuarding(1).handL).toEqual({ x: 8, y: -24 });
+    expect(poseGuarding(1).handL).toEqual(scaled({ x: 8, y: -24 }));
   });
 
   it("raises the guard arm to the mid band height", () => {
-    expect(poseGuarding(2).handL).toEqual({ x: 8, y: -46 });
+    expect(poseGuarding(2).handL).toEqual(scaled({ x: 8, y: -46 }));
   });
 
   it("raises the guard arm to the high band height", () => {
-    expect(poseGuarding(3).handL).toEqual({ x: 8, y: -68 });
+    expect(poseGuarding(3).handL).toEqual(scaled({ x: 8, y: -68 }));
   });
 
   it("stacks the three guard bands as distinct heights ascending up the screen", () => {
@@ -273,11 +319,11 @@ describe("scene — guard raised to the incoming band", () => {
   });
 
   it("leaves the guard arm neutral when not guarding (guardBand 0)", () => {
-    expect(poseGuarding(0).handL).toEqual(NEUTRAL_GUARD_HAND);
+    expect(poseGuarding(0).handL).toEqual(scaled(NEUTRAL_GUARD_HAND));
   });
 
   it("leaves the guard arm neutral for an out-of-range guard band", () => {
-    expect(poseGuarding(9).handL).toEqual(NEUTRAL_GUARD_HAND);
+    expect(poseGuarding(9).handL).toEqual(scaled(NEUTRAL_GUARD_HAND));
   });
 
   it("guards independently of stance — the guard composes with a crouch", () => {
@@ -285,10 +331,10 @@ describe("scene — guard raised to the incoming band", () => {
     const pose = poseGuarding(2, { posture: 1 });
 
     // Guard raised to mid...
-    expect(pose.handL).toEqual({ x: 8, y: -46 });
+    expect(pose.handL).toEqual(scaled({ x: 8, y: -46 }));
     // ...while the CROUCH stance survives (feet planted a touch wider, head dropped).
-    expect(pose.footL).toEqual({ x: -16, y: 0 });
-    expect(pose.head).toEqual({ x: 0, y: -58 });
+    expect(pose.footL).toEqual(scaled({ x: -16, y: 0 }));
+    expect(pose.head).toEqual(scaled({ x: 0, y: -58 }));
   });
 });
 
@@ -302,16 +348,16 @@ describe("scene — throw grab pose", () => {
   it("reaches both hands forward into a grab when throwing", () => {
     const pose = poseThrowing();
 
-    expect(pose.handL).toEqual({ x: 28, y: -44 });
-    expect(pose.handR).toEqual({ x: 36, y: -44 });
+    expect(pose.handL).toEqual(scaled({ x: 28, y: -44 }));
+    expect(pose.handR).toEqual(scaled({ x: 36, y: -44 }));
   });
 
   it("leaves the hands at their neutral stance when not throwing", () => {
     const pose = scene([tickOf(0, { throwing: false }, {})], 0, VIEWPORT).a
       .pose;
 
-    expect(pose.handL).toEqual({ x: -18, y: -44 });
-    expect(pose.handR).toEqual({ x: 18, y: -44 });
+    expect(pose.handL).toEqual(scaled({ x: -18, y: -44 }));
+    expect(pose.handR).toEqual(scaled({ x: 18, y: -44 }));
   });
 
   it("shows a grab distinct from a strike — the rear hand comes forward too", () => {
@@ -345,11 +391,22 @@ describe("scene — knockdown prone pose and wake-up", () => {
     footR: { x: 36, y: -14 },
   };
 
+  // The prone body world-scaled the same way as every other pose (each authored joint ×BODY_SCALE).
+  const SCALED_PRONE = {
+    head: scaled(PRONE.head),
+    shoulder: scaled(PRONE.shoulder),
+    hip: scaled(PRONE.hip),
+    handL: scaled(PRONE.handL),
+    handR: scaled(PRONE.handR),
+    footL: scaled(PRONE.footL),
+    footR: scaled(PRONE.footR),
+  };
+
   const poseDowned = (extra: Partial<ReplayFrame> = {}) =>
     scene([tickOf(0, { knockdown: true, ...extra }, {})], 0, VIEWPORT).a.pose;
 
   it("lays the whole body prone when knocked down", () => {
-    expect(poseDowned()).toEqual(PRONE);
+    expect(poseDowned()).toEqual(SCALED_PRONE);
   });
 
   it("lowers and rotates the body versus a standing fighter", () => {
@@ -371,15 +428,15 @@ describe("scene — knockdown prone pose and wake-up", () => {
     // NOT thrown to the strike reach (kills a "compose knockdown with the action layers" mutant).
     const pose = poseDowned({ attacking: true, attackBand: 3 });
 
-    expect(pose).toEqual(PRONE);
-    expect(pose.handR).not.toEqual({ x: 40, y: -68 }); // the high-band strike geometry
+    expect(pose).toEqual(SCALED_PRONE);
+    expect(pose.handR).not.toEqual(scaled({ x: 40, y: -68 })); // the high-band strike geometry
   });
 
   it("overrides a throw — prone wins over the grab that is otherwise applied last", () => {
     const pose = poseDowned({ throwing: true });
 
-    expect(pose).toEqual(PRONE);
-    expect(pose.handL).not.toEqual({ x: 28, y: -44 }); // the grab geometry
+    expect(pose).toEqual(SCALED_PRONE);
+    expect(pose.handL).not.toEqual(scaled({ x: 28, y: -44 })); // the grab geometry
   });
 
   it("wakes up — returns to the standing stance the tick knockdown clears", () => {
@@ -391,8 +448,8 @@ describe("scene — knockdown prone pose and wake-up", () => {
     const downed = scene(tape, 0, VIEWPORT).a.pose;
     const woken = scene(tape, 1, VIEWPORT).a.pose;
 
-    expect(downed.head).toEqual({ x: -40, y: -10 }); // prone at the knockdown tick
-    expect(woken.head).toEqual({ x: 0, y: -76 }); // upright stand the next tick — wake-up
+    expect(downed.head).toEqual(scaled({ x: -40, y: -10 })); // prone at the knockdown tick
+    expect(woken.head).toEqual(scaled({ x: 0, y: -76 })); // upright stand the next tick — wake-up
   });
 
   it("leaves a standing fighter unaffected when not knocked down", () => {
@@ -400,8 +457,8 @@ describe("scene — knockdown prone pose and wake-up", () => {
     const pose = scene([tickOf(0, { knockdown: false }, {})], 0, VIEWPORT).a
       .pose;
 
-    expect(pose.head).toEqual({ x: 0, y: -76 });
-    expect(pose.footL).toEqual({ x: -14, y: 0 });
+    expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
+    expect(pose.footL).toEqual(scaled({ x: -14, y: 0 }));
   });
 });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { scene, type Viewport } from "../replay/scene";
+import { BODY_HEIGHT_SUB, scene, type Viewport } from "../replay/scene";
 import type { ReplayFrame } from "../replay/replay-contract";
 import {
   controlsToFrame,
@@ -8,6 +8,16 @@ import {
   DEFAULT_KING_CONTROLS,
   type FigureControls,
 } from "./controls";
+
+// Story 3 — world scale. The shipped projection world-scales the pose, so the reference-frame
+// constants render at ×(BODY_HEIGHT_SUB · pxPerSubunit / 76), rounded. Computed from the documented
+// knob + the fixed 1200-wide viewport (not the production scale fn), so a scale mutant is caught.
+const BODY_SCALE = (BODY_HEIGHT_SUB * (1200 / 600_000)) / 76;
+
+const scaled = (joint: { x: number; y: number }) => ({
+  x: Math.round(joint.x * BODY_SCALE),
+  y: Math.round(joint.y * BODY_SCALE),
+});
 
 // The pose lab exposes the RAW frame pose fields as controls (not a mutually-exclusive action enum),
 // so engine-impossible combos are reachable by design and `poseFor` resolves precedence. `controlsToFrame`
@@ -70,7 +80,9 @@ describe("controlsToFrame — maps the lab's raw pose controls to a render frame
   });
 
   it("passes an engine-impossible knockdown+throwing combo through unchanged", () => {
-    const frame = controlsToFrame(controls({ knockdown: true, throwing: true }));
+    const frame = controlsToFrame(
+      controls({ knockdown: true, throwing: true }),
+    );
 
     expect(frame.knockdown).toBe(true);
     expect(frame.throwing).toBe(true);
@@ -88,47 +100,50 @@ describe("the mapped control frame renders through the real scene()/poseFor proj
   };
 
   it("throws the front hand to the mid band for a standing mid strike", () => {
-    expect(poseOf(controls({ attacking: true, attackBand: 2 })).handR).toEqual({
-      x: 40,
-      y: -46,
-    });
+    expect(poseOf(controls({ attacking: true, attackBand: 2 })).handR).toEqual(
+      scaled({ x: 40, y: -46 }),
+    );
   });
 
   it("drops the stance for a crouch (posture 1)", () => {
     const pose = poseOf(controls({ posture: 1 }));
 
-    expect(pose.head).toEqual({ x: 0, y: -58 }); // CROUCH head sits lower than STAND (-76)
-    expect(pose.shoulder).toEqual({ x: 0, y: -46 });
+    expect(pose.head).toEqual(scaled({ x: 0, y: -58 })); // CROUCH head sits lower than STAND (-76)
+    expect(pose.shoulder).toEqual(scaled({ x: 0, y: -46 }));
   });
 
   it("tucks the legs for an air posture (posture 2)", () => {
-    expect(poseOf(controls({ posture: 2 })).footL).toEqual({ x: -10, y: -18 });
+    expect(poseOf(controls({ posture: 2 })).footL).toEqual(
+      scaled({ x: -10, y: -18 }),
+    );
   });
 
   it("falls back to the standing skeleton for an out-of-range posture", () => {
     const pose = poseOf(controls({ posture: 7 }));
 
-    expect(pose.head).toEqual({ x: 0, y: -76 }); // STAND
-    expect(pose.footL).toEqual({ x: -14, y: 0 }); // planted, not tucked
+    expect(pose.head).toEqual(scaled({ x: 0, y: -76 })); // STAND
+    expect(pose.footL).toEqual(scaled({ x: -14, y: 0 })); // planted, not tucked
   });
 
   it("lifts the rear hand to the incoming band for a raised guard", () => {
-    expect(poseOf(controls({ guardBand: 3 })).handL).toEqual({ x: 8, y: -68 });
+    expect(poseOf(controls({ guardBand: 3 })).handL).toEqual(
+      scaled({ x: 8, y: -68 }),
+    );
   });
 
   it("locks both hands into a forward grab for a throw", () => {
     const pose = poseOf(controls({ throwing: true }));
 
-    expect(pose.handL).toEqual({ x: 28, y: -44 });
-    expect(pose.handR).toEqual({ x: 36, y: -44 });
+    expect(pose.handL).toEqual(scaled({ x: 28, y: -44 }));
+    expect(pose.handR).toEqual(scaled({ x: 36, y: -44 }));
   });
 
   it("lays the fighter prone for a knockdown, overriding a simultaneous throw (precedence)", () => {
     const pose = poseOf(controls({ knockdown: true, throwing: true }));
 
     // PRONE wins by poseFor precedence — the head lies at the ground, NOT a standing grab.
-    expect(pose.head).toEqual({ x: -40, y: -10 });
-    expect(pose.handR).not.toEqual({ x: 36, y: -44 }); // not the throw grab
+    expect(pose.head).toEqual(scaled({ x: -40, y: -10 }));
+    expect(pose.handR).not.toEqual(scaled({ x: 36, y: -44 })); // not the throw grab
   });
 });
 
