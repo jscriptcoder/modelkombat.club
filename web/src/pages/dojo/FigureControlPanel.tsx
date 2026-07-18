@@ -1,6 +1,7 @@
 import { For, type Component, type Setter } from "solid-js";
 
 import type { FigureControls } from "./controls";
+import { MAX_GAP, MIN_GAP } from "./reach-presets";
 import { BRANDS, type Brand } from "../../shared/lib/brand";
 
 // One fighter's control panel: buttons + checkboxes + selects bound to that figure's raw pose fields.
@@ -26,6 +27,13 @@ const BANDS = [
   { value: 2, label: "Mid" },
   { value: 3, label: "High" },
 ] as const;
+
+// The attack-reach slider travels the same [0, longest-reach] span as the spacing gap (0 = idle), in
+// 1-world-unit steps — fine enough to feel free, coarse enough to land exactly on a preset reach.
+const REACH_STEP = 1_000;
+
+// The codebase's "k sub-units" shorthand for a reach (240000 → "240k"), for the slider's read-out.
+const formatReach = (reach: number) => `${reach / 1_000}k`;
 
 type FigureControlPanelProps = {
   label: string;
@@ -125,6 +133,25 @@ const FigureControlPanel: Component<FigureControlPanelProps> = (props) => {
             {(band) => <option value={band.value}>{band.label}</option>}
           </For>
         </select>
+      </div>
+
+      <div class="control-slider">
+        {/* The committed reach (world sub-units) the strike aims by (Story 5): dial it to any move's
+            distance so contact can be signed off by eye. Named from the span via aria-labelledby — a
+            range input, like a select, is not associated by `<label for>` in this stack (Slice 2). */}
+        <span id={fieldId("attack-reach")}>Attack reach</span>
+        <input
+          type="range"
+          aria-labelledby={fieldId("attack-reach")}
+          min={MIN_GAP}
+          max={MAX_GAP}
+          step={REACH_STEP}
+          value={props.controls.attackReach}
+          onInput={(e) => patch({ attackReach: Number(e.currentTarget.value) })}
+        />
+        <output class="control-gap-value">
+          {formatReach(props.controls.attackReach)}
+        </output>
       </div>
 
       <div class="control-select">

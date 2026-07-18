@@ -448,6 +448,125 @@ describe("scene — strike reach-to-target", () => {
     expect(backAgain).toEqual(atStrike);
     expect(backAgain).toEqual(scaled({ x: 66, y: -46 }));
   });
+
+  // ─── M2 lean: a committed strike leans the upper body INTO the reach ──────────────────────────────
+  // The arm doesn't reach alone: the upper body (head + shoulder) shifts FORWARD a capped amount toward
+  // the target — a lunge — so a long reach reads as a committed step-in, not one over-stretched arm,
+  // while the hand keeps its target (the arm "telescopes" for the remainder). The lean is a viewer-only
+  // cosmetic: the fighter's ROOT x (its truthful world position from the tape) never moves — only the
+  // local pose leans. The lower body (hip + both feet) stays planted and the rear hand keeps its
+  // endpoint; only the shared shoulder anchor leans, so the derived elbows follow it. The shift is a
+  // fixed LOCAL +x direction (the container flip carries facing) and a pure function of the frame.
+  // Lean = min(CAP 16, reachedHandX × RATIO 0.5) local px — recomputed here from the documented rule.
+  const LEAN_CAP = 16;
+
+  it("shifts the striking head + shoulder forward while the hand keeps its target (telescope)", () => {
+    // In-range gyaku strike: the hand still lands at 66, but the upper body leans forward by
+    // min(16, 66 × 0.5) = 16 (capped), so the arm spans a natural distance instead of stretching from a
+    // planted shoulder.
+    const pose = poseStriking({ gap: 240_000, band: 2 });
+
+    expect(pose.shoulder).toEqual(scaled({ x: LEAN_CAP, y: -64 }));
+    expect(pose.head).toEqual(scaled({ x: LEAN_CAP, y: -76 }));
+    expect(pose.handR).toEqual(scaled({ x: 66, y: -46 })); // target unchanged — the arm telescopes
+  });
+
+  it("keeps the lower body planted and the rear hand at rest while the upper body leans", () => {
+    // Only the upper body leans (M2): the hip, both feet, and the rear (non-striking) hand endpoint are
+    // untouched — the lunge pivots from a planted base.
+    const pose = poseStriking({ gap: 240_000, band: 2 });
+
+    expect(pose.hip).toEqual(scaled({ x: 0, y: -34 }));
+    expect(pose.footL).toEqual(scaled({ x: -14, y: 0 }));
+    expect(pose.footR).toEqual(scaled({ x: 14, y: 0 }));
+    expect(pose.handL).toEqual(scaled({ x: -18, y: -44 })); // rear hand endpoint unchanged
+  });
+
+  it("leans proportionally to the reach, capped — a short technique leans less than a long one", () => {
+    // Point-blank (hand floored at 24): lean = min(16, 24 × 0.5) = 12 (un-capped — pins the 0.5 ratio).
+    const pointBlank = poseStriking({ gap: 0, band: 2 });
+    // A whiff extends the hand to the cap (76): lean = min(16, 76 × 0.5) = 16 (capped plateau).
+    const whiff = poseStriking({ gap: 330_000, band: 2 });
+
+    expect(pointBlank.shoulder).toEqual(scaled({ x: 12, y: -64 }));
+    expect(whiff.shoulder).toEqual(scaled({ x: LEAN_CAP, y: -64 }));
+    // The shorter reach leans less than the longer (capped) one — a monotone, bounded lunge.
+    expect(pointBlank.shoulder.x).toBeLessThan(whiff.shoulder.x);
+  });
+
+  it("does not lean when the fighter is not committing a strike", () => {
+    // An idle fighter (no reach to draw) keeps its upright stance — the lean is strike-only, gated on
+    // the same "is there a strike hand" condition as the reach itself.
+    const idle = scene([tickOf(0, {}, {})], 0, VIEWPORT).a.pose;
+
+    expect(idle.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+    expect(idle.head).toEqual(scaled({ x: 0, y: -76 }));
+  });
+
+  it("leans by the facing-local forward direction — a left-facer leans the same local +x", () => {
+    // The lean is a fixed LOCAL +x shift (the container flip turns it on screen), so a left-facing
+    // striker leans to the same local shoulder x as a right-facer. Kills a "lean by facing sign" mutant.
+    const pose = scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: 240_000,
+            x: 400_000,
+            facing: -1,
+          },
+          { x: 160_000 }, // one gyaku gap to the striker's LEFT = in front of a left-facer
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.shoulder).toEqual(scaled({ x: LEAN_CAP, y: -64 }));
+  });
+
+  it("keeps the fighter's root x truthful — the lean shifts the pose, not the world position", () => {
+    // M2's headline guarantee: the forward lean is cosmetic. A striker and an idle fighter at the SAME
+    // world x render at the SAME root x; only the leaning striker's local pose differs.
+    const striking = scene(
+      [
+        tickOf(
+          0,
+          { attacking: true, attackBand: 2, attackReach: 240_000, x: 150_000 },
+          { x: 390_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a;
+
+    const idle = scene([tickOf(0, { x: 150_000 }, {})], 0, VIEWPORT).a;
+
+    expect(striking.x).toBe(300); // 150000 × 0.002 — the truthful world position
+    expect(striking.x).toBe(idle.x); // the lean did not move the root
+    expect(striking.pose.shoulder.x).not.toBe(idle.pose.shoulder.x); // ...only the pose leaned
+  });
+
+  it("leans as a pure function of the frame — a backward scrub re-leans the same shoulder", () => {
+    const tape: ReplayTape = [
+      tickOf(
+        0,
+        { attacking: true, attackBand: 2, attackReach: 240_000, x: 150_000 },
+        { x: 390_000 },
+      ),
+      tickOf(1, {}, {}),
+    ];
+
+    const atStrike = scene(tape, 0, VIEWPORT).a.pose.shoulder;
+
+    scene(tape, 1, VIEWPORT); // advance...
+    const backAgain = scene(tape, 0, VIEWPORT).a.pose.shoulder; // ...then scrub back
+
+    expect(backAgain).toEqual(atStrike);
+    expect(backAgain).toEqual(scaled({ x: LEAN_CAP, y: -64 }));
+  });
 });
 
 describe("scene — guard raised to the incoming band", () => {
@@ -709,8 +828,8 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
   });
 
   it("re-derives the elbow from a thrown strike hand (the bend follows the technique)", () => {
-    // A mid strike lands handR on the opponent's near edge (66,-46) at gyaku distance; the elbow
-    // re-derives from the MOVED endpoint.
+    // A mid strike lands handR on the opponent's near edge (66,-46) at gyaku distance AND leans the
+    // shoulder forward to x 16 (M2), so the elbow re-derives from the leaned shoulder → the moved hand.
     const pose = scene(
       [
         tickOf(
@@ -724,7 +843,7 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     ).a.pose;
 
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 0, y: -64 }, { x: 66, y: -46 }),
+      scaledElbow({ x: 16, y: -64 }, { x: 66, y: -46 }),
     );
     // ...distinct from the resting-stance elbow (proves it tracked the hand, not a fixed value).
     expect(pose.elbowR).not.toEqual(
@@ -743,10 +862,10 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
   });
 
   it("bows the elbow correctly for a high strike, where the hand rises above the shoulder", () => {
-    // A high-band strike lifts handR ABOVE the shoulder (y −68 vs −64), which flips which
-    // perpendicular side counts as "backward" — this exercises the opposite bow-direction branch
-    // from the resting/mid-strike arms (where the hand hangs below the shoulder). The hand lands on
-    // the near edge (66,−68) at gyaku distance.
+    // A high-band strike lifts handR ABOVE the shoulder (y −68 vs the leaned shoulder's −64), which
+    // flips which perpendicular side counts as "backward" — this exercises the opposite bow-direction
+    // branch from the resting/mid-strike arms (where the hand hangs below the shoulder). The hand lands
+    // on the near edge (66,−68) at gyaku distance and the shoulder leans forward to x 16 (M2).
     const pose = scene(
       [
         tickOf(
@@ -760,7 +879,7 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     ).a.pose;
 
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 0, y: -64 }, { x: 66, y: -68 }),
+      scaledElbow({ x: 16, y: -64 }, { x: 66, y: -68 }),
     );
   });
 
