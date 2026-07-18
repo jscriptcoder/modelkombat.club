@@ -1,10 +1,18 @@
 # Plan: Model-identity brand-glyph heads (make-it-fight · Story 2)
 
-**Branch**: feat/coin-heads
-**Status**: Active
+**Status**: Active — Slice 1 ✅ merged; Slice 2 next.
 
 > Informally "coin heads" (the branch/memory name); the disc was dropped 2026-07-18 — the head
 > is the **bare brand glyph**, no disc. See the Design note under Goal.
+
+## Progress
+
+- **Slice 1 · shared brand source — ✅ COMPLETE + MERGED** (2026-07-18). Pure refactor; branch
+  `feat/coin-heads`, PR **#333** squashed to `main` @ `abff48a`. Extracted
+  `web/src/shared/lib/brand.ts` (glyph geometry + `modelToBrand`); `BrandMark`/`ModelLogo`
+  consume it; DOM marks provably unchanged (189/189 green, prerendered hero byte-identical).
+- **Slice 2 · glyph head on real replays — NEXT** (behaviour; branch `feat/replay-glyph-head`).
+- **Slice 3 · `/dojo` brand picker — not started** (behaviour).
 
 Child story 2 of the replay-viewer "make it fight" arc. Design source of truth:
 `plans/replay-viewer-fight-decisions.md` (decision 6 + M5/M6/M11/M-purity) and
@@ -81,7 +89,7 @@ without touching DOM behaviour, then two behaviour slices (glyph head on real re
 
 ---
 
-### Slice 1: Extract a shared brand source (glyph geometry + hue + `modelToBrand`) with the DOM marks unchanged
+### Slice 1 ✅ DONE (#333): Extract a shared brand source (glyph geometry + hue + `modelToBrand`) with the DOM marks unchanged
 
 **Value** (pure refactor): one shared brand module that both the DOM `BrandMark`/`ModelLogo`
 **and** the coming Pixi head can consume — the M6 "pure extraction, verified by the existing

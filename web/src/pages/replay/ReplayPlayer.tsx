@@ -7,7 +7,7 @@ import {
 } from "solid-js";
 import { Application } from "pixi.js";
 
-import { createStage } from "./figures";
+import { brandsFor, createStage } from "./figures";
 import { scene, type Viewport } from "./scene";
 import {
   advance,
@@ -90,7 +90,9 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
     app = created;
     host.appendChild(created.canvas);
 
-    const stage = createStage(viewport);
+    // Each fighter's head wears its authoring model's brand glyph, resolved once here (identity is
+    // off-tape — the models ride on the item, not the render frames).
+    const stage = createStage(viewport, brandsFor(props.item.fighters));
 
     created.stage.addChild(stage.root);
 
