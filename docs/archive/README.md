@@ -1100,3 +1100,39 @@ trail** — `plans/replay-viewer-fight-decisions.md` + `plans/replay-viewer-figh
 
 **Story 2 (model-identity heads) complete — fighters now wear their author's mark on `/watch`.** Stories
 3–5 (scale · bends · connect) continue the arc, each demoed in `/dojo`.
+
+## Big fighters via world-scale — "make it fight" arc, Story 3 ✅ COMPLETE
+
+**A spectator sees big fighters at a believable fighting distance.** The stickman body is defined in world
+sub-units from **one tunable height knob** (`BODY_HEIGHT_SUB ≈ 240k`) and projected by the SAME
+`pxPerSubunit` that positions the fighter, so two fighters at a contact-distance gap fill a large share of
+the ring instead of being tiny figures across a void — and the brand head grows with them (0.3× body
+height). **Web-only** — the scale lives in the pure `scene()` projection + the Pixi head sizing; **no `src/`
+logic / `api/` / TCB / `INPUT_HASH` / `BENCHMARK_VERSION` change** (the `attackReach` engine field belongs to
+Story 5). `web/**` is outside Stryker → each slice recorded **Mutation: N/A (Stryker)** and substituted
+exhaustive exact-assertion tests (a magnitude literal + a formula-independent recompute from the imported
+knob, so a scale mutant is caught) + a manual mutator scan + a `/dojo` visual sign-off.
+
+- **Slice 1 — body world-scale from one knob** (PR #338, `feat/fight-s3-world-scale`) — `scene.ts` gained
+  `BODY_HEIGHT_SUB` (~240k sub-units), a `REF_BODY_HEIGHT_PX` derived from `STAND` (76px, can't drift), and a
+  uniform `bodyScale = BODY_HEIGHT_SUB × pxPerSubunit / REF_BODY_HEIGHT_PX` applied to every joint inside the
+  pure `figure()`. The WHOLE pose (every stance + strike/guard/grab/prone override) scales together, feet stay
+  planted at local y 0, and both `/watch` and `/dojo` inherit it — at a 1200-wide viewport a standing body
+  renders ~480px tall. Existing exact-coordinate assertions were rewrapped in a `scaled()`/`s()` helper
+  recomputed from the imported knob (not the production `bodyScale`), pinning proportions + a scale mutant; a
+  span-linearity test (480→960 on a doubled viewport) sidesteps per-joint float rounding.
+- **Slice 2 — proportional head glyph, closes Story 3** (PR #339, `feat/fight-s3-head-scale`) — the brand head
+  was a fixed `HEAD_GLYPH_PX = 44` dot dwarfed by the big body. `scene.ts` exports
+  `bodyHeightPx(viewport) = BODY_HEIGHT_SUB × pxPerSubunit`; `figures.ts` replaces the fixed px with
+  `HEAD_HEIGHT_RATIO = 0.3` and sizes each fighter's glyph to `0.3 × bodyHeightPx / 24` in `createStage`, so
+  the head grows with the body at any viewport (6× @ 1200px, 12× @ 2400px). Story-2 counter-flip (upright
+  glyph) + non-empty-geometry guards preserved. The test carries its own `0.3` / `24` / `600_000` literals
+  (independent of production) so ratio / size / viewport-dependence mutants are caught.
+
+[replay-viewer-fight-s3-scale.md](replay-viewer-fight-s3-scale.md) — the plan (both slices + whole-story
+acceptance criteria inline). The spanning **"make it fight" design trail** —
+`plans/replay-viewer-fight-decisions.md` + `plans/replay-viewer-fight-stories.md` — stays **live in `plans/`**
+(Stories 4–5 remain: bending limbs with elbows/knees · strikes-connect via `attackReach` + IK).
+
+**Story 3 (big fighters / world-scale) complete — fighters now read big at fighting distance, head and body
+scaling together from one knob.** Stories 4–5 (bends · connect) continue the arc, each demoed in `/dojo`.
