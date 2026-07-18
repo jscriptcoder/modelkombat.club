@@ -65,16 +65,22 @@ export type FigureNodes = {
   handR: Container;
   footL: Container;
   footR: Container;
+  elbowL: Container;
+  elbowR: Container;
 };
 
-// The six line segments (stroked into the `bones` Graphics) that connect the joints into a
-// stickman: torso, two legs, two arms. The head is the brand glyph riding the head joint.
+// The line segments (stroked into the `bones` Graphics) that connect the joints into a stickman:
+// torso, two straight legs, and two ARMS jointed at the elbow (shoulder→elbow→hand) so they read
+// bent, not rigid (Story 4 · Slice 1). The head is the brand glyph riding the head joint; the knees
+// (jointed legs) follow in a later slice.
 const BONES: ReadonlyArray<readonly [keyof Skeleton, keyof Skeleton]> = [
   ["hip", "shoulder"],
   ["hip", "footL"],
   ["hip", "footR"],
-  ["shoulder", "handL"],
-  ["shoulder", "handR"],
+  ["shoulder", "elbowL"],
+  ["elbowL", "handL"],
+  ["shoulder", "elbowR"],
+  ["elbowR", "handR"],
 ];
 
 type Figure = { nodes: FigureNodes; bones: Graphics; color: number };
@@ -103,11 +109,35 @@ const createFigure = (color: number, brand: Brand, headPx: number): Figure => {
   const handR = new Container();
   const footL = new Container();
   const footR = new Container();
+  const elbowL = new Container();
+  const elbowR = new Container();
 
-  root.addChild(bones, head, shoulder, hip, handL, handR, footL, footR);
+  root.addChild(
+    bones,
+    head,
+    shoulder,
+    hip,
+    handL,
+    handR,
+    footL,
+    footR,
+    elbowL,
+    elbowR,
+  );
 
   return {
-    nodes: { root, head, shoulder, hip, handL, handR, footL, footR },
+    nodes: {
+      root,
+      head,
+      shoulder,
+      hip,
+      handL,
+      handR,
+      footL,
+      footR,
+      elbowL,
+      elbowR,
+    },
     bones,
     color,
   };
@@ -138,6 +168,8 @@ const applyFigure = (figure: Figure, placement: Scene["a"]): void => {
   place(nodes.handR, pose.handR);
   place(nodes.footL, pose.footL);
   place(nodes.footR, pose.footR);
+  place(nodes.elbowL, pose.elbowL);
+  place(nodes.elbowR, pose.elbowR);
 
   bones.clear();
 

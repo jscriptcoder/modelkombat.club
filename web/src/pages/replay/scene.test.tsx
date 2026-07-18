@@ -389,6 +389,10 @@ describe("scene — knockdown prone pose and wake-up", () => {
     handR: { x: -20, y: -18 },
     footL: { x: 36, y: -6 },
     footR: { x: 36, y: -14 },
+    // A downed body reshapes everything, so PRONE AUTHORS its own elbows (Story 4) rather than
+    // running the upright bend rule — the arms lie splayed by the shoulder.
+    elbowL: { x: -22, y: -6 },
+    elbowR: { x: -22, y: -14 },
   };
 
   // The prone body world-scaled the same way as every other pose (each authored joint ×BODY_SCALE).
@@ -400,6 +404,8 @@ describe("scene — knockdown prone pose and wake-up", () => {
     handR: scaled(PRONE.handR),
     footL: scaled(PRONE.footL),
     footR: scaled(PRONE.footR),
+    elbowL: scaled(PRONE.elbowL),
+    elbowR: scaled(PRONE.elbowR),
   };
 
   const poseDowned = (extra: Partial<ReplayFrame> = {}) =>
@@ -459,6 +465,130 @@ describe("scene — knockdown prone pose and wake-up", () => {
 
     expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
     expect(pose.footL).toEqual(scaled({ x: -14, y: 0 }));
+  });
+});
+
+describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
+  // The arm is a 2-bone limb shoulder→elbow→hand. The elbow is DERIVED from the two endpoints (no
+  // authored constant): the midpoint of shoulder→hand, offset along the bone's perpendicular by a
+  // fixed local-px bow toward the BACK (−x local). poseFor never reads facing — the container flip
+  // (applyFigure) carries it — so the bow is a fixed local direction that reads correctly for both
+  // facings. The bow is authored in local px, so Story 3's scalePose scales it with the body.
+  // bendBack is recomputed here from the documented rule (NOT the production fn) so a formula / sign /
+  // magnitude mutant makes production disagree with these expectations.
+  const ELBOW_BEND = 8;
+
+  const bendBack = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+  ) => {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const perpX = -dy / len;
+    const perpY = dx / len;
+    const flip = perpX > 0 ? -1 : 1; // force the bow backward (−x local)
+
+    return {
+      x: (from.x + to.x) / 2 + perpX * flip * ELBOW_BEND,
+      y: (from.y + to.y) / 2 + perpY * flip * ELBOW_BEND,
+    };
+  };
+
+  const scaledElbow = (
+    from: { x: number; y: number },
+    to: { x: number; y: number },
+  ) => scaled(bendBack(from, to));
+
+  const poseAt = (posture: number) =>
+    scene([tickOf(0, { posture }, {})], 0, VIEWPORT).a.pose;
+
+  it("bends the front arm — the elbow sits off the straight shoulder→hand line", () => {
+    const pose = poseAt(0);
+
+    // STAND: shoulder (0,-64) → front hand (18,-44).
+    expect(pose.elbowR).toEqual(
+      scaledElbow({ x: 0, y: -64 }, { x: 18, y: -44 }),
+    );
+    // ...and it bows BACKWARD: the elbow sits behind the straight-line midpoint (x 9 local) — a
+    // formula-independent check that kills a bow-sign flip.
+    expect(pose.elbowR.x).toBeLessThan(scaled({ x: 9, y: 0 }).x);
+  });
+
+  it("bends the rear arm at the elbow too", () => {
+    // STAND: shoulder (0,-64) → rear hand (-18,-44).
+    expect(poseAt(0).elbowL).toEqual(
+      scaledElbow({ x: 0, y: -64 }, { x: -18, y: -44 }),
+    );
+  });
+
+  it("re-derives the elbow from a thrown strike hand (the bend follows the technique)", () => {
+    // A mid strike throws handR to (40,-46); the elbow re-derives from the MOVED endpoint.
+    const pose = scene(
+      [tickOf(0, { attacking: true, attackBand: 2 }, {})],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.elbowR).toEqual(
+      scaledElbow({ x: 0, y: -64 }, { x: 40, y: -46 }),
+    );
+    // ...distinct from the resting-stance elbow (proves it tracked the hand, not a fixed value).
+    expect(pose.elbowR).not.toEqual(
+      scaledElbow({ x: 0, y: -64 }, { x: 18, y: -44 }),
+    );
+  });
+
+  it("derives bent elbows for the crouch and air stances (stance-agnostic)", () => {
+    // CROUCH: shoulder (0,-46) → handR (18,-30). AIR upper body = STAND.
+    expect(poseAt(1).elbowR).toEqual(
+      scaledElbow({ x: 0, y: -46 }, { x: 18, y: -30 }),
+    );
+    expect(poseAt(2).elbowR).toEqual(
+      scaledElbow({ x: 0, y: -64 }, { x: 18, y: -44 }),
+    );
+  });
+
+  it("bows the elbow correctly for a high strike, where the hand rises above the shoulder", () => {
+    // A high-band strike lifts handR ABOVE the shoulder (y −68 vs −64), which flips which
+    // perpendicular side counts as "backward" — this exercises the opposite bow-direction branch
+    // from the resting/mid-strike arms (where the hand hangs below the shoulder).
+    const pose = scene(
+      [tickOf(0, { attacking: true, attackBand: 3 }, {})],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.elbowR).toEqual(
+      scaledElbow({ x: 0, y: -64 }, { x: 40, y: -68 }),
+    );
+  });
+
+  it("authors its own elbows when prone — not the upright derivation", () => {
+    // PRONE authors all its joints (a downed body reshapes everything); the elbow is NOT the value
+    // the upright bend rule would derive from the prone shoulder/hand.
+    const prone = scene([tickOf(0, { knockdown: true }, {})], 0, VIEWPORT).a
+      .pose;
+
+    expect(prone.elbowL).toEqual(scaled({ x: -22, y: -6 }));
+    expect(prone.elbowR).toEqual(scaled({ x: -22, y: -14 }));
+    expect(prone.elbowR).not.toEqual(
+      scaledElbow({ x: -24, y: -10 }, { x: -20, y: -18 }),
+    );
+  });
+
+  it("is a pure function of the frame — a backward scrub re-derives the same elbow", () => {
+    const tape: ReplayTape = [
+      tickOf(0, { attacking: true, attackBand: 2 }, {}),
+      tickOf(1, {}, {}),
+    ];
+
+    const atStrike = scene(tape, 0, VIEWPORT).a.pose.elbowR;
+
+    scene(tape, 1, VIEWPORT); // advance...
+    const backAgain = scene(tape, 0, VIEWPORT).a.pose.elbowR; // ...then scrub back
+
+    expect(backAgain).toEqual(atStrike);
   });
 });
 
