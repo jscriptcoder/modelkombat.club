@@ -1136,3 +1136,41 @@ acceptance criteria inline). The spanning **"make it fight" design trail** —
 
 **Story 3 (big fighters / world-scale) complete — fighters now read big at fighting distance, head and body
 scaling together from one knob.** Stories 4–5 (bends · connect) continue the arc, each demoed in `/dojo`.
+
+## Limbs bend (elbows & knees) — "make it fight" arc, Story 4 ✅ COMPLETE
+
+**A spectator sees jointed limbs, not stick figures.** Each arm renders `shoulder→elbow→hand` and each leg
+`hip→knee→foot`, with the elbow bowed **back** and the knee bowed **forward** — on live `/watch` replays and in
+`/dojo`. The mid-joints are **derived**, not authored: a pure `deriveBend(from, to, dir, dist)` in `scene.ts`
+offsets the midpoint of a bone along its unit-perpendicular by a local-px bow, `dir` orienting it back
+(`BEND_BACK`) or forward (`BEND_FORWARD`). Derivation runs on the **final** endpoints (after the
+strike/guard/throw overrides), so a thrown hand/foot re-derives its mid-joint for free — no per-action authored
+bend. `poseFor` never reads facing (the bow is a fixed local direction; the container flip carries facing), so
+a limb reads correctly for both facings. **Web-only** — the derivation lives in the pure `scene()` projection +
+the Pixi node/bone wiring; **no `src/` logic / `api/` / TCB / `INPUT_HASH` / `BENCHMARK_VERSION` change** (the
+`attackReach` engine field belongs to Story 5). `web/**` is outside Stryker → each slice recorded **Mutation:
+N/A (Stryker)** and substituted independent-recompute exact-assertion tests (each test recomputes the mid-joint
+from the endpoints + bend constant, independent of production) + a manual mutator scan + a `/dojo` visual
+sign-off.
+
+- **Slice 1 — arms bend** (PR #341, `feat/fight-s4-arm-bends`) — split the input `Stance` (7 endpoint joints)
+  from the draw `Skeleton` (+`elbowL/R`); a pure `bendBack` + `deriveSkeleton` derives the elbows off the
+  straight shoulder→hand line; `PRONE` authors its own elbows (a downed body reshapes everything, early-return
+  before derivation); `scalePose`/`figures.ts` extend to the elbow nodes; `BONES` routes `shoulder→elbow→hand`.
+  The mutation-killer was a **high-strike** test (hand above the shoulder) exercising the opposite bow-direction
+  branch — the resting/mid-strike arms all hang below the shoulder, so without it a flip-constant mutant
+  survived.
+- **Slice 2 — legs bend, closes Story 4** (PR #342, `feat/fight-s4-legs-bend`) — mirror for the legs: `Skeleton`
+  grows 9 → 11 (`+kneeL/R`), a forward-bend derivation puts the knees off the straight hip→foot line, `PRONE`
+  authors all 11 joints, `BONES` routes `hip→knee→foot`. The **REFACTOR** collapsed the elbow (`bendBack`) and
+  knee (`bendForward`) helpers into one shared `deriveBend(from, to, dir, dist)` — arms + legs now share the
+  flip conditional, which _also_ killed the "flip always −1" survivor the leg-only tests left (no natural leg
+  has the foot above the hip, so a leg alone never exercises the other branch — but the arms do).
+
+[replay-viewer-fight-s4-limbs.md](replay-viewer-fight-s4-limbs.md) — the plan (both slices + whole-story
+acceptance criteria inline). The spanning **"make it fight" design trail** —
+`plans/replay-viewer-fight-decisions.md` + `plans/replay-viewer-fight-stories.md` — stays **live in `plans/`**
+(Story 5 remains: strikes-connect via the `attackReach` engine field + 2-bone IK).
+
+**Story 4 (limbs bend) complete — fighters now read as jointed figures, arms and legs both.** Story 5
+(strikes connect) is the last of the arc and the only one that touches `src/`.

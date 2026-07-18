@@ -31,9 +31,14 @@ user-visible capability; they compose rather than layer.
   (#338 body world-scale from one height knob · #339 head glyph 0.3× body height); plan archived at
   `docs/archive/replay-viewer-fight-s3-scale.md` (archive PR #340, `main` @ `9db85a2`). Fighters now fill
   the ring at fighting distance; the head scales with the body from the one knob. **Straight limbs still.**
-- **Story 4 · limbs bend (elbows & knees) — NEXT** (see the split-candidates table row 4). Needs
-  `planning` to slice it; its plan file lands with Slice 1's PR (the established pattern — plan shipped in #338).
-- Story 5 (strikes connect) not started.
+- **Story 4 · limbs bend (elbows & knees) — ✅ COMPLETE + ARCHIVED** (2026-07-18). 2 slices, PR-per-slice
+  (#341 arms bow back `shoulder→elbow→hand` · #342 legs bow forward `hip→knee→foot`); plan archived at
+  `docs/archive/replay-viewer-fight-s4-limbs.md` (archive PR #343, `main` @ `31547ee`). Mid-joints are a pure
+  `deriveBend(from, to, dir, dist)` derivation in `scene.ts` (`Skeleton` 7→11 joints, `PRONE` authors its own);
+  `BEND_BACK`/`BEND_FORWARD` share one rule. **Limbs now read jointed. Web-only — no `src/` change.**
+- **Story 5 · strikes connect (`attackReach` engine field + 2-bone IK) — NEXT** (split-candidates row 5).
+  Needs `planning` to slice it. The one Story in this arc that touches `src/` — the engine `attackReach` field
+  drives an IK reach onto the striking arm's elbow (introduced in Story 4). Keep 4 → 5 order (done).
 
 ## Recommended first slice
 
@@ -120,15 +125,14 @@ learning**, not spectator — stated explicitly.
 
 ## Next step
 
-Stories 1–3 (`/dojo` pose lab · model-identity heads · big fighters/world-scale) are done +
-archived. **Story 4 — limbs bend (elbows & knees)** is next: **load `planning` for story 4** to
-sequence it into PR-sized TDD slices. Shape (table row 4 + M4): grow the `Skeleton` to ~11 joints
-(add `elbow L/R`, `knee L/R`); bones become `shoulder→elbow→hand` / `hip→knee→foot`; the mid-joints
-are **derived** from endpoints + a facing-aware bend rule (elbows bow back, knees forward) for
-STAND/CROUCH/AIR — no new authored constants; the strike/guard/throw override layers set the
-**hand/foot endpoint** and the mid-joint **re-derives**; **PRONE authors all 11 joints** itself
-(a downed body reshapes everything). Pure/scrub-safe — **no IK reach-to-target yet** (that's story 5,
-which also lands the `attackReach` engine field). Each planned slice repeats the full cycle —
-`tdd` · `testing` · `mutation-testing` (manual scan; `web/` is not Stryker-reachable) ·
-`refactoring`, RED→GREEN→MUTATE→KILL→REFACTOR — before the next begins. **Keep 4 → 5 (bends →
-connect) in order** — story 5 hard-depends on story 4's elbow joint + the `attackReach` task.
+Stories 1–4 (`/dojo` pose lab · model-identity heads · big fighters/world-scale · limbs bend) are
+done + archived. **Story 5 — strikes connect (`attackReach` + 2-bone IK)** is next and LAST: **load
+`planning` for story 5** to sequence it into PR-sized TDD slices. Shape (table row 5 + M10): an
+engine `attackReach` field (the first `src/` touch in this arc — behind the validator gate, TCB /
+`INPUT_HASH` / `BENCHMARK_VERSION` implications to weigh) reports how far a strike reaches; the viewer
+runs a 2-bone **IK** solve so the striking arm's **elbow** (introduced in Story 4) bends to plant the
+hand on the target, so a strike reads as _contact_, not a swing into space. Each planned slice repeats
+the full cycle — `tdd` · `testing` · `mutation-testing` (manual scan for `web/`; real Stryker if the
+engine field is touched) · `refactoring`, RED→GREEN→MUTATE→KILL→REFACTOR — before the next begins.
+Because Story 5 crosses into `src/`, run `grill-me` on the `attackReach` determinism/TCB questions
+before planning. This closes the "make it fight" arc (5/5).
