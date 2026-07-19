@@ -1332,3 +1332,63 @@ be authored.
 `min(CAP, shortfall)`) was assessed and **rejected as out of scope**: they agree at the workhorse distance and
 diverge closer in, so merging them changes how punches look at close range. That is a behaviour change, and it
 belongs where `gyaku-zuki` is being judged by eye.
+
+---
+
+## Move showcase & per-move poses — S3: browse the arsenal in `/dojo` (2026-07-19)
+
+**Four slices, four PRs**, turning `/dojo` from a lab pinned to one hard-coded technique into the authoring
+harness the rest of the arc runs on. `web/`-only throughout — no `src/` change, `BENCHMARK_VERSION` held at
+`v19`. Mutation **`N/A`** for every slice; substitute evidence each time was exhaustive exact-assertion tests, a
+**scripted** manual mutator scan (4 / 12 / 7 / 9, all killed) and a Playwright `/dojo` visual sign-off.
+
+- **Slice 1 — Restart replays from the first tick** (PR #358, `feat/move-poses-s3-picker`) — reused
+  `startTransport()` rather than seeking, because a seek always pauses and `transport.ts:11` already **named**
+  that function the restart target. Nothing was added to the transport model. Shipped first because it is close
+  to a prerequisite: playback auto-pauses at the end, so selecting a move while parked would land on that move's
+  final recovery frame.
+- **Slice 2 — a per-figure move picker** (PR #359, `feat/move-poses-s3-move-picker`) — options come straight off
+  the engine-mirror table, so the picker cannot offer a move the engine lacks; `""` is the engine's own idle
+  sentinel. Selecting stamps and lets go (decision 6). **One mutant survived the first pass** — "the picker does
+  not reflect the committed move": there were tests for writing but none for reading back. Refactor **taken**:
+  the stamp became a pure `selectMove(controls, move)` in `controls.ts`, which slices 3 and 4 then extended
+  exactly as predicted.
+- **Slice 3 — the gap snaps to the move's true reach** (PR #360, `feat/move-poses-s3-gap-snap`) — driven by
+  slice 2's eye check, where `empi` (95k) selected at the 240k default visibly whiffed. The superseded "Reach
+  preset" dropdown was **retired**, and two of its tests with it: one had its live half moved into the picker
+  test, the other described a read-back state that no longer exists.
+- **Slice 4 — the picker stamps a legal band** (PR #361, `feat/move-poses-s3-band-stamp`) — `bands` joins the
+  mirror as its third transcribed field, in `rules.ts`'s own order, since the **first** entry is what gets
+  stamped.
+
+[move-poses-s3.md](move-poses-s3.md) — the plan, with all four slices' recorded outcomes, the amended AC and the
+rejected refactors. The arc's design trail (`plans/move-poses-{decisions,stories}.md`) stays **live in
+`plans/`**, since S4–S8 still run off it.
+
+**The engine settled a question the plan got wrong.** The plan assumed all 13 moves carry a band list —
+`sweep` and `throw` do not. The tempting fix was to invent one (the sweep is documented as a low technique).
+`bandLegal` (`sim.ts:613`) decided it instead: an **absent `bands` means _every_ band is legal, not none**. The
+sweep is gated by hurtbox occupancy; a throw is a grab with no height. So the mirror leaves them absent and the
+stamp leaves the band alone — whatever is set is already legal. **No interpretation entered a table whose whole
+job is to transcribe**, and the AC was amended rather than the data bent.
+
+**The finding that outlives the story — S2's structural mismatch is now visible, and it lands on S5.** Standing
+the pair at each move's true reach shows the body failing to fit the engine's distance range from both ends at
+once: **`empi` at its true 95k renders as two interpenetrating figures** (heads overlapping, bodies crossed),
+while **`ushiro-geri` at 330k stretches the arm enormously**. Both are correct — those _are_ the engine's
+distances. S5's two moves (`empi`, `hiza-geri`) are exactly the close-range pair this makes undrawable, so S5
+must confront it rather than inherit it.
+
+**GOTCHA — `as const` hides an absent optional key.** `throw`/`sweep` have no `bands` **key**, so the literal
+union has no such property and `tsc` rejects reading it _even though the tests pass_. Read through the declared
+type (`p: ReachPreset`), where the field is optional.
+
+**GOTCHA — a control that both writes and displays needs both assertions.** Slice 2's scan found the picker had
+tests for writing but none for reading back, so a mutant deleting `value={...}` survived. The scan is what
+earned that test, not the TDD pass.
+
+**Two refactors rejected, recorded.** `SpacingControl` keeps its component despite collapsing to a single
+slider (a named fieldset with its own accessible name and format constants). A named `primaryBandOf` has one
+caller, and its fallback (`?? controls.attackBand`) belongs to the caller, not the table. **Still carried:**
+`formatGap` / `formatReach` are the same one-liner — predicted to ride along with slice 4, which never opened
+that file, so it remains a standalone tidy rather than something smuggled into a feature commit.

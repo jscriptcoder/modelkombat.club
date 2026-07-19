@@ -1093,17 +1093,18 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    stats**. Both presentation-only (no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change). All Arsenal +
    Gauntlet artifacts archived under `docs/archive/` (see the build-log entries above + the archive
    [`README.md`](archive/README.md)).
-9. **Move showcase + per-move poses — 🚧 IN PROGRESS (3 of 8 child stories shipped; PRs #350, #352,
-   #353, #355–#357).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
+9. **Move showcase + per-move poses — 🚧 IN PROGRESS (4 of 8 child stories shipped; PRs #350, #352,
+   #353, #355–#361).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
    `poseFor` knew only `attacking` / `attackBand` / `throwing`, so all **12 strikes rendered as one
    picture** (a `mawashi-geri` drew as a punch), and `attacking` stays true for a move's whole committed
    duration — a `gyaku-zuki` holds **24 ticks (~0.4 s) frozen at full extension**. Design resolved via
    `grill-me` → `find-gaps` → `story-splitting` (PR #350): 10 decisions + mechanics M1–M11, 8 child
    stories ordered S0 → S1 → S2 phases → S3 picker → S4+ the rest, the tail sequenced by
    `npm run telemetry` move-usage rather than anatomy. Design source:
-   `plans/move-poses-{decisions,stories}.md` (still live — S3–S8 run off it); the completed plans are
-   archived at [`docs/archive/move-poses-s0-s1.md`](archive/move-poses-s0-s1.md) and
-   [`docs/archive/move-poses-s2.md`](archive/move-poses-s2.md). Defense / _uke_ poses are explicitly a
+   `plans/move-poses-{decisions,stories}.md` (still live — S4–S8 run off it); the completed plans are
+   archived at [`docs/archive/move-poses-s0-s1.md`](archive/move-poses-s0-s1.md),
+   [`docs/archive/move-poses-s2.md`](archive/move-poses-s2.md) and
+   [`docs/archive/move-poses-s3.md`](archive/move-poses-s3.md). Defense / _uke_ poses are explicitly a
    **later** arc.
 
    - **S0 ✅ (PR #352)** — the arc's **only `src/` touch**: additive render-only **`attackMove` +
@@ -1135,10 +1136,29 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
      bounded one. M8.2's support-integrity assertion never had to change: the step is capped, so the
      rear foot stays planted.
 
-   - **Next: S3** — the `/dojo` move picker that was the original ask, and now **blocking the authoring
-     loop**: the lab still hard-codes the challenger to `mae-geri`, so S2 could only eye-check a punch by
-     temporarily editing that constant. A Restart control belongs with it. **S4 then opens on
-     `gyaku-zuki`** by the telemetry bargain — against geometry that is now settled.
+   - **S3 ✅ (PRs #358, #359, #360, #361)** — `web/`-only, four slices, turning `/dojo` from a lab pinned
+     to one hard-coded technique into **the authoring harness the rest of the arc runs on**. A **Restart**
+     control (playback auto-pauses at the end, so the lab settled on a recovery frame); a **per-figure move
+     picker** listed off the engine-mirror table, whose selection stamps and then lets go (decision 6); the
+     **gap snapping** to the move's true reach, retiring the superseded "Reach preset" dropdown; and a
+     **legal band** stamped from the engine's own first-listed entry. All 13 are now selectable, and the 12
+     without descriptors keep the generic fallback (M7).
+
+     **The engine settled a question the plan got wrong.** `sweep` and `throw` carry no band list, and
+     `bandLegal` (`sim.ts:613`) reads an **absent `bands` as _every_ band being legal, not none** — the
+     sweep is gated by hurtbox occupancy, a throw is a grab with no height. The mirror leaves them absent
+     and the stamp leaves the band alone, so no interpretation entered a transcription table.
+
+     **S2's structural mismatch is now visible rather than argued.** Standing the pair at each move's true
+     reach shows the body failing to fit the engine's distance range from both ends: `empi` at 95k renders
+     as two **interpenetrating** figures, `ushiro-geri` at 330k stretches the arm enormously. Both are
+     correct distances — which is the problem. **This lands on S5**, whose two moves are exactly that
+     close-range pair.
+
+   - **Next: S4 — `gyaku-zuki`**, by the telemetry bargain (~80% of all committed on-screen time), against
+     geometry that is now settled and with the harness finally in place. It carries the **rear-hand
+     precedence rule** (the guard lives on the rear arm, and the reverse punch wants the same limb) and the
+     `strikeLean` / `rootTravel` unification carried from S2.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
@@ -1155,7 +1175,9 @@ shipped: **you can now watch the King's fights play back as animated stickmen.**
 build-log entry above. (Several of these post-#240 features are logged only in `docs/archive/`; a full
 build-log backfill remains pending.) **Item 9 is now underway** — giving each of the 13 arsenal moves its own
 look, so a spectator can tell _which_ technique a fighter just threw. The engine field (S0, PR #352), the
-first per-move pose (S1, PR #353 — a `mae-geri` that kicks with its foot) and **the whole wind-up /
-recovery story (S2, PRs #355–#357)** have shipped: techniques now read as _movements_ rather than holding
-full extension for ~0.4 s, and the figure keeps its bone lengths instead of telescoping. **S3** — the
-`/dojo` move picker that was the original ask — is next, followed by **S4** on `gyaku-zuki`.
+first per-move pose (S1, PR #353 — a `mae-geri` that kicks with its foot), **the whole wind-up / recovery
+story (S2, PRs #355–#357)** and **the `/dojo` authoring harness (S3, PRs #358–#361)** have shipped:
+techniques now read as _movements_ rather than holding full extension for ~0.4 s, the figure keeps its bone
+lengths instead of telescoping, and any of the 13 can be selected, stood at its true fighting distance and
+replayed without editing source. **S4 — `gyaku-zuki`, ~80% of all committed on-screen time — is next**, and
+everything that was blocking it is now cleared.

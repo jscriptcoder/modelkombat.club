@@ -36,7 +36,7 @@ single-tick tape.
 | ✅ **S0** — the tape carries move identity + phase _(enabling / validation)_ — **shipped #352**      | Proves a move id can be threaded through committed state **without** touching the outcome path — the M11 gate. No visible change.                 | `attackMove` + `attackPhase` on `RenderFrame` (M1, M2); threading the id onto `AttackingState` + both call sites (M2a); web contract mirror                                                              | Every renderer change                                                                   | Given a fight where A throws `mae-geri`, when the tape is rendered, the frame at the strike tick carries `attackMove: "mae-geri"` and `attackPhase ∈ {1,2,3}` · Given the full suite, when slice 0 lands, determinism/replay tests are green **and** `BENCHMARK_VERSION` is unchanged at `v19`                                                                            | Shippable, invisible               |
 | ✅ **S1** — a kick renders with a foot — **shipped #353**                                            | A spectator sees a front kick as a **kick**. Dev learns whether the foot-through-solver assumption holds.                                         | Descriptor table + shared solver; `mae-geri` descriptor (active phase only); `/dojo` default scene set to it; M7 fallbacks; M8 assertion floor                                                           | Chamber/recovery, picker, other 12 moves                                                | Given the challenger throwing `mae-geri` in range, when the active phase renders, `footR` is the driven endpoint at the mid band and `handR` stays at stance · Given two different fighter gaps, when each renders, the phase-2 `footR.x` differs (solve retained, M8.5) · Given `attackMove: "gyaku-zuki"` (no descriptor), when it renders, the generic hand pose draws | Shippable to `/watch` (M6)         |
 | ✅ **S2** — a technique winds up and recovers — **all 3 slices shipped #355, #356, #357**            | Kills the 0.4 s-frozen-at-full-extension defect. Techniques read as _movements_. Unlocks tuning for every later move.                             | Multi-tick `buildDojoTape` spanning real duration; `reach-presets.ts` gains `startup`/`active`/`recovery` (M4); S4 transport reuse; `mae-geri` chamber authored; fixed bone lengths + a capped root step | Per-move chambers for the other 12                                                      | Given `mae-geri` selected, when the dojo tape builds, it spans `startup+active+recovery` ticks and the playhead drives `attackPhase` · Given the playhead on a startup tick, when it renders, `footR` sits at the authored chamber, distinct from its active position (M8.3) · Given the transport, when ◀/▶ steps, playback pauses                                       | Shippable                          |
-| **S3** — browse the arsenal in `/dojo`                                                               | **The original ask.** Select any of the 13 and see it. Becomes the authoring harness that makes S4+ fast.                                         | Per-figure move picker absorbing the "Reach preset" dropdown; write-through stamping band + reach + gap (decision 6); `aria-labelledby` naming (M10)                                                     | Contact sheet                                                                           | Given the picker, when `mawashi-geri` is selected, the pose updates **and** the gap snaps to 300k · Given a move selected, when the gap slider moves, the selected move does not change · Given a stamped band, when the band control is changed, the pose follows (M10 free-combos preserved)                                                                            | Shippable                          |
+| ✅ **S3** — browse the arsenal in `/dojo` — **all 4 slices shipped #358, #359, #360, #361**          | **The original ask**, and by the time it was built, the blocker. Select any of the 13 and see it. The authoring harness S4+ depends on.           | Restart; per-figure move picker absorbing the "Reach preset" dropdown; write-through stamping band + reach + gap (decision 6); `bands` added to the engine mirror; `aria-labelledby` naming (M10)        | Contact sheet                                                                           | Given the picker, when `mawashi-geri` is selected, the pose updates **and** the gap snaps to 300k · Given a move selected, when the gap slider moves, the selected move does not change · Given a stamped band, when the band control is changed, the pose follows (M10 free-combos preserved)                                                                            | Shippable                          |
 | **S4** — the moves fighters actually throw look distinct                                             | Most spectator-visible value per PR. See **bargain** below.                                                                                       | Descriptors for the highest-usage moves, ordered by `npm run telemetry` move-usage                                                                                                                       | Low-usage tail                                                                          | Given each authored move, when its active phase renders, its driven endpoint differs from every other authored move's · Given the contact of two authored moves at the same band, when both render, they are visually distinguishable                                                                                                                                     | Shippable, per-move PRs            |
 | **S5** — close-range techniques lead with the elbow / knee                                           | `empi` and `hiza-geri` are the only moves whose driven point is a **mid-joint**, currently derived rather than authored. Distinct technical risk. | `empi`, `hiza-geri`; mid-joint promoted to a drivable endpoint                                                                                                                                           | —                                                                                       | Given `empi` active, when it renders, `elbowR` is the driven endpoint and the derived-bend rule does not overwrite it                                                                                                                                                                                                                                                     | Shippable                          |
 | **S6** — the non-strike moves read correctly                                                         | Completes the 13. `throw` already has a look; `sweep` and `tobi-geri` compose with existing layers.                                               | `throw`, `sweep`, `tobi-geri` descriptors routed through the same lookup (M2 vocabulary)                                                                                                                 | —                                                                                       | Given `attackMove: "throw"`, when it renders, the two-hand grab draws via the descriptor lookup, not a `throwing` special case · Given `tobi-geri`, when it renders, the `AIR` stance composes with the kick descriptor                                                                                                                                                   | Shippable                          |
@@ -140,6 +140,17 @@ lands. It is also the one story that changes how `/watch` looks without authorin
   S2 · Slice 3 replaced it with a bounded one (a capped root step plus a bounded residual
   stretch) rather than eliminating it. Any future slice tempted to "fix the stretch properly"
   should read `docs/archive/move-poses-s2.md` first.
+  **S3 · Slice 3 turned this from an argument into something you can see**, from both ends at
+  once: standing the pair at each move's true reach makes `empi` (95k) render as two
+  interpenetrating figures — heads overlapping — while `ushiro-geri` (330k) stretches the arm
+  enormously. **This lands on S5**, whose two moves (`empi`, `hiza-geri`) are exactly the
+  close-range pair that cannot currently be drawn without overlap. S5 must confront it, not
+  inherit it.
+- **Two moves have no band list, and absent means UNRESTRICTED.** `sweep` and `throw` declare no
+  `bands` in `rules.ts`, and `bandLegal` (`sim.ts:613`) reads that as _every_ band being legal —
+  not none. The sweep is gated by hurtbox occupancy; a throw is a grab with no height. Any future
+  work tempted to "fill in the missing bands" would be inventing a restriction the engine does
+  not impose (S3 · Slice 4 resolved this).
 - **S4 has no fixed size.** It is 1–8 PRs depending on the telemetry ordering and where the
   stopping rule lands. Do not plan it as a single unit.
 - **The expressiveness risk is still live.** M3 accepts that only the driven endpoint moves, so
@@ -148,24 +159,25 @@ lands. It is also the one story that changes how `/watch` looks without authorin
 
 ## Next step
 
-Load `planning` for **S3**. S0, S1 and S2 have all shipped (#352, #353, #355–#357; plans archived
-at `docs/archive/move-poses-s0-s1.md` and `docs/archive/move-poses-s2.md`), so the descriptor
-mechanism, the driven-endpoint solve, phase-correct playback at engine timing and a limb that
-keeps its bone lengths all exist and are proven.
+Load `planning` for **S4**. S0–S3 have all shipped (#352, #353, #355–#361; plans archived at
+`docs/archive/move-poses-s0-s1.md`, `-s2.md` and `-s3.md`), so the descriptor mechanism, the
+driven-endpoint solve, phase-correct playback at engine timing, a limb that keeps its bone lengths,
+and a working authoring harness all exist and are proven.
 
-S3 is next on the critical path and its value has grown since it was written. It is no longer just
-"the original ask" — it is now **blocking the authoring loop**. `/dojo` still hard-codes the
-challenger to `mae-geri` (`controls.ts:49`), so S2 · Slice 3 could only eye-check a punch by
-temporarily editing that constant and reverting. Every later slice authors a move it cannot
-currently select. Two small usability gaps found along the way belong with it:
+**Everything blocking S4 is now cleared.** `/dojo` can select any of the 13, stands the pair at the
+move's true reach, poses it at a legal band, and replays it from tick 0 — so a move can be authored
+and judged without editing source, which is what S2 · Slice 3 had to do.
 
-- **No Restart.** Playback auto-pauses at the final tick, so `/dojo` opens resting on the last
-  recovery frame and replaying means scrubbing to 0 and pressing Play (found in S2 · Slice 2).
-- **No move picker**, per above (found in S2 · Slice 3).
+**S4 opens on `gyaku-zuki`** by the telemetry bargain (~80% of all committed on-screen time), and
+nothing overtakes it. Its geometry is settled — the bone-length and lean-polarity questions open
+when S4 was written have both been answered — but it carries two live items:
 
-Note the sequencing rule still holds: **S4 opens on `gyaku-zuki`** by the telemetry bargain, and
-nothing overtakes it. S4's geometry is now settled — the bone-length and lean-polarity questions
-that were open when S4 was written have both been answered — but it inherits one live question
-from S2 · Slice 3, recorded there: unifying `strikeLean` (a heuristic) with `rootTravel` (derived)
-would change how punches look at close range, which is a behaviour change and belongs where the
-punch is being judged by eye.
+- **The rear-hand precedence rule.** `gyaku-zuki` is the _reverse_ hand, and `scene.ts:87` puts the
+  guard on the rear arm specifically so a strike and a guard never fight over the same limb. This
+  is the slice that breaks that (already in the parking lot).
+- **Unifying `strikeLean` (heuristic) with `rootTravel` (derived)** — carried from S2 · Slice 3. It
+  changes how punches look at close range, so it belongs where a punch is judged by eye.
+
+**S5 has grown.** It is no longer only "close-range techniques lead with the elbow/knee" — S3's gap
+snap showed `empi` and `hiza-geri` cannot currently be drawn at their true distances without the
+figures overlapping (see Warnings). S5 owns that problem now.

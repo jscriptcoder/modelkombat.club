@@ -1,7 +1,7 @@
 # Plan: S3 — browse the arsenal in `/dojo`
 
-**Branch**: `feat/move-poses-s3-picker`
-**Status**: Active
+**Status**: ✅ **COMPLETE — all 4 slices shipped 2026-07-19** (#358, #359, #360, #361)
+**Branches**: `feat/move-poses-s3-picker` · `-move-picker` · `-gap-snap` · `-band-stamp`
 **Story**: S3 in `plans/move-poses-stories.md`; decisions 5, 6, 9, 10 + M10 in
 `plans/move-poses-decisions.md`
 
@@ -34,16 +34,81 @@ cannot currently select — S3 is the harness that makes the rest of the arc fas
 
 ## Acceptance Criteria
 
-- [ ] Every arsenal move can be selected on either figure, and selecting one plays that
+- [x] Every arsenal move can be selected on either figure, and selecting one plays that
       technique through its own duration
-- [ ] Selecting a move sets the scene up for it: the fighters' gap becomes that move's true
+- [x] Selecting a move sets the scene up for it: the fighters' gap becomes that move's true
       engine reach, and the figure's attack band becomes one the move can legally be thrown at
-- [ ] Stamped values stay editable — after a selection, the band, reach and gap controls can each
+      — **amended at Slice 4**: two moves (`sweep`, `throw`) declare no band list, which the
+      engine reads as _every_ band being legal, so for those the band is correctly left alone
+- [x] Stamped values stay editable — after a selection, the band, reach and gap controls can each
       be moved freely without the selected move changing (M10 free combos, decision 6)
-- [ ] The technique can be replayed from its first tick without scrubbing
-- [ ] `/dojo` exposes exactly one move dropdown per figure — the shared "Reach preset" dropdown
+- [x] The technique can be replayed from its first tick without scrubbing
+- [x] `/dojo` exposes exactly one move dropdown per figure — the shared "Reach preset" dropdown
       it supersedes is gone
-- [ ] No `src/` change: `BENCHMARK_VERSION` stays `v19` and the engine suite is untouched
+- [x] No `src/` change: `BENCHMARK_VERSION` stays `v19` and the engine suite is untouched
+
+## Recorded outcome
+
+**Shipped in four PRs, in the planned order.** Suite 2114 → 2131.
+
+| Slice           | PR   | Note                                                                                                                                                           |
+| --------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1 · Restart     | #358 | Reused `startTransport()` — the primitive already existed and `transport.ts:11` already named it the restart target. Nothing was added to the transport model. |
+| 2 · Move picker | #359 | Options come off the engine-mirror table, so the picker cannot offer a move the engine lacks.                                                                  |
+| 3 · Gap snap    | #360 | Retired the superseded "Reach preset" dropdown; two of its tests went with it.                                                                                 |
+| 4 · Band stamp  | #361 | Added `bands` as the mirror's third transcribed field.                                                                                                         |
+
+### What the plan got wrong, and how the engine settled it
+
+**The plan assumed all 13 moves carry a band list. `sweep` and `throw` do not.** The tempting
+fix was to invent one — the sweep is documented as a low-band technique. `bandLegal`
+(`sim.ts:613`) decided it instead: an **absent** `bands` means _every_ band is legal, not none.
+The sweep is gated by hurtbox occupancy; a throw is a grab with no height. So the mirror leaves
+them absent and the stamp leaves the band alone — whatever is set is already legal. **No
+interpretation entered a table whose job is to transcribe.** AC 2 was amended accordingly.
+
+### The finding that outlives the story
+
+Slice 3's snap made a structural problem visible for the first time. Standing the pair at each
+move's true reach shows that **the body does not fit the engine's distance range**, from both
+ends at once:
+
+- **`empi` at its true 95k: the fighters visibly interpenetrate.** Heads overlap, bodies cross.
+  The snap is correct — that _is_ the engine's infighting distance.
+- **`ushiro-geri` at 330k: the arm stretches enormously** to cover the gap.
+
+This is the mismatch already recorded in the story warnings (`BODY_HEIGHT_SUB` equals the opening
+distance), but until now it was an argument on paper. It lands on **S5** (`empi`, `hiza-geri` —
+the two close-range moves), which will have to confront it rather than inherit it. Read
+`docs/archive/move-poses-s2.md` before attempting to "fix the stretch properly".
+
+### Refactors: one taken, two rejected
+
+- **Taken (Slice 2):** the stamp is a pure `selectMove(controls, move)` in `controls.ts`, beside
+  `controlsToFrame`. Slices 3 and 4 both extended it, as predicted.
+- **Rejected (Slice 3):** `SpacingControl` keeps its component despite collapsing to one slider —
+  it is a named fieldset with its own accessible name and format constants.
+- **Rejected (Slice 4):** a named `primaryBandOf` has one caller, and the fallback
+  (`?? controls.attackBand`) belongs to the caller, not the table.
+
+### Carried forward
+
+- **`formatGap` / `formatReach` are the same one-liner** expressing the same idea (how this
+  codebase writes a world distance). Predicted to ride along with Slice 4 — it did not, because
+  Slice 4 never opened `FigureControlPanel`. Still unmerged; a standalone tidy, not a feature.
+- **Unifying `strikeLean` with `rootTravel`** — carried from S2 · Slice 3, still belongs to S4
+  where a punch is judged by eye.
+
+### Durable gotchas
+
+- **`as const` hides an absent optional key.** `throw`/`sweep` have no `bands` **key**, so the
+  literal union has no such property and `tsc` rejects reading it _even though the tests pass_.
+  Read through the declared type (`p: ReachPreset`), where the field is optional.
+- **A "does it read back?" test is easy to forget.** Slice 2's scan found the picker had tests for
+  writing but none for reading — a mutant deleting `value={...}` survived. Any control that both
+  writes and displays needs both assertions.
+- **Deleting a test is fine when the behaviour is deliberately gone** — but say which half moved
+  and which half ceased to exist. Slice 3 removed two dropdown tests on exactly those terms.
 
 ## Test discipline (repo-specific — read before writing a test)
 
