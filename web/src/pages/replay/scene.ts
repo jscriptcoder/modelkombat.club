@@ -129,28 +129,48 @@ const KNEE_BEND = 8;
 const BEND_BACK = -1;
 const BEND_FORWARD = 1;
 
-// The mid-joint of a 2-bone limb (elbow / knee): the midpoint of its two endpoints, offset along the
-// bone's unit-perpendicular by `dist` local px, oriented by `dir` (BEND_BACK −x / BEND_FORWARD +x).
+// The FIXED length of one bone in a 2-bone limb. Derived from STAND and the bow above, so that at
+// the stance span the solve below reproduces exactly the old fixed perpendicular offset: the neutral
+// figure draws pixel-identically to before this change, and only a limb that MOVES is affected.
+// Both bones of a limb are equal (upper === lower), which is what makes the solve a bisector.
+const boneOf = (from: Joint, to: Joint, bend: number): number =>
+  Math.hypot(Math.hypot(to.x - from.x, to.y - from.y) / 2, bend);
+
+const ARM_BONE = boneOf(STAND.shoulder, STAND.handR, ELBOW_BEND);
+const LEG_BONE = boneOf(STAND.hip, STAND.footR, KNEE_BEND);
+
+// The mid-joint of a 2-bone limb (elbow / knee), solved so the two bones keep their FIXED length
+// (`bone`) whatever the endpoints do — 2-bone IK, not a bulge. With equal bones the joint lies on
+// the perpendicular bisector of the endpoints, offset by the far leg of a right triangle whose
+// hypotenuse is the bone and whose base is half the endpoint span. `dir` picks which of the two
+// mirror solutions to take (BEND_BACK −x / BEND_FORWARD +x); taking the wrong one inverts the joint.
+//
+// Before this, the offset was a CONSTANT 8px, so the bones it implied were √((span/2)² + 8²) — they
+// stretched with the reach, and a mae-geri's leg ran 10.2 → 34.5 local px inside one technique.
+//
 // poseFor never reads facing, so the bow is a fixed local direction; the container flip (applyFigure)
-// carries facing, so the joint reads correctly whichever way the fighter faces. A degenerate
-// (zero-length) bone divides by 1 instead of 0 — TOTAL, like the stance/band fallbacks — and offsets
-// purely along the perpendicular.
+// carries facing, so the joint reads correctly whichever way the fighter faces. TOTAL at both
+// degenerate ends: a zero-length span divides by 1 instead of 0, and a span BEYOND the limb's
+// straight reach (2 × bone) floors the offset at 0 so the limb simply straightens rather than
+// producing a NaN — reaching such a target is the root's job (see `rootTravel`), not the joint's.
 const deriveBend = (
   from: Joint,
   to: Joint,
   dir: number,
-  dist: number,
+  bone: number,
 ): Joint => {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   const len = Math.hypot(dx, dy) || 1;
+  const half = len / 2;
+  const offset = Math.sqrt(Math.max(0, bone * bone - half * half));
   const perpX = -dy / len;
   const perpY = dx / len;
   const flip = perpX * dir < 0 ? -1 : 1; // orient the bow's x toward dir
 
   return {
-    x: (from.x + to.x) / 2 + perpX * flip * dist,
-    y: (from.y + to.y) / 2 + perpY * flip * dist,
+    x: (from.x + to.x) / 2 + perpX * flip * offset,
+    y: (from.y + to.y) / 2 + perpY * flip * offset,
   };
 };
 
@@ -159,10 +179,10 @@ const deriveBend = (
 // (Story 4) — so an arm reads shoulder→elbow→hand and a leg reads hip→knee→foot, not rigid sticks.
 const deriveSkeleton = (stance: Stance): Skeleton => ({
   ...stance,
-  elbowL: deriveBend(stance.shoulder, stance.handL, BEND_BACK, ELBOW_BEND),
-  elbowR: deriveBend(stance.shoulder, stance.handR, BEND_BACK, ELBOW_BEND),
-  kneeL: deriveBend(stance.hip, stance.footL, BEND_FORWARD, KNEE_BEND),
-  kneeR: deriveBend(stance.hip, stance.footR, BEND_FORWARD, KNEE_BEND),
+  elbowL: deriveBend(stance.shoulder, stance.handL, BEND_BACK, ARM_BONE),
+  elbowR: deriveBend(stance.shoulder, stance.handR, BEND_BACK, ARM_BONE),
+  kneeL: deriveBend(stance.hip, stance.footL, BEND_FORWARD, LEG_BONE),
+  kneeR: deriveBend(stance.hip, stance.footR, BEND_FORWARD, LEG_BONE),
 });
 
 // ─── M2 lean: a committed strike leans the upper body forward INTO the reach ──────────────────────
@@ -180,6 +200,28 @@ const STRIKE_LEAN_CAP = 16;
 // forward), so no lower bound is needed.
 const strikeLean = (handX: number): number =>
   Math.min(STRIKE_LEAN_CAP, handX * STRIKE_LEAN_RATIO);
+
+// ─── S2 · Slice 3: the driving root steps into a technique it cannot otherwise reach ──────────────
+// The engine's reaches are longer than a human-proportioned figure can span: at the workhorse
+// distance (gyaku-zuki's 240k, also the dojo's default gap) a fighter stands about ONE BODY-HEIGHT
+// from its opponent, while a leg spans ~0.48 of that and an arm ~0.35. Nothing with human proportions
+// reaches its own height, and the drawing cannot fix a ratio the engine fixes — scaling the body up
+// scales the gap with it, and the figure already fills 80% of the viewport.
+//
+// So something must give, and this is where: the root closes PART of the shortfall — a step into the
+// technique — and the limb stretches for the rest. Both bounded. Closing it entirely would lunge the
+// figure 27-56 local px on a 76 px body every time it commits, which reads as lurching rather than
+// stepping; leaving it entirely to the limb is the rubber band this slice exists to kill.
+const ROOT_TRAVEL_CAP = 16;
+
+// How far the driving root shifts toward `target`: the shortfall between the target's distance and
+// the limb's straight-line reach (both bones end to end), capped. Zero when the target is already
+// reachable, so a close-range technique never steps.
+const rootTravel = (root: Joint, target: Joint, bone: number): number =>
+  Math.min(
+    ROOT_TRAVEL_CAP,
+    Math.max(0, Math.hypot(target.x - root.x, target.y - root.y) - 2 * bone),
+  );
 
 // ─── S2 phase: a technique winds up, commits, and recovers ────────────────────────────────────────
 // `attackPhase` (M1 encoding: 0 nothing committed / 1 startup / 2 active / 3 recovery) selects WHICH
@@ -230,10 +272,25 @@ const poseFor = (
   const driven =
     strikeHand === null || !winding ? strikeHand : chamberFor(frame.attackMove);
 
-  // A drawn strike leans the upper body forward into the reach (M2) — gated to the ACTIVE phase
+  // A drawn HAND strike leans the upper body forward into the reach (M2) — gated to the ACTIVE phase
   // (M9), because leaning fully forward during the chamber is backwards: a fighter leans INTO a
   // technique as it extends, not while winding up.
-  const lean = driven === null || winding ? 0 : strikeLean(driven.x);
+  //
+  // Gated to hand techniques as well (S2 · Slice 3). The lean was authored for punches and inherited
+  // by kicks, where it reads wrong: pitching the torso forward over a rising leg makes the figure
+  // look like it is FALLING INTO the kick. A real front kick counterbalances. The kick's reach
+  // problem is answered by the hip step below instead, which is the lower body's own mechanism.
+  const lean =
+    driven === null || winding || limb === "footR" ? 0 : strikeLean(driven.x);
+
+  // A kick whose target is beyond the leg's reach steps the HIP forward (the leg's root) — the
+  // lower-body counterpart of the lean, which already does this for the arm by shifting the shoulder.
+  // Horizontal only: the fighter steps in, it does not rise. Zero for a punch (the lean covers it),
+  // for a chamber (always within reach), and for any non-strike layer.
+  const step =
+    driven === null || limb !== "footR"
+      ? 0
+      : rootTravel(stance.hip, driven, LEG_BONE);
 
   const endpoints: Stance = {
     ...stance,
@@ -242,6 +299,7 @@ const poseFor = (
       : {
           head: { x: stance.head.x + lean, y: stance.head.y },
           shoulder: { x: stance.shoulder.x + lean, y: stance.shoulder.y },
+          hip: { x: stance.hip.x + step, y: stance.hip.y },
           ...(limb === "footR" ? { footR: driven } : { handR: driven }),
         }),
     ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),

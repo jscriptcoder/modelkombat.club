@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { BODY_HEIGHT_SUB, scene, type Scene, type Viewport } from "./scene";
+import {
+  BODY_HEIGHT_SUB,
+  scene,
+  type Joint,
+  type Scene,
+  type Viewport,
+} from "./scene";
 import { DESCRIBED_MOVES } from "./move-descriptors";
 import { REACH_PRESETS } from "../dojo/reach-presets";
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
@@ -985,13 +991,20 @@ describe("scene — knockdown prone pose and wake-up", () => {
 
 describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
   // The arm is a 2-bone limb shoulder→elbow→hand. The elbow is DERIVED from the two endpoints (no
-  // authored constant): the midpoint of shoulder→hand, offset along the bone's perpendicular by a
-  // fixed local-px bow toward the BACK (−x local). poseFor never reads facing — the container flip
-  // (applyFigure) carries it — so the bow is a fixed local direction that reads correctly for both
-  // facings. The bow is authored in local px, so Story 3's scalePose scales it with the body.
-  // bendBack is recomputed here from the documented rule (NOT the production fn) so a formula / sign /
-  // magnitude mutant makes production disagree with these expectations.
+  // authored constant): both bones hold a FIXED length, so the elbow sits on the perpendicular
+  // bisector of shoulder→hand, offset toward the BACK (−x local) by however much the bones' slack
+  // allows. poseFor never reads facing — the container flip (applyFigure) carries it — so the bow is
+  // a fixed local direction that reads correctly for both facings. Lengths are authored in local px,
+  // so Story 3's scalePose scales them with the body. bendBack is recomputed here from the documented
+  // rule (NOT the production fn) so a formula / sign / magnitude mutant makes production disagree
+  // with these expectations.
+  //
+  // S2 · Slice 3 changed this rule: the offset was a CONSTANT 8px, which made the bones stretch with
+  // the endpoint span. The bone length is now the invariant and the offset is solved from it. The two
+  // agree exactly at the STAND span — which is why the stance expectations below are untouched — and
+  // diverge for every pose that moves an endpoint.
   const ELBOW_BEND = 8;
+  const ARM_BONE = Math.hypot(Math.hypot(18, 20) / 2, ELBOW_BEND);
 
   const bendBack = (
     from: { x: number; y: number },
@@ -1000,13 +1013,14 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const len = Math.hypot(dx, dy) || 1;
+    const offset = Math.sqrt(Math.max(0, ARM_BONE ** 2 - (len / 2) ** 2));
     const perpX = -dy / len;
     const perpY = dx / len;
     const flip = perpX > 0 ? -1 : 1; // force the bow backward (−x local)
 
     return {
-      x: (from.x + to.x) / 2 + perpX * flip * ELBOW_BEND,
-      y: (from.y + to.y) / 2 + perpY * flip * ELBOW_BEND,
+      x: (from.x + to.x) / 2 + perpX * flip * offset,
+      y: (from.y + to.y) / 2 + perpY * flip * offset,
     };
   };
 
@@ -1126,15 +1140,15 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
 });
 
 describe("scene — legs bend at the knee (Story 4 · Slice 2)", () => {
-  // The leg is a 2-bone limb hip→knee→foot, mirroring the arm. The knee is DERIVED from the two
-  // endpoints (no authored constant): the midpoint of hip→foot, offset along the bone's perpendicular
-  // by a fixed local-px bow toward the FRONT (+x local) — a knee bows forward where an elbow bows
-  // back. poseFor never reads facing (the container flip carries it), so the bow is a fixed local
-  // direction that reads correctly for both facings; it is authored in local px so Story 3's scalePose
-  // scales it with the body. bendForward is recomputed here from the documented rule (NOT the
-  // production fn) so a formula / sign / magnitude mutant makes production disagree with these
-  // expectations.
+  // The leg is a 2-bone limb hip→knee→foot, mirroring the arm: both bones hold a FIXED length and the
+  // knee is solved on the perpendicular bisector of hip→foot, offset toward the FRONT (+x local) — a
+  // knee bows forward where an elbow bows back. poseFor never reads facing (the container flip carries
+  // it), so the bow is a fixed local direction that reads correctly for both facings; lengths are
+  // authored in local px so Story 3's scalePose scales them with the body. bendForward is recomputed
+  // here from the documented rule (NOT the production fn) so a formula / sign / magnitude mutant makes
+  // production disagree with these expectations. See the arm block above for what S2 · Slice 3 changed.
   const KNEE_BEND = 8;
+  const LEG_BONE = Math.hypot(Math.hypot(14, 34) / 2, KNEE_BEND);
 
   const bendForward = (
     from: { x: number; y: number },
@@ -1143,13 +1157,14 @@ describe("scene — legs bend at the knee (Story 4 · Slice 2)", () => {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const len = Math.hypot(dx, dy) || 1;
+    const offset = Math.sqrt(Math.max(0, LEG_BONE ** 2 - (len / 2) ** 2));
     const perpX = -dy / len;
     const perpY = dx / len;
     const flip = perpX < 0 ? -1 : 1; // force the bow FORWARD (+x local)
 
     return {
-      x: (from.x + to.x) / 2 + perpX * flip * KNEE_BEND,
-      y: (from.y + to.y) / 2 + perpY * flip * KNEE_BEND,
+      x: (from.x + to.x) / 2 + perpX * flip * offset,
+      y: (from.y + to.y) / 2 + perpY * flip * offset,
     };
   };
 
@@ -1379,30 +1394,58 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
     );
   });
 
+  const crossOf = (pose: ReturnType<typeof poseKicking>) =>
+    (pose.footR.x - pose.hip.x) * (pose.kneeR.y - pose.hip.y) -
+    (pose.footR.y - pose.hip.y) * (pose.kneeR.x - pose.hip.x);
+
   it("bends the knee off the straight hip → foot line, so the kicking leg reads jointed (M8.6)", () => {
-    const pose = poseKicking();
-
-    // Non-collinearity via the cross product of (hip → footR) against (hip → kneeR): exactly 0
-    // would mean the knee sits ON the straight line, i.e. a rigid stick.
-    const cross =
-      (pose.footR.x - pose.hip.x) * (pose.kneeR.y - pose.hip.y) -
-      (pose.footR.y - pose.hip.y) * (pose.kneeR.x - pose.hip.x);
-
-    expect(cross).not.toBe(0);
+    // Non-collinearity via the cross product of (hip → footR) against (hip → kneeR): exactly 0 would
+    // mean the knee sits ON the straight line, i.e. a rigid stick. Measured at a gap the leg can
+    // actually reach (120k), because S2 · Slice 3 made the bend a CONSEQUENCE of fixed bone lengths
+    // rather than a constant — a leg only has slack to bend while its target is inside its reach.
+    expect(crossOf(poseKicking({ gap: 120_000 }))).not.toBe(0);
   });
 
-  it("leans the upper body into a kick exactly as it does into a punch", () => {
-    // A DELIBERATE carry-over, pinned so it is a decision rather than an accident: the M2 lean is
-    // driven by the reaching endpoint's forward x whatever limb that is, so a kick lunges too. The
-    // lean is min(CAP 16, 66 · 0.5) = 16, applied to head + shoulder only. Whether a kick should
-    // lean forward, stay upright, or counter-lean BACK for balance is an eye question this slice
-    // deliberately leaves open (the plan parks lean polarity) — if the answer changes, change this.
+  it("straightens the leg once the kick is at full extension (S2 · Slice 3)", () => {
+    // The other side of that rule, pinned so it reads as a decision rather than a regression. At the
+    // workhorse distance the target is beyond the leg's reach even after the hip steps, so both bones
+    // line up: a fully committed kick IS a straight line, and forcing a bow into one would be
+    // anatomically wrong. The knee therefore sits on the hip → foot midpoint.
+    const pose = poseKicking({ gap: 240_000 });
+    const midX = (pose.hip.x + pose.footR.x) / 2;
+    const midY = (pose.hip.y + pose.footR.y) / 2;
+
+    // Within a pixel: the joints are rounded independently after scaling.
+    expect(Math.hypot(pose.kneeR.x - midX, pose.kneeR.y - midY)).toBeLessThan(
+      1,
+    );
+  });
+
+  it("keeps the upper body upright in a kick, while a punch still leans into its reach (M9)", () => {
+    // The M2 lean was authored for PUNCHES, where pitching the torso into the reach is right. S2 ·
+    // Slice 2's eye check found it inherited wrongly by kicks: on a mae-geri the torso pitches
+    // forward over a rising leg, so the figure reads as FALLING INTO the kick rather than kicking.
+    // Real front kicks counterbalance — so the lean is now a property of the driving limb, not of
+    // "a strike happened". A kick stays upright; a hand technique is untouched.
+    const kick = poseKicking();
+    const punch = poseKicking({ move: "gyaku-zuki" });
+
+    expect(kick.head).toEqual(scaled({ x: 0, y: -76 }));
+    expect(kick.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+
+    // The punch's lean is unchanged: min(CAP 16, 66 · 0.5) = 16, head + shoulder only.
+    expect(punch.head).toEqual(scaled({ x: 16, y: -76 }));
+    expect(punch.shoulder).toEqual(scaled({ x: 16, y: -64 }));
+  });
+
+  it("steps the kicking hip forward even though the upper body stays upright", () => {
+    // The two mechanisms are independent: the hip steps because the leg cannot span the distance
+    // (S2 · Slice 3), and that is true whether or not the torso leans. A kick that neither leaned
+    // nor stepped would be back to a leg stretching across the whole gap on its own.
     const pose = poseKicking();
 
-    expect(pose.head).toEqual(scaled({ x: 16, y: -76 }));
-    expect(pose.shoulder).toEqual(scaled({ x: 16, y: -64 }));
-    // The hip is NOT part of the lean, so the lower body stays planted under the kick.
-    expect(pose.hip).toEqual(scaled({ x: 0, y: -34 }));
+    expect(pose.hip.x).toBeGreaterThan(scaled({ x: 0, y: -34 }).x);
+    expect(pose.hip.y).toBe(scaled({ x: 0, y: -34 }).y);
   });
 
   it("falls back to today's generic hand pose for a move with no descriptor yet (M7)", () => {
@@ -1587,39 +1630,192 @@ describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
   });
 
   it("leans the upper body only at contact, never during the wind-up (M9)", () => {
-    // A fighter leans INTO a technique as it extends; leaning fully forward while still chambered
-    // is backwards. The lean is min(CAP 16, 66 · 0.5) = 16 at contact, 0 either side of it.
+    // A fighter leans INTO a technique as it extends; leaning fully forward while still chambered is
+    // backwards. The lean is min(CAP 16, 66 · 0.5) = 16 at contact, 0 either side of it.
+    //
+    // Demonstrated on a PUNCH: S2 · Slice 3 made the lean a hand-technique property, so a kick is
+    // upright at every phase and can no longer show the phase gate. `gyaku-zuki` has no descriptor,
+    // so it drives the generic hand — and it is the move that spends the most time on screen.
     const UPRIGHT_HEAD = { x: 0, y: -76 };
 
-    expect(poseAtPhase({ attackPhase: CHAMBER }).head).toEqual(
-      scaled(UPRIGHT_HEAD),
-    );
-    expect(poseAtPhase({ attackPhase: RECOVER }).head).toEqual(
-      scaled(UPRIGHT_HEAD),
-    );
-    expect(poseAtPhase({ attackPhase: CONTACT }).head).toEqual(
-      scaled({ x: 16, y: -76 }),
+    const punchAt = (attackPhase: number) =>
+      poseAtPhase({ attackPhase, attackMove: "gyaku-zuki" }).head;
+
+    expect(punchAt(CHAMBER)).toEqual(scaled(UPRIGHT_HEAD));
+    expect(punchAt(RECOVER)).toEqual(scaled(UPRIGHT_HEAD));
+    expect(punchAt(CONTACT)).toEqual(scaled({ x: 16, y: -76 }));
+  });
+
+  it("keeps a kick upright at every phase — the lean belongs to hand techniques (M9)", () => {
+    // The complement of the gate above, so "a kick never leans" is pinned as its own rule rather
+    // than being a side effect of whichever phase a test happened to pick.
+    [CHAMBER, CONTACT, RECOVER].forEach((attackPhase) =>
+      expect(poseAtPhase({ attackPhase }).head).toEqual(
+        scaled({ x: 0, y: -76 }),
+      ),
     );
   });
 
-  it("keeps the support leg planted and the limb jointed through every phase (M8.2, M8.6)", () => {
+  it("keeps the support leg planted through every phase (M8.2)", () => {
     const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot — the support leg
 
-    [CHAMBER, CONTACT, RECOVER].forEach((attackPhase) => {
+    // The fighter neither slides nor floats, whatever the kicking leg is doing — and still not once
+    // S2 · Slice 3 let the HIP step into a long kick: capping that step keeps the support leg's own
+    // stretch small enough that the rear foot stays put.
+    [CHAMBER, CONTACT, RECOVER].forEach((attackPhase) =>
+      expect(poseAtPhase({ attackPhase }).footL).toEqual(
+        scaled(NEUTRAL_FOOT_L),
+      ),
+    );
+  });
+
+  it("bends the kicking leg while it is chambered, and straightens it at contact (M8.6)", () => {
+    // Non-collinearity of hip → kneeR → footR via the cross product: exactly 0 means the knee sits ON
+    // the straight line. A CHAMBERED leg is folded, so it bends for free — the mid-joints re-derive
+    // from whatever endpoints the phase produced. At CONTACT the target is past what the leg can span
+    // even after the hip steps, so the bones line up and the leg draws straight (S2 · Slice 3). Both
+    // are the same rule — fixed bones, and the bend is whatever slack is left over.
+    const crossAt = (attackPhase: number) => {
       const pose = poseAtPhase({ attackPhase });
 
-      // The fighter neither slides nor floats, whatever the kicking leg is doing.
-      expect(pose.footL).toEqual(scaled(NEUTRAL_FOOT_L));
-
-      // Non-collinearity of hip → kneeR → footR via the cross product: exactly 0 would mean the
-      // knee sits ON the straight line, i.e. a rigid stick. A chambered leg bends for free because
-      // the mid-joints re-derive from whatever endpoints the phase produced.
-      const cross =
+      return (
         (pose.footR.x - pose.hip.x) * (pose.kneeR.y - pose.hip.y) -
-        (pose.footR.y - pose.hip.y) * (pose.kneeR.x - pose.hip.x);
+        (pose.footR.y - pose.hip.y) * (pose.kneeR.x - pose.hip.x)
+      );
+    };
 
-      expect(cross).not.toBe(0);
-    });
+    expect(crossAt(CHAMBER)).not.toBe(0);
+    expect(crossAt(RECOVER)).not.toBe(0);
+    expect(crossAt(CONTACT)).toBe(0);
+  });
+});
+
+describe("scene — limbs keep their bone lengths (S2 · Slice 3)", () => {
+  // Until now `deriveBend` placed the mid-joint at the MIDPOINT of the two endpoints plus a fixed
+  // 8px perpendicular, so the two bones it implied were √((span/2)² + 8²) — a function of how far
+  // apart the endpoints happened to be. The bones therefore STRETCHED with the reach: mae-geri's
+  // leg ran 10.2 → 34.5 local px across a single technique (a 3.4× swing) and the arm 1.77×, which
+  // is what made the contact frame read as a rubber band rather than a limb. Bones are now FIXED
+  // at their stance length and the mid-joint solves for them (2-bone IK).
+  //
+  // Asserted as a RATIO against the figure's own stance, never a literal coordinate, so the
+  // descriptor table stays free to retune without touching a test (decision 9 / the M8 floor).
+  const boneLength = (from: Joint, to: Joint) =>
+    Math.hypot(to.x - from.x, to.y - from.y);
+
+  // Every joint is rounded to a whole pixel AFTER scaling (≈6.32× at this viewport), so two
+  // endpoints can each shift up to half a pixel and a measured bone can drift ~1.1% from its true
+  // length. 2% therefore sits above the rounding floor while staying far below the defect being
+  // killed, which is a 72% overrun at contact and a 240% swing across the technique.
+  const BONE_TOLERANCE = 0.02;
+
+  // A committed mid-band mae-geri `gap` sub-units from its opponent. The gap is the lever that
+  // decides whether the target is inside the limb's straight-line reach.
+  const poseOf = ({
+    gap = 240_000,
+    ...extra
+  }: Partial<ReplayFrame> & { gap?: number } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: 270_000,
+            attackMove: "mae-geri",
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  // The same figure standing idle — the reference every bone is measured against.
+  const stancePose = () => poseOf({ attacking: false });
+
+  // How far a pose's bone has drifted from the same bone in stance. 0 means the fighter kept its
+  // own anatomy; the old derivation drifted by 0.72 at contact.
+  const boneDrift = (
+    pose: ReturnType<typeof poseOf>,
+    from: keyof ReturnType<typeof poseOf>,
+    to: keyof ReturnType<typeof poseOf>,
+  ) => {
+    const stance = stancePose();
+
+    return Math.abs(
+      boneLength(pose[from], pose[to]) / boneLength(stance[from], stance[to]) -
+        1,
+    );
+  };
+
+  it("keeps the kicking leg's bones at stance length when the target is within reach", () => {
+    // A 120k gap puts the near edge at 28 local px, so hip → foot spans ~30.5 against a leg that
+    // straightens to ~40: comfortably reachable, so the knee alone absorbs the difference and
+    // nothing else has to move. The bone belongs to the fighter, not to the distance it happens to
+    // be reaching. Both bones, because a solve that fixes only the thigh would leave the shin to
+    // take up the slack.
+    const contact = poseOf({ gap: 120_000, attackPhase: 2 });
+
+    expect(boneDrift(contact, "hip", "kneeR")).toBeLessThan(BONE_TOLERANCE);
+    expect(boneDrift(contact, "kneeR", "footR")).toBeLessThan(BONE_TOLERANCE);
+  });
+
+  it("keeps the chamber's bones at stance length too — the wind-up is a bend, not a shrink", () => {
+    // The other end of the swing, and the one the eye check flagged. A chambered foot sits ~12.6 px
+    // from the hip, well inside the leg's reach, so a folded knee absorbs all of it. Before this the
+    // implied bones SHRANK to 10.2 — the chambered leg read as a stump.
+    const chambered = poseOf({ attackPhase: 1 });
+
+    expect(boneDrift(chambered, "hip", "kneeR")).toBeLessThan(BONE_TOLERANCE);
+    expect(boneDrift(chambered, "kneeR", "footR")).toBeLessThan(BONE_TOLERANCE);
+  });
+
+  it("steps the hip into a kick whose target is beyond the leg's reach", () => {
+    // At the workhorse distance (gyaku-zuki's 240k reach, and the dojo's default gap) the fighter
+    // stands about one body-height from its opponent while a leg spans roughly half that. No
+    // human-proportioned figure reaches its own height, so the root closes part of the gap — a step
+    // INTO the technique — and the limb stretches for the remainder.
+    const stance = stancePose();
+    const contact = poseOf({ gap: 240_000, attackPhase: 2 });
+
+    expect(contact.hip.x).toBeGreaterThan(stance.hip.x);
+  });
+
+  it("leaves the hip planted when the kick can reach without stepping", () => {
+    // The fighter steps only when the technique demands it: a close-range kick keeps its stance.
+    expect(poseOf({ gap: 120_000, attackPhase: 2 }).hip).toEqual(
+      stancePose().hip,
+    );
+  });
+
+  it("bounds how far the kicking leg may stretch once the step is spent", () => {
+    // The step is capped, so beyond it the limb still stretches — but boundedly. At the workhorse
+    // distance the overrun falls from 0.72 (the defect this slice exists to kill) to under 0.3.
+    const contact = poseOf({ gap: 240_000, attackPhase: 2 });
+
+    expect(boneDrift(contact, "hip", "kneeR")).toBeLessThan(0.3);
+  });
+
+  it("still lands the kicking foot on its target once the leg is constrained", () => {
+    // The S5 guarantee (#344-#347): a strike CONNECTS. Constraining the limb must not quietly undo
+    // it — the foot lands on the opponent's near edge exactly as it did before this slice.
+    expect(poseOf({ gap: 240_000, attackPhase: 2 }).footR).toEqual(
+      scaled({ x: 66, y: -46 }),
+    );
+  });
+
+  it("keeps the support foot planted while the hip steps (M8.2 holds)", () => {
+    // Capping the step at 16px keeps the support leg's own stretch to ~1.13x — small enough that the
+    // rear foot stays where the fighter put it. M8.2 therefore stands as written: the plan's tripwire
+    // (hip travel forcing footL to slide) never fires, because the travel is bounded.
+    expect(poseOf({ gap: 240_000, attackPhase: 2 }).footL).toEqual(
+      stancePose().footL,
+    );
   });
 });
 

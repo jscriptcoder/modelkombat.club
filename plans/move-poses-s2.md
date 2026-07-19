@@ -4,7 +4,9 @@
 `plans/move-poses-decisions.md`
 **Predecessors**: S0 (#352, `attackMove`/`attackPhase` on the tape) · S1 (#353, the descriptor
 table + `mae-geri`'s foot)
-**Status**: Active — slice 1 shipped (#355, `bbb61ee`); slice 2 next; slice 3 still conditional
+**Status**: Active — slice 1 shipped (#355, `bbb61ee`); slice 2 shipped (#356, `ea36c2b`);
+slice 3 CONFIRMED NEEDED by slice 2's eye check and is next — acceptance criteria still to be
+drafted and approved
 
 ## Goal
 
@@ -93,7 +95,10 @@ the archive alongside it when S2 completes.
       pinned value-by-value — _slice 2, all 13 in one exhaustive assertion_
 - [x] Every unauthored move, absent `attackPhase`, and out-of-range phase code renders
       something sensible — no blank figure, no throw (M7 totality) — _slice 1_
-- [x] No `src/` change; `BENCHMARK_VERSION` stays `v19` — _held through slice 1_
+- [x] No `src/` change; `BENCHMARK_VERSION` stays `v19` — _held through slice 3_
+- [x] A kick's contact frame reads like a kick: the limb keeps its bone lengths within reach and
+      stretches only boundedly beyond it, and the upper body no longer pitches forward into a
+      kick — _slice 3, eye-checked in `/dojo` at ticks 0/4/9/10/14_
 
 ## Slices
 
@@ -360,15 +365,190 @@ These ship together rather than as separate slices because they are **one observ
 means judging it against a figure the other still distorts. Splitting them would mean tuning the
 bone length against a torso pitched at the wrong angle, then re-tuning it afterwards.
 
-Candidate fixes for the length, in rough order of cost — hip travel, a knee-lift chamber that
-shortens the required reach, or a hard bone-length constraint. Still not chosen: pick against the
-real figure, not from here. The lean fix is likely a per-descriptor polarity (kicks vs hands)
-rather than a global change, since punches read correctly today.
+### What the geometry actually says — measured from the source, 2026-07-19
 
-**Tripwire, stated up front**: hip travel would move the support leg, which trips M8.2's
-support-integrity assertion. That assertion is a **decision record, not a bug**
-(`plans/move-poses-stories.md` § Warnings). If this slice moves the hip, M8.2 changes
-deliberately, in its own commit, with the reasoning written down — it is not patched around.
+Before drafting criteria the figure was measured rather than described. All values are local px in
+the authoring frame (`STAND`, `mae-geri`'s chamber, a mid-band solve at the default dojo gap).
+
+| Limb                  | Endpoint span | Implied bone |
+| --------------------- | ------------- | ------------ |
+| Leg, stance           | 36.8          | 20.1         |
+| Leg, chamber          | 12.6          | 10.2         |
+| Leg, contact          | 67.1          | 34.5         |
+| Arm, stance           | 26.9          | 15.7         |
+| Arm, contact (leaned) | 53.1          | 27.8         |
+
+**The framing in the notes above is wrong, and the correction matters.** "The limb telescopes to
+1.8× its natural length" treats `hip → foot` distance as bone length. It is not — a folded knee
+_should_ bring the foot close to the hip, so the 0.34× chamber is anatomically fine. The real
+defect is one level down: `deriveBend` (`scene.ts:138`) places the mid-joint at the **midpoint of
+the two endpoints plus a fixed 8 px perpendicular**, so the two bones it implies are
+`√((span/2)² + 8²)` — a function of how far apart the endpoints are. The bones themselves stretch.
+The driven leg's bones run **10.2 → 34.5 across one technique, a 3.4× swing**; the arm's run
+1.77×. This is not a kick defect. **The whole figure is rubber**, and the kick merely exposes it,
+because its authored chamber makes the swing happen inside a single move.
+
+That reframes the fix from "constrain the reach" to "**make the two bones constant and solve the
+mid-joint**" — i.e. replace the perpendicular-bulge heuristic with real 2-bone IK, where fixed
+bone lengths plus a target determine the knee. Relational, no tuned numbers, and it fixes arms and
+legs from one function.
+
+**But constant bones collide with a shipped guarantee, and the collision is unavoidable.** A
+constant-bone leg spans at most `2 × 20.1 = 40.1` px fully straight. The contact frame needs
+**67.1**. So the kick that S5 (#344–#347) deliberately made _connect_ can no longer reach the
+opponent — the previous arc's whole achievement. Bounding hip travel does not rescue it either:
+keeping the support leg constant-length over a planted `footL` allows only **7.3 px** of hip
+travel, giving **47.4** against the 67.1 required. Still ~20 px short.
+
+**Call 3 — RESOLVED 2026-07-19 → (ii), the support foot slides.** Three ways out, only one of
+which can hold:
+
+| Option                                       | Cost                                                                                                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **(i)** Bones constant, limb stops short     | Strikes stop connecting. Reverts S5. Rejected unless the decision owner wants it.                                                                                         |
+| **(ii)** Bones constant, support foot slides | The fighter **steps into** the technique. Amends M8.2. Reads as real karate — a committed kick _does_ close distance — and root `x` stays truthful (a local pose change). |
+| **(iii)** Bones stretch                      | Today's look. The defect.                                                                                                                                                 |
+
+**Chosen: (ii).** It is the only option that keeps both invariants that matter — bones stay bones,
+and strikes still land. It also explains the M2 lean retroactively: the lean already _is_ root
+travel for the arm (it moves the shoulder so the arm spans 50 instead of 66), and the leg simply
+never got its hip-shaped equivalent. Adopting (ii) generalises one existing mechanism rather than
+adding a second. **Accepted consequence:** a committed technique now visibly closes distance, so
+the drawn figure's stance width no longer matches its idle stance. That is what a lunging kick
+looks like, but it is a real change to the silhouette and is called out here rather than
+discovered later.
+
+**Tripwire, now confirmed rather than hypothetical**: (ii) moves the support leg, which trips
+M8.2's support-integrity assertion. That assertion is a **decision record, not a bug**
+(`plans/move-poses-stories.md` § Warnings). It changes deliberately, **in its own commit**, with
+the reasoning written down — it is not patched around, and it is not bundled into the IK commit.
+
+**Scope consequence — the length fix is not kick-only.** It lives in the shared derivation, so it
+changes punches too, and the arm's ratio (1.77×) is close behind the leg's. Special-casing legs
+would be _more_ code and would leave the worse-lit defect on the move that is ~80% of screen time.
+The **lean polarity** fix stays kick-specific (per-descriptor), since punches read correctly today.
+`gyaku-zuki` therefore changes shape here, one slice before S4 authors its chamber — accepted:
+S4 then authors against settled geometry, which is the sequencing this plan already argued for.
+
+**Acceptance criteria** _(confirm before code)_:
+
+1. Given any described move at any phase, the driven limb's two bones (`hip→knee`, `knee→foot`;
+   `shoulder→elbow`, `elbow→hand`) are each within **1%** of their stance length — asserted as a
+   ratio computed from the stance, never a literal coordinate, so the descriptor stays free to
+   retune (decision 9).
+2. Given `mae-geri` at phase 2, the driven foot still reaches the opponent's near edge — the S5
+   contact guarantee survives — and two different opponent gaps still yield two different
+   `footR.x` (M8.5, the solve is retained).
+3. Given a target beyond the limb's straight-line reach, the limb's **root travels** toward it
+   (hip for a kick, shoulder for a punch) by exactly the shortfall, so the endpoint still lands on
+   target with both bones at stance length. Given a target within reach, the root does **not**
+   travel — the fighter only lunges when the technique demands it.
+4. Given `mae-geri` at phase 2, the upper body does **not** lean forward into the kick (M9
+   polarity, corrected); given an undescribed **punch** at phase 2, it still does — the existing
+   punch look is preserved, proving the fix is per-descriptor and not a global removal.
+5. Given phases 1/2/3, the driven endpoint positions stay pairwise-distinct for phase 2 vs 1 and 3
+   (M8.3 as amended by Call 2), and the phase-2 endpoint is still forward of phase 1 (M8.4).
+6. Given any phase, each mid-joint still lies off the straight endpoint-to-endpoint line (M8.6) and
+   bows the correct way — knees forward, elbows back.
+7. Support integrity, **M8.2 as amended by Call 3**: when the hip travels, `footL` follows only as
+   far as it must to keep the support leg at stance bone length — asserted as _"the support leg's
+   bones are unchanged"_, which is strictly stronger than the old _"`footL` never moves"_ and is
+   the assertion M8.2 was always reaching for. `footL` stays planted whenever the hip does not
+   travel, so an idle, guarding or short-reach figure is pixel-identical to today.
+8. No `src/` change; `BENCHMARK_VERSION` stays `v19`.
+
+**RED**: `scene.test.tsx` — assert the driven leg's `hip→knee` length at phase 2 equals its stance
+`hip→knee` length. Fails today at roughly 34.5 vs 20.1.
+**GREEN**: replace `deriveBend`'s midpoint-plus-perpendicular with a fixed-length 2-bone solve,
+keeping the `dir` argument as the bend-direction selector so the arms-vs-legs split survives
+unchanged. Then the Call 3 mechanism for out-of-reach targets.
+**MUTATE**: `N/A` (`web/` is outside Stryker). Manual scan targets: the IK branch selection (the
+two mirror solutions — a sign flip yields a backward knee), the reach-exceeded boundary
+(`>` vs `>=`), the lean gate now that it is per-descriptor rather than global, and the bone-length
+ratio bound.
+**REFACTOR**: Assess whether root travel (shoulder lean + hip travel) wants to be one named
+mechanism rather than two — see the M2 observation above. Decide against the real diff, not from
+here.
+**Done when**: all eight criteria pass, gates green, the contact frame eye-checked in `/dojo` for
+both a kick and a punch, M8.2's fate recorded either way, and the human approves the commit.
+
+**Recorded outcome** _(2026-07-19)_:
+
+- 479 web tests (2114 repo-wide), typecheck + lint green, `src/` untouched, `BENCHMARK_VERSION`
+  still `v19`. **Manual mutator scan: 19/19 killed**, no survivors — scripted, each mutant applied
+  to the real source with the suite run and the file restored.
+
+**Call 3 was re-opened during GREEN, and the first answer did not survive contact with the
+numbers.** The approved option (ii) — bones always constant, root travels however far it must —
+turned out to be unbounded in practice. I had checked that root travel was _possible_, not that it
+was _bounded_:
+
+| Gap  | Hip travel needed | Shoulder travel needed |
+| ---- | ----------------- | ---------------------- |
+| 120k | 0                 | 2.0                    |
+| 150k | 0                 | 10.3                   |
+| 240k | **27.0**          | **37.1**               |
+| 300k | 45.7              | 55.6                   |
+
+On a 76 px figure, and 240k is not an edge case — it is `gyaku-zuki`'s reach, the annotated
+"workhorse / opening distance", and the dojo's `DEFAULT_GAP`. Faithful (ii) lunges the fighter
+36-73% of its own height on every technique.
+
+**Root cause, worth keeping.** `BODY_HEIGHT_SUB` is 240_000 and the opening distance is 240_000:
+fighters stand **one body-height apart**, while an arm spans 0.35 of that and a leg 0.48. Nothing
+human-proportioned reaches its own height. Scaling the body cannot fix it — that ratio is the
+engine's, and scaling magnifies gap and body together (the figure already fills 80% of the
+viewport). **So the original stretching was not an oversight; it was the compromise that made
+contact legible at all.** Options (i) and (iii) both fail for the reasons in the table above.
+
+**Call 3 revised → capped travel + bounded residual stretch** (decision owner, 2026-07-19). The
+root closes `min(16, shortfall)` and the limb stretches for the rest. Consequences:
+
+- Bone drift at the workhorse distance falls from **0.72 → 0.28**, and the swing _across_ a
+  technique from 0.51×→1.72× down to 1.0×→1.28×. Roughly two-thirds of the rubber band is gone.
+- **M8.2 needs no amendment after all.** Capping the step at 16 keeps the support leg's own stretch
+  to ~1.13×, small enough to leave `footL` planted. The plan's tripwire never fired, so AC 7 above
+  is superseded by the simpler original assertion, and `plans/move-poses-decisions.md` M8 stands
+  entirely as written.
+- **AC 1 is amended**: bones are constant _within_ the limb's reach (tolerance 2%, not 1% — joints
+  are rounded to whole px after a ~6.3× scale, which alone drifts a measured bone ~1.1%). Beyond
+  reach they stretch, bounded.
+- **AC 6 is amended**: a limb at or past full extension draws **straight**, because the solved bow
+  floors at zero. This is correct rather than tolerated — a fully committed kick _is_ a straight
+  line, and forcing an 8 px bow into one would be anatomically wrong. M8.6 therefore holds wherever
+  the limb is not fully extended, and the tests pin both halves of that rule.
+- **AC 3 is amended**: the root closes part of the shortfall, not all of it.
+
+**Visual sign-off: DONE** (Playwright against the local dev server; `/dojo` at ticks 0/4/9/10/14 for
+the kick, and at tick 8 with the challenger's default move temporarily flipped to `gyaku-zuki` for
+the punch — reverted immediately, since `/dojo` has no move picker yet).
+
+- **Chamber** (tick 4) now reads as a folded leg with a visible thigh and shin of comparable length,
+  instead of the 10.2 px stump.
+- **Contact** (tick 10) reads as a front kick: support leg planted and angled back, hips driven
+  forward, kicking leg extended onto the opponent's edge, head upright.
+- **An unplanned win — the counterbalance came free.** The eye check in slice 2 asked for a kick to
+  counter-lean _backward_; this slice only removed the forward lean, expecting "upright". But
+  because the hip steps forward while the shoulder does not, the torso ends up leaning **back over
+  the driven hip** — the counterbalance, produced by the step rather than authored. No kick-specific
+  lean polarity was needed beyond the removal.
+- **Punch** (tick 8) reads as a committed lunging punch: shoulder leaned in, hip planted, arm
+  straight onto the target. Its only change this slice is the straight arm at full extension.
+
+**Refactor assessed — unifying lean and step REJECTED.** The REFACTOR note above asked whether the
+shoulder lean and the hip step want to be one mechanism. They nearly are: both cap at 16, and the
+lean is exactly "root travel for the arm". But `strikeLean` is a **heuristic**
+(`min(CAP, handX × 0.5)`) while `rootTravel` is **derived** (`min(CAP, shortfall)`). They agree at
+the workhorse distance — both saturate at 16 — and diverge closer in, where the heuristic leans
+further than the reach actually requires. Merging them would therefore _change how punches look at
+close range_, which makes it a behaviour change and not a refactor; it is outside this slice's
+approved criteria and belongs with S4, where `gyaku-zuki` gets authored and the punch is being
+judged by eye anyway. The two caps sharing the value 16 is coincidence between independently
+eye-tuned knobs, not duplicated knowledge, so they stay separate.
+
+**Follow-up, not this slice**: `/dojo` still has no move picker, so a punch can only be eye-checked
+by temporarily editing `controls.ts`. Worth a small control alongside the missing Restart noted in
+slice 2.
 
 **Explicitly NOT in this slice — interpolation.** Slice 2's eye check found that nothing eases
 between the three phases: a technique is three still frames held for 9/3/16 ticks. That is the
