@@ -190,16 +190,14 @@ const deriveSkeleton = (stance: Stance): Skeleton => ({
 // body (head + shoulder) FORWARD toward the target — a lunge — and the arm telescopes for the
 // remainder, reading as a committed step-in rather than one over-stretched limb. Viewer-only cosmetic:
 // the fighter's root x (its truthful tape position) is untouched; only the local pose leans. The shift
-// is a fraction of the hand's forward reach, CAPPED so a long technique lunges but never topples, in
-// local +x (the container flip carries facing). Both constants are tuned by eye in /dojo.
-const STRIKE_LEAN_RATIO = 0.5;
-const STRIKE_LEAN_CAP = 16;
-
-// The upper-body forward shift for a strike whose hand reaches `handX` local px: a fraction of that
-// reach, bounded by the cap. Only a positive handX ever reaches here (a drawn strike always floors
-// forward), so no lower bound is needed.
-const strikeLean = (handX: number): number =>
-  Math.min(STRIKE_LEAN_CAP, handX * STRIKE_LEAN_RATIO);
+// is in local +x (the container flip carries facing).
+//
+// HOW FAR it leans is `rootTravel` below — the same derived shortfall the hip uses for a kick (S4 ·
+// Slice 3). It was a heuristic first (half the hand's forward x, capped) which never asked whether the
+// arm could already reach, so a close-range punch lunged the torso forward for nothing and a punch to
+// a LOW band under-leaned, the heuristic reading only x while a low target sits 40px BELOW the
+// shoulder. One mechanism now answers the question for both limbs: an arm's root is the shoulder, a
+// leg's is the hip.
 
 // ─── S2 · Slice 3: the driving root steps into a technique it cannot otherwise reach ──────────────
 // The engine's reaches are longer than a human-proportioned figure can span: at the workhorse
@@ -214,9 +212,10 @@ const strikeLean = (handX: number): number =>
 // stepping; leaving it entirely to the limb is the rubber band this slice exists to kill.
 const ROOT_TRAVEL_CAP = 16;
 
-// How far the driving root shifts toward `target`: the shortfall between the target's distance and
-// the limb's straight-line reach (both bones end to end), capped. Zero when the target is already
-// reachable, so a close-range technique never steps.
+// How far a limb's ROOT shifts toward `target`: the shortfall between the target's distance and the
+// limb's straight-line reach (both bones end to end), capped. Zero when the target is already
+// reachable, so a close-range technique never steps. Shared by both limbs (S4 · Slice 3) — the hip is
+// the leg's root and the shoulder is the arm's, so a kick steps and a punch leans by the same rule.
 const rootTravel = (root: Joint, target: Joint, bone: number): number =>
   Math.min(
     ROOT_TRAVEL_CAP,
@@ -276,12 +275,22 @@ const poseFor = (
   // (M9), because leaning fully forward during the chamber is backwards: a fighter leans INTO a
   // technique as it extends, not while winding up.
   //
+  // Since S4 · Slice 3 that phase gate is REDUNDANT under current data, and the mutator scan proves
+  // it: deleting `winding` changes nothing, because a chamber sits near the body by definition and a
+  // derived lean is 0 for anything the arm can already reach (gyaku-zuki's chamber is 29.5px from a
+  // 31.3px shoulder). It is kept rather than deleted because the only thing making it unreachable is
+  // slice 2's authoring convention — an authored point must stay inside the limb's reach or it renders
+  // as a stretched line — and nothing enforces that convention. M9 is a stated design rule; this is
+  // where it is stated, rather than left to hold by luck.
+  //
   // Gated to hand techniques as well (S2 · Slice 3). The lean was authored for punches and inherited
   // by kicks, where it reads wrong: pitching the torso forward over a rising leg makes the figure
   // look like it is FALLING INTO the kick. A real front kick counterbalances. The kick's reach
   // problem is answered by the hip step below instead, which is the lower body's own mechanism.
   const lean =
-    driven === null || winding || limb === "footR" ? 0 : strikeLean(driven.x);
+    driven === null || winding || limb === "footR"
+      ? 0
+      : rootTravel(stance.shoulder, driven, ARM_BONE);
 
   // A kick whose target is beyond the leg's reach steps the HIP forward (the leg's root) — the
   // lower-body counterpart of the lean, which already does this for the arm by shifting the shoulder.
@@ -317,6 +326,23 @@ const poseFor = (
           head: { x: stance.head.x + lean, y: stance.head.y },
           shoulder: { x: stance.shoulder.x + lean, y: stance.shoulder.y },
           hip: { x: stance.hip.x + step, y: stance.hip.y },
+          // Both hands ride the lean, because both arms hang off the shoulder it moves (S4 · Slice 3).
+          // Leaving a resting hand planted while its own shoulder leaned 16px away from it opened the
+          // span to 39.4 against a 31.3px reach, so deriveBend floored its offset and each bone grew
+          // to half the span — the rubber-band arm Story 4 removed, back on every generic punch.
+          //
+          // Only a hand STILL AT ITS STANCE ends up riding: the layers below overwrite whichever hands
+          // are authored destinations — the driven endpoint, a hikite pull, a guard, a throw's grab —
+          // and a destination means "put the fist HERE", not "here relative to a leaning body". That
+          // distinction is what keeps slice 2's eye-tuned off hand where it was tuned.
+          //
+          // The handR line is EQUIVALENT under today's data and the mutator scan says so: reaching it
+          // with a non-zero lean needs a hand technique that drives handL and authors no off hand, and
+          // gyaku-zuki — the only handL driver — authors one. Kept rather than hard-coded away because
+          // "both arms hang off the shoulder" is the actual rule; the first rear-hand move without a
+          // pull (a backfist, say) would silently render a stretched arm if only handL rode.
+          handL: { x: stance.handL.x + lean, y: stance.handL.y },
+          handR: { x: stance.handR.x + lean, y: stance.handR.y },
           // An explicit three-way rather than a computed `[limb]: driven` key. The computed form is
           // shorter, but it type-checks ANY string into the pose object — a limb the Stance has no
           // endpoint for would silently add a junk property and the strike would vanish. The ternary
