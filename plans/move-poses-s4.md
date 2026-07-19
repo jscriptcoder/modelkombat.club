@@ -4,8 +4,9 @@
 (`feat/move-poses-s4-gyaku-zuki`, `4f0d3b7`); slice 3 + the M12 decision tree in **#364**
 (`feat/move-poses-s4-lean`, `7800ed9`); slice 4 the girdle in **#365** (`feat/move-poses-s4-girdle`,
 `7ff7a7d`); slice 5 the rotation in **#366** (`feat/move-poses-s4-rotate`, `c658e3e`) — all merged
-**Status**: Active — **5 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12). Only
-slice 6 (`mawashi-geri`) remains.
+**Status**: **S4 COMPLETE — 6 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12).
+Slice 6 (`mawashi-geri`, the rear-leg roundhouse / M12i escape hatch) is built + green + `/dojo`-signed;
+PR pending. Archive this file under `docs/archive/` once slice 6 merges (house rule; add the README entry).
 **Parent story**: `plans/move-poses-stories.md` § S4 · **Decisions**: `plans/move-poses-decisions.md` (M1–M12)
 
 ## Goal
@@ -53,13 +54,15 @@ fallback read acceptably?), not an authoring obligation.
       stance _(slice 2)_
 - [x] A committed punch leans the upper body **only when the arm cannot otherwise reach**, so a
       close-range punch no longer leans for nothing _(slice 3)_
-- [ ] `mawashi-geri` is distinguishable from `mae-geri` at the same band
+- [x] `mawashi-geri` is distinguishable from `mae-geri` at the same band _(slice 6 — it drives the
+      REAR leg, the M12i escape hatch; different leg, not the identical pixel two footR kicks would be)_
 - [~] Every unauthored move still renders exactly as it does today (M7 totality — the fallback is the
   status quo, not a degraded state) — **M7 holds** (no descriptor lookup degrades an unauthored
   move: it gets the generic limb, no chamber, no pull), but slice 3 deliberately changed the lean
   and the resting hand for **every** move, authored or not, so the criterion's literal wording no
   longer describes what shipped. Recorded rather than ticked.
-- [ ] `web/` only: no `src/` touch, no `BENCHMARK_VERSION` bump, no TCB change (M11)
+- [x] `web/` only: no `src/` touch, no `BENCHMARK_VERSION` bump, no TCB change (M11) — held every
+      slice; slice 6's `git diff --stat main -- src/` is empty (which leg renders is a descriptor choice)
 
 ## Non-goals
 
@@ -407,24 +410,67 @@ lean, both midpoint/head halves, the per-arm root, both driving-root signs, the 
 girdle pass-through). Every kill attributed to a named failing test — kills recorded only on named
 `FAIL` lines, never exit codes (the slice-4 false-kill lesson, still load-bearing).
 
-### Slice 6 — the roundhouse arcs in from the side
+### ✅ Slice 6 — the roundhouse kicks with the rear leg — DONE
+
+_All 7 approved ACs green (8 net new tests → 152); scan **12/12 killed**, every kill on a named
+failing test; `/dojo` sign-off taken. **The carried expressiveness risk resolved by taking the escape
+hatch, not by shipping look-alikes.**_
+
+**The finding, and the resolution (approved 2026-07-20).** A front kick and a roundhouse BOTH drive a
+foot to the same solved target (`reachTargetX` at the band), so driving the same foot renders them on
+the **identical pixel** — the same M3 wall the girdle was built for, now on kicks. In a 2-D sagittal
+stickman the chamber cannot rescue it either: a roundhouse's signature is _lateral hip rotation_
+(knee to the side), which is into/out of the screen and invisible. So the slice took **M12i's named
+escape hatch: the roundhouse drives the REAR leg (`footL`, a new `StrikeLimb`)** — the rear foot
+swings across to the near edge while the front foot holds as support. "Different leg" is the one
+distinction a side view _can_ show; it is also the classic rear-leg round kick, and mechanically it is
+just another endpoint through the shared solver (decision 3), so it stayed **web-only** (the engine
+does not model legs — which leg renders is a descriptor choice). Driving `footR` first was skipped:
+the identical contact is deterministic from the solve, not an eye question, so it would only have
+burned a PR to confirm the wall.
 
 **Value**: the second and last move with real screen time (~13%). Completes S4.
-**Path**: `mawashi-geri` descriptor → the existing kick path (`footR`, already proven by `mae-geri`).
+**Path**: `mawashi-geri` descriptor `{ limb: "footL", chamber }` → the existing kick path (now
+generalised from `footR` to either foot) → `kneeL` re-derives off the moved `hip → footL` for free.
 **Class**: Behaviour change.
 
-**Acceptance criteria** _(refined at approval time)_
+**What changed**
 
-- [ ] Given `mawashi-geri` at a band, when the active phase renders, its driven endpoint is
-      **distinguishable from `mae-geri`'s at the same band**
-- [ ] Given a startup tick, when it renders, it draws its own chamber (knee lifted to the side)
+1. `StrikeLimb` grows `"footL"`; `poseFor`'s routing gains a `footL` branch.
+2. A shared `isKick = limb === "footR" || limb === "footL"` predicate replaces the two
+   `limb === "footR"` gates — a kick (either foot) **steps the hip** (M9) and **never leans or rotates
+   the girdle**. The routing below still splits which foot.
+3. `mawashi-geri` descriptor authors its own chamber (rear knee cocked up and back), eye-tuned in
+   `/dojo`; relations pinned, the literal free to retune (decision 9).
 
-**Known risk — this is where M3's expressiveness limit bites.** M3 accepts that _only the driven
-endpoint moves_, and a roundhouse differs from a front kick mainly in the **path** the foot travels
-and the **hip rotation**, not in where the foot ends up. Two kicks may well end up looking alike at
-the same band. That is the arc's carried expressiveness risk, and this slice is its detector.
-**If they read the same, stop and escalate** — decision 3 holds a bespoke escape hatch, and S7's
-contact sheet is the confirming instrument. Do not quietly ship two identical kicks.
+**Acceptance criteria** _(approved 2026-07-20)_
+
+- [x] `mawashi-geri` active drives **`footL`** (rear foot) to the solved edge, `footR` planted — and at
+      the same band/gap `mae-geri` drives `footR` and rests `footL`: the two kicks move **different
+      legs** (the escape hatch; criterion 1)
+- [x] Two gaps → two different phase-2 `footL` x — the rear-leg solve is retained, not a fixed
+      extension (M8.5)
+- [x] Startup draws its own chamber (rear knee cocked), distinct from stance and from the extension,
+      with the extension forward of it (M8.3/8.4)
+- [x] The support (front) foot stays at stance through every phase (M8.2)
+- [x] It reads as a kick: the hip **steps**, the torso stays **upright**, the girdle stays **square**
+      (M9) — no lean, no rotation
+- [x] `kneeL` re-derives off the moved `hip → footL`, so the kicking leg reads jointed (M8.6)
+- [x] `mae-geri` still drives the front leg — the additive `footL` route did not disturb it (M7)
+
+**MUTATE**: scripted scan, **12/12 killed** (limb → footR / hand; the routing branch → footR / dropped;
+`isKick` dropping either foot; the lean gate no longer suppressing kicks; the step gate flipped /
+always-on; and three chamber-shape mutants). Kills recorded only on named `FAIL` lines, never exit
+codes (the slice-4 lesson, still load-bearing).
+
+**`/dojo` sign-off — PASS, read honestly.** The roundhouse and front kick are _distinguishable_, not
+identical (the footR-vs-footR alternative would have been pixel-identical). The distinction is carried
+by **which leg kicks** (rear-across vs front-snap → a visibly different support-stance width), a
+clearly different **cocked-rear-leg chamber**, and — the part a still undersells — the rear leg
+sweeping a wide arc in motion. In real fights `mawashi-geri` defaults to its **HIGH** band while
+`mae-geri` is **MID-only**, so height separates them further on `/watch`. The contact _stills_ share a
+gross shape (both extend a leg to the target); if S7's contact sheet later judges that too weak across
+all 13, this is the move to revisit — but it clears the "do not ship two identical kicks" bar.
 
 ---
 

@@ -2672,3 +2672,176 @@ describe("scene — the torso rotates into the punch (S4 · Slice 5)", () => {
     expect(jab.handL).toEqual(scaled({ x: -18, y: -44 }));
   });
 });
+
+describe("scene — the roundhouse kicks with the rear leg (S4 · Slice 6)", () => {
+  // mae-geri and mawashi-geri BOTH drive a foot, so under M3 (only the driven endpoint moves) they
+  // solve to the identical pixel at the same band and gap — the same wall that made a reverse punch
+  // and a jab one picture before the girdle. The girdle cannot help: it separates two moves only when
+  // they drive DIFFERENT limbs (M12i). So the roundhouse takes the escape hatch decision 3 reserved —
+  // it drives the REAR foot (footL). A front kick snaps the front leg straight out; a roundhouse
+  // swings the rear leg across. "Different leg" is a thing a 2-D side view can actually show; a lateral
+  // hip turn is not. Same solve (reachTargetX), same phase machinery — only the endpoint it lands on
+  // differs, which is exactly the descriptor-plus-shared-solver bet.
+  //
+  // Local-px anchors, recomputed independent of production: one sub-unit is 76/240000 local px, so a
+  // 240k gap is 76px between centres and the near edge sits one BODY_HALF_WIDTH (10) nearer ⇒ 66.
+  // mawashi-geri's 300k reach caps at 300000·(76/240000) = 95, so an in-range kick lands on the edge.
+  const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot — the DRIVEN leg here
+  const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // STAND front foot — the SUPPORT leg here
+
+  const CHAMBER = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+
+  const poseRound = ({
+    gap = 240_000,
+    band = 2,
+    reach = 300_000,
+    extra = {},
+  }: {
+    gap?: number;
+    band?: number;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: "mawashi-geri",
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  // A mae-geri companion at the SAME geometry — the front-leg kick the roundhouse must read apart from.
+  const poseFront = ({ gap = 240_000, band = 2 } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: 270_000,
+            attackMove: "mae-geri",
+            x: 150_000,
+            facing: 1,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("drives the REAR foot to the opponent's near edge, leaving the front foot planted (M8.1/8.2)", () => {
+    const pose = poseRound();
+
+    // The kick lands on footL — the rear leg — at the near edge (66), where mae-geri lands its footR.
+    expect(pose.footL).toEqual(scaled({ x: 66, y: -46 }));
+    // The front foot is the SUPPORT leg now: it holds its stance. The fighter neither slides nor floats.
+    expect(pose.footR).toEqual(scaled(NEUTRAL_FOOT_R));
+  });
+
+  it("moves a DIFFERENT leg than mae-geri at the same band and gap — the escape hatch (criterion 1)", () => {
+    // The whole reason the roundhouse drives the rear leg: a front kick and a roundhouse solve to the
+    // SAME target, so putting that target on the OTHER leg is what makes them two pictures instead of
+    // one. mae-geri drives footR and rests footL; mawashi-geri drives footL and rests footR — the same
+    // solved endpoint, on the swapped legs.
+    const front = poseFront();
+    const round = poseRound();
+
+    // Same solved endpoint...
+    expect(round.footL).toEqual(front.footR);
+    // ...on the swapped legs: each move rests the leg the other drives.
+    expect(round.footR).toEqual(scaled(NEUTRAL_FOOT_R));
+    expect(front.footL).toEqual(scaled(NEUTRAL_FOOT_L));
+    // ...and within the roundhouse the two feet land genuinely apart — one driven, one planted.
+    expect(round.footR).not.toEqual(round.footL);
+  });
+
+  it("tracks the real opponent distance — the rear-leg solve is retained (M8.5)", () => {
+    // Two gaps, two phase-2 endpoints: the roundhouse foot tracks true distance through the SAME
+    // reachTargetX a fist uses, not a fixed authored extension. 150k ⇒ edge 37.5, 240k ⇒ 66, both
+    // inside the 95 cap.
+    expect(poseRound({ gap: 150_000 }).footL).toEqual(
+      scaled({ x: 37.5, y: -46 }),
+    );
+    expect(poseRound({ gap: 240_000 }).footL).toEqual(
+      scaled({ x: 66, y: -46 }),
+    );
+  });
+
+  it("chambers the rear leg during startup, then whips it forward at contact (M8.3/8.4)", () => {
+    const chambered = poseRound({ extra: { attackPhase: CHAMBER } }).footL;
+    const extended = poseRound({ extra: { attackPhase: CONTACT } }).footL;
+
+    // A wind-up is a different SHAPE, not a shorter reach (M3).
+    expect(chambered).not.toEqual(extended);
+    // M8.4 direction: the kick EXTENDS forward from its chamber, never retracts into contact.
+    expect(chambered.x).toBeLessThan(extended.x);
+    // Lifted off the ground — a chambered leg is cocked knee-up, not resting in stance.
+    expect(chambered.y).toBeLessThan(0);
+    // ...and distinct from where the leg rests: the chamber is an authored point, not the stance.
+    expect(chambered).not.toEqual(scaled(NEUTRAL_FOOT_L));
+  });
+
+  it("keeps the support (front) leg planted through every phase (M8.2)", () => {
+    [CHAMBER, CONTACT, RECOVER].forEach((attackPhase) =>
+      expect(poseRound({ extra: { attackPhase } }).footR).toEqual(
+        scaled(NEUTRAL_FOOT_R),
+      ),
+    );
+  });
+
+  it("is a kick, not a punch: it steps the hip and stays upright, with no torso rotation (M9)", () => {
+    const pose = poseRound();
+
+    // Upright: the head + girdle midpoint hold their stance x. A kick counterbalances — it does not
+    // pitch the torso forward into the reach the way a punch leans.
+    expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
+    expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+    // No rotation: the girdle stays SQUARE, both shoulders equidistant from the midpoint. A footL
+    // strike must not accidentally swing the girdle the way a rear-HAND punch does.
+    expect(pose.shoulderR.x - pose.shoulder.x).toBe(
+      pose.shoulder.x - pose.shoulderL.x,
+    );
+    // But the hip STEPS forward — the leg cannot span the gap alone, so the kicking root closes part
+    // of the shortfall, exactly as mae-geri's front-leg step does.
+    expect(pose.hip.x).toBeGreaterThan(scaled({ x: 0, y: -34 }).x);
+    expect(pose.hip.y).toBe(scaled({ x: 0, y: -34 }).y);
+  });
+
+  it("bends the rear knee off the straight hip → footL line, so the kicking leg reads jointed (M8.6)", () => {
+    // Measured at a gap the leg can actually reach (120k), where fixed bone lengths leave slack to
+    // bend; kneeL re-derives off the MOVED hip → footL for free (the bend rule runs on the final
+    // endpoints). Non-collinearity via the cross product of (hip → footL) against (hip → kneeL).
+    const pose = poseRound({ gap: 120_000 });
+
+    const cross =
+      (pose.footL.x - pose.hip.x) * (pose.kneeL.y - pose.hip.y) -
+      (pose.footL.y - pose.hip.y) * (pose.kneeL.x - pose.hip.x);
+
+    expect(cross).not.toBe(0);
+  });
+
+  it("does not disturb mae-geri — the front kick still drives the front leg (M7)", () => {
+    // The new footL route is additive: mae-geri keeps driving footR to the edge and resting footL, so
+    // adding the rear-leg branch left the proven front-kick path untouched.
+    const front = poseFront();
+
+    expect(front.footR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(front.footL).toEqual(scaled(NEUTRAL_FOOT_L));
+  });
+});

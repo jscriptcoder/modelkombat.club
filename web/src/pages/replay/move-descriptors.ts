@@ -22,7 +22,12 @@ import type { Joint } from "./scene";
 //
 // `handL` — the REAR hand — is what separates a reverse punch from a jab (S4). It also collides with
 // the guard arm, which `poseFor` resolves in favour of the strike; see the precedence rule there.
-export type StrikeLimb = "handR" | "handL" | "footR";
+//
+// `footL` — the REAR leg — is what separates a roundhouse from a front kick (S4 · Slice 6). Both kicks
+// drive a foot to the same solved target, so under M3 (only the driven endpoint moves) driving the
+// same foot would render them identically; the roundhouse takes the M12i escape hatch and drives the
+// OTHER leg, which is the one distinction a 2-D side view can show that a lateral hip turn cannot.
+export type StrikeLimb = "handR" | "handL" | "footR" | "footL";
 
 // Where the driven endpoint sits while the technique is WINDING UP or RECOVERING (S2). A chambered
 // technique is a different SHAPE, not a shorter reach (M3) — scaling the extension down reads as a
@@ -68,6 +73,15 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
     "gyaku-zuki",
     { limb: "handL", chamber: { x: -26, y: -50 }, offHand: { x: -20, y: -50 } },
   ],
+  // mawashi-geri (roundhouse): the second move with real screen time (~13%), and the one that forces
+  // M3's expressiveness limit. A front kick and a roundhouse both drive a FOOT to the same solved
+  // target, so driving the same foot renders them on the identical pixel — the wall the girdle was
+  // built to break, now on kicks. The girdle cannot help (it separates moves only when they drive
+  // DIFFERENT limbs, M12i), so the roundhouse drives the REAR leg (`footL`): the rear foot swings
+  // across to the near edge while the front foot holds as the support leg, a picture the front kick
+  // never draws. Chamber: the rear knee cocked up and back, so the wind-up reads as a leg loading to
+  // whip around rather than the front leg's straight knee-up. Eye-tuned in /dojo, relations pinned.
+  ["mawashi-geri", { limb: "footL", chamber: { x: -8, y: -30 } }],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this
