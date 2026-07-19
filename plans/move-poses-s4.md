@@ -1,9 +1,9 @@
 # Plan: S4 — the moves fighters actually throw look distinct
 
-**Branch**: slice 5 the rotation on `feat/move-poses-s4-rotate` (open PR). Shipped so far — slices 1–2
-in **#363** (`feat/move-poses-s4-gyaku-zuki`, `4f0d3b7`); slice 3 + the M12 decision tree in **#364**
-(`feat/move-poses-s4-lean`, `7800ed9`); slice 4 the girdle in **#365**
-(`feat/move-poses-s4-girdle`, `7ff7a7d`) — all merged 2026-07-19
+**Branch**: slice 6 cuts from `main`. Shipped so far — slices 1–2 in **#363**
+(`feat/move-poses-s4-gyaku-zuki`, `4f0d3b7`); slice 3 + the M12 decision tree in **#364**
+(`feat/move-poses-s4-lean`, `7800ed9`); slice 4 the girdle in **#365** (`feat/move-poses-s4-girdle`,
+`7ff7a7d`); slice 5 the rotation in **#366** (`feat/move-poses-s4-rotate`, `c658e3e`) — all merged
 **Status**: Active — **5 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12). Only
 slice 6 (`mawashi-geri`) remains.
 **Parent story**: `plans/move-poses-stories.md` § S4 · **Decisions**: `plans/move-poses-decisions.md` (M1–M12)
