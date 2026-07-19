@@ -53,6 +53,11 @@ export const selectMove = (
     attackMove: move,
     attackReach: preset?.reach ?? 0,
     attacking: preset !== undefined,
+    // The engine's own first-listed legal band, so the lab opens on a frame the engine could
+    // actually produce (a mae-geri posed HIGH is degraded to idle, and would be tuning a
+    // combination that never occurs). A move the band gate does not restrict — `throw`, `sweep` —
+    // keeps whatever band is set: every band is already legal for it, so there is nothing to fix.
+    attackBand: preset?.bands?.[0] ?? controls.attackBand,
   };
 };
 

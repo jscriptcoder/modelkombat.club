@@ -724,6 +724,77 @@ describe("DojoApp — per-figure move picker (S3)", () => {
     expect(latest()[0].a.attackMove).toBe("mawashi-geri"); // ...still a roundhouse
   });
 
+  it("sets the attack band to one the selected technique can legally strike", () => {
+    // Without this a mae-geri picked after a high technique would be posed at HIGH — a combination
+    // the engine degrades to idle, so the developer would be tuning a frame that cannot occur.
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const picker = within(challenger).getByRole("combobox", { name: "Move" });
+
+    fireEvent.change(picker, { target: { value: "uraken" } }); // jodan-only backfist
+    expect(latest()[0].a.attackBand).toBe(3);
+
+    fireEvent.change(picker, { target: { value: "mae-geri" } }); // chudan-only front kick
+    expect(latest()[0].a.attackBand).toBe(2);
+  });
+
+  it("takes the engine's first-listed band for a technique legal at several", () => {
+    // gyaku-zuki is high·mid. Picking one is unavoidable; taking the engine's own first entry keeps
+    // the choice mechanical rather than an opinion transcribed into the mirror.
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "gyaku-zuki" } },
+    );
+
+    expect(latest()[0].a.attackBand).toBe(3); // "high" heads rules.ts's list
+  });
+
+  it("leaves the band alone for a technique the band gate does not restrict", () => {
+    // `sweep` and `throw` declare no band list, which `bandLegal` reads as EVERY band being legal
+    // (sim.ts:613) — so whatever band is already set is already legal and there is nothing to
+    // correct. Stamping one would invent a restriction the engine does not impose.
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const picker = within(challenger).getByRole("combobox", { name: "Move" });
+
+    fireEvent.change(picker, { target: { value: "uraken" } }); // stamps high
+    expect(latest()[0].a.attackBand).toBe(3);
+
+    fireEvent.change(picker, { target: { value: "sweep" } });
+    expect(latest()[0].a.attackBand).toBe(3); // ...and the sweep leaves it there
+  });
+
+  it("leaves the stamped band free to be changed without changing the move", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "mae-geri" } },
+    );
+
+    // Deliberately move it OUT of legality — the engine would degrade this to idle, and being able
+    // to see that frame anyway is the point of the lab (M10 free combos).
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Attack band" }),
+      { target: { value: "3" } },
+    );
+
+    expect(latest()[0].a.attackBand).toBe(3);
+    expect(latest()[0].a.attackMove).toBe("mae-geri");
+  });
+
   it("supersedes the shared reach-preset dropdown, leaving one move control per figure", () => {
     // The preset dropdown snapped the gap by naming a move — exactly what the picker now does, but
     // shared across both figures. Two controls naming moves could disagree; this is the one that

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_GAP, MAX_GAP, MIN_GAP, REACH_PRESETS } from "./reach-presets";
+import {
+  DEFAULT_GAP,
+  MAX_GAP,
+  MIN_GAP,
+  REACH_PRESETS,
+  type ReachPreset,
+} from "./reach-presets";
 
 // The reach-preset table is a documented mirror of the engine move reaches (src/engine/rules.ts):
 // web/src can't import src/, exactly as WORLD_WIDTH mirrors the ring width. The pose lab snaps the
@@ -50,6 +56,35 @@ describe("REACH_PRESETS — mirrors every engine technique reach, ascending", ()
       ["mawashi-geri", 11, 3, 18],
       ["yoko-geri", 12, 3, 20],
       ["ushiro-geri", 13, 3, 22],
+    ]);
+  });
+
+  it("mirrors which height bands each technique may legally strike, in the engine's own order", () => {
+    // The third mirrored field (S3): `bands` from rules.ts, as this codebase's numeric band codes
+    // (3 high / 2 mid / 1 low), in the order the engine lists them — the first entry is the one the
+    // move picker stamps, so ORDER is load-bearing here and not merely cosmetic.
+    //
+    // `throw` and `sweep` carry NO band list, and that is faithful rather than a gap: `bandLegal`
+    // (sim.ts:613) reads an absent `bands` as EVERY band being legal, so those two are unrestricted
+    // by the band gate — the sweep is constrained by hurtbox occupancy instead, and a throw is a
+    // grab with no height at all. Inventing a list for them would put an interpretation in a table
+    // whose whole job is to transcribe.
+    // Read through the declared ReachPreset rather than the `as const` literal union: `throw` and
+    // `sweep` genuinely have no `bands` KEY, so only the real type exposes it as optional.
+    expect(REACH_PRESETS.map((p: ReachPreset) => [p.move, p.bands])).toEqual([
+      ["empi", [3, 2]],
+      ["hiza-geri", [2]],
+      ["throw", undefined],
+      ["sweep", undefined],
+      ["uraken", [3]],
+      ["kizami-zuki", [3, 2]],
+      ["gyaku-zuki", [3, 2]],
+      ["tobi-geri", [3, 2]],
+      ["shuto", [3, 2]],
+      ["mae-geri", [2]],
+      ["mawashi-geri", [3, 2]],
+      ["yoko-geri", [2]],
+      ["ushiro-geri", [3, 2]],
     ]);
   });
 });
