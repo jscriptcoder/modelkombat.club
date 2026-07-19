@@ -30,6 +30,12 @@ export type ReplayFrame = {
   // aims the striking limb by. Optional + read defensively: the loader casts the wire wholesale,
   // so an absent / non-numeric / negative value is treated as 0 (⇒ no reach ⇒ stance pose, M7).
   attackReach?: number;
+  // Which technique is committed (`MoveId | "sweep" | "throw"`, "" when none) and which phase of
+  // it this frame shows (0 none / 1 startup / 2 active / 3 recovery) — the render-only engine
+  // fields (src/engine/sim.ts) the viewer picks a per-move pose by. Optional + read defensively
+  // like `attackReach`: an absent / unknown id falls back to the generic pose (M7).
+  attackMove?: string;
+  attackPhase?: number;
 };
 
 // One tick of the tape: the engine tick number plus both fighters' frames (challenger `a`, King `b`).

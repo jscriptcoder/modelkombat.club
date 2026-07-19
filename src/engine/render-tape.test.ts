@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { runFight, renderTape, type FightConfig } from "./sim.js";
 import type { BotDoc } from "./dsl.js";
-import type { Rules, Action } from "./types.js";
+import type { Rules, Action, Band, MoveId } from "./types.js";
 
 // ─── factories ───────────────────────────────────────────────────────────────
 const bot = (dflt: Action, rules: BotDoc["rules"] = []): BotDoc => ({
@@ -126,6 +126,8 @@ describe("renderTape — per-tick render state for the viewer", () => {
       guardBand: 0, // committed to a strike ⇒ not guarding
       throwing: false,
       attackReach: 250000, // gyaku-zuki reach
+      attackMove: "gyaku-zuki",
+      attackPhase: 1, // commit tick renders elapsed 1, inside startup 4 ⇒ winding up
       knockdown: false,
       points: 0,
       stamina: 80, // 100 − 20 spent on commit, no regen while committed
@@ -331,6 +333,420 @@ describe("renderTape — attackReach (the committed action's reach)", () => {
 
     expect(
       tape.every((t) => t.a.attackReach === 0 && t.b.attackReach === 0),
+    ).toBe(true);
+  });
+});
+
+// ─── attackMove / attackPhase ────────────────────────────────────────────────
+// Which technique a fighter committed to, and which phase of it a frame shows. Render-only
+// (like `guardBand` / `attackReach`): the viewer picks a per-move pose; resolution never reads
+// either field.
+//
+// TIMING NOTE — a rendered frame's `elapsed` is ALREADY ADVANCED. The tick order is
+// resolve → advance (sim.ts:1369) → render (sim.ts:1414), so the commit tick renders
+// `elapsed: 1`, and a move's rendered `elapsed` equals `tick + 1` for its whole commitment.
+// Phase is derived from that rendered value with the engine's OWN active-window inequality
+// (sim.ts:802-803): `elapsed < startup ⇒ 1`, `elapsed < startup + active ⇒ 2`, else `3`.
+// The consequence is deliberate: the FIRST contact tick still renders phase 2 (a strike's
+// `scored` flag latches on first contact), and an air strike's landing park at
+// `elapsed = startup + active` (sim.ts:1049) correctly reads phase 3 (recovery).
+
+// Commits `move` on exactly one tick, idling otherwise — so the strike's later frames carry an
+// IDLE live action while the fighter is still committed. Proves the id comes from the committed
+// STATE, not the live action (the same property the attackReach suite pins for reach).
+const attackAtTick = (tick: number, move: MoveId, band: Band = "mid"): BotDoc =>
+  bot({ type: "idle" }, [
+    {
+      when: {
+        op: "eq",
+        args: [
+          { op: "field", path: "clock.tick" },
+          { op: "const", value: tick },
+        ],
+      },
+      do: { type: "attack", move, band },
+    },
+  ]);
+
+const SWEEPER = bot({ type: "sweep" });
+
+// Jumps the instant it is free, then air-strikes with a REAL air technique (`tobi-geri`), so
+// the emitted id proves the air-attacking branch reads its own committed move.
+const TOBI = bot({ type: "attack", move: "tobi-geri", band: "mid" }, [
+  {
+    when: {
+      op: "eq",
+      args: [
+        { op: "field", path: "self.canAct" },
+        { op: "const", value: 1 },
+      ],
+    },
+    do: { type: "jump", dir: 0 },
+  },
+]);
+
+const GYAKU: Rules["moves"]["gyaku-zuki"] = {
+  startup: 4,
+  active: 2,
+  recovery: 6,
+  score: 1,
+  reach: 250000,
+};
+
+describe("renderTape — attackMove (the committed technique's id)", () => {
+  it("names the committed move through the whole strike, even on frames whose live action is idle", () => {
+    const tape = renderTape(
+      getMockConfig({ botA: attackAtTick(0, "gyaku-zuki"), botB: IDLE }),
+    );
+
+    const committed = tape.filter((t) => t.a.attacking);
+
+    expect(committed.length).toBeGreaterThan(0);
+    expect(committed.every((t) => t.a.attackMove === "gyaku-zuki")).toBe(true);
+  });
+
+  it("names the move actually committed — a different move reads a different id", () => {
+    // Two different moves through the same path: kills a hardcoded id at the commit site.
+    const rules = getMockRules({
+      moves: { "gyaku-zuki": GYAKU, "mae-geri": { ...GYAKU, score: 2 } },
+    });
+
+    expect(
+      renderTape(
+        getMockConfig({ rules, botA: attackAtTick(0, "mae-geri"), botB: IDLE }),
+      )[0].a.attackMove,
+    ).toBe("mae-geri");
+    expect(
+      renderTape(
+        getMockConfig({
+          rules,
+          botA: attackAtTick(0, "gyaku-zuki"),
+          botB: IDLE,
+        }),
+      )[0].a.attackMove,
+    ).toBe("gyaku-zuki");
+  });
+
+  it("names a sweep `sweep` and a throw `throw` — the two non-MoveId techniques", () => {
+    const sweepTape = renderTape(
+      getMockConfig({
+        rules: getMockRules({
+          moves: { "gyaku-zuki": GYAKU, sweep: { ...GYAKU, score: 0 } },
+          knockdownDuration: 5,
+        }),
+        botA: SWEEPER,
+        botB: IDLE,
+      }),
+    );
+
+    expect(sweepTape[0].a.attacking).toBe(true);
+    expect(sweepTape[0].a.attackMove).toBe("sweep");
+
+    const throwTape = renderTape(
+      getMockConfig({
+        rules: getMockRules({
+          throw: {
+            startup: 4,
+            active: 3,
+            recovery: 3,
+            reach: 250000,
+            score: 3,
+          },
+          knockdownDuration: 5,
+        }),
+        botA: THROW,
+        botB: IDLE,
+      }),
+    );
+
+    expect(throwTape[0].a.throwing).toBe(true);
+    expect(throwTape[0].a.attackMove).toBe("throw");
+  });
+
+  it("names an air technique while airborne, and keeps naming it through the grounded landing recovery", () => {
+    // Landing is master: an air-attacking state converts to a grounded `attacking` state parked
+    // at the start of recovery (sim.ts:1040-1052) — a FIFTH construction site. The committed id
+    // must survive that conversion, or a landed tobi-geri loses its identity mid-recovery.
+    const rules = getMockRules({
+      jumpImpulse: 24000,
+      gravity: 6000,
+      lowClearance: 10000,
+      moves: {
+        "gyaku-zuki": GYAKU,
+        "tobi-geri": {
+          ...GYAKU,
+          startup: 2,
+          active: 3,
+          recovery: 8,
+          air: true,
+        },
+      },
+    });
+
+    const tape = renderTape(
+      getMockConfig({ rules, botA: TOBI, botB: IDLE, maxTicks: 20 }),
+    );
+
+    // Airborne AND attacking ⇒ the air-attacking state specifically.
+    expect(
+      tape.some(
+        (t) =>
+          t.a.posture === 2 && t.a.attacking && t.a.attackMove === "tobi-geri",
+      ),
+    ).toBe(true);
+
+    // Back on the ground (y === 0) and still committed ⇒ the landing recovery.
+    const landed = tape.filter(
+      (t) => t.a.attacking && t.a.y === 0 && t.tick > 0,
+    );
+
+    expect(landed.length).toBeGreaterThan(0);
+    expect(landed.every((t) => t.a.attackMove === "tobi-geri")).toBe(true);
+  });
+
+  it("renames the move when an on-contact cancel interrupts into a follow-up", () => {
+    // The cancel path is its own commit site (sim.ts:599). An opener that CONNECTS opens the
+    // cancel window; cancelling into a DIFFERENT move must re-name the frame — kills both a
+    // hardcoded id and a "keep the original move" implementation at that site.
+    const rules = getMockRules({
+      startGap: 200000, // inside reach ⇒ the opener connects and opens the window
+      cancelWindow: 10,
+      moves: {
+        "gyaku-zuki": { ...GYAKU, cancelInto: ["mae-geri"] },
+        "mae-geri": { ...GYAKU, score: 2 },
+      },
+    });
+
+    const botA = bot({ type: "idle" }, [
+      {
+        when: {
+          op: "eq",
+          args: [
+            { op: "field", path: "clock.tick" },
+            { op: "const", value: 0 },
+          ],
+        },
+        do: { type: "attack", move: "gyaku-zuki", band: "mid" },
+      },
+      {
+        when: {
+          op: "eq",
+          args: [
+            { op: "field", path: "clock.tick" },
+            { op: "const", value: 6 },
+          ],
+        },
+        do: { type: "attack", move: "mae-geri", band: "mid" },
+      },
+    ]);
+
+    const tape = renderTape(
+      getMockConfig({ rules, botA, botB: IDLE, maxTicks: 16 }),
+    );
+
+    expect(tape[0].a.attackMove).toBe("gyaku-zuki"); // the opener
+    expect(tape[6].a.attackMove).toBe("mae-geri"); // cancelled into the follow-up
+  });
+
+  it("names nothing for a fighter that is neutral, merely airborne, or knocked down", () => {
+    const idle = renderTape(getMockConfig({ botA: IDLE, botB: IDLE }));
+
+    expect(
+      idle.every(
+        (t) => t.a.attackMove === "" && t.a.attackPhase === 0 && !t.a.attacking,
+      ),
+    ).toBe(true);
+
+    // A jumper that never strikes: airborne is a committed state, but not an ATTACK.
+    const jump = renderTape(
+      getMockConfig({
+        rules: getMockRules({
+          jumpImpulse: 24000,
+          gravity: 6000,
+          lowClearance: 10000,
+        }),
+        botA: JUMP,
+        botB: IDLE,
+      }),
+    );
+
+    const aloft = jump.filter((t) => t.a.posture === 2);
+
+    expect(aloft.length).toBeGreaterThan(0);
+    expect(
+      aloft.every((t) => t.a.attackMove === "" && t.a.attackPhase === 0),
+    ).toBe(true);
+
+    // The thrown defender: downed carries no technique of its own.
+    const thrown = renderTape(
+      getMockConfig({
+        rules: getMockRules({
+          throw: {
+            startup: 1,
+            active: 3,
+            recovery: 3,
+            reach: 250000,
+            score: 3,
+          },
+          knockdownDuration: 5,
+        }),
+        botA: THROW,
+        botB: IDLE,
+      }),
+    );
+
+    const downed = thrown.filter((t) => t.b.knockdown);
+
+    expect(downed.length).toBeGreaterThan(0);
+    expect(
+      downed.every((t) => t.b.attackMove === "" && t.b.attackPhase === 0),
+    ).toBe(true);
+  });
+});
+
+describe("renderTape — attackPhase (startup / active / recovery)", () => {
+  // startup 7, active 3, recovery 6 (total 16). Rendered `elapsed` is `tick + 1`, so:
+  //   ticks 0–5 ⇒ elapsed 1–6  ⇒ phase 1 (startup)
+  //   ticks 6–8 ⇒ elapsed 7–9  ⇒ phase 2 (active)
+  //   ticks 9–14 ⇒ elapsed 10–15 ⇒ phase 3 (recovery)
+  // The fighters start OUT OF RANGE so the strike whiffs — timing is isolated from contact.
+  const phaseRules = (): Rules =>
+    getMockRules({
+      startGap: 400000, // beyond reach (250000) ⇒ no contact, no cancel window, no score
+      moves: {
+        "gyaku-zuki": {
+          startup: 7,
+          active: 3,
+          recovery: 6,
+          score: 1,
+          reach: 250000,
+        },
+      },
+    });
+
+  const phaseTape = () =>
+    renderTape(
+      getMockConfig({
+        rules: phaseRules(),
+        botA: attackAtTick(0, "gyaku-zuki"),
+        botB: IDLE,
+        maxTicks: 16,
+      }),
+    );
+
+  it("winds up, extends, then recovers — switching phase exactly on the frame boundaries", () => {
+    const tape = phaseTape();
+
+    // Both boundaries asserted from BOTH sides: these four pin the `<` / `>=` comparisons and
+    // are what a `<`-to-`<=` mutant on either inequality has to survive.
+    expect(tape[5].a.attackPhase).toBe(1); // elapsed 6 — last startup frame
+    expect(tape[6].a.attackPhase).toBe(2); // elapsed 7 — first active frame
+    expect(tape[8].a.attackPhase).toBe(2); // elapsed 9 — last active frame
+    expect(tape[9].a.attackPhase).toBe(3); // elapsed 10 — first recovery frame
+  });
+
+  it("reads a phase on every committed frame and none once the move ends", () => {
+    const tape = phaseTape();
+
+    expect(
+      tape.every((t) =>
+        t.a.attacking
+          ? t.a.attackPhase >= 1 && t.a.attackPhase <= 3
+          : t.a.attackPhase === 0,
+      ),
+    ).toBe(true);
+
+    // The move runs out during the window: the last tick is free again (total 16 frames, and a
+    // rendered `elapsed` of 16 releases the state) — so phase 0 is genuinely reached.
+    expect(tape[15].a.attacking).toBe(false);
+    expect(tape[15].a.attackPhase).toBe(0);
+  });
+
+  it("winds up, grabs, then recovers on the THROW's own frame table", () => {
+    // A throw's phase comes from `rules.throw` (startup 4 / active 3 / recovery 3) — a different
+    // table from the moves one — so the grab reads extended exactly on its grab-active ticks.
+    const tape = renderTape(
+      getMockConfig({
+        rules: getMockRules({
+          throw: {
+            startup: 4,
+            active: 3,
+            recovery: 3,
+            reach: 250000,
+            score: 3,
+          },
+          knockdownDuration: 5,
+        }),
+        botA: THROW,
+        botB: IDLE,
+        maxTicks: 12,
+      }),
+    );
+
+    expect(tape[3].a.throwing).toBe(true); // it is the grab being phased, not a strike
+    expect(tape[2].a.attackPhase).toBe(1); // elapsed 3 — still winding up
+    expect(tape[3].a.attackPhase).toBe(2); // elapsed 4 — the grab goes live
+    expect(tape[5].a.attackPhase).toBe(2); // elapsed 6 — last grab-active frame
+    expect(tape[6].a.attackPhase).toBe(3); // elapsed 7 — recovering
+  });
+
+  it("phases an air technique while it is still airborne", () => {
+    // The air-attacking state runs its own move clock mid-arc, so an air strike must read a real
+    // phase BEFORE it lands — otherwise the viewer draws a jumping kick frozen at stance.
+    const rules = getMockRules({
+      jumpImpulse: 24000,
+      gravity: 6000,
+      lowClearance: 10000,
+      moves: {
+        "gyaku-zuki": GYAKU,
+        "tobi-geri": {
+          ...GYAKU,
+          startup: 2,
+          active: 3,
+          recovery: 8,
+          air: true,
+        },
+      },
+    });
+
+    const tape = renderTape(
+      getMockConfig({ rules, botA: TOBI, botB: IDLE, maxTicks: 20 }),
+    );
+
+    const aloftStriking = tape.filter(
+      (t) => t.a.posture === 2 && t.a.attacking,
+    );
+
+    expect(aloftStriking.length).toBeGreaterThan(0);
+    expect(
+      aloftStriking.every((t) => t.a.attackPhase >= 1 && t.a.attackPhase <= 3),
+    ).toBe(true);
+    // The kick genuinely extends mid-air rather than landing still winding up.
+    expect(aloftStriking.some((t) => t.a.attackPhase === 2)).toBe(true);
+  });
+
+  it("holds the recovery pose longer when a parry extends it, without a fourth phase", () => {
+    // A parried strike accrues `extra` recovery ticks (sim.ts:166). Phase derivation's ELSE
+    // branch absorbs them (M5), so the tail stays phase 3 rather than inventing a new code.
+    const rules = getMockRules({
+      startGap: 200000, // in range ⇒ the mid guard can parry
+      moves: { "gyaku-zuki": GYAKU },
+    });
+
+    const tape = renderTape(
+      getMockConfig({
+        rules,
+        botA: attackAtTick(0, "gyaku-zuki"),
+        botB: BLOCK_MID,
+        maxTicks: 20,
+      }),
+    );
+
+    const tail = tape.filter((t) => t.a.attacking && t.a.attackPhase !== 1);
+
+    expect(tail.length).toBeGreaterThan(0);
+    expect(
+      tail.every((t) => t.a.attackPhase === 2 || t.a.attackPhase === 3),
     ).toBe(true);
   });
 });
