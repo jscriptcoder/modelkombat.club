@@ -1392,3 +1392,73 @@ slider (a named fieldset with its own accessible name and format constants). A n
 caller, and its fallback (`?? controls.attackBand`) belongs to the caller, not the table. **Still carried:**
 `formatGap` / `formatReach` are the same one-liner — predicted to ride along with slice 4, which never opened
 that file, so it remains a standalone tidy rather than something smuggled into a feature commit.
+
+## Move showcase & per-move poses — S4: the moves fighters actually throw look distinct ✅ COMPLETE (5/8 of the arc, 2026-07-20)
+
+The first story a **spectator** sees pay off. S1–S3 built the mechanism and the harness; S4 spent it on the
+two moves with real screen time — `gyaku-zuki` (~80%) and `mawashi-geri` (~13%). It grew mid-flight from 4
+slices to 6: the shoulder girdle (M12) was not a third move but the mechanism without which the reverse punch
+did not read. Every slice was `web/`-only — `BENCHMARK_VERSION` held at `v19`, `git diff main -- src/` empty
+each time (M11) — with mutation `N/A` (`web/` is outside Stryker); substitute evidence was exhaustive
+exact-assertion tests, a **scripted** manual mutator scan, and a Playwright `/dojo` visual sign-off.
+
+- **Slice 1 — the reverse punch is thrown with the rear arm** (PR #363, `feat/move-poses-s4-gyaku-zuki`) —
+  `StrikeLimb` gains `handL`; a **precedence rule** lets a committed strike win the rear hand off the guard
+  (gated on a live strike, not the move id). The visual check found the distinction reads _faintly_ — both
+  arms hang off one shoulder, so the extended arm lands the same place either way.
+- **Slice 2 — the reverse punch chambers at the hip, `hikite` folded in** (PR #363) — the off-hand pull is the
+  first crack in M3's "only the driven endpoint moves": a second authored endpoint. Authored at the hip first,
+  found undrawable (outside the arm's reach once the girdle slid the shoulder), parked at the flank until
+  slice 5.
+- **Slice 3 — a punch leans only as far as it must reach** (PR #364, `feat/move-poses-s4-lean`) — the heuristic
+  `strikeLean` became the derived `rootTravel` shortfall shared with the kick's hip step. **The eye-check here
+  surfaced the arc's main risk on _punches_, not the kicks it was forecast for:** at the workhorse distance a
+  jab and a reverse punch render on the **identical pixel**. That forced the **M12 girdle decision tree** (10
+  sub-decisions), pinned in the plan before slice 4.
+- **Slice 4 — the fighter gets a shoulder girdle** (PR #365, `feat/move-poses-s4-girdle`) — `Skeleton` gains
+  derived `shoulderL`/`shoulderR` at `shoulder.x ± SHOULDER_HALF_WIDTH`; each elbow re-roots onto its own
+  shoulder so the rear arm starts 14px back. `ARM_BONE` deliberately unchanged (widening shoulders does not
+  shorten arms). Shipped a **bounded intermediate state** (the rigid slide stretched `hikite` 8.7%, ceilinged
+  by an AC), removed in slice 5.
+- **Slice 5 — the torso rotates into the punch** (PR #366, `feat/move-poses-s4-rotate`) — the lean drives only
+  the **driving** shoulder by the full amount (a new `GirdleShift` on `deriveSkeleton`), midpoint + head follow
+  at half, and the shortfall is measured per-arm — so a reverse punch leans more than a jab at mid range. The
+  rear shoulder comes through; the front returns to x 7, **restoring `hikite` to the hip** where slice 2 wanted
+  it. Slice 3's hand-ride retired with the slide that forced it.
+- **Slice 6 — the roundhouse kicks with the rear leg** (PR #367, `feat/move-poses-s4-mawashi-geri`) — the
+  forecast M3 risk finally bit where predicted, on the kicks: `mae-geri` and `mawashi-geri` both drive a foot to
+  the same solved target, so the same foot would render them identically, and a 2-D side view cannot show
+  lateral hip rotation. Took **M12i's named escape hatch — drive the REAR leg (`footL`, a new `StrikeLimb`)**;
+  a shared `isKick` predicate generalised the two `footR` gates. Not a bespoke mechanism: another endpoint
+  through the shared solver.
+
+[move-poses-s4.md](move-poses-s4.md) — the plan, with all six slices' recorded outcomes, the M12 girdle
+decision tree, and slice 6's honest `/dojo` read. The design trail
+(`plans/move-poses-{decisions,stories}.md`) stays **live in `plans/`**, since S5–S8 still run off it.
+
+**The expressiveness limit was diagnosed AND treated — twice.** M3 accepts "only the driven endpoint moves",
+and the plan forecast this would collapse the four kicks into one picture. It bit first on **punches** (slice
+3) — because both hands shared one shoulder — and the treatment was the girdle. It bit again on **kicks**
+(slice 6) as forecast, and the treatment was to drive a **different limb** (the rear leg). Both are the same
+move: when two techniques land the same endpoint, separate them by _where the limb starts_, not by nudging
+where it ends.
+
+**GOTCHA — never trust an exit code as a kill signal.** The slice-4 scan reported a **false kill**: `execSync`
+goes non-zero for runner errors as well as test failures, so a mutant that broke the harness read as "killed"
+while it was alive. Every scan since records a kill only when the run **names a failing test**. A transport
+test also surfaced intermittently _only under mutation_ — more reason to attribute kills to named tests, not
+counts.
+
+**GOTCHA — a Pixi `Graphics` path is invisible to display-object assertions.** Re-rooting an arm or dropping
+the girdle bar was invisible to the whole suite while plainly visible on screen, until `BONES` was **exported**
+and its wiring asserted directly (same discipline as `DESCRIBED_MOVES`). Any change to what the draw layer
+connects needs that test.
+
+**GOTCHA — the working tree is CRLF, so multi-line mutation anchors miss.** `.ts` files check out CRLF on
+Windows (the repo LF-pins via `.gitattributes`), so a scripted-scan anchor containing `\n` never matches.
+Single-line, uniquely-identifying anchors are robust; span-a-newline ones are not.
+
+**GOTCHA — measure a limb from its REAL root, not the midpoint.** A slice-5 resting-arm bone-drift test
+measured from the shared `shoulder` midpoint — a fictional bone that passed under the old hand-ride (arm rigid
+vs a moving midpoint) but drifted 35% under rotation. Rooted at `shoulderL` (the arm's actual origin) it read
+true.

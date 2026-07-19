@@ -1093,8 +1093,8 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    stats**. Both presentation-only (no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change). All Arsenal +
    Gauntlet artifacts archived under `docs/archive/` (see the build-log entries above + the archive
    [`README.md`](archive/README.md)).
-9. **Move showcase + per-move poses — 🚧 IN PROGRESS (4 of 8 child stories shipped; PRs #350, #352,
-   #353, #355–#361).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
+9. **Move showcase + per-move poses — 🚧 IN PROGRESS (5 of 8 child stories shipped; PRs #350, #352,
+   #353, #355–#361, #363–#367).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
    `poseFor` knew only `attacking` / `attackBand` / `throwing`, so all **12 strikes rendered as one
    picture** (a `mawashi-geri` drew as a punch), and `attacking` stays true for a move's whole committed
    duration — a `gyaku-zuki` holds **24 ticks (~0.4 s) frozen at full extension**. Design resolved via
@@ -1103,8 +1103,9 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    `npm run telemetry` move-usage rather than anatomy. Design source:
    `plans/move-poses-{decisions,stories}.md` (still live — S4–S8 run off it); the completed plans are
    archived at [`docs/archive/move-poses-s0-s1.md`](archive/move-poses-s0-s1.md),
-   [`docs/archive/move-poses-s2.md`](archive/move-poses-s2.md) and
-   [`docs/archive/move-poses-s3.md`](archive/move-poses-s3.md). Defense / _uke_ poses are explicitly a
+   [`docs/archive/move-poses-s2.md`](archive/move-poses-s2.md),
+   [`docs/archive/move-poses-s3.md`](archive/move-poses-s3.md) and
+   [`docs/archive/move-poses-s4.md`](archive/move-poses-s4.md). Defense / _uke_ poses are explicitly a
    **later** arc.
 
    - **S0 ✅ (PR #352)** — the arc's **only `src/` touch**: additive render-only **`attackMove` +
@@ -1155,10 +1156,21 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
      correct distances — which is the problem. **This lands on S5**, whose two moves are exactly that
      close-range pair.
 
-   - **Next: S4 — `gyaku-zuki`**, by the telemetry bargain (~80% of all committed on-screen time), against
-     geometry that is now settled and with the harness finally in place. It carries the **rear-hand
-     precedence rule** (the guard lives on the rear arm, and the reverse punch wants the same limb) and the
-     `strikeLean` / `rootTravel` unification carried from S2.
+   - **S4 ✅ (PRs #363–#367)** — `web/`-only, **six** slices (grown from four mid-flight), spending the
+     mechanism on the two moves with real screen time: **`gyaku-zuki`** (~80%) and **`mawashi-geri`** (~13%).
+     Slices 1–2 threw the reverse punch with the **rear hand** + a hip `hikite`, but the eye-check found the
+     distinction faint — both arms hung off one shoulder, landing the extended arm the same place either way,
+     which at the workhorse distance rendered a jab and a reverse punch on the **identical pixel**. That forced
+     the **shoulder girdle** (M12): slice 3 derived the lean, slice 4 split the shoulder into two ends so the
+     rear arm starts 14px back, and slice 5 made the girdle **rotate** — only the driving shoulder comes
+     through — restoring `hikite` to the hip. Slice 6 hit the same wall on kicks as originally forecast
+     (`mae-geri` and `mawashi-geri` both drive a foot to the same target, and a 2-D view cannot show hip
+     rotation) and took **M12i's escape hatch: the roundhouse drives the REAR leg (`footL`)** — a different
+     limb, the one distinction a side view can show. `BENCHMARK_VERSION` held at `v19`, `src/` untouched every
+     slice (M11).
+   - **Next: S5 — the close-range pair (`empi`, `hiza-geri`)**, which must confront the structural mismatch S3
+     made visible: at true engine reach these two interpenetrate, so S5 owns the mid-joint-as-driven-endpoint
+     _and_ the close-range overlap S4 was kept out of.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped

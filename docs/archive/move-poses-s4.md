@@ -1,12 +1,13 @@
 # Plan: S4 — the moves fighters actually throw look distinct
 
-**Branch**: slice 6 cuts from `main`. Shipped so far — slices 1–2 in **#363**
-(`feat/move-poses-s4-gyaku-zuki`, `4f0d3b7`); slice 3 + the M12 decision tree in **#364**
-(`feat/move-poses-s4-lean`, `7800ed9`); slice 4 the girdle in **#365** (`feat/move-poses-s4-girdle`,
-`7ff7a7d`); slice 5 the rotation in **#366** (`feat/move-poses-s4-rotate`, `c658e3e`) — all merged
-**Status**: **S4 COMPLETE — 6 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12).
-Slice 6 (`mawashi-geri`, the rear-leg roundhouse / M12i escape hatch) is built + green + `/dojo`-signed;
-PR pending. Archive this file under `docs/archive/` once slice 6 merges (house rule; add the README entry).
+**Branch**: all six slices merged. Slices 1–2 in **#363** (`feat/move-poses-s4-gyaku-zuki`, `4f0d3b7`);
+slice 3 + the M12 decision tree in **#364** (`feat/move-poses-s4-lean`, `7800ed9`); slice 4 the girdle
+in **#365** (`feat/move-poses-s4-girdle`, `7ff7a7d`); slice 5 the rotation in **#366**
+(`feat/move-poses-s4-rotate`, `c658e3e`); slice 6 the rear-leg roundhouse in **#367**
+(`feat/move-poses-s4-mawashi-geri`, `87a1d31`).
+**Status**: ✅ **S4 COMPLETE + ARCHIVED — 6 of 6 slices done, all merged** (2026-07-20, `main`@`87a1d31`;
+scope amended 2026-07-19 to add the shoulder girdle, M12). The design trail
+(`plans/move-poses-{decisions,stories}.md`) stays live in `plans/`, since S5–S8 still run off it.
 **Parent story**: `plans/move-poses-stories.md` § S4 · **Decisions**: `plans/move-poses-decisions.md` (M1–M12)
 
 ## Goal
