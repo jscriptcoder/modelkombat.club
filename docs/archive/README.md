@@ -1263,12 +1263,72 @@ active`), because a rendered frame's `elapsed` is already advanced — so the dr
 trail (`plans/move-poses-{decisions,stories}.md` — 10 decisions, mechanics M1–M11, 8 child stories) stays
 **live in `plans/`**, since S2–S7 still run off it.
 
-**Carried findings for S2.** The kick reads **stretched rather than snapped**: the driven leg spans ~67 local
-px against a ~37 px natural length (1.8×), and at that extension the 8 px `KNEE_BEND` is nearly invisible.
-The shipped punch telescopes just as hard (2.0×), so this is the existing visual language rather than a
-regression — but a leg starting at the low hip and rising only to the mid band tolerates the stretch far
-worse than an arm does. This answers the plan's open question _"what fields fall out beyond limb + chamber"_:
-**limb alone is not enough** — a kick needs hip travel (the M2 lean moves head + shoulder only), a knee-lift
-chamber, or a length constraint on the driven bone. Relatedly, **M8.2's support-integrity assertion is now
-load-bearing**: if S2 concludes the hip must travel, that test must be changed _consciously_ — it is a
-decision record, not a bug. `attackPhase` ships emitted but deliberately **unconsumed**; phase is S2's job.
+**Carried findings for S2** _(all three resolved by S2 — see `move-poses-s2.md`)_. The kick reads **stretched
+rather than snapped**: the driven leg spans ~67 local px against a ~37 px natural length (1.8×), and at that
+extension the 8 px `KNEE_BEND` is nearly invisible. This answered the plan's open question _"what fields fall
+out beyond limb + chamber"_ with **limb alone is not enough**. S2 · Slice 3 found the diagnosis itself was
+wrong — `hip → foot` distance is not bone length — and fixed the real defect a level down. **M8.2's
+support-integrity assertion** was flagged as load-bearing in case the hip had to travel; it did, but the step
+is capped, so M8.2 never needed changing. `attackPhase` ships emitted but deliberately **unconsumed**; phase
+is S2's job.
+
+---
+
+## Move showcase & per-move poses — S2: a technique winds up and recovers (2026-07-19)
+
+**Three slices, three PRs**, closing the "0.4 s frozen at full extension" defect end to end. `web/`-only
+throughout — no `src/` change, `BENCHMARK_VERSION` held at `v19`. Mutation **`N/A`** for every slice (Stryker
+is node-only and does not reach `web/`); substitute evidence each time was exhaustive exact-assertion tests, a
+**scripted** manual mutator scan, and a Playwright `/dojo` visual sign-off.
+
+- **Slice 1 — a technique winds up and recovers on `/watch`** (PR #355, `feat/move-poses-s2-windup`) —
+  `poseFor` honours `attackPhase`: a chamber during startup and recovery, the solved extension only at
+  contact. **Call 1** resolved M7's fallback to its literal reading, which made this a **whole-roster** change
+  — all 13 moves gained wind-up and recovery, not just `mae-geri`, because an undescribed move winds up
+  through its stance. **Call 2** relaxed M8.3 to "phase 2 differs from 1 and 3", since M3 defaults recovery to
+  the chamber so `1 === 3` is by design. Scan 16/16 after one genuine survivor was killed (dropping the
+  `strikeHand` gate let an idle fighter chamber off a stale move id). **The change was far bigger than "a
+  nicer strike": 87% of committed ticks were previously drawn wrong** — 636 of 727 committed ticks in one
+  replay are startup or recovery.
+- **Slice 2 — `/dojo` plays a technique at real engine timing** (PR #356, `feat/move-poses-s2-dojo-timing`) —
+  `reach-presets.ts` gains the 13-move `startup`/`active`/`recovery` mirror; `buildDojoTape` spans the longer
+  of the two figures' techniques, stamping phase per tick; `DojoApp` owns the transport **above** the
+  injectable spy seam. Scan 27/28, with one accepted survivor (the stage ignoring the playhead is invisible to
+  the unit layer by construction — the same seam that makes the transport assertable — killed empirically by
+  the visual check). Extraction of shared playback controls with `ReplayPlayer` was **assessed and rejected**:
+  the player carries speed, restart and engine-tick semantics the lab does not want.
+- **Slice 3 — a kick's contact frame reads like a kick** (PR #357, `feat/move-poses-s2-kick-reads`) — see
+  below; the slice that changed the most about how the figure is understood.
+
+[move-poses-s2.md](move-poses-s2.md) — the plan, with all three slices' recorded outcomes, both resolved calls
+and the full Call 3 reversal. The arc's design trail (`plans/move-poses-{decisions,stories}.md`) stays **live
+in `plans/`**, since S3–S8 still run off it.
+
+**The durable finding — the body cannot reach the engine's distances, and that is structural.**
+`BODY_HEIGHT_SUB` is 240*000 and the opening distance is 240_000, so fighters stand **one body-height apart**
+while an arm spans 0.35 of that and a leg 0.48. Nothing human-proportioned reaches its own height, and drawing
+cannot fix a ratio the engine owns — scaling magnifies gap and body together, and the figure already fills 80%
+of the viewport. **So the original limb-stretching was the compromise that made contact legible, not an
+oversight.** Slice 3 replaced it with a \_bounded* compromise rather than eliminating it: bone length became the
+invariant with the mid-joint solved for it (2-bone IK, derived from `STAND` so the neutral figure is
+pixel-identical), plus a root step capped at 16 local px, with a bounded residual stretch beyond that. Drift at
+contact fell **0.72 → 0.28** and the swing across a technique **0.51×→1.72×** → **1.0×→1.28×**.
+
+**GOTCHA — `hip → foot` distance is not bone length.** The S1 finding ("the limb telescopes to 1.8× its
+natural length") measured the endpoint span. A folded knee _should_ bring the foot near the hip, so the 0.34×
+chamber was always fine. The real defect was that `deriveBend` offset the mid-joint by a **constant** 8 px, so
+the bones it implied were `√((span/2)² + 8²)` — a function of endpoint separation. Measure the bones, not the
+span.
+
+**Two rulings recorded rather than patched around.** A limb at or past full extension now draws **straight**
+(the solved bow floors at zero) — correct rather than tolerated, since a committed kick _is_ a straight line;
+M8.6 therefore holds wherever the limb is not fully extended. And the M2 lean is now gated to **hand**
+techniques: authored for punches, inherited wrongly by kicks. **An unplanned win** — slice 2's eye check asked
+for a kick to counter-lean backward, but because the hip steps forward while the shoulder does not, the torso
+leans **back over the driven hip** on its own. The counterbalance fell out of the step rather than needing to
+be authored.
+
+**Carried into S4** — unifying `strikeLean` (a heuristic, `min(CAP, handX × 0.5)`) with `rootTravel` (derived,
+`min(CAP, shortfall)`) was assessed and **rejected as out of scope**: they agree at the workhorse distance and
+diverge closer in, so merging them changes how punches look at close range. That is a behaviour change, and it
+belongs where `gyaku-zuki` is being judged by eye.

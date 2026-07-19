@@ -1093,17 +1093,18 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    stats**. Both presentation-only (no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change). All Arsenal +
    Gauntlet artifacts archived under `docs/archive/` (see the build-log entries above + the archive
    [`README.md`](archive/README.md)).
-9. **Move showcase + per-move poses — 🚧 IN PROGRESS (2 of 8 child stories shipped; PRs #350, #352,
-   #353).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
+9. **Move showcase + per-move poses — 🚧 IN PROGRESS (3 of 8 child stories shipped; PRs #350, #352,
+   #353, #355–#357).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
    `poseFor` knew only `attacking` / `attackBand` / `throwing`, so all **12 strikes rendered as one
    picture** (a `mawashi-geri` drew as a punch), and `attacking` stays true for a move's whole committed
    duration — a `gyaku-zuki` holds **24 ticks (~0.4 s) frozen at full extension**. Design resolved via
    `grill-me` → `find-gaps` → `story-splitting` (PR #350): 10 decisions + mechanics M1–M11, 8 child
    stories ordered S0 → S1 → S2 phases → S3 picker → S4+ the rest, the tail sequenced by
    `npm run telemetry` move-usage rather than anatomy. Design source:
-   `plans/move-poses-{decisions,stories}.md` (still live — S2–S7 run off it); the completed S0+S1 plan is
-   archived at [`docs/archive/move-poses-s0-s1.md`](archive/move-poses-s0-s1.md). Defense / _uke_ poses are
-   explicitly a **later** arc.
+   `plans/move-poses-{decisions,stories}.md` (still live — S3–S8 run off it); the completed plans are
+   archived at [`docs/archive/move-poses-s0-s1.md`](archive/move-poses-s0-s1.md) and
+   [`docs/archive/move-poses-s2.md`](archive/move-poses-s2.md). Defense / _uke_ poses are explicitly a
+   **later** arc.
 
    - **S0 ✅ (PR #352)** — the arc's **only `src/` touch**: additive render-only **`attackMove` +
      `attackPhase`** on `RenderFrame`, with the move id threaded onto the committed `attacking` /
@@ -1115,11 +1116,29 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
      assumption held — a foot drives through the same `reachTargetX` solver as a hand, and the knee
      re-derives off the moved `hip → footR` for free. Undescribed moves keep the generic pose (M7), so
      the viewer stays usable while the other 12 are authored one slice at a time.
-   - **Next: S2** (a technique winds up and recovers — where `attackPhase` is finally consumed), then
-     **S3**, the `/dojo` move picker that was the original ask. S2 also owns a carried finding: the kick
-     currently reads **stretched rather than snapped**, so limb alone is not enough — see the archived
-     plan for the hip-travel / chamber / bone-length options and the note that M8.2's support-integrity
-     assertion is now a decision record.
+   - **S2 ✅ (PRs #355, #356, #357)** — `web/`-only, three slices, where `attackPhase` is finally
+     consumed. **Slice 1** made `poseFor` honour the phase — a chamber during startup and recovery, the
+     solved extension only at contact — which because M7's fallback was read literally became a
+     **whole-roster** change: all 13 moves gained wind-up and recovery. This corrected **87% of committed
+     ticks** (636 of 727 in one replay are startup or recovery, previously all drawn at full extension).
+     **Slice 2** gave `/dojo` a transport and a tape spanning the move's real engine timing, so a
+     technique can be played, paused, scrubbed and frame-stepped. **Slice 3** fixed the figure itself:
+     bone length became the invariant with the mid-joint solved for it (2-bone IK), plus a capped root
+     step, cutting limb drift at contact from **0.72 to 0.28**; and the M2 lean was gated to hand
+     techniques, since it was authored for punches and read as a kick _falling into_ itself.
+
+     The S1 carried finding ("the kick reads stretched") was **resolved and its diagnosis corrected** —
+     `hip → foot` distance is not bone length. The durable version is bigger: `BODY_HEIGHT_SUB` and the
+     opening distance are both 240_000, so fighters stand **one body-height apart** while a leg spans
+     0.48 of that. Nothing human-proportioned reaches its own height, and drawing cannot fix a ratio the
+     engine owns — **the original stretching was the compromise that made contact legible**, now a
+     bounded one. M8.2's support-integrity assertion never had to change: the step is capped, so the
+     rear foot stays planted.
+
+   - **Next: S3** — the `/dojo` move picker that was the original ask, and now **blocking the authoring
+     loop**: the lab still hard-codes the challenger to `mae-geri`, so S2 could only eye-check a punch by
+     temporarily editing that constant. A Restart control belongs with it. **S4 then opens on
+     `gyaku-zuki`** by the telemetry bargain — against geometry that is now settled.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
@@ -1135,6 +1154,8 @@ arc** (PRs #329–#349 — big jointed model-identity fighters whose strikes and
 shipped: **you can now watch the King's fights play back as animated stickmen.** See the replay-viewer
 build-log entry above. (Several of these post-#240 features are logged only in `docs/archive/`; a full
 build-log backfill remains pending.) **Item 9 is now underway** — giving each of the 13 arsenal moves its own
-look, so a spectator can tell _which_ technique a fighter just threw. The engine field (S0, PR #352) and
-the first per-move pose (S1, PR #353 — a `mae-geri` that kicks with its foot) have shipped; S2 (wind-up +
-recovery) and S3 (the `/dojo` move picker) are next.
+look, so a spectator can tell _which_ technique a fighter just threw. The engine field (S0, PR #352), the
+first per-move pose (S1, PR #353 — a `mae-geri` that kicks with its foot) and **the whole wind-up /
+recovery story (S2, PRs #355–#357)** have shipped: techniques now read as _movements_ rather than holding
+full extension for ~0.4 s, and the figure keeps its bone lengths instead of telescoping. **S3** — the
+`/dojo` move picker that was the original ask — is next, followed by **S4** on `gyaku-zuki`.
