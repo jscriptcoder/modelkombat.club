@@ -308,6 +308,13 @@ const poseFor = (
   const limb = limbFor(frame.attackMove);
   const winding = isChamberPhase(frame.attackPhase);
 
+  // Both feet are KICKS: they STEP the hip into the reach (not lean the torso, M9) and never rotate
+  // the girdle. The roundhouse drives the REAR foot (footL) so it reads apart from the front kick's
+  // footR (M12i) — since both solve to the same target, driving different legs is the only separation
+  // a 2-D side view can show. Everything downstream that used to test `limb === "footR"` means "is a
+  // kick", so it asks this instead; the routing below still splits which foot.
+  const isKick = limb === "footR" || limb === "footL";
+
   // WHERE that endpoint sits this phase (S2). `strikeHand` remains the gate: no strike to draw (idle,
   // unmapped band, rejected reach) ⇒ no layer at all, so a stale move id can never make an idle
   // fighter chamber. Given a strike, the phase picks the point — the chamber while winding up and
@@ -344,7 +351,7 @@ const poseFor = (
   };
 
   const lean =
-    driven === null || winding || limb === "footR"
+    driven === null || winding || isKick
       ? 0
       : rootTravel(drivingShoulder, driven, ARM_BONE);
 
@@ -353,9 +360,7 @@ const poseFor = (
   // Horizontal only: the fighter steps in, it does not rise. Zero for a punch (the lean covers it),
   // for a chamber (always within reach), and for any non-strike layer.
   const step =
-    driven === null || limb !== "footR"
-      ? 0
-      : rootTravel(stance.hip, driven, LEG_BONE);
+    driven === null || !isKick ? 0 : rootTravel(stance.hip, driven, LEG_BONE);
 
   // `hikite` — the OTHER hand withdrawn to the hip as the punch lands (S4 · Slice 2). Gated to the
   // ACTIVE phase for the same reason the M2 lean is (M9): a fighter pulls the off hand as the punch
@@ -398,15 +403,17 @@ const poseFor = (
           // swings now, so a resting hand's own shoulder never moves out from under it and S4 · Slice
           // 3's hand-ride is retired with the slide that forced it. The layers below overwrite the
           // authored destinations — the driven endpoint, a hikite pull, a guard, a throw's grab.
-          // An explicit three-way rather than a computed `[limb]: driven` key. The computed form is
-          // shorter, but it type-checks ANY string into the pose object — a limb the Stance has no
+          // An explicit branch-per-limb rather than a computed `[limb]: driven` key. The computed form
+          // is shorter, but it type-checks ANY string into the pose object — a limb the Stance has no
           // endpoint for would silently add a junk property and the strike would vanish. The ternary
           // routes anything unrecognised to the generic front hand instead, which is M7 totality.
           ...(limb === "footR"
             ? { footR: driven }
-            : limb === "handL"
-              ? { handL: driven }
-              : { handR: driven }),
+            : limb === "footL"
+              ? { footL: driven }
+              : limb === "handL"
+                ? { handL: driven }
+                : { handR: driven }),
           // The pull rides in the SAME layer as the strike that causes it. Note this puts it BEFORE
           // the guard below: an off hand landing on handL would lose to a raised guard, where the
           // strike wins. No move authors that today (the only off hand is handR, and a technique
