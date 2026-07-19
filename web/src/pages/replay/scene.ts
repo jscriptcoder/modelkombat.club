@@ -1,5 +1,5 @@
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
-import { chamberFor, limbFor } from "./move-descriptors";
+import { chamberFor, limbFor, offHandFor } from "./move-descriptors";
 
 // The world→screen projection: a pure function from (tape, playhead, viewport) to the on-screen
 // state the Pixi layer draws. Kept free of Pixi and of any engine import (web/src never imports
@@ -292,6 +292,23 @@ const poseFor = (
       ? 0
       : rootTravel(stance.hip, driven, LEG_BONE);
 
+  // `hikite` — the OTHER hand withdrawn to the hip as the punch lands (S4 · Slice 2). Gated to the
+  // ACTIVE phase for the same reason the M2 lean is (M9): a fighter pulls the off hand as the punch
+  // EXTENDS, not while chambering. Drawing both fists back during startup would read as covering up;
+  // one fist chambered with the other hand forward IS the pre-punch shape.
+  //
+  // No `driven === null` check here: the pull is spread INSIDE the strike layer below, which already
+  // only applies when a strike is being drawn, so an idle fighter carrying a stale move id never
+  // pulls a hand. That condition was written here first and the mutator scan proved it dead — no
+  // test could distinguish its presence. The behaviour it was guarding is pinned by a test regardless.
+  const offHand = winding ? null : offHandFor(frame.attackMove);
+
+  // Which hand the pull lands on: the one the strike is NOT driving. Only gyaku-zuki authors an off
+  // hand today and it drives handL, so the handL branch is the only one data reaches — the other is
+  // kept because "the hand not being driven" is the actual rule, and hard-coding handR would be
+  // wrong the moment a front-hand technique authors one.
+  const offHandKey = limb === "handL" ? "handR" : "handL";
+
   const endpoints: Stance = {
     ...stance,
     ...(driven === null
@@ -309,6 +326,12 @@ const poseFor = (
             : limb === "handL"
               ? { handL: driven }
               : { handR: driven }),
+          // The pull rides in the SAME layer as the strike that causes it. Note this puts it BEFORE
+          // the guard below: an off hand landing on handL would lose to a raised guard, where the
+          // strike wins. No move authors that today (the only off hand is handR, and a technique
+          // driving a FOOT would send it to handL), so no test demands a gate and none is written —
+          // but if one ever does, slice 1's precedence rule is the precedent, not this ordering.
+          ...(offHand === null ? {} : { [offHandKey]: offHand }),
         }),
     // The rear-hand precedence rule (S4). A raised guard lives on handL SO THAT a strike and a guard
     // never contend for the same arm — a premise the reverse punch breaks, and this layer is spread

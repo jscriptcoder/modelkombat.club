@@ -30,7 +30,17 @@ export type StrikeLimb = "handR" | "handL" | "footR";
 // frame as the stance constants. Optional: a move with no chamber keeps its stance endpoint through
 // those phases, which is still a wind-up (arm returns to guard between strikes), just an unauthored
 // one. Mid-joints re-derive from the endpoints at every phase, so a chambered limb bends for free.
-export type MoveDescriptor = { limb: StrikeLimb; chamber?: Joint };
+// Where the technique's OTHER hand goes at contact — `hikite`, the fist withdrawn to the hip as the
+// punch lands (S4). A second authored endpoint, and the first crack in M3's "only the driven endpoint
+// moves": the rear-hand drive alone reads faintly, because both arms hang off one shared shoulder, so
+// the extended arm lands in nearly the same place whichever hand throws. Pulling the off hand back is
+// what makes the punch read from the punching side. Optional — a move that authors none keeps its
+// stance hand, which is what every move did before this existed.
+export type MoveDescriptor = {
+  limb: StrikeLimb;
+  chamber?: Joint;
+  offHand?: Joint;
+};
 
 const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // mae-geri (front kick): the front leg snaps out to the band, so the FOOT is the driven endpoint
@@ -43,7 +53,21 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // and the jab — both are straight thrusts to the same bands, so the arm that travels is what a
   // spectator reads. The workhorse of every fight (~80% of committed screen time), and the first
   // authored move that appears on /watch at all. Chamber follows in S4 · Slice 2.
-  ["gyaku-zuki", { limb: "handL" }],
+  // Chamber: the rear fist waits at the flank, drawn back behind its stance position. Off hand: the
+  // front fist withdraws past the centre line as the punch lands. Both sit at the same rib height,
+  // which is what a loaded and a pulling fist share anatomically.
+  //
+  // Both were authored lower and further back first — at the hip, which is where karate actually puts
+  // them — and the /dojo eye-check showed why that cannot be drawn: an authored point must stay
+  // inside the ARM'S REACH of the shoulder (~31 local px, two ARM_BONEs), or deriveBend straightens
+  // the limb and the "withdrawn fist" renders as a long stretched line. The contact-phase shoulder is
+  // leaned 16px forward (M2), which shrinks the reachable envelope further — so the off hand is the
+  // tighter of the two. This is the same bone-length constraint S2 · Slice 3 established; authored
+  // poses are subject to it exactly like solved ones.
+  [
+    "gyaku-zuki",
+    { limb: "handL", chamber: { x: -26, y: -50 }, offHand: { x: -8, y: -50 } },
+  ],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this
@@ -66,3 +90,9 @@ export const limbFor = (move: string | undefined): StrikeLimb =>
 // in which case the caller leaves the endpoint at its stance position (M7). TOTAL, same as limbFor.
 export const chamberFor = (move: string | undefined): Joint | null =>
   DESCRIPTORS.get(move ?? "")?.chamber ?? null;
+
+// Where this move's OTHER hand is pulled to at contact (`hikite`), or `null` when the move authors
+// none — in which case the caller leaves that hand at its stance position (M7). TOTAL, same as the
+// two lookups above.
+export const offHandFor = (move: string | undefined): Joint | null =>
+  DESCRIPTORS.get(move ?? "")?.offHand ?? null;
