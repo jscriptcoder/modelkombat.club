@@ -337,29 +337,47 @@ of signal it exists to give.
 
 ---
 
-### Slice 3 _(conditional)_: a kick's extension reads snapped, not stretched
+### Slice 3 — a kick's contact frame reads like a kick — ⚠️ CONFIRMED NEEDED
 
-**One sentence**: The driven limb stops telescoping to ~1.8× its natural length at full
-extension.
+**One sentence**: The contact frame stops reading as a forward-falling lunge on a rubber-band
+leg — the driven limb stops telescoping to ~1.8× its natural length, and the upper body stops
+leaning _into_ a kick.
 
 **Value**: Closes S1's carried finding (`plans/move-poses-stories.md` § Warnings): the driven
 leg measured ~67 local px against a ~37 px natural length, with the 8 px `KNEE_BEND` swamped.
 
-**This slice is conditional and must not be pre-committed.** Motion hides a great deal, and
-slice 2 is the first time anyone sees the kick _move_. It is entirely possible that a kick
-which chambers and extends reads fine at 1.8×, in which case this slice is deleted rather than
-implemented. **Assess after slice 2's visual sign-off; do not plan the fix before then.**
+**No longer conditional.** This slice was reserved pending slice 2's visual sign-off, on the
+theory that motion might hide the stretch. It does the opposite: watching a short chambered leg
+snap into a near-horizontal pole makes the swing _more_ obvious, not less. Confirmed 2026-07-19.
 
-If it _is_ needed, the candidate fixes in rough order of cost — hip travel, a knee-lift
-chamber that shortens the required reach, or a hard bone-length constraint — differ enough that
-choosing one before seeing the motion would be guesswork.
+**Scope expanded to two findings, deliberately.** Slice 2's eye check surfaced a second defect in
+the same frame — **the M2 lean has the wrong polarity for a kick.** It was authored for punches,
+where leaning into the reach is right; on a `mae-geri` the torso pitches forward over a rising leg
+so the figure reads as _falling into_ the kick. Real front kicks counterbalance backward.
+
+These ship together rather than as separate slices because they are **one observable outcome**
+("the contact frame reads like a kick"), they touch the same code, and judging either by eye
+means judging it against a figure the other still distorts. Splitting them would mean tuning the
+bone length against a torso pitched at the wrong angle, then re-tuning it afterwards.
+
+Candidate fixes for the length, in rough order of cost — hip travel, a knee-lift chamber that
+shortens the required reach, or a hard bone-length constraint. Still not chosen: pick against the
+real figure, not from here. The lean fix is likely a per-descriptor polarity (kicks vs hands)
+rather than a global change, since punches read correctly today.
 
 **Tripwire, stated up front**: hip travel would move the support leg, which trips M8.2's
 support-integrity assertion. That assertion is a **decision record, not a bug**
 (`plans/move-poses-stories.md` § Warnings). If this slice moves the hip, M8.2 changes
 deliberately, in its own commit, with the reasoning written down — it is not patched around.
 
-**Class**: Behavior change (if it happens).
+**Explicitly NOT in this slice — interpolation.** Slice 2's eye check found that nothing eases
+between the three phases: a technique is three still frames held for 9/3/16 ticks. That is the
+single largest remaining gap between "the phases are correct" and "this reads as a movement", but
+it is a **new capability**, it affects all 13 moves and `/watch` as well as `/dojo`, and it is
+much larger than either finding above. Written up as its own arc-level story (S8 in
+`plans/move-poses-stories.md`) rather than smuggled in here.
+
+**Class**: Behavior change.
 **Required implementation skills**: `tdd`, `testing`, `refactoring`; `mutation-testing` `N/A`.
 
 ## Pre-PR Quality Gate
