@@ -65,6 +65,8 @@ export type FigureNodes = {
   handR: Container;
   footL: Container;
   footR: Container;
+  shoulderL: Container;
+  shoulderR: Container;
   elbowL: Container;
   elbowR: Container;
   kneeL: Container;
@@ -73,17 +75,26 @@ export type FigureNodes = {
 
 // The line segments (stroked into the `bones` Graphics) that connect the joints into a stickman:
 // the torso, two LEGS jointed at the knee (hip→knee→foot) and two ARMS jointed at the elbow
-// (shoulder→elbow→hand) so the limbs read bent, not rigid (Story 4). The head is the brand glyph
+// (shoulderL/R→elbow→hand) so the limbs read bent, not rigid (Story 4). The head is the brand glyph
 // riding the head joint.
-const BONES: ReadonlyArray<readonly [keyof Skeleton, keyof Skeleton]> = [
+//
+// The spine still terminates at `shoulder` — the girdle's MIDPOINT — and the girdle bar spans the two
+// ends the arms hang from (S4 · Slice 4). On a knockdown both ends sit on the one authored point, so
+// the bar collapses to zero length and strokes nothing, which is what keeps a downed body unchanged.
+// Exported so a test can assert the WIRING — which joints the stickman connects. The strokes land in
+// a `Graphics` path, which is opaque to display-object assertions, so re-rooting an arm here or
+// dropping the girdle bar is invisible to every other test in the suite even though both are plainly
+// visible on screen. Same discipline as `DESCRIBED_MOVES`: expose the table, assert the contract.
+export const BONES: ReadonlyArray<readonly [keyof Skeleton, keyof Skeleton]> = [
   ["hip", "shoulder"],
   ["hip", "kneeL"],
   ["kneeL", "footL"],
   ["hip", "kneeR"],
   ["kneeR", "footR"],
-  ["shoulder", "elbowL"],
+  ["shoulderL", "shoulderR"],
+  ["shoulderL", "elbowL"],
   ["elbowL", "handL"],
-  ["shoulder", "elbowR"],
+  ["shoulderR", "elbowR"],
   ["elbowR", "handR"],
 ];
 
@@ -108,6 +119,8 @@ const createFigure = (color: number, brand: Brand, headPx: number): Figure => {
   head.addChild(glyph);
 
   const shoulder = new Container();
+  const shoulderL = new Container();
+  const shoulderR = new Container();
   const hip = new Container();
   const handL = new Container();
   const handR = new Container();
@@ -122,6 +135,8 @@ const createFigure = (color: number, brand: Brand, headPx: number): Figure => {
     bones,
     head,
     shoulder,
+    shoulderL,
+    shoulderR,
     hip,
     handL,
     handR,
@@ -138,6 +153,8 @@ const createFigure = (color: number, brand: Brand, headPx: number): Figure => {
       root,
       head,
       shoulder,
+      shoulderL,
+      shoulderR,
       hip,
       handL,
       handR,
@@ -178,6 +195,8 @@ const applyFigure = (figure: Figure, placement: Scene["a"]): void => {
   place(nodes.handR, pose.handR);
   place(nodes.footL, pose.footL);
   place(nodes.footR, pose.footR);
+  place(nodes.shoulderL, pose.shoulderL);
+  place(nodes.shoulderR, pose.shoulderR);
   place(nodes.elbowL, pose.elbowL);
   place(nodes.elbowR, pose.elbowR);
   place(nodes.kneeL, pose.kneeL);

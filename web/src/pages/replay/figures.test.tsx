@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { brandsFor, createStage, glyphSvg } from "./figures";
+import { BONES, brandsFor, createStage, glyphSvg } from "./figures";
 import { BODY_HEIGHT_SUB, scene, type Viewport } from "./scene";
 import type {
   Fighter,
@@ -313,6 +313,64 @@ describe("figures — the leg bends at the knee joint (Story 4 · Slice 2)", () 
     expect(stage.b.kneeL.x).toBe(sc.b.pose.kneeL.x);
     // The knee is genuinely its own joint, not the foot it connects to.
     expect(stage.a.kneeR.x).not.toBe(stage.a.footR.x);
+  });
+});
+
+describe("figures — the arms hang from a shoulder girdle (S4 · Slice 4)", () => {
+  it("places both fighters' shoulder joint nodes at the scene's girdle ends", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+    const sc = scene([tickOf(0, {}, {})], 0, VIEWPORT);
+
+    stage.apply(sc);
+
+    // The wiring, same discipline as the elbow and knee joints — scene.test pins the geometry.
+    // Asserting both ends (distinct x-signs about the midpoint) catches an L/R swap, and comparing
+    // against the midpoint catches a girdle that was derived but never wired through to the draw
+    // layer, which would leave both arms visibly hanging off the spine as before.
+    expect(stage.a.shoulderL.x).toBe(sc.a.pose.shoulderL.x);
+    expect(stage.a.shoulderL.y).toBe(sc.a.pose.shoulderL.y);
+    expect(stage.a.shoulderR.x).toBe(sc.a.pose.shoulderR.x);
+    expect(stage.a.shoulderR.y).toBe(sc.a.pose.shoulderR.y);
+    expect(stage.b.shoulderL.x).toBe(sc.b.pose.shoulderL.x);
+    expect(stage.b.shoulderR.x).toBe(sc.b.pose.shoulderR.x);
+    // Each end is genuinely its own joint, off the midpoint the spine still terminates at.
+    expect(stage.a.shoulderL.x).toBeLessThan(stage.a.shoulder.x);
+    expect(stage.a.shoulderR.x).toBeGreaterThan(stage.a.shoulder.x);
+  });
+});
+
+describe("figures — the drawn skeleton hangs off the girdle (S4 · Slice 4)", () => {
+  // The bones are stroked into a `Graphics` path, which display-object assertions cannot see, so
+  // re-rooting an arm to the midpoint or dropping the girdle bar is invisible to every other test in
+  // this file — both survived the mutation scan while being plainly visible on screen. Asserting the
+  // wiring table directly is what closes that gap.
+  const joins = (a: string, b: string) =>
+    BONES.some(
+      ([from, to]) => (from === a && to === b) || (from === b && to === a),
+    );
+
+  it("joins the two girdle ends and hangs each arm off its own end", () => {
+    expect(joins("shoulderL", "shoulderR")).toBe(true);
+    expect(joins("shoulderL", "elbowL")).toBe(true);
+    expect(joins("shoulderR", "elbowR")).toBe(true);
+  });
+
+  it("keeps the spine on the midpoint and hangs no arm from it", () => {
+    // `shoulder` is the girdle's midpoint: the spine's top, and nothing else. An arm still drawn from
+    // it would start 7px away from the elbow it derives against — a visibly broken limb.
+    expect(joins("hip", "shoulder")).toBe(true);
+    expect(joins("shoulder", "elbowL")).toBe(false);
+    expect(joins("shoulder", "elbowR")).toBe(false);
+  });
+
+  it("leaves every bone connected to a real skeleton joint", () => {
+    // A typo'd key would silently stroke from `undefined` and blank the whole figure.
+    const sc = scene([tickOf(0, {}, {})], 0, VIEWPORT);
+
+    for (const [from, to] of BONES) {
+      expect(sc.a.pose[from]).toBeDefined();
+      expect(sc.a.pose[to]).toBeDefined();
+    }
   });
 });
 
