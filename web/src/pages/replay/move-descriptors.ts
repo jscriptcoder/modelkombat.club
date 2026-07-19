@@ -19,7 +19,10 @@ import type { Joint } from "./scene";
 // (`reachTargetX`) is identical whichever it is — only the endpoint it lands on differs, so a kick
 // tracks true opponent distance exactly as a punch does, and the knee re-derives off the moved
 // `hip → footR` for free (the bend rule runs on the FINAL endpoints).
-export type StrikeLimb = "handR" | "footR";
+//
+// `handL` — the REAR hand — is what separates a reverse punch from a jab (S4). It also collides with
+// the guard arm, which `poseFor` resolves in favour of the strike; see the precedence rule there.
+export type StrikeLimb = "handR" | "handL" | "footR";
 
 // Where the driven endpoint sits while the technique is WINDING UP or RECOVERING (S2). A chambered
 // technique is a different SHAPE, not a shorter reach (M3) — scaling the extension down reads as a
@@ -36,6 +39,11 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // so the derived knee rises toward hip height and the foot hangs beneath it. First authored from
   // anatomy rather than by eye — re-tuned in `/dojo` once the technique can be played (S2 slice 2).
   ["mae-geri", { limb: "footR", chamber: { x: 4, y: -22 } }],
+  // gyaku-zuki (reverse punch): thrown with the REAR hand, which is the whole difference between it
+  // and the jab — both are straight thrusts to the same bands, so the arm that travels is what a
+  // spectator reads. The workhorse of every fight (~80% of committed screen time), and the first
+  // authored move that appears on /watch at all. Chamber follows in S4 · Slice 2.
+  ["gyaku-zuki", { limb: "handL" }],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this

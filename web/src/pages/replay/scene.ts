@@ -300,9 +300,25 @@ const poseFor = (
           head: { x: stance.head.x + lean, y: stance.head.y },
           shoulder: { x: stance.shoulder.x + lean, y: stance.shoulder.y },
           hip: { x: stance.hip.x + step, y: stance.hip.y },
-          ...(limb === "footR" ? { footR: driven } : { handR: driven }),
+          // An explicit three-way rather than a computed `[limb]: driven` key. The computed form is
+          // shorter, but it type-checks ANY string into the pose object — a limb the Stance has no
+          // endpoint for would silently add a junk property and the strike would vanish. The ternary
+          // routes anything unrecognised to the generic front hand instead, which is M7 totality.
+          ...(limb === "footR"
+            ? { footR: driven }
+            : limb === "handL"
+              ? { handL: driven }
+              : { handR: driven }),
         }),
-    ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
+    // The rear-hand precedence rule (S4). A raised guard lives on handL SO THAT a strike and a guard
+    // never contend for the same arm — a premise the reverse punch breaks, and this layer is spread
+    // after the strike, so without the gate it would silently overwrite the punch. The strike wins:
+    // it is the more informative event, and yielding to the guard would draw a fighter with its hands
+    // up and no visible technique, i.e. the move would read as never thrown. Gated on a LIVE strike
+    // (`driven`) rather than the move id, so a stale id on an idle fighter never strips a real guard.
+    ...(guardY === null || (driven !== null && limb === "handL")
+      ? {}
+      : { handL: { x: GUARD_REACH_X, y: guardY } }),
     ...(grab === null ? {} : grab),
   };
 
