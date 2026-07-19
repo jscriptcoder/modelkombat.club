@@ -11,7 +11,7 @@ import DojoStage, { type DojoStageProps } from "./DojoStage";
 import FigureControlPanel from "./FigureControlPanel";
 import SpacingControl from "./SpacingControl";
 import { buildDojoTape } from "./dojo-tape";
-import { DEFAULT_GAP } from "./reach-presets";
+import { DEFAULT_GAP, presetFor } from "./reach-presets";
 import {
   advance,
   seek,
@@ -59,11 +59,22 @@ const DojoApp: Component<DojoAppProps> = (props) => {
 
   const [kingBrand, setKingBrand] = createSignal<Brand>("generic");
 
-  // Commit a figure to a technique: stamp its controls (controls.ts owns what that means), then
-  // restart playback — a selection means "show me this technique", and without the restart the new
-  // move would open parked on its final recovery frame.
+  // Commit a figure to a technique: stamp its controls (controls.ts owns what that means), snap the
+  // pair to the distance the engine would fight it at, then restart playback — a selection means
+  // "show me this technique", and without the restart the new move would open parked on its final
+  // recovery frame.
+  //
+  // The gap is SHARED but the pickers are per-figure, so the two genuinely compete for it:
+  // last-write-wins (decision 6), i.e. the move just picked is the one being looked at. Standing a
+  // figure down leaves the gap where it was — idle has no reach, and snapping to 0 would collapse
+  // the fighters into each other.
   const commitMove = (setFigure: Setter<FigureControls>) => (move: string) => {
+    const preset = presetFor(move);
+
     setFigure((prev) => selectMove(prev, move));
+
+    if (preset !== undefined) setGap(preset.reach);
+
     setTransport(startTransport());
   };
 
