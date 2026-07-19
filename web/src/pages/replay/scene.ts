@@ -27,11 +27,18 @@ export type Stance = {
 // so an arm reads as shoulder→elbow→hand instead of a rigid stick (Story 4 · Slice 1 adds the elbows;
 // the knees follow). PRONE authors its own mid-joints (a downed body reshapes everything).
 export type Skeleton = Stance & {
+  shoulderL: Joint;
+  shoulderR: Joint;
   elbowL: Joint;
   elbowR: Joint;
   kneeL: Joint;
   kneeR: Joint;
 };
+
+// Half the shoulder girdle's width, in the local authoring frame. The arms hang from the two ENDS
+// of a girdle rather than from one point, so a reverse punch starts 14px behind a jab (S4 · Slice 4).
+// Proportioned off the home page's stickman mark, whose shoulder bar spans 0.18 of its body height.
+export const SHOULDER_HALF_WIDTH = 7;
 
 // A fighter's on-screen placement: pixel position + facing (1 right / -1 left, passed through from
 // the frame so the draw layer can flip the sprite) + the stance-derived skeleton to stroke.
@@ -103,6 +110,10 @@ const GRAB_SPREAD = 8;
 const PRONE: Skeleton = {
   head: { x: -40, y: -10 },
   shoulder: { x: -24, y: -10 },
+  // A downed body has no girdle to twist, so both ends sit on the one authored shoulder point
+  // (M12g) and the knockdown renders exactly as it did before the girdle existed.
+  shoulderL: { x: -24, y: -10 },
+  shoulderR: { x: -24, y: -10 },
   hip: { x: 6, y: -10 },
   handL: { x: -20, y: -2 },
   handR: { x: -20, y: -18 },
@@ -177,13 +188,39 @@ const deriveBend = (
 // Grow a stance's endpoints into the full articulated pose by deriving the mid-joints: the elbows bow
 // back off the straight shoulder→hand line, the knees bow forward off the straight hip→foot line
 // (Story 4) — so an arm reads shoulder→elbow→hand and a leg reads hip→knee→foot, not rigid sticks.
-const deriveSkeleton = (stance: Stance): Skeleton => ({
-  ...stance,
-  elbowL: deriveBend(stance.shoulder, stance.handL, BEND_BACK, ARM_BONE),
-  elbowR: deriveBend(stance.shoulder, stance.handR, BEND_BACK, ARM_BONE),
-  kneeL: deriveBend(stance.hip, stance.footL, BEND_FORWARD, LEG_BONE),
-  kneeR: deriveBend(stance.hip, stance.footR, BEND_FORWARD, LEG_BONE),
-});
+const deriveSkeleton = (stance: Stance): Skeleton => {
+  // The girdle: `shoulder` is the MIDPOINT (the spine's top and the head's anchor), and each arm
+  // hangs from its own end of a bar centred on it — the rear at −x, the front at +x, in the local
+  // +x = forward frame (S4 · Slice 4). Derived, never authored, so every stance and every action
+  // layer gets a girdle for free and there is only one shoulder to move (M12a).
+  //
+  // This is what makes a reverse punch and a jab different PICTURES. Both still drive their hand to
+  // the same solved target, so before the girdle the extended arm was the identical line whichever
+  // hand threw it and the whole distinction rested on the resting hand. Starting the rear arm 14px
+  // further back changes the arm line itself.
+  const shoulderL = {
+    x: stance.shoulder.x - SHOULDER_HALF_WIDTH,
+    y: stance.shoulder.y,
+  };
+
+  const shoulderR = {
+    x: stance.shoulder.x + SHOULDER_HALF_WIDTH,
+    y: stance.shoulder.y,
+  };
+
+  return {
+    ...stance,
+    shoulderL,
+    shoulderR,
+    // Each elbow re-roots onto its OWN shoulder. ARM_BONE is deliberately NOT re-derived from the
+    // new, shorter stance span (M12b — widening the shoulders does not shorten the arms), so an idle
+    // arm keeps its 15.65px bones and simply bows deeper: 8.00 → 10.71 local px.
+    elbowL: deriveBend(shoulderL, stance.handL, BEND_BACK, ARM_BONE),
+    elbowR: deriveBend(shoulderR, stance.handR, BEND_BACK, ARM_BONE),
+    kneeL: deriveBend(stance.hip, stance.footL, BEND_FORWARD, LEG_BONE),
+    kneeR: deriveBend(stance.hip, stance.footR, BEND_FORWARD, LEG_BONE),
+  };
+};
 
 // ─── M2 lean: a committed strike leans the upper body forward INTO the reach ──────────────────────
 // The arm alone can't span the engine's reach at this body scale, so a drawn strike shifts the upper
@@ -556,6 +593,8 @@ const scalePose = (pose: Skeleton, scale: number): Skeleton => {
     handR: scaleJoint(pose.handR),
     footL: scaleJoint(pose.footL),
     footR: scaleJoint(pose.footR),
+    shoulderL: scaleJoint(pose.shoulderL),
+    shoulderR: scaleJoint(pose.shoulderR),
     elbowL: scaleJoint(pose.elbowL),
     elbowR: scaleJoint(pose.elbowR),
     kneeL: scaleJoint(pose.kneeL),

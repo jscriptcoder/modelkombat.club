@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   BODY_HEIGHT_SUB,
   scene,
+  SHOULDER_HALF_WIDTH,
   type Joint,
   type Scene,
   type Viewport,
@@ -881,9 +882,17 @@ describe("scene — knockdown prone pose and wake-up", () => {
     elbowR: { x: -22, y: -14 },
     kneeL: { x: 21, y: -8 },
     kneeR: { x: 21, y: -12 },
+    // ...and from S4 · Slice 4, its own shoulder girdle — COLLAPSED onto the one authored shoulder
+    // point (M12g). A downed body has no girdle to twist, and spreading one here would be the only
+    // way this slice could change a knockdown, so the coincidence is the assertion.
+    shoulderL: { x: -24, y: -10 },
+    shoulderR: { x: -24, y: -10 },
   };
 
   // The prone body world-scaled the same way as every other pose (each authored joint ×BODY_SCALE).
+  // Kept as an EXHAUSTIVE expectation rather than an objectContaining: "a knockdown renders exactly
+  // as it did before" is the guarantee, so a joint appearing that this list does not name should
+  // fail here — which is precisely what caught the girdle when it was first derived unconditionally.
   const SCALED_PRONE = {
     head: scaled(PRONE.head),
     shoulder: scaled(PRONE.shoulder),
@@ -892,6 +901,8 @@ describe("scene — knockdown prone pose and wake-up", () => {
     handR: scaled(PRONE.handR),
     footL: scaled(PRONE.footL),
     footR: scaled(PRONE.footR),
+    shoulderL: scaled(PRONE.shoulderL),
+    shoulderR: scaled(PRONE.shoulderR),
     elbowL: scaled(PRONE.elbowL),
     elbowR: scaled(PRONE.elbowR),
     kneeL: scaled(PRONE.kneeL),
@@ -1034,31 +1045,48 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     to: { x: number; y: number },
   ) => scaled(bendBack(from, to));
 
+  // S4 · Slice 4 moved each arm's ROOT: an arm now hangs from its own end of the shoulder girdle
+  // rather than from the midpoint `shoulder`. The rule these tests assert is unchanged — an elbow
+  // bows back off the straight root→hand line — so only the root they measure from moves. Written
+  // against the imported constant, so re-tuning the girdle re-flows these expectations rather than
+  // breaking them; the girdle's MAGNITUDE is pinned by its own literal-floor test in the slice-4
+  // block, which is what keeps a zero-width mutant from surviving here.
+  const armRoot = (
+    shoulder: { x: number; y: number },
+    side: "L" | "R",
+  ): { x: number; y: number } => ({
+    x: shoulder.x + (side === "R" ? SHOULDER_HALF_WIDTH : -SHOULDER_HALF_WIDTH),
+    y: shoulder.y,
+  });
+
   const poseAt = (posture: number) =>
     scene([tickOf(0, { posture }, {})], 0, VIEWPORT).a.pose;
 
   it("bends the front arm — the elbow sits off the straight shoulder→hand line", () => {
     const pose = poseAt(0);
 
-    // STAND: shoulder (0,-64) → front hand (18,-44).
+    // STAND: front shoulder (7,-64) → front hand (18,-44).
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 0, y: -64 }, { x: 18, y: -44 }),
+      scaledElbow(armRoot({ x: 0, y: -64 }, "R"), { x: 18, y: -44 }),
     );
-    // ...and it bows BACKWARD: the elbow sits behind the straight-line midpoint (x 9 local) — a
+    // ...and it bows BACKWARD: the elbow sits behind the straight-line midpoint of that span — a
     // formula-independent check that kills a bow-sign flip.
-    expect(pose.elbowR.x).toBeLessThan(scaled({ x: 9, y: 0 }).x);
+    expect(pose.elbowR.x).toBeLessThan(
+      scaled({ x: (armRoot({ x: 0, y: -64 }, "R").x + 18) / 2, y: 0 }).x,
+    );
   });
 
   it("bends the rear arm at the elbow too", () => {
-    // STAND: shoulder (0,-64) → rear hand (-18,-44).
+    // STAND: rear shoulder (-7,-64) → rear hand (-18,-44).
     expect(poseAt(0).elbowL).toEqual(
-      scaledElbow({ x: 0, y: -64 }, { x: -18, y: -44 }),
+      scaledElbow(armRoot({ x: 0, y: -64 }, "L"), { x: -18, y: -44 }),
     );
   });
 
   it("re-derives the elbow from a thrown strike hand (the bend follows the technique)", () => {
     // A mid strike lands handR on the opponent's near edge (66,-46) at gyaku distance AND leans the
-    // shoulder forward to x 16 (M2), so the elbow re-derives from the leaned shoulder → the moved hand.
+    // shoulder forward to x 16 (M2), so the elbow re-derives from the leaned FRONT shoulder (x 23,
+    // the girdle riding the leaned midpoint) → the moved hand.
     const pose = scene(
       [
         tickOf(
@@ -1072,21 +1100,22 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     ).a.pose;
 
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 16, y: -64 }, { x: 66, y: -46 }),
+      scaledElbow(armRoot({ x: 16, y: -64 }, "R"), { x: 66, y: -46 }),
     );
     // ...distinct from the resting-stance elbow (proves it tracked the hand, not a fixed value).
     expect(pose.elbowR).not.toEqual(
-      scaledElbow({ x: 0, y: -64 }, { x: 18, y: -44 }),
+      scaledElbow(armRoot({ x: 0, y: -64 }, "R"), { x: 18, y: -44 }),
     );
   });
 
   it("derives bent elbows for the crouch and air stances (stance-agnostic)", () => {
-    // CROUCH: shoulder (0,-46) → handR (18,-30). AIR upper body = STAND.
+    // CROUCH: shoulder (0,-46) → handR (18,-30). AIR upper body = STAND. The girdle is derived from
+    // whichever stance is in play, so both get one without either authoring it.
     expect(poseAt(1).elbowR).toEqual(
-      scaledElbow({ x: 0, y: -46 }, { x: 18, y: -30 }),
+      scaledElbow(armRoot({ x: 0, y: -46 }, "R"), { x: 18, y: -30 }),
     );
     expect(poseAt(2).elbowR).toEqual(
-      scaledElbow({ x: 0, y: -64 }, { x: 18, y: -44 }),
+      scaledElbow(armRoot({ x: 0, y: -64 }, "R"), { x: 18, y: -44 }),
     );
   });
 
@@ -1108,7 +1137,7 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     ).a.pose;
 
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 16, y: -64 }, { x: 66, y: -68 }),
+      scaledElbow(armRoot({ x: 16, y: -64 }, "R"), { x: 66, y: -68 }),
     );
   });
 
@@ -2299,4 +2328,180 @@ describe("scene — a punch leans only as far as it must reach (S4 · Slice 3)",
   // not the world position" is already pinned in the M2 lean block above, and the root x is computed in
   // `figure()` from the tape alone — `poseFor` is never given it and cannot reach it. A second copy
   // would assert the same guarantee against the same mechanism.
+});
+
+describe("scene — the fighter gets a shoulder girdle (S4 · Slice 4)", () => {
+  // Slices 1–2 gave the reverse punch its own arm and its own chamber, and slice 3's eye-check then
+  // measured what a spectator actually sees: the driven hands of a jab and a reverse punch land on
+  // the IDENTICAL pixel (417,−429 at the workhorse distance), because both arms hang off one
+  // `shoulder` joint and both solve toward the same target. The entire distinction lived in the
+  // RESTING hand. A real body throws a reverse punch from the BACK shoulder — a girdle is what makes
+  // the two arm LINES differ, which is the thing slices 1–2 could not produce (M12).
+  //
+  // `shoulder` is redefined as the girdle's MIDPOINT (the spine's top, the head's anchor), with
+  // `shoulderL` / `shoulderR` derived at ± SHOULDER_HALF_WIDTH. The lean is deliberately NOT touched
+  // here: it still moves the midpoint, so both ends travel together and the girdle stays rigid.
+  // Slice 5 is what makes it rotate.
+
+  // Recomputed from the documented STAND geometry rather than imported, same discipline as the
+  // slice-3 block: shoulder {0,−64} → hand {18,−44} spans 26.91, so one bone is 15.65 and the arm
+  // straightens at 31.31 local px. ARM_BONE must NOT be re-derived from the new, shorter span.
+  const ARM_REACH = 2 * Math.hypot(Math.hypot(18, 20) / 2, 8);
+
+  const dist = (a: Joint, b: Joint) => Math.hypot(b.x - a.x, b.y - a.y);
+
+  // Joint coordinates round to whole pixels after a ~6.3× scale, so a distance between two of them
+  // carries up to ~1px of rounding error. Every "these two lengths are equal" assertion below allows
+  // for that and no more — a mutant that re-roots a limb moves it by tens of pixels.
+  const PX = 1.5;
+
+  const poseOf = ({
+    gap = 240_000,
+    band = 3,
+    move = "gyaku-zuki",
+    reach = 240_000,
+    attacking = true,
+    extra = {},
+  }: {
+    gap?: number;
+    band?: number;
+    move?: string;
+    reach?: number;
+    attacking?: boolean;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: move,
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("roots the rear arm at the rear shoulder, not at the midpoint", () => {
+    // `deriveBend` puts a limb's mid-joint on the perpendicular bisector of its endpoints, so its two
+    // bones are ALWAYS equal in length whatever the reach does — including when the arm straightens.
+    // Measured from `shoulderL`, that equality holds only if the elbow was actually derived there: an
+    // elbow still rooted at the midpoint sits 202 and 158 from the two ends, not 180 and 180.
+    const pose = poseOf();
+
+    expect(
+      Math.abs(
+        dist(pose.shoulderL, pose.elbowL) - dist(pose.elbowL, pose.handL),
+      ),
+    ).toBeLessThan(PX);
+    expect(pose.shoulderL.x).toBeLessThan(pose.shoulder.x);
+  });
+
+  it("makes a reverse punch and a jab draw different arm lines", () => {
+    // The payoff, and the reason this slice exists. Both punches still drive their hand to the same
+    // pixel; what differs is where the arm STARTS. The rear arm spans 57.1 local px from a shoulder
+    // at x 9, the front arm 43.2 from a shoulder at x 23 — a difference of 13.95, which is 2 × the
+    // half-width shortened slightly by the 4px the hands sit below shoulder height.
+    const reverse = poseOf({ move: "gyaku-zuki" });
+    const jab = poseOf({ move: "kizami-zuki" });
+
+    const reverseSpan = dist(reverse.shoulderL, reverse.handL);
+    const jabSpan = dist(jab.shoulderR, jab.handR);
+
+    expect(reverseSpan).toBeGreaterThan(jabSpan);
+    expect(
+      Math.abs(reverseSpan - jabSpan - 2 * SHOULDER_HALF_WIDTH * BODY_SCALE),
+    ).toBeLessThan(3);
+  });
+
+  it("separates the two punches by a VISIBLE amount, not merely a positive one", () => {
+    // The magnitude pin. Every other assertion in this block is written against the imported
+    // SHOULDER_HALF_WIDTH so a deliberate re-tune re-flows them — which means a mutant setting that
+    // constant to 0 would make production and expectation agree at zero and survive. This test uses a
+    // LITERAL floor instead: the difference must clear 40 screen px on a 480px body (~8% of height).
+    // Loose enough to survive re-tuning the girdle narrower, strict enough that no girdle fails it.
+    const reverse = poseOf({ move: "gyaku-zuki" });
+    const jab = poseOf({ move: "kizami-zuki" });
+
+    expect(
+      dist(reverse.shoulderL, reverse.handL) - dist(jab.shoulderR, jab.handR),
+    ).toBeGreaterThan(40);
+  });
+
+  it("hangs the girdle horizontally and centred on the midpoint", () => {
+    const pose = poseOf({ attacking: false });
+
+    expect(pose.shoulderL.y).toBe(pose.shoulder.y);
+    expect(pose.shoulderR.y).toBe(pose.shoulder.y);
+    expect(pose.shoulder.x - pose.shoulderL.x).toBe(
+      pose.shoulderR.x - pose.shoulder.x,
+    );
+  });
+
+  it("keeps each arm's bones at their STANCE length when the girdle shortens the span", () => {
+    // The girdle shrinks the idle arm's span from 26.91 to 22.83, so the elbow bows deeper (8.00 →
+    // 10.71). That is a consequence of the shorter span, NOT of a shorter bone: ARM_BONE stays 15.65.
+    // Re-deriving it from the new span would give 13.94 — an 11px error on screen — so this is the
+    // assertion that pins M12b, that widening the shoulders does not shorten the arms.
+    const pose = poseOf({ attacking: false });
+    const bone = (ARM_REACH / 2) * BODY_SCALE;
+
+    expect(Math.abs(dist(pose.shoulderR, pose.elbowR) - bone)).toBeLessThan(PX);
+    expect(Math.abs(dist(pose.elbowR, pose.handR) - bone)).toBeLessThan(PX);
+    expect(Math.abs(dist(pose.shoulderL, pose.elbowL) - bone)).toBeLessThan(PX);
+  });
+
+  it("collapses both shoulders onto the one authored point when the fighter is down", () => {
+    // PRONE authors its own complete skeleton and wins by early return, so a knockdown must render
+    // exactly as it did before the girdle existed (M12g). Any visible change here is a bug, not a
+    // judgement call — a downed body has no girdle to twist.
+    const pose = scene(
+      [tickOf(0, { knockdown: true, x: 150_000, facing: 1 }, { x: 390_000 })],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.shoulderL).toEqual(pose.shoulder);
+    expect(pose.shoulderR).toEqual(pose.shoulder);
+    expect(pose.shoulder).toEqual(scaled({ x: -24, y: -10 }));
+    expect(pose.head).toEqual(scaled({ x: -40, y: -10 }));
+    expect(pose.hip).toEqual(scaled({ x: 6, y: -10 }));
+  });
+
+  it("leaves the legs rooted at the single hip — there is no hip girdle", () => {
+    // M12i: a girdle separates two moves only when they drive DIFFERENT limbs, and both kicks drive
+    // footR, so splitting the hips buys nothing today. Same bone-equality probe as the rear arm — a
+    // knee derived off some new hipR would not sit equidistant from the one `hip`.
+    const pose = poseOf({ move: "mae-geri", band: 2 });
+
+    expect(
+      Math.abs(dist(pose.hip, pose.kneeR) - dist(pose.kneeR, pose.footR)),
+    ).toBeLessThan(PX);
+    expect(
+      Math.abs(dist(pose.hip, pose.kneeL) - dist(pose.kneeL, pose.footL)),
+    ).toBeLessThan(PX);
+  });
+
+  it("stretches the pulled fist no more than a tenth past its reach", () => {
+    // The girdle breaks `hikite` on its own, and this is the ceiling the slice was approved under.
+    // The pull is authored at (−8,−50) and its root moves from x 16 (the leaned midpoint) to x 23
+    // (the leaned FRONT shoulder), opening the span 27.78 → 34.01 against a 31.305 reach: 8.7% over,
+    // so `deriveBend` floors the bow and the fist renders on a straightened arm. Accepted as a
+    // bounded intermediate state rather than re-tuning a fist slice 5 will re-tune again — the
+    // rotation returns the front shoulder to x 7 and removes the cause. This asserts only the
+    // CEILING, so slice 5 tightening it to "inside reach" will not fail the test.
+    const pose = poseOf({ move: "gyaku-zuki" });
+
+    expect(dist(pose.shoulderR, pose.handR)).toBeLessThanOrEqual(
+      1.1 * ARM_REACH * BODY_SCALE,
+    );
+  });
 });

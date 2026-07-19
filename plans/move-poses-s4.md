@@ -1,8 +1,9 @@
 # Plan: S4 — the moves fighters actually throw look distinct
 
-**Branch**: `feat/move-poses-s4-lean` (slice 3) — slices 1–2 shipped together in **#363**
-(`feat/move-poses-s4-gyaku-zuki`, merged 2026-07-19 as `4f0d3b7`)
-**Status**: Active — **3 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12)
+**Branch**: `feat/move-poses-s4-girdle` (slice 4). Shipped so far — slices 1–2 in **#363**
+(`feat/move-poses-s4-gyaku-zuki`, merged 2026-07-19 as `4f0d3b7`); slice 3 + the M12 decision tree
+in **#364** (`feat/move-poses-s4-lean`, merged 2026-07-19 as `7800ed9`)
+**Status**: Active — **4 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12)
 **Parent story**: `plans/move-poses-stories.md` § S4 · **Decisions**: `plans/move-poses-decisions.md` (M1–M12)
 
 ## Goal
@@ -272,7 +273,7 @@ That is a skeleton change touching every pose and stance, so it is **its own dec
 slice 4** — slice 4 is about to hit the same wall from the kick side, and a second shoulder would
 change how both are judged.
 
-### Slice 4 — the fighter gets a shoulder girdle
+### ✅ Slice 4 — the fighter gets a shoulder girdle — DONE
 
 **Value**: the mechanism that makes a reverse punch and a jab different pictures. Today their
 driven hands land on the **identical pixel** because both arms hang off one joint; after this the
@@ -295,27 +296,68 @@ rear arm starts 14px further back, so the whole arm line differs. Decided in
    `applyFigure` places two more containers.
 
 **The lean is NOT touched in this slice.** It keeps applying to `shoulder` (the midpoint) exactly
-as slice 3 left it, so both ends move together. That is deliberate: a rigid girdle **breaks
-`hikite`** (M12's "the slide breaks hikite"), so slice 4 must not also change the lean's magnitude
-or the pulled fist stretches. Slice 5 rewires it in the same breath as making it rotate.
+as slice 3 left it, so both ends move together. Slice 5 rewires it in the same breath as making it
+rotate.
 
-**Acceptance criteria** — _present for approval before any code_
+#### The girdle breaks `hikite` on its own — accepted, bounded, pinned (approved 2026-07-19)
 
-- [ ] Given `gyaku-zuki` committed, when it renders, `elbowL` derives off **`shoulderL`** (the rear
+M12's "the slide breaks `hikite`" was read here as _leaving the lean alone avoids the break_. It
+does not; it only avoids making it worse. Measured before writing any code:
+
+```
+hikite fist (-8,-50), root = shoulderR
+  today   shoulder at x 16 → span 27.78   ✓ inside the 31.305 reach
+  slice 4 shoulderR at 23  → span 34.01   ✗ 8.7% over
+```
+
+`deriveBend` floors the offset at 0 and slice 2's eye-tuned pulled fist renders as a straightened
+line — the artifact slice 3 removed, at about a third the old severity (the rubber-band arm was 26%
+over). The two alternatives were both worse: a half-width of 4 puts the span at 31.30 against a
+31.3050 reach (a margin that breaks on any re-tune, and it halves the payoff below), and re-tuning
+`hikite` here and again in slice 5 means judging the same fist by eye twice — exactly what slice 2
+folded `hikite` in to avoid. So it ships as a **bounded intermediate state with a ceiling on it**
+(AC 7), and slice 5 removes the cause by returning the front shoulder to x 7.
+
+Two smaller consequences are deliberate non-criteria: the guard arm's span grows 19.70 → 23.43 and
+the throw's rear grab arm goes from 8px shorter than the front to 6px longer. Both stay inside
+reach — comment them in `scene.ts`, do not assert them.
+
+**Acceptance criteria** — _approved 2026-07-19_
+
+- [x] Given `gyaku-zuki` committed, when it renders, `elbowL` derives off **`shoulderL`** (the rear
       end), not the midpoint — so the rear arm visibly starts further back
-- [ ] Given `kizami-zuki` at the same gap and band, when both render, the two punches' **arm spans
-      differ by ~2 × the half-width** — the distinction slices 1–2 could not produce
-- [ ] Given any pose, when it renders, both shoulders sit at the **same y**, equidistant from
+- [x] Given `kizami-zuki` at the same gap and band, when both render, the reverse punch's **arm span
+      exceeds the jab's, by an amount that tracks the half-width constant** — the distinction slices
+      1–2 could not produce. Assert the RELATION, not the literal (decision 9): the difference is
+      **13.95**, not 14, because the hands sit 4px below shoulder height
+- [x] Given any pose, when it renders, both shoulders sit at the **same y**, equidistant from
       `shoulder` — the girdle is horizontal and centred
-- [ ] Given a **knockdown**, when it renders, the pose is **unchanged** from today and both
+- [x] Given a **knockdown**, when it renders, the pose is **unchanged** from today and both
       shoulders coincide (M12g — any visible change here is a bug, not a judgement call)
-- [ ] Given an idle fighter, when it renders, each arm's **bones keep their stance length** — the
-      deeper bow is a consequence of the shorter span, not a stretched bone
-- [ ] Given `mae-geri`, when it renders, the **legs are untouched** — no hip girdle (M12i)
+- [x] Given an idle fighter, when it renders, each arm's **bones keep their stance length** — the
+      deeper bow (8.00 → 10.71) is a consequence of the shorter span, not a stretched bone
+- [x] Given `mae-geri`, when it renders, the **legs are untouched** — no hip girdle (M12i)
+- [x] Given `gyaku-zuki` at contact, when it renders, the pulled fist's arm is stretched **no more
+      than 10%** past its straight reach — the bounded intermediate state above. Slice 5 tightens
+      this to "inside reach" once the rotation returns the front shoulder to x 7
 
-**MUTATE**: scripted scan. Anticipated: half-width sign flipped (both shoulders on one side),
-`shoulderL`/`shoulderR` swapped (arms cross), the girdle bar omitted from `BONES`, `PRONE`
-receiving the derivation, `ARM_BONE` re-derived from the new span.
+**MUTATE**: scripted scan, **13 applied / 13 killed** (every anticipated mutant plus the draw-layer
+ones). Two findings worth carrying forward:
+
+- **The scan's first version reported a false kill.** It trusted `execSync`'s exit code, which goes
+  non-zero for runner errors as well as test failures — M10 was reported killed and was in fact
+  alive. The scan now records a kill only when the run **names failing tests**, so every verdict is
+  attributable to a test. _Never trust an exit code as a kill signal._
+- **`BONES` needed exporting to be testable at all.** The bones stroke into a Pixi `Graphics` path,
+  which display-object assertions cannot see, so re-rooting an arm to the midpoint (M11) or dropping
+  the girdle bar (M10) was invisible to the whole suite while being plainly visible on screen. Both
+  survived until `BONES` was exported and its wiring asserted directly — the same discipline
+  `DESCRIBED_MOVES` already uses. Any future change to what the draw layer connects needs that test.
+
+A transport test (`auto-pauses at the end of a short fight`) surfaced intermittently **only under
+mutation**, never on clean code (verified 3× stashed, 5× on the player suite). Broken geometry
+perturbing the render loop, not a pre-existing flake — but it is why kill attribution must name the
+test rather than count failures.
 
 ### Slice 5 — the torso rotates into the punch
 
@@ -400,8 +442,8 @@ contact sheet is the confirming instrument. Do not quietly ship two identical ki
 
 - **The precedence rule is the only structural change in this story.** Everything else is descriptor
   data on proven mechanisms. Keep slice 1 small enough that the rule is reviewable on its own.
-- **Slice 4 may fail its own acceptance criterion**, and that is a real outcome, not a defect to code
-  around. See the risk note above.
+- **Slice 6 may fail its own acceptance criterion** (renumbered from slice 4 by the M12 amendment),
+  and that is a real outcome, not a defect to code around. See the risk note under slice 6.
 - **Do not "fix the stretch"** — read `docs/archive/move-poses-s2.md` first. The bounded stretch is a
   deliberate compromise against a ratio the engine owns, not an oversight.
 
