@@ -1452,7 +1452,7 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
     // The other 12 moves, an id the table has never heard of, an empty id, and an ABSENT field
     // (the loader casts the wire wholesale, so the key may simply not be there) all draw the hand.
     const generic = [
-      { attackMove: "gyaku-zuki" }, // a real move, no descriptor yet
+      { attackMove: "kizami-zuki" }, // a real move, no descriptor yet
       { attackMove: "no-such-move" }, // unknown id
       { attackMove: "" }, // the engine's "nothing committed" sentinel
       { attackMove: undefined }, // field absent from the wire
@@ -1580,7 +1580,10 @@ describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
     // state: it is still a wind-up, just not a bespoke one, and it is what makes THIS slice fix all
     // 13 moves rather than only mae-geri.
     const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
-    const unauthored = { attackMove: "gyaku-zuki", attackReach: 240_000 };
+    // kizami-zuki (the jab) is the stand-in for "real move, still unauthored" — gyaku-zuki held this
+    // role until S4 · Slice 1 gave it a descriptor. Its 210k reach caps at 66.5px, so the in-range
+    // edge at 66 is unchanged and the contact expectation below still reads the same number.
+    const unauthored = { attackMove: "kizami-zuki", attackReach: 210_000 };
 
     expect(poseAtPhase({ ...unauthored, attackPhase: CHAMBER }).handR).toEqual(
       scaled(NEUTRAL_HAND_R),
@@ -1817,6 +1820,249 @@ describe("scene — limbs keep their bone lengths (S2 · Slice 3)", () => {
       stancePose().footL,
     );
   });
+});
+
+describe("scene — the reverse punch is thrown with the rear arm (S4 · Slice 1)", () => {
+  // `gyaku-zuki` is the REVERSE punch — the rear hand travels. Until now it fell back to the generic
+  // front-hand pose, so the workhorse technique (~80% of all committed screen time) and the jab
+  // (`kizami-zuki`, genuinely a front-hand punch) drew the identical picture. A descriptor naming
+  // `handL` as the driven endpoint is what separates them.
+  //
+  // Local-px anchors, recomputed here independently of the production formula: one sub-unit is
+  // 76/240000 local px, so a 240k gap is 76px between centres and the near edge sits one
+  // BODY_HALF_WIDTH (10) nearer ⇒ 66. gyaku-zuki's reach is also 240k ⇒ a 76px cap, so an in-range
+  // punch lands on the edge at 66, not the cap. Its first legal band is high ⇒ y −68.
+  const NEUTRAL_HAND_L = { x: -18, y: -44 }; // STAND rear hand — the guard arm
+  const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
+  const GUARD_MID = { x: 8, y: -46 }; // a raised mid guard, for the precedence cases
+
+  const posePunching = ({
+    gap = 240_000,
+    move = "gyaku-zuki",
+    band = 3,
+    reach = 240_000,
+    attacking = true,
+    extra = {},
+  }: {
+    gap?: number;
+    move?: string;
+    band?: number;
+    reach?: number;
+    attacking?: boolean;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: move,
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("drives the REAR hand to the opponent's near edge for a gyaku-zuki", () => {
+    const pose = posePunching();
+
+    expect(pose.handL).toEqual(scaled({ x: 66, y: -68 }));
+    // The front hand is not the driven endpoint — only ONE hand reaches the target. This pinned the
+    // front hand to its stance until S4 · Slice 2 pulled it back (hikite), so it now asserts the part
+    // that is actually this slice's claim; where the other hand goes is slice 2's.
+    expect(pose.handR).not.toEqual(scaled({ x: 66, y: -68 }));
+  });
+
+  it("lets the committed punch win the rear arm when the fighter is also guarding", () => {
+    // The rear-hand precedence rule. `handL` is the guard arm precisely so a strike and a guard never
+    // contend for the same limb — a premise a rear-hand strike breaks. The strike wins: it is the more
+    // informative event, and the alternative draws a fighter with a raised guard and NO visible punch,
+    // i.e. the move reads as unthrown. Engine-impossible (guard and attack are mutually exclusive in
+    // the sim) but reachable in /dojo by design (M10 free combos), so the rule is exercised for real.
+    const pose = posePunching({ extra: { guardBand: 2 } });
+
+    expect(pose.handL).toEqual(scaled({ x: 66, y: -68 }));
+  });
+
+  it("keeps the guard on the rear arm when no strike is being drawn, even carrying a move id", () => {
+    // The other half of the rule, and the one that stops it overreaching: the yield is gated on a LIVE
+    // strike, not on the move id. A fighter idling with a stale `gyaku-zuki` in the frame must keep a
+    // real guard — otherwise a leftover id silently strips the fighter's defence.
+    const pose = posePunching({ attacking: false, extra: { guardBand: 2 } });
+
+    expect(pose.handL).toEqual(scaled(GUARD_MID));
+  });
+
+  it("still drives the FRONT hand for a punch with no descriptor, leaving the rear arm at stance", () => {
+    // M7 totality: the generic path is the status quo, not a degraded state. `kizami-zuki` (the jab)
+    // has no descriptor, so it must draw exactly as every hand technique drew before this slice.
+    // Its 210k reach caps at 66.5px, so the in-range edge at 66 is still what it lands on.
+    const pose = posePunching({ move: "kizami-zuki", reach: 210_000 });
+
+    expect(pose.handR).toEqual(scaled({ x: 66, y: -68 }));
+    expect(pose.handL).toEqual(scaled(NEUTRAL_HAND_L));
+  });
+
+  const crossOf = (pose: ReturnType<typeof posePunching>) =>
+    (pose.handL.x - pose.shoulder.x) * (pose.elbowL.y - pose.shoulder.y) -
+    (pose.handL.y - pose.shoulder.y) * (pose.elbowL.x - pose.shoulder.x);
+
+  it("re-derives the rear elbow off the moved shoulder → hand, so the punching arm reads jointed", () => {
+    // The bend rule runs on the FINAL endpoints, so a driven rear hand re-bends its own elbow for
+    // free. Measured at a gap the arm can actually reach (120k ⇒ a 28px target), because S2 · Slice 3
+    // made the bow a CONSEQUENCE of fixed bone lengths: a fully committed punch straightens, so
+    // asserting a bend at the workhorse distance would be asserting the wrong anatomy.
+    const punching = posePunching({ gap: 120_000 });
+
+    expect(crossOf(punching)).not.toBe(0);
+    // And it is genuinely re-derived rather than left at the stance bend.
+    expect(punching.elbowL).not.toEqual(
+      posePunching({ attacking: false }).elbowL,
+    );
+  });
+
+  it("leaves the kick path undisturbed — a mae-geri still drives the foot", () => {
+    // The endpoint routing grows from a binary (foot vs front hand) to a three-way. This pins that
+    // widening it did not knock the kick into the wrong branch.
+    const pose = posePunching({ move: "mae-geri", band: 2, reach: 270_000 });
+
+    expect(pose.footR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
+    expect(pose.handL).toEqual(scaled(NEUTRAL_HAND_L));
+  });
+});
+
+describe("scene — the reverse punch chambers and pulls (S4 · Slice 2)", () => {
+  // Two authored points, one technique. The CHAMBER is the rear fist waiting at the ribs while the
+  // punch winds up and recovers (without it gyaku-zuki sits at stance and SNAPS to full extension —
+  // the S2 defect returning for the move with ~80% of all screen time). The OFF HAND is `hikite`:
+  // the front fist withdrawn to the hip as the punch lands.
+  //
+  // hikite exists because slice 1's rear-hand drive reads faintly on its own. Both arms hang off ONE
+  // shared `shoulder` joint, so the EXTENDED arm lands in nearly the same place whichever hand
+  // throws; only the resting arm differs. Pulling the off hand back is what makes the punching side
+  // read, rather than leaving the distinction to a trailing arm nobody looks at.
+  //
+  // Both points are authored by eye and WILL be re-tuned, so these assert the RELATIONS that carry
+  // the meaning (pulled back, distinct from extension, behind stance) rather than the literal
+  // coordinates — the same discipline the mae-geri chamber follows above.
+  const CHAMBER = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+
+  const STANCE_HAND_L = { x: -18, y: -44 };
+  const STANCE_HAND_R = { x: 18, y: -44 };
+
+  const poseAt = (
+    attackPhase: number | undefined,
+    extra: Partial<ReplayFrame> = {},
+  ) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 3,
+            attackReach: 240_000,
+            attackMove: "gyaku-zuki",
+            attackPhase,
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 390_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("chambers the punching fist back at the ribs during startup, then drives it forward at contact", () => {
+    const chambered = poseAt(CHAMBER).handL;
+    const extended = poseAt(CONTACT).handL;
+
+    // A wind-up is a different SHAPE, not a shorter reach (M3).
+    expect(chambered).not.toEqual(extended);
+    // The technique EXTENDS from its chamber — if this inverts, the punch retracts into contact.
+    expect(chambered.x).toBeLessThan(extended.x);
+    // And it waits BEHIND the stance hand: a chambered fist is drawn back, not merely held still.
+    expect(chambered.x).toBeLessThan(scaled(STANCE_HAND_L).x);
+  });
+
+  it("returns the punching fist to that chamber during recovery", () => {
+    expect(poseAt(RECOVER).handL).toEqual(poseAt(CHAMBER).handL);
+    expect(poseAt(RECOVER).handL).not.toEqual(poseAt(CONTACT).handL);
+  });
+
+  it("leaves the contact geometry exactly where slice 1 put it", () => {
+    // The load-bearing guard: hikite is COSMETIC, and where contact happens is what the engine
+    // actually cares about. A 240k gap puts the near edge at 66 local px, inside gyaku-zuki's 76 cap,
+    // and the first legal band is high ⇒ y −68. Asserted exactly (a SOLVED value, not an eye-tuned
+    // one), so re-tuning either authored point can never quietly move the punch.
+    expect(poseAt(CONTACT).handL).toEqual(scaled({ x: 66, y: -68 }));
+  });
+
+  it("pulls the front fist back toward the hip as the punch lands (hikite)", () => {
+    const pulled = poseAt(CONTACT).handR;
+
+    // Clearly BEHIND where the stance leaves it — this is the assertion that makes the punch read
+    // from the punching side rather than from the trailing arm.
+    expect(pulled.x).toBeLessThan(scaled(STANCE_HAND_R).x);
+    // Drawn back past the body's centre line, i.e. genuinely withdrawn to the hip rather than merely
+    // relaxed a little.
+    expect(pulled.x).toBeLessThan(0);
+    // The pulled hand and the chambered fist are DIFFERENT authored points, not one position reused
+    // for both. Without this the two lookups can be crossed — the scan's "offHandFor wired to the
+    // chamber field" mutant satisfies every relation above, because the chamber is also drawn back.
+    expect(pulled).not.toEqual(poseAt(CHAMBER).handL);
+  });
+
+  it("does not pull the off hand for an idle fighter carrying a stale move id", () => {
+    // The same trap slice 1's precedence rule guards for the guard arm: `hikite` must need a LIVE
+    // strike, not merely a move id sitting in the frame, or a fighter who has finished punching
+    // keeps a hand withdrawn at its hip. Found by the mutator scan, not by the TDD pass.
+    const idle = poseAt(CONTACT, { attacking: false });
+
+    expect(idle.handR).toEqual(scaled(STANCE_HAND_R));
+  });
+
+  it("holds the front hand forward while the punch is still winding up", () => {
+    // hikite is gated to CONTACT, matching how the M2 lean is gated (M9): a fighter pulls the off
+    // hand as the punch EXTENDS, not while chambering. Drawing both fists back during startup would
+    // read as a fighter covering up, not as a wind-up — one fist chambered with the other hand
+    // forward IS the pre-punch shape.
+    expect(poseAt(CHAMBER).handR).toEqual(scaled(STANCE_HAND_R));
+  });
+
+  it("leaves the other hand at stance for a move with no off hand authored (M7)", () => {
+    // Totality: `offHand` is descriptor data, so every move that does not author one keeps the status
+    // quo. kizami-zuki is a hand technique with no descriptor at all, so its rear hand must not be
+    // dragged along by gyaku-zuki's authoring.
+    const jab = poseAt(CONTACT, {
+      attackMove: "kizami-zuki",
+      attackReach: 210_000,
+    });
+
+    expect(jab.handL).toEqual(scaled(STANCE_HAND_L));
+  });
+
+  // NO test here for "the front elbow re-derives off the pulled hand", though the slice's acceptance
+  // criteria asked for one. Every candidate assertion passed BEFORE the off hand existed: comparing
+  // contact against chamber detects the M2 LEAN (the shoulder shifts at contact and not while
+  // winding up), not the pull, and the weaker forms — elbow behind the shoulder, the two bones equal
+  // — already hold with the hand at stance. The property is guaranteed by construction: `offHand` is
+  // written into the endpoints object and `deriveSkeleton` runs on the result, so there is no path
+  // where the hand moves and the elbow does not. Slice 1's equivalent test was meaningful only
+  // because its endpoint genuinely moved somewhere new. A test that cannot fail is worse than none.
 });
 
 describe("move descriptors — table integrity", () => {
