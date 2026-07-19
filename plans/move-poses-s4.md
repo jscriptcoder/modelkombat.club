@@ -1,8 +1,9 @@
 # Plan: S4 — the moves fighters actually throw look distinct
 
-**Branch**: `feat/move-poses-s4-girdle` (slice 4). Shipped so far — slices 1–2 in **#363**
-(`feat/move-poses-s4-gyaku-zuki`, merged 2026-07-19 as `4f0d3b7`); slice 3 + the M12 decision tree
-in **#364** (`feat/move-poses-s4-lean`, merged 2026-07-19 as `7800ed9`)
+**Branch**: next slice cuts from `main`. Shipped so far — slices 1–2 in **#363**
+(`feat/move-poses-s4-gyaku-zuki`, `4f0d3b7`); slice 3 + the M12 decision tree in **#364**
+(`feat/move-poses-s4-lean`, `7800ed9`); slice 4 the girdle in **#365**
+(`feat/move-poses-s4-girdle`, `7ff7a7d`) — all merged 2026-07-19
 **Status**: Active — **4 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12)
 **Parent story**: `plans/move-poses-stories.md` § S4 · **Decisions**: `plans/move-poses-decisions.md` (M1–M12)
 
