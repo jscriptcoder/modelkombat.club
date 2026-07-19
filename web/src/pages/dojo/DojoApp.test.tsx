@@ -3,9 +3,21 @@ import { fireEvent, render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
 import DojoApp from "./DojoApp";
+import { durationOf, REACH_PRESETS } from "./reach-presets";
 import type { DojoStageProps } from "./DojoStage";
 import type { ReplayTape } from "../replay/replay-contract";
 import type { Brand } from "../../shared/lib/brand";
+
+// Look a move up in the engine-mirror table. Tests assert AGAINST the table rather than against
+// transcribed literals (decision 9), so re-tuning a move's reach or timing never breaks a test —
+// only a move DISAPPEARING does, which is exactly the drift worth failing on.
+const presetOf = (move: string) => {
+  const preset = REACH_PRESETS.find((p) => p.move === move);
+
+  if (!preset) throw new Error(`no preset mirrors "${move}"`);
+
+  return preset;
+};
 
 // /dojo is the pose lab: a dark dev route that renders two fighters through the real replay pipeline
 // so the pose model can be tuned in isolation. The scene-graph maths is asserted in dojo-tape.test /
@@ -511,5 +523,178 @@ describe("DojoApp — replaying a technique from the start", () => {
 
     expect(latestTick()).toBe(0);
     expect(toggle.textContent).toBe("Pause");
+  });
+});
+
+// S3 · Slice 2 — the arsenal becomes browsable. Until now the committed technique was a constant in
+// controls.ts, so seeing any move but mae-geri meant editing source. The picker is a per-figure raw
+// control like every other (M10): selecting STAMPS the move's mirrored reach and lets go, leaving
+// every slider free afterward (decision 6). The pose each move DRAWS is scene.test's subject — these
+// assert the wiring from the control to the tape.
+describe("DojoApp — per-figure move picker (S3)", () => {
+  it("offers every arsenal technique, plus an idle row for no committed move", () => {
+    const { getByRole } = render(() => <DojoApp />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const picker = within(challenger).getByRole("combobox", { name: "Move" });
+
+    const values = within(picker)
+      .getAllByRole("option")
+      .map((option) => option.getAttribute("value"));
+
+    // Idle first (the "" the engine itself uses for nothing committed), then the mirror's own order.
+    expect(values).toEqual(["", ...REACH_PRESETS.map((p) => p.move)]);
+  });
+
+  it("shows which technique each fighter is committed to, opening on the lab's defaults", () => {
+    // The picker must READ BACK, not just write: it is the only place the committed move is
+    // visible, so a picker that drives the pose without reflecting it would leave the developer
+    // unable to tell what they are looking at.
+    const { getByRole } = render(() => <DojoApp />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const king = getByRole("group", { name: "King" });
+
+    expect(
+      within(challenger).getByRole("option", {
+        name: "mae-geri",
+        selected: true,
+      }),
+    ).toBeTruthy();
+
+    expect(
+      within(king).getByRole("option", { name: "idle", selected: true }),
+    ).toBeTruthy();
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "shuto" } },
+    );
+
+    expect(
+      within(challenger).getByRole("option", { name: "shuto", selected: true }),
+    ).toBeTruthy();
+  });
+
+  it("plays the selected technique over its own duration, at its own reach", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const mawashi = presetOf("mawashi-geri");
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "mawashi-geri" } },
+    );
+
+    expect(latest()).toHaveLength(durationOf(mawashi)); // the tape re-spans to the new timing
+    expect(latest()[0].a.attackMove).toBe("mawashi-geri");
+    expect(latest()[0].a.attackReach).toBe(mawashi.reach); // reach stamped from the mirror
+    expect(latest()[0].a.attacking).toBe(true); // ...and the figure is committed to it
+  });
+
+  it("restarts playback from the first tick when a move is selected", () => {
+    // Playback auto-pauses at the end, so without this a selection would land on the new move's
+    // final recovery frame — the picker would look broken from the second selection onward.
+    const { Stage, latestTick } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    fireEvent.input(getByRole("slider", { name: /scrub/i }), {
+      target: { value: "27" }, // park at the end of the default mae-geri, which also pauses
+    });
+    expect(latestTick()).toBe(27);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "mawashi-geri" } },
+    );
+
+    expect(latestTick()).toBe(0);
+    expect(getByRole("button", { name: /pause|play/i }).textContent).toBe(
+      "Pause",
+    ); // ...and running, so the technique plays rather than sitting at tick 0
+  });
+
+  it("stands a fighter down when the idle row is selected", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "" } },
+    );
+
+    expect(latest()[0].a.attacking).toBe(false);
+    expect(latest()[0].a.attackMove).toBe("");
+    expect(latest()[0].a.attackReach).toBe(0);
+    expect(latest()).toHaveLength(1); // nothing committed on either figure ⇒ one static tick
+  });
+
+  it("commits the king to its own technique, leaving the challenger untouched", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const king = getByRole("group", { name: "King" });
+    const yoko = presetOf("yoko-geri");
+
+    fireEvent.change(within(king).getByRole("combobox", { name: "Move" }), {
+      target: { value: "yoko-geri" },
+    });
+
+    expect(latest()[0].b.attackMove).toBe("yoko-geri");
+    expect(latest()[0].b.attackReach).toBe(yoko.reach);
+    expect(latest()[0].a.attackMove).toBe("mae-geri"); // challenger keeps its default
+    expect(latest()[0].a.attackReach).toBe(presetOf("mae-geri").reach);
+  });
+
+  it("leaves the stamped reach free to be dialed away without changing the move", () => {
+    // Stamp-then-let-go (decision 6): the picker seeds a real fighting distance, then every slider
+    // stays live — deviating from it is the point of the lab, not a mistake to be corrected.
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "mawashi-geri" } },
+    );
+
+    fireEvent.input(
+      within(challenger).getByRole("slider", { name: "Attack reach" }),
+      { target: { value: "95000" } },
+    );
+
+    expect(latest()[0].a.attackReach).toBe(95_000); // dialed to point-blank...
+    expect(latest()[0].a.attackMove).toBe("mawashi-geri"); // ...still a roundhouse
+    expect(
+      within(challenger).getByRole("option", {
+        name: "mawashi-geri",
+        selected: true,
+      }),
+    ).toBeTruthy(); // ...and the picker still says so
+  });
+
+  it("commits an unauthored move so the renderer's generic fallback draws it (M7)", () => {
+    // 12 of the 13 have no descriptor yet. The picker must still commit them — the fallback to the
+    // generic hand pose lives in the renderer (scene.test owns that), so what matters here is that
+    // the id reaches the tape rather than being filtered out as unknown.
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "uraken" } },
+    );
+
+    expect(latest()[0].a.attackMove).toBe("uraken");
+    expect(latest()).toHaveLength(durationOf(presetOf("uraken")));
   });
 });

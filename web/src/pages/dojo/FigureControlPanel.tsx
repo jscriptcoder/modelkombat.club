@@ -1,7 +1,7 @@
 import { For, type Component, type Setter } from "solid-js";
 
 import type { FigureControls } from "./controls";
-import { MAX_GAP, MIN_GAP } from "./reach-presets";
+import { MAX_GAP, MIN_GAP, REACH_PRESETS } from "./reach-presets";
 import { BRANDS, type Brand } from "../../shared/lib/brand";
 
 // One fighter's control panel: buttons + checkboxes + selects bound to that figure's raw pose fields.
@@ -43,6 +43,9 @@ type FigureControlPanelProps = {
   // flows through `controlsToFrame`); it rides the item, not the render frame.
   brand: Brand;
   onBrandChange: Setter<Brand>;
+  // Selecting a technique is not a plain field patch — it STAMPS several controls at once and
+  // restarts playback, so the page owns what a selection means and the panel only reports it.
+  onSelectMove: (move: string) => void;
 };
 
 const FigureControlPanel: Component<FigureControlPanelProps> = (props) => {
@@ -119,6 +122,25 @@ const FigureControlPanel: Component<FigureControlPanelProps> = (props) => {
         />
         Attacking
       </label>
+
+      <div class="control-select">
+        {/* Which technique this fighter is committed to. Listed straight off the engine-mirror
+            table, so the picker can never offer a move the engine doesn't have — and the "" idle
+            row is the engine's own sentinel for nothing committed. Moves with no descriptor yet
+            still draw (the renderer falls back to the generic hand, M7), so all 13 are selectable
+            from the day the picker lands. Named from the span via aria-labelledby (M10). */}
+        <span id={fieldId("move")}>Move</span>
+        <select
+          aria-labelledby={fieldId("move")}
+          value={props.controls.attackMove}
+          onChange={(e) => props.onSelectMove(e.currentTarget.value)}
+        >
+          <option value="">idle</option>
+          <For each={REACH_PRESETS}>
+            {(preset) => <option value={preset.move}>{preset.move}</option>}
+          </For>
+        </select>
+      </div>
 
       <div class="control-select">
         {/* A <select> is not associated by <label for>, so name it from the visible span via
