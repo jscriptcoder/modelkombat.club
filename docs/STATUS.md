@@ -1093,22 +1093,33 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    stats**. Both presentation-only (no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change). All Arsenal +
    Gauntlet artifacts archived under `docs/archive/` (see the build-log entries above + the archive
    [`README.md`](archive/README.md)).
-9. **Move showcase + per-move poses — 📋 PLANNED (design resolved, no code yet; PR #350).** The next
-   replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Today `poseFor` only knows
-   `attacking` / `attackBand` / `throwing`, so all **12 strikes render as one picture** (a `mawashi-geri`
-   draws as a punch), and `attacking` stays true for a move's whole committed duration — a `gyaku-zuki`
-   holds **24 ticks (~0.4 s) frozen at full extension**. Resolved via `grill-me` → `find-gaps` →
-   `story-splitting`: an additive render-only **`attackMove` + `attackPhase`** on `RenderFrame` (the arc's
-   only `src/` touch — same invariant-safe pattern as `guardBand`/`attackReach`, and it must NOT move
-   `INPUT_HASH` or `BENCHMARK_VERSION`), then a **descriptor table + one shared solver** that drives a
-   per-move limb through the existing `reachTargetX` / `deriveBend` machinery — authored chamber, **solved**
-   extension (a fixed extension would reopen the "strikes hit the air" defect `#344`–`#347` closed). The
-   `/dojo` lab gains a **move picker** (absorbing the spacing-only "Reach preset" dropdown) and a
-   **multi-tick tape** that reuses the S4 transport, so a technique can be judged in motion at true engine
-   timing. 8 child stories, **S0** (enabling engine change) → **S1** (walking skeleton: a kick renders with
-   a **foot**) → S2 phases → S3 picker → S4+ the rest, ordered by `npm run telemetry` move-usage rather
-   than anatomy. Design source: `plans/move-poses-{decisions,stories}.md` (10 decisions + mechanics M1–M11).
-   Defense / _uke_ poses are explicitly a **later** arc.
+9. **Move showcase + per-move poses — 🚧 IN PROGRESS (2 of 8 child stories shipped; PRs #350, #352,
+   #353).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
+   `poseFor` knew only `attacking` / `attackBand` / `throwing`, so all **12 strikes rendered as one
+   picture** (a `mawashi-geri` drew as a punch), and `attacking` stays true for a move's whole committed
+   duration — a `gyaku-zuki` holds **24 ticks (~0.4 s) frozen at full extension**. Design resolved via
+   `grill-me` → `find-gaps` → `story-splitting` (PR #350): 10 decisions + mechanics M1–M11, 8 child
+   stories ordered S0 → S1 → S2 phases → S3 picker → S4+ the rest, the tail sequenced by
+   `npm run telemetry` move-usage rather than anatomy. Design source:
+   `plans/move-poses-{decisions,stories}.md` (still live — S2–S7 run off it); the completed S0+S1 plan is
+   archived at [`docs/archive/move-poses-s0-s1.md`](archive/move-poses-s0-s1.md). Defense / _uke_ poses are
+   explicitly a **later** arc.
+
+   - **S0 ✅ (PR #352)** — the arc's **only `src/` touch**: additive render-only **`attackMove` +
+     `attackPhase`** on `RenderFrame`, with the move id threaded onto the committed `attacking` /
+     `air-attacking` states. A **validation** slice that validated — `BENCHMARK_VERSION` held at `v19`
+     with determinism + replay-byte-identity green, so the id never reached the outcome path (M11).
+     Mutation 95.45%, the two survivors equivalent.
+   - **S1 ✅ (PR #353)** — `web/`-only: a **`mae-geri` draws its front foot** instead of its front hand,
+     via a `move-descriptors.ts` table naming each technique's driven endpoint. The arc's riskiest
+     assumption held — a foot drives through the same `reachTargetX` solver as a hand, and the knee
+     re-derives off the moved `hip → footR` for free. Undescribed moves keep the generic pose (M7), so
+     the viewer stays usable while the other 12 are authored one slice at a time.
+   - **Next: S2** (a technique winds up and recovers — where `attackPhase` is finally consumed), then
+     **S3**, the `/dojo` move picker that was the original ask. S2 also owns a carried finding: the kick
+     currently reads **stretched rather than snapped**, so limb alone is not enough — see the archived
+     plan for the hip-travel / chamber / bone-length options and the note that M8.2's support-integrity
+     assertion is now a decision record.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
@@ -1123,6 +1134,7 @@ the **`/replay` API + the Pixi `/watch` viewer** (PRs #306–#327), and the **"m
 arc** (PRs #329–#349 — big jointed model-identity fighters whose strikes and grabs connect) have all since
 shipped: **you can now watch the King's fights play back as animated stickmen.** See the replay-viewer
 build-log entry above. (Several of these post-#240 features are logged only in `docs/archive/`; a full
-build-log backfill remains pending.) **Next up is item 9** — giving each of the 13 arsenal moves its own
-look, so a spectator can tell _which_ technique a fighter just threw (design resolved, PR #350; no code
-yet).
+build-log backfill remains pending.) **Item 9 is now underway** — giving each of the 13 arsenal moves its own
+look, so a spectator can tell _which_ technique a fighter just threw. The engine field (S0, PR #352) and
+the first per-move pose (S1, PR #353 — a `mae-geri` that kicks with its foot) have shipped; S2 (wind-up +
+recovery) and S3 (the `/dojo` move picker) are next.
