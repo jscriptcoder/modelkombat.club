@@ -16,6 +16,10 @@ export type FigureControls = {
   // opponent. 0 for an idle fighter. The default challenger carries a gyaku-zuki reach so the opening
   // strike lands at the default gap; a future control lets it be tuned per figure (M10).
   attackReach: number;
+  // Which technique the committed strike is (S1): selects the per-move pose descriptor, so a
+  // `mae-geri` draws with the foot while an undescribed move keeps the generic hand. "" = nothing
+  // committed. A per-figure move PICKER lands in S3; until then the default scene names it.
+  attackMove: string;
 };
 
 // controlsToFrame: the pure mapper from control state to a render `ReplayFrame`. Passes every pose
@@ -41,7 +45,8 @@ export const DEFAULT_CHALLENGER_CONTROLS: FigureControls = {
   guardBand: 0,
   throwing: false,
   knockdown: false,
-  attackReach: 240_000, // gyaku-zuki reach — lands on the king at the default (gyaku) gap
+  attackReach: 270_000, // mae-geri reach
+  attackMove: "mae-geri", // the first technique with a pose of its own (S1) — opens the lab on it
 };
 
 export const DEFAULT_KING_CONTROLS: FigureControls = {
@@ -53,4 +58,5 @@ export const DEFAULT_KING_CONTROLS: FigureControls = {
   throwing: false,
   knockdown: false,
   attackReach: 0, // idle — no committed reach
+  attackMove: "", // idle — nothing committed
 };

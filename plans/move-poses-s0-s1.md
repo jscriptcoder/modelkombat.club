@@ -17,11 +17,12 @@ first move in the arsenal with its own look, delivered through the real producti
       _(slice 1)_
 - [x] Committing a move never changes a fight's outcome: determinism/replay tests stay green and
       `BENCHMARK_VERSION` remains `v19` (M11) _(slice 1)_
-- [ ] A `mae-geri` in its active window draws its **front foot** at the mid band, with the front
-      hand left at stance
-- [ ] The drawn foot still tracks the real opponent distance — two different gaps produce two
-      different foot positions (the S5 reach-to-target property is preserved)
-- [ ] A move with no descriptor yet (any of the other 12) still draws today's generic pose
+- [x] A `mae-geri` in its active window draws its **front foot** at the mid band, with the front
+      hand left at stance _(slice 2)_
+- [x] The drawn foot still tracks the real opponent distance — two different gaps produce two
+      different foot positions (the S5 reach-to-target property is preserved) _(slice 2)_
+- [x] A move with no descriptor yet (any of the other 12) still draws today's generic pose
+      _(slice 2)_
 
 ## Slices
 
@@ -181,6 +182,38 @@ reads as a kick.
 
 **Done when**: all six criteria met, manual mutator scan recorded, `/dojo` signed off visually,
 and the human approves the commit.
+
+**Outcome (2026-07-19)** — all six criteria met; 444 web tests and 2079 total green, typecheck
+clean. The riskiest assumption **held**: a foot drives through the same `reachTargetX` solver as a
+hand, the knee re-derives off the moved `hip → footR` for free (the bend rule already ran on the
+FINAL endpoints), and the support leg stays planted — so `poseFor`'s only change is which endpoint
+receives the already-solved position.
+
+Mutation `N/A` (web is outside Stryker). **Manual mutator scan** over `limbFor` and the driven-
+endpoint branch: `move ?? ""`→`&&`, `?.limb`→`.limb`, `?? GENERIC_LIMB`→`&&`, the descriptor key
+and its limb value, `limb === "footR"`→`!==`/`true`/`false`, and dropping either endpoint object —
+all killed by the mae-geri / fallback / not-attacking cases. `GENERIC_LIMB` retyping is blocked by
+`StrikeLimb`, not by a test. The scan also found the M2 lean was being applied to kicks with
+nothing pinning that choice; it is now an explicit test rather than an accident.
+
+**Visual sign-off (Playwright screenshot of `/dojo`, both states captured for comparison):** the
+kick is unmistakably a kick — leg out to the King's chest, hand at rest, support leg planted —
+where the same frame previously drew a punch. **But it reads STRETCHED rather than SNAPPED.** The
+driven leg spans ~67 local px against a ~37 px natural length (1.8×), and at that extension the
+8 px `KNEE_BEND` is nearly invisible, so the leg reads as one straight stick. Notably the shipped
+punch telescopes just as hard (~53 px against a ~27 px arm, 2.0×), so this is **consistent with the
+existing visual language, not a regression** — but a leg starting from the low hip and rising only
+to the mid band is a near-horizontal line, which tolerates the stretch far worse than an arm does.
+
+**This answers one of the questions slice 2 was set to report back on** ("what fields fall out
+beyond limb + chamber"): **limb alone is not enough.** A kick needs either hip travel (the M2 lean
+currently moves head + shoulder only) or a knee-lift chamber, or a length constraint on the driven
+bone. That is S2's chamber work — and it is the exact eventuality the stories file warned about
+when it said M8.2's support-integrity assertion "is a decision record, not a bug". The assertion
+still holds today; if S2 concludes the hip must travel, change it consciously.
+
+Deferred deliberately, unchanged from the plan: `attackPhase` is emitted but NOT consumed, so a
+kick holds its extension for the whole commitment exactly as a punch does.
 
 ## Pre-PR Quality Gate
 

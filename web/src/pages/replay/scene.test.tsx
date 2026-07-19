@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { BODY_HEIGHT_SUB, scene, type Scene, type Viewport } from "./scene";
+import { DESCRIBED_MOVES } from "./move-descriptors";
+import { REACH_PRESETS } from "../dojo/reach-presets";
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
 
 // A 1200×600 viewport makes the world→screen maths land on whole pixels: the world is 600000
@@ -1294,5 +1296,184 @@ describe("scene — score pop over a lookback window", () => {
 
     expect(scene(tape, 1, VIEWPORT).hud.scoredA).toBe(true);
     expect(scene(tape, 2, VIEWPORT).hud.scoredA).toBe(true); // still inside the window
+  });
+});
+
+describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () => {
+  // Until now every one of the 13 arsenal moves drew the same picture: the front HAND at a band
+  // height. A descriptor lets a move name which endpoint its committed strike drives, so a
+  // `mae-geri` reads as a kick. The solve itself is unchanged — the same reach-to-target that aims
+  // a fist aims the foot, and the knee re-derives off the moved `hip → footR` for free.
+  //
+  // Local-px anchors (recomputed here, independent of the production formula): one sub-unit is
+  // 76/240000 local px, so a 240k gap is 76 px between centres and the near edge sits one
+  // BODY_HALF_WIDTH (10) nearer ⇒ 66. mae-geri's 270k reach caps at 270000·(76/240000) = 85.5, so
+  // an in-range kick lands on the edge at 66, not the cap.
+  const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // STAND front foot — the no-descriptor fallback
+  const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot — the support leg
+  const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
+
+  const poseKicking = ({
+    gap = 240_000,
+    move = "mae-geri",
+    band = 2,
+    reach = 270_000,
+    extra = {},
+  }: {
+    gap?: number;
+    move?: string;
+    band?: number;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: move,
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("drives the front FOOT to the opponent's near edge for a mae-geri, leaving the hand at stance", () => {
+    const pose = poseKicking();
+
+    expect(pose.footR).toEqual(scaled({ x: 66, y: -46 }));
+    // The front hand is NOT the driven endpoint for a kick — it stays where the stance put it.
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
+  });
+
+  it("keeps the support leg planted while the kicking leg extends (M8.2)", () => {
+    // The fighter neither slides nor floats: the rear foot holds the stance it started in.
+    expect(poseKicking().footL).toEqual(scaled(NEUTRAL_FOOT_L));
+  });
+
+  it("tracks the real opponent distance — a nearer opponent is kicked at a nearer point (M8.5)", () => {
+    // The solve is retained for the foot, not replaced by a constant forward stub. A 150k gap is
+    // 47.5 px between centres ⇒ the edge sits at 37.5; a 240k gap ⇒ 66. Both are inside
+    // mae-geri's 85.5 cap, so the two land at genuinely different points.
+    expect(poseKicking({ gap: 150_000 }).footR).toEqual(
+      scaled({ x: 37.5, y: -46 }),
+    );
+    expect(poseKicking({ gap: 240_000 }).footR).toEqual(
+      scaled({ x: 66, y: -46 }),
+    );
+  });
+
+  it("stops the kicking foot at the move's reach cap when the opponent is beyond it (a whiff)", () => {
+    // A 400k gap is 126.7 px between centres — past mae-geri's 85.5 cap, so the foot stops at the
+    // cap rather than stretching to the edge. Pins that the foot obeys the SAME clamp as a fist.
+    expect(poseKicking({ gap: 400_000 }).footR).toEqual(
+      scaled({ x: 85.5, y: -46 }),
+    );
+  });
+
+  it("bends the knee off the straight hip → foot line, so the kicking leg reads jointed (M8.6)", () => {
+    const pose = poseKicking();
+
+    // Non-collinearity via the cross product of (hip → footR) against (hip → kneeR): exactly 0
+    // would mean the knee sits ON the straight line, i.e. a rigid stick.
+    const cross =
+      (pose.footR.x - pose.hip.x) * (pose.kneeR.y - pose.hip.y) -
+      (pose.footR.y - pose.hip.y) * (pose.kneeR.x - pose.hip.x);
+
+    expect(cross).not.toBe(0);
+  });
+
+  it("leans the upper body into a kick exactly as it does into a punch", () => {
+    // A DELIBERATE carry-over, pinned so it is a decision rather than an accident: the M2 lean is
+    // driven by the reaching endpoint's forward x whatever limb that is, so a kick lunges too. The
+    // lean is min(CAP 16, 66 · 0.5) = 16, applied to head + shoulder only. Whether a kick should
+    // lean forward, stay upright, or counter-lean BACK for balance is an eye question this slice
+    // deliberately leaves open (the plan parks lean polarity) — if the answer changes, change this.
+    const pose = poseKicking();
+
+    expect(pose.head).toEqual(scaled({ x: 16, y: -76 }));
+    expect(pose.shoulder).toEqual(scaled({ x: 16, y: -64 }));
+    // The hip is NOT part of the lean, so the lower body stays planted under the kick.
+    expect(pose.hip).toEqual(scaled({ x: 0, y: -34 }));
+  });
+
+  it("falls back to today's generic hand pose for a move with no descriptor yet (M7)", () => {
+    // The other 12 moves, an id the table has never heard of, an empty id, and an ABSENT field
+    // (the loader casts the wire wholesale, so the key may simply not be there) all draw the hand.
+    const generic = [
+      { attackMove: "gyaku-zuki" }, // a real move, no descriptor yet
+      { attackMove: "no-such-move" }, // unknown id
+      { attackMove: "" }, // the engine's "nothing committed" sentinel
+      { attackMove: undefined }, // field absent from the wire
+    ];
+
+    generic.forEach((extra) => {
+      const pose = poseKicking({ extra });
+
+      expect(pose.handR).toEqual(scaled({ x: 66, y: -46 })); // the hand drives
+      expect(pose.footR).toEqual(scaled(NEUTRAL_FOOT_R)); // the foot stays home
+    });
+  });
+
+  it("draws no kick at all when the fighter is not attacking, even carrying a stale move id", () => {
+    // The descriptor selects WHICH endpoint a committed strike drives; it never makes an idle
+    // fighter strike. Both endpoints keep the stance (M7 totality).
+    const pose = poseKicking({ extra: { attacking: false } });
+
+    expect(pose.footR).toEqual(scaled(NEUTRAL_FOOT_R));
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
+  });
+
+  it("carries the kick to whichever band it targets, and draws none for an unmapped band", () => {
+    expect(poseKicking({ band: 1 }).footR).toEqual(scaled({ x: 66, y: -24 }));
+    expect(poseKicking({ band: 3 }).footR).toEqual(scaled({ x: 66, y: -68 }));
+    // Band 0 / out-of-range ⇒ no strike to draw ⇒ the foot keeps its stance.
+    expect(poseKicking({ band: 0 }).footR).toEqual(scaled(NEUTRAL_FOOT_R));
+    expect(poseKicking({ band: 9 }).footR).toEqual(scaled(NEUTRAL_FOOT_R));
+  });
+
+  it("is a pure function of the frame — a backward scrub re-lands the same foot", () => {
+    const tape: ReplayTape = [
+      tickOf(
+        0,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: 270_000,
+          attackMove: "mae-geri",
+          x: 150_000,
+          facing: 1,
+        },
+        { x: 390_000 },
+      ),
+      tickOf(1, { x: 150_000, facing: 1 }, { x: 390_000 }),
+    ];
+
+    const first = scene(tape, 0, VIEWPORT).a.pose.footR;
+
+    scene(tape, 1, VIEWPORT);
+
+    expect(scene(tape, 0, VIEWPORT).a.pose.footR).toEqual(first);
+  });
+});
+
+describe("move descriptors — table integrity", () => {
+  it("describes only real arsenal moves, so no descriptor is silently dead", () => {
+    // A typo'd key ("maegeri") would never match a tape's `attackMove` and would fall back to the
+    // generic pose forever, with nothing failing. REACH_PRESETS is the engine-mirror move list, so
+    // every described id must appear in it. (Arsenal.tsx carries the same 13 ids but does not
+    // export its array — it is presentation only, so the mirror is the authority here.)
+    const known = new Set(REACH_PRESETS.map((p) => p.move));
+
+    expect(DESCRIBED_MOVES.length).toBeGreaterThan(0);
+    DESCRIBED_MOVES.forEach((move) => expect(known).toContain(move));
   });
 });

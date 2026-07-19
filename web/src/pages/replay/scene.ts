@@ -1,4 +1,5 @@
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
+import { limbFor } from "./move-descriptors";
 
 // The world→screen projection: a pure function from (tape, playhead, viewport) to the on-screen
 // state the Pixi layer draws. Kept free of Pixi and of any engine import (web/src never imports
@@ -205,6 +206,9 @@ const poseFor = (
   const guardY = bandHeight(frame.guardBand);
   // A drawn strike leans the upper body forward into the reach (M2); no strike ⇒ no lean.
   const lean = strikeHand === null ? 0 : strikeLean(strikeHand.x);
+  // Which endpoint this technique drives (S1): a punch reaches with the front hand, a kick with the
+  // front foot. The solved position is identical either way — only its destination differs.
+  const limb = limbFor(frame.attackMove);
 
   const endpoints: Stance = {
     ...stance,
@@ -213,7 +217,7 @@ const poseFor = (
       : {
           head: { x: stance.head.x + lean, y: stance.head.y },
           shoulder: { x: stance.shoulder.x + lean, y: stance.shoulder.y },
-          handR: strikeHand,
+          ...(limb === "footR" ? { footR: strikeHand } : { handR: strikeHand }),
         }),
     ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
     ...(grab === null ? {} : grab),
