@@ -1,5 +1,5 @@
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
-import { limbFor } from "./move-descriptors";
+import { chamberFor, limbFor } from "./move-descriptors";
 
 // The world→screen projection: a pure function from (tape, playhead, viewport) to the on-screen
 // state the Pixi layer draws. Kept free of Pixi and of any engine import (web/src never imports
@@ -181,6 +181,18 @@ const STRIKE_LEAN_CAP = 16;
 const strikeLean = (handX: number): number =>
   Math.min(STRIKE_LEAN_CAP, handX * STRIKE_LEAN_RATIO);
 
+// ─── S2 phase: a technique winds up, commits, and recovers ────────────────────────────────────────
+// `attackPhase` (M1 encoding: 0 nothing committed / 1 startup / 2 active / 3 recovery) selects WHICH
+// shape a committed move draws. Startup and recovery draw the technique's chamber; only the active
+// phase drives to the solved target. Before this, `attacking` was emitted true for the whole
+// committed duration, so a gyaku-zuki held full extension for 24 ticks (~0.4 s).
+//
+// TOTAL by construction: an absent field (the loader casts the wire wholesale), a non-numeric value,
+// and any out-of-range code all answer `false` and therefore draw the EXTENSION — exactly what every
+// tape drew before phases existed, so no frame can regress into a blank or frozen figure (M7).
+const isChamberPhase = (phase: number | undefined): boolean =>
+  phase === 1 || phase === 3;
+
 // The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
 // over everything (highest precedence — an early return, so a downed fighter is never also striking
 // or throwing, and it keeps its OWN authored mid-joints rather than the derived bend); otherwise the
@@ -204,20 +216,33 @@ const poseFor = (
 
   const stance = stanceFor(frame.posture);
   const guardY = bandHeight(frame.guardBand);
-  // A drawn strike leans the upper body forward into the reach (M2); no strike ⇒ no lean.
-  const lean = strikeHand === null ? 0 : strikeLean(strikeHand.x);
   // Which endpoint this technique drives (S1): a punch reaches with the front hand, a kick with the
   // front foot. The solved position is identical either way — only its destination differs.
   const limb = limbFor(frame.attackMove);
+  const winding = isChamberPhase(frame.attackPhase);
+
+  // WHERE that endpoint sits this phase (S2). `strikeHand` remains the gate: no strike to draw (idle,
+  // unmapped band, rejected reach) ⇒ no layer at all, so a stale move id can never make an idle
+  // fighter chamber. Given a strike, the phase picks the point — the chamber while winding up and
+  // recovering, the solved target at contact. A move with no authored chamber winds up through its
+  // STANCE instead (`chamberFor` ⇒ null ⇒ no layer), which is why every move gains a wind-up here,
+  // not just the authored ones.
+  const driven =
+    strikeHand === null || !winding ? strikeHand : chamberFor(frame.attackMove);
+
+  // A drawn strike leans the upper body forward into the reach (M2) — gated to the ACTIVE phase
+  // (M9), because leaning fully forward during the chamber is backwards: a fighter leans INTO a
+  // technique as it extends, not while winding up.
+  const lean = driven === null || winding ? 0 : strikeLean(driven.x);
 
   const endpoints: Stance = {
     ...stance,
-    ...(strikeHand === null
+    ...(driven === null
       ? {}
       : {
           head: { x: stance.head.x + lean, y: stance.head.y },
           shoulder: { x: stance.shoulder.x + lean, y: stance.shoulder.y },
-          ...(limb === "footR" ? { footR: strikeHand } : { handR: strikeHand }),
+          ...(limb === "footR" ? { footR: driven } : { handR: driven }),
         }),
     ...(guardY === null ? {} : { handL: { x: GUARD_REACH_X, y: guardY } }),
     ...(grab === null ? {} : grab),

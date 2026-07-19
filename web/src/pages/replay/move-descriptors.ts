@@ -10,18 +10,32 @@
 // Moves absent from the table fall back to the generic hand pose, so the viewer stays fully usable
 // while descriptors are authored one slice at a time.
 
+// A pose coordinate in the local-px authoring frame. Imported TYPE-ONLY from scene.ts, which imports
+// `limbFor` back from here — a type-only cycle is erased at compile time, so there is no runtime
+// cycle and no need to hoist the type into a third module.
+import type { Joint } from "./scene";
+
 // Which skeleton endpoint a committed strike drives toward the opponent. The reach-to-target solve
 // (`reachTargetX`) is identical whichever it is — only the endpoint it lands on differs, so a kick
 // tracks true opponent distance exactly as a punch does, and the knee re-derives off the moved
 // `hip → footR` for free (the bend rule runs on the FINAL endpoints).
 export type StrikeLimb = "handR" | "footR";
 
-export type MoveDescriptor = { limb: StrikeLimb };
+// Where the driven endpoint sits while the technique is WINDING UP or RECOVERING (S2). A chambered
+// technique is a different SHAPE, not a shorter reach (M3) — scaling the extension down reads as a
+// weak strike rather than a wind-up — so the descriptor authors one extra point in the same local-px
+// frame as the stance constants. Optional: a move with no chamber keeps its stance endpoint through
+// those phases, which is still a wind-up (arm returns to guard between strikes), just an unauthored
+// one. Mid-joints re-derive from the endpoints at every phase, so a chambered limb bends for free.
+export type MoveDescriptor = { limb: StrikeLimb; chamber?: Joint };
 
 const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // mae-geri (front kick): the front leg snaps out to the band, so the FOOT is the driven endpoint
-  // and the front hand simply stays in its stance.
-  ["mae-geri", { limb: "footR" }],
+  // and the front hand simply stays in its stance. Its chamber is the classic knee-up: the foot
+  // drawn BACK under the hip (stance foot sits at x 14, the hip at x 0) and LIFTED off the ground,
+  // so the derived knee rises toward hip height and the foot hangs beneath it. First authored from
+  // anatomy rather than by eye — re-tuned in `/dojo` once the technique can be played (S2 slice 2).
+  ["mae-geri", { limb: "footR", chamber: { x: 4, y: -22 } }],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this
@@ -38,3 +52,9 @@ export const DESCRIBED_MOVES: readonly string[] = [...DESCRIPTORS.keys()];
 // can never resolve to a descriptor.
 export const limbFor = (move: string | undefined): StrikeLimb =>
   DESCRIPTORS.get(move ?? "")?.limb ?? GENERIC_LIMB;
+
+// Where this move's driven endpoint sits while winding up / recovering, or `null` when the move
+// authors no chamber (unknown id, the "" sentinel, an absent field, or simply not yet authored) —
+// in which case the caller leaves the endpoint at its stance position (M7). TOTAL, same as limbFor.
+export const chamberFor = (move: string | undefined): Joint | null =>
+  DESCRIPTORS.get(move ?? "")?.chamber ?? null;
