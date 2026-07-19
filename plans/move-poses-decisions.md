@@ -220,6 +220,53 @@ Decisions that tighten the table above into something implementable without re-a
   done when the determinism/replay tests are green **and** `BENCHMARK_VERSION` is unchanged —
   if either fails, the id has leaked into the outcome path and the design is wrong.
 
+- **M12 — the shoulder girdle: two shoulders, and a torso that rotates** _(grilled 2026-07-19,
+  after S4 · slice 3's eye-check)_. `Stance` has ONE `shoulder`, so both arms hang off the same
+  point and a reverse punch and a jab send their driven hand to the **identical pixel**
+  (`417, −429` at the workhorse distance). The entire distinction between them lives in the
+  resting hand, and slice 3 shrank that from 63px to 38px by removing the stretch artifact that
+  had been accidentally carrying it. This is decision 3's expressiveness limit — the arc's
+  stated main technical risk — arriving on **punches** rather than the kicks it was forecast for.
+
+  Resolved, in dependency order:
+
+  | #   | Question                                     | Choice                                                                                                                       | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+  | --- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | a   | Authored or derived?                         | **Derived** — `shoulder` stays as the girdle's midpoint; the ends are `shoulder.x ± SHOULDER_HALF_WIDTH`                     | Touches no authored data, so nothing is re-tuned and `PRONE`'s 11 hand-placed joints stand. Matches how the codebase already handles limb structure (`deriveBend` computes elbows and knees rather than authoring them). Cost: no pose can hunch or square its shoulders independently — no move in the roster needs it.                                                                                                                                          |
+  | b   | Does the arm keep its length?                | **Yes — `ARM_BONE` unchanged at 15.65**                                                                                      | Widening someone's shoulders does not shorten their arms. The girdle relocates where an arm _starts_, not how long it is; `ARM_BONE` stops meaning "the bone the stance span implies" and starts meaning "the arm's length". Re-deriving it would shorten every arm 11% and push the reverse punch from 1.6× stretch to 2.05×, making the rubber-band problem worse on the move we are trying to fix. **Visible cost: every resting arm bows 10.7 instead of 8.** |
+  | c   | Which arm hangs off which end?               | **Determined, not chosen** — `handR` (front, x +18) off `shoulderR`, `handL` (rear) off `shoulderL`                          | `poseFor` never reads `facing`; the root container flip carries it, so local +x is always forward. No facing dependency.                                                                                                                                                                                                                                                                                                                                          |
+  | d   | Where is the lean's shortfall measured from? | **Each arm's own root**                                                                                                      | It is what `rootTravel` already means. Also physically right — the rear hand has further to travel. Separates the two punches at **mid range**, where the arm-span axis is weakest: at a 35px reach a jab stands upright while a reverse punch leans 10.9. Contributes nothing at the workhorse distance, where both cap.                                                                                                                                         |
+  | e   | Slide or rotate?                             | **Rotate** — only the _driving_ shoulder moves forward by `lean`; the other stays                                            | See "the slide breaks `hikite`" below. Also what a reverse punch anatomically _is_, and what `Hero.tsx` already draws.                                                                                                                                                                                                                                                                                                                                            |
+  | f   | Where does the head go?                      | **Follows the girdle midpoint** — `lean/2`                                                                                   | The only option that follows from the geometry rather than being picked. A torso that rotates _and_ lunges the full 16 is two motions where a body does one. **Cost: 8px of lunge instead of 16 on the most-viewed frame in the product.**                                                                                                                                                                                                                        |
+  | g   | What does `PRONE` do?                        | **Both shoulders on its one authored point** — zero-length girdle bone, byte-identical rendering                             | A derived girdle offsets in **x**, but `PRONE` lies _along_ x — applying it would string the shoulders down the spine, one at the neck and one halfway to the hip. Its arms already splay in **y**. Authoring two shoulders for it is more correct and cheap, but it changes a pose we are not otherwise judging; keeping it identical means any visible change to a knockdown is a **bug, not a judgement call**, which makes the sign-off readable.             |
+  | h   | What does the draw layer stroke?             | **A girdle bar.** Keep `hip→shoulder` as the spine, add `shoulderL→shoulderR` crossing it, re-root the two arms. Net +1 bone | Otherwise there is a 7px gap at each armpit. It is what `Hero.tsx` draws, and the proportion matches exactly: Hero's girdle is 20 on a 112-unit body (0.18); 7px on our 76px body is 14/76, **also 0.18**. The alternative (forking the spine into a Y) orphans the centre joint, which the head, the lean and many tests still need.                                                                                                                             |
+  | i   | Hips too?                                    | **No — shoulders only**                                                                                                      | The girdle separates two moves only when they drive **different limbs**. `mae-geri` and `mawashi-geri` both drive `footR`, so a hip girdle gives them zero separation. It would pay off only if slice 6 authors the roundhouse onto the rear leg (`footL`, a new `StrikeLimb`) — an open decision. Building it now is speculative generality, and it would deepen every knee bow in the same breath as the elbows.                                                |
+  | j   | Naming                                       | **`shoulderL` / `shoulderR`**; `shoulder` redefined as the **midpoint**                                                      | The convention already encodes front/rear as L/R (`handR` is the front hand). `shoulderF`/`shoulderR` would make `R` mean "rear" on shoulders and "front" on hands in the same object. Keeping `shoulder` as the midpoint makes "the head follows the midpoint" and "the spine's top" the same fact.                                                                                                                                                              |
+
+  **The slide breaks `hikite` — the finding that reversed (e).** Under a rigid slide both
+  shoulders move forward by the lean, so `gyaku-zuki`'s _front_ shoulder sits at `7 + 16 = 23`
+  while its pulled fist is authored at `−8`: a span of **34.0** against a 31.3 reach, i.e. the
+  stretched line slice 2 spent an eye-pass escaping. To stay legal the fist would have to move
+  _forward_, making the pull read **less** on the move whose pull is the whole point. Rotation
+  leaves the front shoulder at 7, putting the fist at a comfortable 20.5 and extending the
+  reachable envelope back to about **−21** — near the hip, which is where slice 2 authored it
+  first, found undrawable, and abandoned for the flank. Rotation is what makes `hikite`
+  authorable where karate actually puts it.
+
+  **Consequences to expect, not discover:**
+
+  - **Rotation supersedes S4 · slice 3's hand-ride.** The resting hand's shoulder never moves,
+    so the rule becomes "each hand keeps its offset from **its own** shoulder" and the resting
+    arm's ride is zero. Slice 3's trailing-hand fix was a workaround for the shared shoulder;
+    this removes the cause and the code goes. Slice 3's **derived lean** survives and is
+    load-bearing.
+  - **~8 existing tests assert `pose.shoulder` at the full `LEAN_CAP` of 16** and will need
+    revising to 8 (the midpoint). Same category as the four revised in slice 3.
+  - **The neutral figure changes twice over** — deeper elbow bow (b) plus a new horizontal bar
+    (h). An idle fighter after this lands is noticeably different from today's.
+  - `SHOULDER_HALF_WIDTH` starts at **7** (Hero's 0.18) and is eye-tuned under decision 9.
+    Smaller gives more `hikite` room, larger gives more arm-span separation.
+
 ## Slice ladder
 
 1. **Engine** — `attackMove` + `attackPhase` on `RenderFrame`. Additive, render-only, outcome
