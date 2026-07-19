@@ -163,11 +163,32 @@ recorded, and the human approves the commit.
   may read as a stump exactly as an extended one reads as a rubber band. This sharpens the
   slice-3 question from "should the extension be constrained?" to "should bone length be
   conserved at all?"
-- **Visual sign-off is deferred to slice 2, by construction.** `/dojo` builds a single-tick tape
-  carrying no `attackPhase`, so it renders the extension and shows **no change**; seeing this
-  slice needs either a real `mae-geri` replay on a preview deploy or slice 2's multi-tick tape.
-  This is the accepted cost of the split — the chamber is authored from anatomy and tuned by eye
-  in slice 2.
+- **Visual sign-off: PARTIALLY DONE on the preview, better than this plan predicted.** The plan
+  assumed nothing could be seen until slice 2. Wrong — reading A means every move winds up
+  through its stance, so the **phase mechanism** is visible on real replays right now. Confirmed
+  on `/watch/7076747f…` (Playwright, seeking to specific ticks):
+
+  | Tick | Phase    | What renders                           |
+  | ---- | -------- | -------------------------------------- |
+  | 41   | startup  | upright stance, arm down — the wind-up |
+  | 47   | active   | full extension + the M2 lean           |
+  | 58   | recovery | back to upright stance                 |
+
+  What remains unseen is only the **authored `mae-geri` chamber** — see the move-usage finding
+  below for why that will stay unseen on `/watch` regardless.
+
+- **The change is far larger than "a nicer strike": 87% of committed ticks were wrong before.**
+  In that replay 636 of 727 committed ticks are startup or recovery. Across all 29 replays,
+  `gyaku-zuki` alone spends 4040 ticks in startup and 9164 in recovery against just 1833 active.
+  Nearly all committed time was previously drawn at full extension.
+
+- **Confirmed cost of reading A.** At tick 58 the recovering fighter is pixel-identical to an
+  idle one. The "committed and vulnerable" read really is gone for unauthored moves, exactly as
+  predicted — not a surprise, but now observed rather than argued.
+
+- **The lean + telescoping read strongly at contact.** The active frame is a hard diagonal lunge
+  with an arm roughly 2× its stance length. Consistent with the bone-length finding above; slice
+  2 should judge the lean's magnitude at the same time as the limb lengths.
 
 ---
 

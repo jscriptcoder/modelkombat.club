@@ -53,8 +53,31 @@ This matters because the roster is known to be uneven — the dead-move probe (2
 Authoring their poses early spends the same effort for a technique a spectator may never see
 thrown.
 
-**Recommendation:** before starting S4, run `npm run telemetry` and order the descriptors by
-observed usage. Expect roughly half the roster to carry the great majority of on-screen strikes,
+**Hard data, measured 2026-07-19** (S2 slice 1 preview check — every committed tick across all
+29 replays on the deployed `/replay` API, counted by move):
+
+| Move           | startup | active | recovery |
+| -------------- | ------: | -----: | -------: |
+| `gyaku-zuki`   |    4040 |   1833 |     9164 |
+| `mawashi-geri` |    1820 |    361 |      216 |
+| `tobi-geri`    |     120 |     40 |      638 |
+| `sweep`        |     324 |    108 |      214 |
+| `throw`        |      30 |     10 |       70 |
+
+**Only five of the thirteen moves are ever thrown**, and `gyaku-zuki` alone is ~80% of all
+committed time. This is a much sharper bargain than the section assumed: authoring `gyaku-zuki`
+and `mawashi-geri` covers nearly everything a spectator will ever see, and the remaining eight
+moves have **zero** on-screen presence today.
+
+Note the awkward corollary: **`mae-geri` — the move S1 and S2 authored — is never thrown.** That
+was the right choice for the reasons decision 8 gives (it is mid-only and a straight thrust, so
+it tests the foot-through-solver risk in isolation), and it is fully visible in `/dojo`. But it
+means the arc's authored pose will not appear on `/watch` until S4 reaches a move that fighters
+actually use. Worth knowing before anyone concludes the feature "isn't working".
+
+**Recommendation:** before starting S4, re-run this count (or `npm run telemetry`) and order the
+descriptors by observed usage — starting with `gyaku-zuki`, which also forces the rear-hand
+precedence rule parked in the warnings below. Expect roughly half the roster to carry the great majority of on-screen strikes,
 making S4 a genuine bargain — most of the visible value for a fraction of the authoring. The
 tail becomes optional rather than obligatory, and can be dropped entirely if the contact sheet
 (S7) shows the generic fallback reads acceptably for rare moves.
