@@ -3,7 +3,7 @@ import { fireEvent, render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
 import DojoApp from "./DojoApp";
-import { durationOf, REACH_PRESETS } from "./reach-presets";
+import { DEFAULT_GAP, durationOf, REACH_PRESETS } from "./reach-presets";
 import type { DojoStageProps } from "./DojoStage";
 import type { ReplayTape } from "../replay/replay-contract";
 import type { Brand } from "../../shared/lib/brand";
@@ -268,22 +268,10 @@ describe("DojoApp — per-figure brand picker", () => {
   });
 });
 
+// Snapping the gap by NAMING a move moved to the per-figure move picker in S3 · Slice 3, along
+// with the "Custom" read-back that only existed to describe the retired dropdown's state. What
+// remains here is the free slider: the half the picker deliberately does not do.
 describe("DojoApp — world-gap spacing control", () => {
-  it("snaps the fighter gap to a preset move's reach, repositioning both fighters", () => {
-    const { Stage, latest } = spyStage();
-    const { getByRole } = render(() => <DojoApp stage={Stage} />);
-
-    // Snap to the longest reach in the arsenal.
-    fireEvent.change(getByRole("combobox", { name: "Reach preset" }), {
-      target: { value: "ushiro-geri" },
-    });
-
-    const frame = latest()[0];
-
-    expect(frame.b.x - frame.a.x).toBe(330_000); // ushiro-geri reach
-    expect((frame.a.x + frame.b.x) / 2).toBe(300_000); // still centered on the ring
-  });
-
   it("sets a free gap from the slider, repositioning both fighters symmetrically", () => {
     const { Stage, latest } = spyStage();
     const { getByRole } = render(() => <DojoApp stage={Stage} />);
@@ -313,24 +301,6 @@ describe("DojoApp — world-gap spacing control", () => {
     });
 
     expect(within(spacing).getByText("100k")).toBeTruthy(); // the read-out follows the gap
-  });
-
-  it("reflects the current gap in the preset selector — a matching reach, else Custom", () => {
-    const { getByRole } = render(() => <DojoApp />);
-
-    // The lab opens at the default 240k gap, which IS gyaku-zuki's reach.
-    expect(
-      getByRole("option", { name: /gyaku-zuki/, selected: true }),
-    ).toBeTruthy();
-
-    // Drag to a value that matches no preset → the selector falls back to Custom.
-    fireEvent.input(getByRole("slider", { name: "Gap" }), {
-      target: { value: "123000" },
-    });
-
-    expect(
-      getByRole("option", { name: "Custom", selected: true }),
-    ).toBeTruthy();
   });
 });
 
@@ -633,6 +603,10 @@ describe("DojoApp — per-figure move picker (S3)", () => {
     expect(latest()[0].a.attackMove).toBe("");
     expect(latest()[0].a.attackReach).toBe(0);
     expect(latest()).toHaveLength(1); // nothing committed on either figure ⇒ one static tick
+
+    // Standing down leaves the fighters where they were: idle has no reach to snap to, and a 0 gap
+    // would collapse them into each other rather than showing anything.
+    expect(latest()[0].b.x - latest()[0].a.x).toBe(DEFAULT_GAP);
   });
 
   it("commits the king to its own technique, leaving the challenger untouched", () => {
@@ -678,6 +652,86 @@ describe("DojoApp — per-figure move picker (S3)", () => {
         selected: true,
       }),
     ).toBeTruthy(); // ...and the picker still says so
+  });
+
+  it("sets the fighters' distance to the selected technique's true reach", () => {
+    // Picking a move without moving the fighters leaves a short technique visibly whiffing at the
+    // previous move's distance — an elbow judged from punching range tells you nothing. The snap is
+    // what makes each move judgeable: it stands the pair at the distance the engine would.
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const empi = presetOf("empi");
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "empi" } },
+    );
+
+    const frame = latest()[0];
+
+    expect(frame.b.x - frame.a.x).toBe(empi.reach);
+    expect((frame.a.x + frame.b.x) / 2).toBe(300_000); // still centered on the ring
+  });
+
+  it("takes the most recent selection when both fighters pick a technique", () => {
+    // One gap, two pickers — so the two figures genuinely compete for it. Last-write-wins
+    // (decision 6): the move you just picked is the one you are looking at.
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+    const king = getByRole("group", { name: "King" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "ushiro-geri" } },
+    );
+    fireEvent.change(within(king).getByRole("combobox", { name: "Move" }), {
+      target: { value: "empi" },
+    });
+
+    expect(latest()[0].b.x - latest()[0].a.x).toBe(presetOf("empi").reach);
+
+    // ...and back the other way, so the rule is direction-free rather than "the king wins".
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "ushiro-geri" } },
+    );
+
+    expect(latest()[0].b.x - latest()[0].a.x).toBe(
+      presetOf("ushiro-geri").reach,
+    );
+  });
+
+  it("leaves the snapped gap free to be dragged away without changing the move", () => {
+    const { Stage, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.change(
+      within(challenger).getByRole("combobox", { name: "Move" }),
+      { target: { value: "mawashi-geri" } },
+    );
+
+    fireEvent.input(getByRole("slider", { name: "Gap" }), {
+      target: { value: "123000" },
+    });
+
+    expect(latest()[0].b.x - latest()[0].a.x).toBe(123_000); // dragged off the snap...
+    expect(latest()[0].a.attackMove).toBe("mawashi-geri"); // ...still a roundhouse
+  });
+
+  it("supersedes the shared reach-preset dropdown, leaving one move control per figure", () => {
+    // The preset dropdown snapped the gap by naming a move — exactly what the picker now does, but
+    // shared across both figures. Two controls naming moves could disagree; this is the one that
+    // also poses the fighter, so the other goes (decision 5 — the picker ABSORBS it).
+    const { queryByRole, getByRole } = render(() => <DojoApp />);
+
+    expect(queryByRole("combobox", { name: "Reach preset" })).toBeNull();
+    expect(getByRole("slider", { name: "Gap" })).toBeTruthy(); // the free slider stays
   });
 
   it("commits an unauthored move so the renderer's generic fallback draws it (M7)", () => {
