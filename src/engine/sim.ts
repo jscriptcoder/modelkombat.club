@@ -102,6 +102,14 @@ export type RenderFrame = {
   // `throw.reach`, or 0 when idle. Render-only (like `guardBand`): the viewer aims a strike/grab
   // at its true reach; the outcome path never reads it.
   attackReach: number;
+  // Which technique is committed, in the 13-id web vocabulary (`MoveId | "sweep" | "throw"`),
+  // or "" when nothing is. Render-only: lets the viewer draw a per-move pose instead of one
+  // generic strike. NOT bot-readable — the bot API (`docs/spec.md`) is unchanged.
+  attackMove: string;
+  // Which phase of that technique this frame shows: 0 none / 1 startup / 2 active / 3 recovery
+  // — mirroring the `0 = none` convention of `attackBand` / `guardBand`, so an idle fighter
+  // reads 0 for every action code and no consumer needs `attacking` as a validity gate.
+  attackPhase: number;
   knockdown: boolean;
   points: number;
   stamina: number;
@@ -160,6 +168,7 @@ type MoveState =
   | {
       kind: "attacking";
       spec: MoveSpec; // the resolved frame data, captured at intake — so no site re-indexes the (optionally-sweep) moves table by a union key
+      move: string; // RENDER-ONLY: which technique this is (`MoveId | "sweep"`), captured alongside `spec` so the viewer can draw a per-move pose. Never read by resolution.
       band: Band;
       elapsed: number;
       scored: boolean; // terminal flag: the strike has resolved (scored OR was deflected)
@@ -176,6 +185,7 @@ type MoveState =
       vy: number;
       vx: number;
       spec: MoveSpec;
+      move: string; // RENDER-ONLY, as `attacking`.move — survives the landing conversion below.
       band: Band;
       elapsed: number;
       scored: boolean;
@@ -257,6 +267,14 @@ const frameOf = (f: Fighter, prev: Frame | undefined): Frame => ({
   ticksSinceOffense: f.ticksSinceOffense,
 });
 
+// Which phase of a committed move a render frame shows: 1 startup / 2 active / 3 recovery.
+// Uses the engine's OWN active-window inequality (`computeStrike`, `elapsed >= startup &&
+// elapsed < startup + active`) so the drawn extension lines up with the ticks that resolve
+// contact. The else-branch absorbs parry-extended recovery (`extra`) with no fourth code — a
+// deflected fighter simply holds the recovery pose longer. Render-only.
+const phaseOf = (elapsed: number, startup: number, active: number): number =>
+  elapsed < startup ? 1 : elapsed < startup + active ? 2 : 3;
+
 // Project a fighter's CURRENT (post-tick, post-advance) state into a render frame — a
 // coherent snapshot: x/y/points and the strike/throw/knockdown pose all read the resolved
 // post-advance state. Posture is RECOMPUTED here via `postureOf` rather than read from the
@@ -287,6 +305,24 @@ const renderFrameOf = (
       ? f.state.spec.reach
       : f.state.kind === "throwing"
         ? (rules.throw?.reach ?? 0)
+        : 0,
+  // The committed technique's id and phase, read from the committed STATE for the same reason
+  // `attackReach` is: the live `action` may be idle for most of a move's duration.
+  attackMove:
+    f.state.kind === "attacking" || f.state.kind === "air-attacking"
+      ? f.state.move
+      : f.state.kind === "throwing"
+        ? "throw"
+        : "",
+  attackPhase:
+    f.state.kind === "attacking" || f.state.kind === "air-attacking"
+      ? phaseOf(f.state.elapsed, f.state.spec.startup, f.state.spec.active)
+      : f.state.kind === "throwing"
+        ? phaseOf(
+            f.state.elapsed,
+            rules.throw?.startup ?? 0,
+            rules.throw?.active ?? 0,
+          )
         : 0,
   knockdown: f.state.kind === "downed",
   points: f.points,
@@ -431,9 +467,14 @@ const viewFor = (
 // A fresh attacking move: startup begins now (elapsed 0), nothing resolved yet, no
 // parry-extended recovery. The single source for "start an attack" — used both when a
 // neutral fighter strikes and when an on-contact cancel interrupts into a follow-up.
-const startAttack = (spec: MoveSpec, band: Band): AttackingState => ({
+const startAttack = (
+  spec: MoveSpec,
+  band: Band,
+  move: string,
+): AttackingState => ({
   kind: "attacking",
   spec,
+  move,
   band,
   elapsed: 0,
   scored: false,
@@ -451,11 +492,13 @@ const startAirAttack = (
   band: Band,
   vy: number,
   vx: number,
+  move: string,
 ): AirAttackingState => ({
   kind: "air-attacking",
   vy,
   vx,
   spec,
+  move,
   band,
   elapsed: 0,
   scored: false,
@@ -596,7 +639,7 @@ const intake = (
         (f.state.spec.cancelInto ?? []).includes(action.move) &&
         bandLegal(spec, action.band) // C9: an out-of-band cancel is refused
       ) {
-        f.state = startAttack(spec, action.band);
+        f.state = startAttack(spec, action.band, action.move);
         f.cancelRemaining = 0; // the fresh move re-opens the window only when IT connects
 
         return null; // the cancel took effect
@@ -619,7 +662,14 @@ const intake = (
         if (!bandLegal(spec, action.band)) return "out-of-band";
         if (!affordable(f, spec, rules)) return "unaffordable"; // C10 gate — no spend, rides to landing
 
-        const move = startAirAttack(spec, action.band, f.state.vy, f.state.vx);
+        const move = startAirAttack(
+          spec,
+          action.band,
+          f.state.vy,
+          f.state.vx,
+          action.move,
+        );
+
         f.state = move;
         spend(f, spec, rules); // C10: the air strike drains stamina on commit
         move.extra += gasRecovery(f, rules); // C10 Story 3: a gassed commit lengthens the landing recovery
@@ -643,7 +693,7 @@ const intake = (
     if (!bandLegal(spec, action.band)) return "out-of-band"; // C9: an out-of-band attack degrades to idle
     if (!affordable(f, spec, rules)) return "unaffordable"; // C10: too little stamina to commit
 
-    const move = startAttack(spec, action.band);
+    const move = startAttack(spec, action.band, action.move);
     f.state = move;
     spend(f, spec, rules); // C10: a costed move drains stamina on commit
     move.extra += gasRecovery(f, rules); // C10 Story 3: a commit into the gas line recovers slower
@@ -658,7 +708,7 @@ const intake = (
     if (rules.moves.sweep === undefined) return "inert";
     if (!affordable(f, rules.moves.sweep, rules)) return "unaffordable";
 
-    const move = startAttack(rules.moves.sweep, "low");
+    const move = startAttack(rules.moves.sweep, "low", "sweep");
     f.state = move;
     spend(f, rules.moves.sweep, rules);
     move.extra += gasRecovery(f, rules); // C10 Story 3: a gassed sweep also recovers slower
@@ -1042,6 +1092,7 @@ const advance = (f: Fighter, rules: Rules): void => {
       f.state = {
         kind: "attacking",
         spec: st.spec,
+        move: st.move, // the technique survives the landing — its recovery is still ITS recovery
         band: st.band,
         // Park at the start of the recovery frames: `elapsed` is already past the active window, so
         // computeStrike can never re-fire on the ground regardless of `scored` (the `scored: true`
