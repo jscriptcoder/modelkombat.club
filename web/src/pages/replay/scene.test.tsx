@@ -1465,6 +1465,164 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
   });
 });
 
+describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
+  // Until now a committed move drew ONE pose for its whole duration — startup, active and recovery
+  // alike — so a gyaku-zuki held full extension for 24 ticks (~0.4s). `attackPhase` (shipped on the
+  // tape in S0) now selects the shape: a chamber while winding up and recovering, the solved
+  // extension only at contact. The solve is retained at phase 2 (M3, non-negotiable).
+  const CHAMBER = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+
+  // A committed mid-band mae-geri at a 240k gap — the same geometry the S1 block uses, so the
+  // phase-2 endpoint is the familiar edge-solve at x 66.
+  const poseAtPhase = (extra: Partial<ReplayFrame> = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: 270_000,
+            attackMove: "mae-geri",
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 390_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  const footAt = (attackPhase: number | undefined) =>
+    poseAtPhase({ attackPhase }).footR;
+
+  it("chambers the kicking foot during startup, then drives it forward at contact", () => {
+    const chambered = footAt(CHAMBER);
+    const extended = footAt(CONTACT);
+
+    // A wind-up is a different SHAPE, not a shorter reach (M3) — scaling the extension down reads
+    // as a weak kick rather than a chamber.
+    expect(chambered).not.toEqual(extended);
+    // M8.4 direction: the technique EXTENDS from its chamber. If this ever inverts, the kick is
+    // retracting into contact.
+    expect(chambered.x).toBeLessThan(extended.x);
+    // Lifted off the ground — a chambered leg is knee-up, not a foot resting in stance.
+    expect(chambered.y).toBeLessThan(0);
+  });
+
+  it("returns to the chamber during recovery (M3 default, no per-move override yet)", () => {
+    // M3 defaults recovery to the chamber point; whether mae-geri needs its OWN recovery pose is an
+    // eye question deferred to slice 2's visual sign-off. Phase 1 === phase 3 is therefore BY
+    // DESIGN, which is why M8.3 was relaxed to "phase 2 differs from 1 and 3" (see the plan).
+    expect(footAt(RECOVER)).toEqual(footAt(CHAMBER));
+    expect(footAt(RECOVER)).not.toEqual(footAt(CONTACT));
+  });
+
+  it("still tracks the real opponent distance at contact — the solve survives phasing (M8.5)", () => {
+    // The standing guard against M3 quietly regressing into a fixed authored extension. A 150k gap
+    // puts the near edge at 37.5 local px, a 240k gap at 66 — both inside mae-geri's 85.5 cap.
+    const near = poseAtPhase({ attackPhase: CONTACT, x: 240_000 }).footR;
+    const far = poseAtPhase({ attackPhase: CONTACT, x: 150_000 }).footR;
+
+    expect(near.x).not.toBe(far.x);
+  });
+
+  it("winds a move with NO authored chamber up through its stance instead (M7, reading A)", () => {
+    // The other 12 moves are unauthored, so their driven endpoint simply returns to the stance while
+    // winding up and recovering — an arm dropping back to guard between strikes. Not a degraded
+    // state: it is still a wind-up, just not a bespoke one, and it is what makes THIS slice fix all
+    // 13 moves rather than only mae-geri.
+    const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
+    const unauthored = { attackMove: "gyaku-zuki", attackReach: 240_000 };
+
+    expect(poseAtPhase({ ...unauthored, attackPhase: CHAMBER }).handR).toEqual(
+      scaled(NEUTRAL_HAND_R),
+    );
+    expect(poseAtPhase({ ...unauthored, attackPhase: RECOVER }).handR).toEqual(
+      scaled(NEUTRAL_HAND_R),
+    );
+    // ...and it still punches at contact.
+    expect(poseAtPhase({ ...unauthored, attackPhase: CONTACT }).handR).toEqual(
+      scaled({ x: 66, y: -46 }),
+    );
+  });
+
+  it("draws the extension for any phase code that is not a chamber phase (M7 totality)", () => {
+    // An absent field (the loader casts the wire wholesale), the `0` = nothing-committed sentinel,
+    // and any out-of-range or nonsense code all fall back to the extension — today's look — so no
+    // tape can regress into a blank or frozen figure. A non-numeric value is total by construction:
+    // `isChamberPhase` compares with `===` against numeric literals.
+    const extended = scaled({ x: 66, y: -46 });
+
+    [undefined, 0, 7, -1, NaN].forEach((attackPhase) =>
+      expect(footAt(attackPhase)).toEqual(extended),
+    );
+  });
+
+  it("never chambers a fighter who has no strike to draw, whatever phase the tape claims", () => {
+    // `attackPhase` selects WHERE a committed strike is drawn; it must never conjure one. A fighter
+    // who is idle, aiming at an unmapped band, or carrying a defensively-rejected reach keeps the
+    // stance through every phase — even holding a stale move id. Without this the wind-up branch
+    // reaches the chamber before anything has checked there is a strike at all.
+    const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // STAND front foot
+
+    const noStrike = [
+      { attacking: false }, // idle, stale id still on the frame
+      { attackBand: 0 }, // the "no band" sentinel
+      { attackBand: 9 }, // out of range
+      { attackReach: 0 }, // reach defensively rejected
+    ];
+
+    noStrike.forEach((extra) =>
+      [CHAMBER, CONTACT, RECOVER].forEach((attackPhase) =>
+        expect(poseAtPhase({ ...extra, attackPhase }).footR).toEqual(
+          scaled(NEUTRAL_FOOT_R),
+        ),
+      ),
+    );
+  });
+
+  it("leans the upper body only at contact, never during the wind-up (M9)", () => {
+    // A fighter leans INTO a technique as it extends; leaning fully forward while still chambered
+    // is backwards. The lean is min(CAP 16, 66 · 0.5) = 16 at contact, 0 either side of it.
+    const UPRIGHT_HEAD = { x: 0, y: -76 };
+
+    expect(poseAtPhase({ attackPhase: CHAMBER }).head).toEqual(
+      scaled(UPRIGHT_HEAD),
+    );
+    expect(poseAtPhase({ attackPhase: RECOVER }).head).toEqual(
+      scaled(UPRIGHT_HEAD),
+    );
+    expect(poseAtPhase({ attackPhase: CONTACT }).head).toEqual(
+      scaled({ x: 16, y: -76 }),
+    );
+  });
+
+  it("keeps the support leg planted and the limb jointed through every phase (M8.2, M8.6)", () => {
+    const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot — the support leg
+
+    [CHAMBER, CONTACT, RECOVER].forEach((attackPhase) => {
+      const pose = poseAtPhase({ attackPhase });
+
+      // The fighter neither slides nor floats, whatever the kicking leg is doing.
+      expect(pose.footL).toEqual(scaled(NEUTRAL_FOOT_L));
+
+      // Non-collinearity of hip → kneeR → footR via the cross product: exactly 0 would mean the
+      // knee sits ON the straight line, i.e. a rigid stick. A chambered leg bends for free because
+      // the mid-joints re-derive from whatever endpoints the phase produced.
+      const cross =
+        (pose.footR.x - pose.hip.x) * (pose.kneeR.y - pose.hip.y) -
+        (pose.footR.y - pose.hip.y) * (pose.kneeR.x - pose.hip.x);
+
+      expect(cross).not.toBe(0);
+    });
+  });
+});
+
 describe("move descriptors — table integrity", () => {
   it("describes only real arsenal moves, so no descriptor is silently dead", () => {
     // A typo'd key ("maegeri") would never match a tape's `attackMove` and would fall back to the
