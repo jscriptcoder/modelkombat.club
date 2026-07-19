@@ -467,3 +467,49 @@ describe("DojoApp — playing a technique through its duration", () => {
     expect(latestTick()).toBe(0); // ...and the playhead is no longer off the end
   });
 });
+
+describe("DojoApp — replaying a technique from the start", () => {
+  // Playback auto-pauses on the final tick, so without a restart the lab settles on a recovery
+  // frame and the only way back is to scrub to 0 and press Play. Restart is that in one control:
+  // it returns to the first tick AND resumes, so the technique plays rather than sitting at 0.
+
+  it("returns to the first tick and resumes from a technique parked at its end", () => {
+    const { Stage, latestTick } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    // Scrubbing to the last tick is how the lab actually ends up here — and it pauses on the way.
+    fireEvent.input(getByRole("slider", { name: /scrub/i }), {
+      target: { value: "27" },
+    });
+
+    const toggle = getByRole("button", { name: /pause|play/i });
+
+    expect(latestTick()).toBe(27);
+    expect(toggle.textContent).toBe("Play"); // parked and paused
+
+    fireEvent.click(getByRole("button", { name: /restart/i }));
+
+    expect(latestTick()).toBe(0);
+    expect(toggle.textContent).toBe("Pause"); // ...and running again, not merely rewound
+  });
+
+  it("rewinds a technique that is still playing, without pausing it", () => {
+    const { Stage, latestTick } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const toggle = getByRole("button", { name: /pause|play/i });
+
+    fireEvent.input(getByRole("slider", { name: /scrub/i }), {
+      target: { value: "9" }, // mae-geri's contact tick — a scrub pauses
+    });
+    fireEvent.click(toggle); // ...so resume, to reach mid-tape AND playing
+
+    expect(latestTick()).toBe(9);
+    expect(toggle.textContent).toBe("Pause");
+
+    fireEvent.click(getByRole("button", { name: /restart/i }));
+
+    expect(latestTick()).toBe(0);
+    expect(toggle.textContent).toBe("Pause");
+  });
+});

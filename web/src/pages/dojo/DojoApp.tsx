@@ -95,6 +95,17 @@ const DojoApp: Component<DojoAppProps> = (props) => {
       </Show>
 
       <div class="dojo-transport" role="group" aria-label="Technique playback">
+        {/* Playback auto-pauses on the final tick, so the lab settles on a recovery frame. Restart
+            is the way back to the movement: `startTransport()` IS the restart target (tick 0,
+            resumed), so this reuses it rather than seeking — a seek would pause. */}
+        <button
+          type="button"
+          class="control-segment"
+          onClick={() => setTransport(startTransport())}
+        >
+          Restart
+        </button>
+
         <button
           type="button"
           class="control-segment"
