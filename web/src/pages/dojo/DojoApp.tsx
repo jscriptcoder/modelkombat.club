@@ -1,4 +1,10 @@
-import { createMemo, createSignal, Show, type Component } from "solid-js";
+import {
+  createMemo,
+  createSignal,
+  Show,
+  type Component,
+  type Setter,
+} from "solid-js";
 import { Dynamic } from "solid-js/web";
 
 import DojoStage, { type DojoStageProps } from "./DojoStage";
@@ -17,6 +23,7 @@ import {
   controlsToFrame,
   DEFAULT_CHALLENGER_CONTROLS,
   DEFAULT_KING_CONTROLS,
+  selectMove,
   type FigureControls,
 } from "./controls";
 import { type Brand } from "../../shared/lib/brand";
@@ -51,6 +58,14 @@ const DojoApp: Component<DojoAppProps> = (props) => {
   const [challengerBrand, setChallengerBrand] = createSignal<Brand>("claude");
 
   const [kingBrand, setKingBrand] = createSignal<Brand>("generic");
+
+  // Commit a figure to a technique: stamp its controls (controls.ts owns what that means), then
+  // restart playback — a selection means "show me this technique", and without the restart the new
+  // move would open parked on its final recovery frame.
+  const commitMove = (setFigure: Setter<FigureControls>) => (move: string) => {
+    setFigure((prev) => selectMove(prev, move));
+    setTransport(startTransport());
+  };
 
   const tape = createMemo(() =>
     buildDojoTape({
@@ -161,6 +176,7 @@ const DojoApp: Component<DojoAppProps> = (props) => {
           onChange={setChallenger}
           brand={challengerBrand()}
           onBrandChange={setChallengerBrand}
+          onSelectMove={commitMove(setChallenger)}
         />
         <FigureControlPanel
           label="King"
@@ -168,6 +184,7 @@ const DojoApp: Component<DojoAppProps> = (props) => {
           onChange={setKing}
           brand={kingBrand()}
           onBrandChange={setKingBrand}
+          onSelectMove={commitMove(setKing)}
         />
       </div>
     </main>

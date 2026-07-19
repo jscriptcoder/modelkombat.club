@@ -1,3 +1,4 @@
+import { presetFor } from "./reach-presets";
 import type { ReplayFrame } from "../replay/replay-contract";
 
 // The pose lab's control state: the RAW frame pose fields a developer tunes in `/dojo`. Deliberately
@@ -33,6 +34,27 @@ export const controlsToFrame = (controls: FigureControls): ReplayFrame => ({
   points: 0,
   stamina: 100,
 });
+
+// What committing a figure to a technique means for its controls (S3): the move id, plus the fields
+// the mirror table can fill in for it. STAMP-then-let-go (decision 6) — this computes a starting
+// point, it does not lock anything: every field it writes stays independently editable afterward,
+// which is how the lab reaches the engine-impossible combos it exists to show (M10).
+//
+// An id the mirror doesn't know — including the "" idle row — stands the figure down rather than
+// half-committing it to a technique with no reach and no duration.
+export const selectMove = (
+  controls: FigureControls,
+  move: string,
+): FigureControls => {
+  const preset = presetFor(move);
+
+  return {
+    ...controls,
+    attackMove: move,
+    attackReach: preset?.reach ?? 0,
+    attacking: preset !== undefined,
+  };
+};
 
 // The opening scene the lab seeds on first load: the challenger throwing a standing mid-band strike,
 // facing right toward an idle king that faces left. Mapped through `controlsToFrame`, these are the
