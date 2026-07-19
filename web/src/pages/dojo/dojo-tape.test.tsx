@@ -4,7 +4,7 @@ import { createStage } from "../replay/figures";
 import { BODY_HEIGHT_SUB, scene, type Viewport } from "../replay/scene";
 import type { ReplayFrame } from "../replay/replay-contract";
 import { buildDojoTape, DEFAULT_CHALLENGER, DEFAULT_KING } from "./dojo-tape";
-import { DEFAULT_GAP } from "./reach-presets";
+import { DEFAULT_GAP, REACH_PRESETS } from "./reach-presets";
 
 // Story 3 — world scale. Pose joints render at ×(BODY_HEIGHT_SUB · pxPerSubunit / 76), rounded;
 // recomputed from the documented knob + fixed 1200-wide viewport so a scale mutant is caught.
@@ -102,6 +102,131 @@ describe("buildDojoTape — centers two posed fighters on the ring", () => {
   });
 });
 
+// S2 · Slice 2 — a committed technique plays through its real engine duration. The single static
+// tick becomes a span of `startup + active + recovery` ticks, each stamped with the phase the engine
+// would be in, so the pose lab shows the technique as a MOVEMENT rather than a frozen contact frame.
+const committed = (move: string, overrides: Partial<ReplayFrame> = {}) =>
+  frame({
+    attacking: true,
+    attackMove: move,
+    attackBand: 2,
+    attackReach: 270_000,
+    ...overrides,
+  });
+
+describe("buildDojoTape — a committed technique spans its real engine duration (S2 · Slice 2)", () => {
+  it("spans mae-geri's full 9/3/16 engine timing — 28 ticks", () => {
+    const tape = buildDojoTape({
+      a: committed("mae-geri"),
+      b: frame(),
+      gap: 240_000,
+    });
+
+    expect(tape).toHaveLength(28);
+  });
+
+  it("stamps the engine's phase on every tick — startup 0-8, active 9-11, recovery 12-27", () => {
+    const tape = buildDojoTape({
+      a: committed("mae-geri"),
+      b: frame(),
+      gap: 240_000,
+    });
+
+    // Exhaustive, so either boundary shifting by one tick fails here (9 startup, 3 active, 16
+    // recovery — mae-geri's engine timing, in order).
+    expect(tape.map((t) => t.a.attackPhase)).toEqual([
+      ...Array<number>(9).fill(1),
+      ...Array<number>(3).fill(2),
+      ...Array<number>(16).fill(3),
+    ]);
+  });
+
+  it("spans the LONGER technique when the two figures differ, phasing each from its own timing", () => {
+    // Both figures are posable independently (M10 free combos), so they can carry different moves.
+    // ushiro-geri is 13/3/22 = 38 ticks; gyaku-zuki is 7/3/14 = 24.
+    const tape = buildDojoTape({
+      a: committed("ushiro-geri"),
+      b: committed("gyaku-zuki"),
+      gap: 240_000,
+    });
+
+    expect(tape).toHaveLength(38); // the longer of the two, so both play out in full
+
+    // At the SAME tick the two are in different phases — each read off its own timing, not a
+    // shared clock: the slow back kick is still winding up while the punch is already at contact.
+    expect(tape[7].a.attackPhase).toBe(1);
+    expect(tape[7].b.attackPhase).toBe(2);
+  });
+
+  it("spans the KING's technique when the king is the one holding the longer move", () => {
+    // The mirror image of the case above. Both figures are posable, so either can own the span —
+    // asserting only the challenger's side would let "the tape ignores figure b" pass unnoticed.
+    const tape = buildDojoTape({
+      a: committed("gyaku-zuki"), // 24 ticks
+      b: committed("ushiro-geri"), // 38 ticks — the longer
+      gap: 240_000,
+    });
+
+    expect(tape).toHaveLength(38);
+    expect(tape[30].b.attackPhase).toBe(3); // the king is still recovering...
+    expect(tape[30].a.attacking).toBe(false); // ...long after the challenger's punch is spent
+  });
+
+  it("drops a figure to idle once its own technique has run out, while the longer one plays on", () => {
+    const tape = buildDojoTape({
+      a: committed("ushiro-geri"),
+      b: committed("gyaku-zuki"),
+      gap: 240_000,
+    });
+
+    // gyaku-zuki's last tick (index 23) is still recovery; index 24 is past its end.
+    expect(tape[23].b.attacking).toBe(true);
+    expect(tape[23].b.attackPhase).toBe(3);
+
+    // Spent: the engine would have this fighter idle again, so the tape says so rather than holding
+    // the last recovery frame.
+    expect(tape[24].b.attacking).toBe(false);
+    expect(tape[24].b.attackPhase).toBe(0);
+
+    // ...while the longer technique keeps playing to its own end.
+    expect(tape[24].a.attacking).toBe(true);
+    expect(tape[37].a.attackPhase).toBe(3);
+  });
+
+  // M7 totality: the lab must stay usable for every pose a developer can dial in, including ones the
+  // timing mirror knows nothing about. No blank tape, no throw, no phase invented out of thin air.
+  it("collapses to a single static tick when neither figure is committed", () => {
+    const tape = buildDojoTape({ a: frame(), b: frame(), gap: 240_000 });
+
+    expect(tape).toHaveLength(1);
+    expect(tape[0].tick).toBe(0);
+    expect(tape[0].a.attackPhase).toBeUndefined(); // nothing committed ⇒ nothing to phase
+  });
+
+  it("leaves a figure committed to an unknown move exactly as posed — no duration, no phase", () => {
+    // An id with no entry in the timing mirror (a future move, a typo in a hand-edited control).
+    const posed = committed("kokoro-nage");
+
+    const tape = buildDojoTape({ a: posed, b: frame(), gap: 240_000 });
+
+    expect(tape).toHaveLength(1); // contributes no duration
+    expect(tape[0].a).toEqual({ ...posed, x: 180_000 }); // and is otherwise untouched
+    expect(tape[0].a.attacking).toBe(true); // still renders its strike, pre-S2 style
+  });
+
+  it("gives every move in the arsenal a playable span — none collapses or runs backwards", () => {
+    // Guards the whole table at once: a dropped/zeroed timing field would show up as a 1-tick span.
+    const spans = REACH_PRESETS.map(
+      (p) =>
+        buildDojoTape({ a: committed(p.move), b: frame(), gap: 240_000 })
+          .length,
+    );
+
+    expect(spans).toEqual([24, 27, 23, 22, 22, 22, 24, 21, 25, 28, 32, 35, 38]);
+    expect(Math.min(...spans)).toBeGreaterThan(1);
+  });
+});
+
 describe("the default dojo scene — challenger mid-band mae-geri vs an idle king, facing off at gyaku distance", () => {
   const defaultTape = () =>
     buildDojoTape({ a: DEFAULT_CHALLENGER, b: DEFAULT_KING, gap: DEFAULT_GAP });
@@ -166,12 +291,39 @@ describe("the default dojo scene renders two fighters through the real scene()/c
     expect(stage.a.root.scale.x).toBe(1);
     expect(stage.b.root.scale.x).toBe(-1);
 
-    // The default poses render through the pipeline: the challenger throws a mae-geri, so its FOOT
-    // lands on the king's near edge (x 66 local, world-scaled) while its hand stays at the stance
-    // (x 18) — the whole point of the per-move descriptor. The idle king keeps both at stance.
-    expect(stage.a.footR.x).toBe(s(66));
+    // The default poses render through the pipeline: the challenger throws a mae-geri, so its FOOT is
+    // the driven limb while its hand stays at the stance (x 18) — the whole point of the per-move
+    // descriptor. Tick 0 is the technique's STARTUP (S2), so the foot sits at the authored chamber
+    // (x 4), drawn back under the hip rather than out at the target. The idle king keeps both at
+    // stance.
+    expect(stage.a.footR.x).toBe(s(4));
     expect(stage.a.handR.x).toBe(s(18));
     expect(stage.b.handR.x).toBe(s(18));
     expect(stage.b.footR.x).toBe(s(14));
+  });
+
+  it("drives the technique through the real pipeline — the foot leaves the chamber and reaches the target at contact", () => {
+    // The end-to-end proof of the slice: ONE tape, rendered at two playheads, through the shipped
+    // scene()/createStage. The dojo now shows a movement, not a frozen contact frame.
+    const tape = buildDojoTape({
+      a: DEFAULT_CHALLENGER,
+      b: DEFAULT_KING,
+      gap: DEFAULT_GAP,
+    });
+
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    stage.apply(scene(tape, 0, VIEWPORT)); // startup — chambered
+    const chambered = stage.a.footR.x;
+
+    stage.apply(scene(tape, 9, VIEWPORT)); // active — mae-geri's contact tick
+    const extended = stage.a.footR.x;
+
+    expect(chambered).toBe(s(4)); // drawn back under the hip
+    expect(extended).toBe(s(66)); // out on the king's near edge
+    expect(extended).toBeGreaterThan(chambered); // the kick travels FORWARD to its target
+
+    // ...and the support foot never moves while it does (M8.2 support integrity).
+    expect(stage.a.footL.x).toBe(s(-14));
   });
 });

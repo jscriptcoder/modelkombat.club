@@ -166,3 +166,27 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* The technique transport (S2): play/pause, frame-step, scrub and a tick read-out, so a committed
+   move can be watched at engine speed and then frozen on the frame being tuned. Sits directly under
+   the stage — the controls that move the FIGURES stay grouped below with the pose panels. */
+.dojo-transport {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.dojo-scrub {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* Tabular so the playhead number doesn't jitter the scrub bar as it counts up. */
+.dojo-tick-readout {
+  min-width: 6rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--accent);
+}

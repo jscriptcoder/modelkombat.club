@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  DEFAULT_GAP,
-  MAX_GAP,
-  MIN_GAP,
-  REACH_PRESETS,
-} from "./reach-presets";
+import { DEFAULT_GAP, MAX_GAP, MIN_GAP, REACH_PRESETS } from "./reach-presets";
 
 // The reach-preset table is a documented mirror of the engine move reaches (src/engine/rules.ts):
 // web/src can't import src/, exactly as WORLD_WIDTH mirrors the ring width. The pose lab snaps the
@@ -31,6 +26,30 @@ describe("REACH_PRESETS — mirrors every engine technique reach, ascending", ()
       ["mawashi-geri", 300_000],
       ["yoko-geri", 315_000],
       ["ushiro-geri", 330_000],
+    ]);
+  });
+
+  it("mirrors every technique's frame timing value-by-value (startup / active / recovery)", () => {
+    // The second half of the mirror (S2): the engine's own three timing fields, under the same names,
+    // transcribed from rules.ts. Exhaustive for the same reason the reaches are — any drift (a
+    // retuned move, a transposed pair, a dropped field) fails right here rather than silently
+    // desynchronising the pose lab's playback speed from the engine's.
+    expect(
+      REACH_PRESETS.map((p) => [p.move, p.startup, p.active, p.recovery]),
+    ).toEqual([
+      ["empi", 8, 2, 14],
+      ["hiza-geri", 9, 2, 16],
+      ["throw", 7, 2, 14],
+      ["sweep", 7, 2, 13],
+      ["uraken", 7, 2, 13],
+      ["kizami-zuki", 7, 2, 13],
+      ["gyaku-zuki", 7, 3, 14],
+      ["tobi-geri", 4, 3, 14],
+      ["shuto", 8, 2, 15],
+      ["mae-geri", 9, 3, 16],
+      ["mawashi-geri", 11, 3, 18],
+      ["yoko-geri", 12, 3, 20],
+      ["ushiro-geri", 13, 3, 22],
     ]);
   });
 });
