@@ -4,7 +4,9 @@
 `plans/move-poses-decisions.md`
 **Predecessors**: S0 (#352, `attackMove`/`attackPhase` on the tape) · S1 (#353, the descriptor
 table + `mae-geri`'s foot)
-**Status**: Active — slice 1 shipped (#355, `bbb61ee`); slice 2 next; slice 3 still conditional
+**Status**: Active — slice 1 shipped (#355, `bbb61ee`); slice 2 shipped (#356, `ea36c2b`);
+slice 3 CONFIRMED NEEDED by slice 2's eye check and is next — acceptance criteria still to be
+drafted and approved
 
 ## Goal
 
