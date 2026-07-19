@@ -479,24 +479,29 @@ describe("scene — strike reach-to-target", () => {
     expect(pose.handR).toEqual(scaled({ x: 66, y: -46 })); // target unchanged — the arm telescopes
   });
 
-  it("keeps the lower body planted and the rear hand at rest while the upper body leans", () => {
-    // Only the upper body leans (M2): the hip, both feet, and the rear (non-striking) hand endpoint are
-    // untouched — the lunge pivots from a planted base.
+  it("keeps the LOWER body planted while the upper body leans", () => {
+    // Only the upper body leans (M2): the hip and both feet are untouched — the lunge pivots from a
+    // planted base. This also pinned the rear hand as untouched, which S4 · Slice 3 deliberately
+    // changed: that hand hangs off the shoulder the lean moves, so leaving it planted stretched the
+    // resting arm past its own bones. It now rides, and where it lands is asserted in that block.
     const pose = poseStriking({ gap: 240_000, band: 2 });
 
     expect(pose.hip).toEqual(scaled({ x: 0, y: -34 }));
     expect(pose.footL).toEqual(scaled({ x: -14, y: 0 }));
     expect(pose.footR).toEqual(scaled({ x: 14, y: 0 }));
-    expect(pose.handL).toEqual(scaled({ x: -18, y: -44 })); // rear hand endpoint unchanged
   });
 
-  it("leans proportionally to the reach, capped — a short technique leans less than a long one", () => {
-    // Point-blank (hand floored at 24): lean = min(16, 24 × 0.5) = 12 (un-capped — pins the 0.5 ratio).
+  it("leans further the further it must reach, capped — and not at all point-blank", () => {
+    // Point-blank the hand floors at 24, which at the mid band is 30 from the shoulder — inside the
+    // arm's own 31.3 reach, so there is nothing for the body to cover. The old proportional rule leaned
+    // 12 here regardless (min(16, 24 × 0.5)); S4 · Slice 3 made the lean the DERIVED shortfall, so a
+    // punch the arm can already land no longer lunges. The monotone, bounded claim is unchanged.
     const pointBlank = poseStriking({ gap: 0, band: 2 });
-    // A whiff extends the hand to the cap (76): lean = min(16, 76 × 0.5) = 16 (capped plateau).
+    // A whiff extends the hand to its 76px cap — 78 from the shoulder, far past the arm — so the body
+    // covers the maximum it is allowed to.
     const whiff = poseStriking({ gap: 330_000, band: 2 });
 
-    expect(pointBlank.shoulder).toEqual(scaled({ x: 12, y: -64 }));
+    expect(pointBlank.shoulder).toEqual(scaled({ x: 0, y: -64 }));
     expect(whiff.shoulder).toEqual(scaled({ x: LEAN_CAP, y: -64 }));
     // The shorter reach leans less than the longer (capped) one — a monotone, bounded lunge.
     expect(pointBlank.shoulder.x).toBeLessThan(whiff.shoulder.x);
@@ -1908,7 +1913,12 @@ describe("scene — the reverse punch is thrown with the rear arm (S4 · Slice 1
     const pose = posePunching({ move: "kizami-zuki", reach: 210_000 });
 
     expect(pose.handR).toEqual(scaled({ x: 66, y: -68 }));
-    expect(pose.handL).toEqual(scaled(NEUTRAL_HAND_L));
+    // The rear arm is not driven — it keeps its stance OFFSET from the shoulder. Asserted as an offset
+    // rather than an absolute since S4 · Slice 3, which carries a resting hand along with the shoulder
+    // the lean moves; before that the shoulder leaned out from under it and the arm stretched.
+    expect(pose.handL.x - pose.shoulder.x).toBe(
+      scaled(NEUTRAL_HAND_L).x - scaled({ x: 0, y: -64 }).x,
+    );
   });
 
   const crossOf = (pose: ReturnType<typeof posePunching>) =>
@@ -2043,16 +2053,21 @@ describe("scene — the reverse punch chambers and pulls (S4 · Slice 2)", () =>
     expect(poseAt(CHAMBER).handR).toEqual(scaled(STANCE_HAND_R));
   });
 
-  it("leaves the other hand at stance for a move with no off hand authored (M7)", () => {
+  it("leaves the other hand at its stance shape for a move with no off hand authored (M7)", () => {
     // Totality: `offHand` is descriptor data, so every move that does not author one keeps the status
     // quo. kizami-zuki is a hand technique with no descriptor at all, so its rear hand must not be
-    // dragged along by gyaku-zuki's authoring.
+    // dragged along by gyaku-zuki's authoring — it must sit where an unauthored hand sits.
+    //
+    // "Where an unauthored hand sits" became shoulder-relative in S4 · Slice 3: a resting hand rides
+    // the lean with the shoulder it hangs from. So this asserts the stance OFFSET, which is the claim
+    // that actually distinguishes an authored pull from an unauthored hand — an absolute stance
+    // coordinate would now be asserting the absence of the lean, not the absence of a pull.
     const jab = poseAt(CONTACT, {
       attackMove: "kizami-zuki",
       attackReach: 210_000,
     });
 
-    expect(jab.handL).toEqual(scaled(STANCE_HAND_L));
+    expect(jab.handL.x - jab.shoulder.x).toBe(scaled(STANCE_HAND_L).x);
   });
 
   // NO test here for "the front elbow re-derives off the pulled hand", though the slice's acceptance
@@ -2076,4 +2091,212 @@ describe("move descriptors — table integrity", () => {
     expect(DESCRIBED_MOVES.length).toBeGreaterThan(0);
     DESCRIBED_MOVES.forEach((move) => expect(known).toContain(move));
   });
+});
+
+describe("scene — a punch leans only as far as it must reach (S4 · Slice 3)", () => {
+  // Two mechanisms answered the same question in two different ways. A KICK beyond the leg's reach
+  // stepped the hip by the DERIVED shortfall (`rootTravel`: how far past the limb's straight reach the
+  // target sits, capped). A PUNCH leaned the upper body by a HEURISTIC — half the hand's forward x,
+  // capped — which never asked whether the arm could already reach. They agree at the workhorse
+  // distance and diverge close in, where the heuristic lunges the torso forward for nothing.
+  //
+  // The lean is now that same derived shortfall, measured shoulder → target. Two consequences the
+  // tests below pin: a close-range punch stops leaning entirely, and a punch to a LOW band leans MORE
+  // than the heuristic gave, because the heuristic read only the forward x and ignored the vertical
+  // drop to the target.
+  //
+  // Second consequence, same block: the lean moves the shoulder, and the OTHER arm hangs off that
+  // shoulder. Leaving its hand planted stretched the resting arm past its own bone lengths — 39.4px of
+  // span against a 31.3px reach — so `deriveBend` straightened it into a line on every generic punch.
+  // A hand still at its stance now travels with the shoulder it hangs from. Authored destinations (the
+  // driven hand, a `hikite` pull, a raised guard) do NOT travel: they say "put the fist HERE".
+
+  // Recomputed from the documented STAND geometry rather than imported, so a production change to
+  // either constant makes these expectations disagree — the same discipline as BODY_SCALE above.
+  // shoulder {0,−64} → hand {18,−44} spans 26.91, so one bone is hypot(26.91/2, 8) = 15.65 and the
+  // arm straightens at 31.31 local px.
+  const ARM_REACH = 2 * Math.hypot(Math.hypot(18, 20) / 2, 8);
+  const LEAN_CAP = 16;
+  const SHOULDER = { x: 0, y: -64 };
+  const STANCE_HAND_L = { x: -18, y: -44 };
+
+  // The rule under test, written independently of production: how far past the arm's straight reach
+  // the target sits, floored at 0 (already reachable ⇒ no lean) and capped.
+  const leanFor = (handX: number, bandY: number) =>
+    Math.min(
+      LEAN_CAP,
+      Math.max(0, Math.hypot(handX, bandY - SHOULDER.y) - ARM_REACH),
+    );
+
+  const poseOf = ({
+    gap = 240_000,
+    band = 3,
+    move = "gyaku-zuki",
+    reach = 240_000,
+    extra = {},
+  }: {
+    gap?: number;
+    band?: number;
+    move?: string;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: move,
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("does not lean at all when the arm can already reach the target", () => {
+    // The headline change. A 120k gap puts the near edge at 28px and a high target 4px above the
+    // shoulder, so the arm spans 28.3 against a 31.3 reach — it gets there on its own. The old
+    // heuristic still lunged 14px for it; a fighter that steps into a punch it could already land
+    // reads as over-committing to nothing.
+    const pose = poseOf({ gap: 120_000 });
+
+    expect(pose.shoulder).toEqual(scaled(SHOULDER));
+    expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
+  });
+
+  it("leans by the shortfall — not by half the reach — when the arm falls short", () => {
+    // The uncapped middle of the range, which is where a derived lean and a proportional one disagree
+    // most visibly. A 150k gap at the mid band puts the target 41.6 from the shoulder: 10.3 past the
+    // arm's reach, so the body covers 10.3. The heuristic would have covered its full 16px cap.
+    const pose = poseOf({ gap: 150_000, band: 2 });
+    const expected = leanFor(37.5, -46);
+
+    expect(pose.shoulder).toEqual(scaled({ x: expected, y: -64 }));
+    expect(pose.head).toEqual(scaled({ x: expected, y: -76 }));
+    expect(expected).toBeLessThan(LEAN_CAP);
+  });
+
+  it("reads the vertical drop to the target, not just the forward reach", () => {
+    // The mutation-critical case. Two punches with the SAME forward x to DIFFERENT bands are different
+    // distances from the shoulder — a mid target sits 18px below it, a high target 4px above — so they
+    // must lean differently. Under the old heuristic (a function of x alone) they leaned identically,
+    // which is why a low punch under-leaned. Without this, a production mutant that drops the vertical
+    // term survives every other test in this block.
+    const high = poseOf({ gap: 130_000, band: 3 });
+    const mid = poseOf({ gap: 130_000, band: 2 });
+
+    expect(mid.shoulder.x).toBeGreaterThan(high.shoulder.x);
+    expect(high.shoulder).toEqual(scaled({ x: leanFor(31.1666, -68), y: -64 }));
+    expect(mid.shoulder).toEqual(scaled({ x: leanFor(31.1666, -46), y: -64 }));
+  });
+
+  it("caps the lean, leaving the workhorse punch exactly as it rendered before", () => {
+    // The regression pin for the move this story just authored. gyaku-zuki's reach and the dojo's
+    // default gap are both 240k, so its hand solves to 66 and the shortfall (34.8) saturates the same
+    // 16px cap the heuristic produced there. The punch a spectator actually sees is byte-identical
+    // across this slice — the change is confined to distances and bands the workhorse never uses.
+    const pose = poseOf({ gap: 240_000, band: 3 });
+
+    expect(pose.shoulder).toEqual(scaled({ x: LEAN_CAP, y: -64 }));
+    expect(pose.handL).toEqual(scaled({ x: 66, y: -68 })); // the driven hand does NOT ride the lean
+  });
+
+  it("keeps the upper body upright while the punch is still chambering", () => {
+    // M9's phase gate, re-pinned because this slice rewrites the expression it guards. A fighter leans
+    // INTO a technique as it extends, never while winding up.
+    const pose = poseOf({ gap: 240_000, extra: { attackPhase: 1 } });
+
+    expect(pose.shoulder).toEqual(scaled(SHOULDER));
+  });
+
+  it("leaves a kick's hip step alone and still does not lean over it", () => {
+    // The two mechanisms now share one function, so this pins that sharing it did not cross the wires:
+    // a kick steps the HIP and keeps the torso upright (pitching forward over a rising leg reads as
+    // falling into the kick), exactly as before.
+    const kick = poseOf({ move: "mae-geri", band: 2, reach: 270_000 });
+
+    expect(kick.shoulder).toEqual(scaled(SHOULDER));
+    expect(kick.hip.x).toBeGreaterThan(scaled({ x: 0, y: -34 }).x);
+  });
+
+  it("carries the resting hand forward with the shoulder it hangs from", () => {
+    // The trailing-arm defect. A jab drives handR, so handL just rests — but it rested in the STANCE
+    // frame while the shoulder leaned 16px away from it, opening the span to 39.4 against a 31.3
+    // reach. The hand travels with its own shoulder now, so the resting arm keeps its stance shape.
+    const jab = poseOf({ move: "kizami-zuki", reach: 210_000 });
+
+    expect(jab.handL).toEqual(
+      scaled({ x: STANCE_HAND_L.x + LEAN_CAP, y: STANCE_HAND_L.y }),
+    );
+  });
+
+  it("keeps the resting arm's bones at their stance length instead of stretching them", () => {
+    // What the coordinates above mean on screen, and the S2 · Slice 3 guarantee this defect broke.
+    // Once the span exceeds the arm's straight reach, `deriveBend` floors its offset at 0 and drops
+    // the elbow onto the midpoint — so each bone silently grows to half the span. At 39.4px of span
+    // that is 19.7 against a 15.65 bone: a 26% overrun, the rubber-band arm Story 4 removed, back on
+    // every generic punch.
+    //
+    // Asserted as drift from the fighter's OWN stance bones, with the same 2% tolerance the bone-length
+    // block uses (joints round to whole px after a ~6.3× scale, so a measured bone can drift ~1%).
+    // Not a collinearity check: rounded integer coordinates are almost never exactly collinear, so
+    // that assertion passes whether or not the elbow was floored — it cannot fail.
+    const BONE_TOLERANCE = 0.02;
+
+    const boneLength = (from: Joint, to: Joint) =>
+      Math.hypot(to.x - from.x, to.y - from.y);
+
+    const jab = poseOf({ move: "kizami-zuki", reach: 210_000 });
+
+    const stance = poseOf({
+      move: "kizami-zuki",
+      reach: 210_000,
+      extra: { attacking: false },
+    });
+
+    const drift = (from: "shoulder" | "elbowL", to: "elbowL" | "handL") =>
+      Math.abs(
+        boneLength(jab[from], jab[to]) / boneLength(stance[from], stance[to]) -
+          1,
+      );
+
+    expect(drift("shoulder", "elbowL")).toBeLessThan(BONE_TOLERANCE);
+    expect(drift("elbowL", "handL")).toBeLessThan(BONE_TOLERANCE);
+  });
+
+  it("leaves an authored hikite pull where the descriptor put it", () => {
+    // The other half of the rule: a hand the descriptor placed is a DESTINATION, not a stance point,
+    // so it does not ride. gyaku-zuki's off hand was tuned by eye against the leaned shoulder in slice
+    // 2 — carrying it forward again would undo that tuning and drag the withdrawn fist back in front
+    // of the body.
+    const pose = poseOf({ gap: 240_000, band: 3 });
+
+    expect(pose.handR).toEqual(scaled({ x: -8, y: -50 }));
+  });
+
+  it("leaves a raised guard where the guard layer put it", () => {
+    // Same rule, the other authored destination. A guard is placed at a fixed protective x; riding the
+    // lean would push it forward of the guarding distance the layer chose. Engine-impossible alongside
+    // a strike, /dojo-reachable by design (M10).
+    const pose = poseOf({
+      move: "kizami-zuki",
+      reach: 210_000,
+      extra: { guardBand: 2 },
+    });
+
+    expect(pose.handL).toEqual(scaled({ x: 8, y: -46 }));
+  });
+
+  // NO root-x test here, though the slice's acceptance criteria listed one. "The lean shifts the pose,
+  // not the world position" is already pinned in the M2 lean block above, and the root x is computed in
+  // `figure()` from the tape alone — `poseFor` is never given it and cannot reach it. A second copy
+  // would assert the same guarantee against the same mechanism.
 });

@@ -1,7 +1,8 @@
 # Plan: S4 — the moves fighters actually throw look distinct
 
-**Branch**: `feat/move-poses-s4-gyaku-zuki` (slice 1; one branch per slice thereafter)
-**Status**: Active
+**Branch**: `feat/move-poses-s4-lean` (slice 3) — slices 1–2 shipped together in **#363**
+(`feat/move-poses-s4-gyaku-zuki`, merged 2026-07-19 as `4f0d3b7`)
+**Status**: Active — **2 of 4 slices done**
 **Parent story**: `plans/move-poses-stories.md` § S4 · **Decisions**: `plans/move-poses-decisions.md` (M1–M11)
 
 ## Goal
@@ -43,15 +44,18 @@ fallback read acceptably?), not an authoring obligation.
 
 ## Acceptance criteria
 
-- [ ] A spectator watching a replay can tell a **reverse punch** from a **jab** — they are thrown
-      with different arms
-- [ ] `gyaku-zuki` winds up, commits, and recovers through a shape authored for it, not through its
-      stance
-- [ ] A committed punch leans the upper body **only when the arm cannot otherwise reach**, so a
-      close-range punch no longer leans for nothing
+- [x] A spectator watching a replay can tell a **reverse punch** from a **jab** — they are thrown
+      with different arms _(slice 1 drove the rear hand; slice 2's `hikite` is what makes it read)_
+- [x] `gyaku-zuki` winds up, commits, and recovers through a shape authored for it, not through its
+      stance _(slice 2)_
+- [x] A committed punch leans the upper body **only when the arm cannot otherwise reach**, so a
+      close-range punch no longer leans for nothing _(slice 3)_
 - [ ] `mawashi-geri` is distinguishable from `mae-geri` at the same band
-- [ ] Every unauthored move still renders exactly as it does today (M7 totality — the fallback is the
-      status quo, not a degraded state)
+- [~] Every unauthored move still renders exactly as it does today (M7 totality — the fallback is the
+      status quo, not a degraded state) — **M7 holds** (no descriptor lookup degrades an unauthored
+      move: it gets the generic limb, no chamber, no pull), but slice 3 deliberately changed the lean
+      and the resting hand for **every** move, authored or not, so the criterion's literal wording no
+      longer describes what shipped. Recorded rather than ticked.
 - [ ] `web/` only: no `src/` touch, no `BENCHMARK_VERSION` bump, no TCB change (M11)
 
 ## Non-goals
@@ -72,7 +76,10 @@ before code, and completes RED-GREEN-MUTATE-KILL MUTANTS-REFACTOR before the nex
 mutant to real source → run → restore) plus a `/dojo` visual sign-off. Never reason about a mutant
 without applying it; re-run the scan after any refactor, because moving code invalidates the anchors.
 
-### Slice 1 — the reverse punch is thrown with the rear arm
+### ✅ Slice 1 — the reverse punch is thrown with the rear arm — DONE (#363)
+
+_All six ACs green; scan 9/9 killed; `/dojo` sign-off taken. The sign-off is what produced the
+plan amendment under slice 2 — see there._
 
 **Value**: A spectator can tell `gyaku-zuki` from `kizami-zuki`. Today both fall back to the generic
 front hand, so the workhorse technique and the jab are the same picture.
@@ -107,7 +114,7 @@ no tape produces it.
 - [ ] Given that same frame **also carrying a guard band**, when it renders, `handL` still shows the
       punch — the strike wins the rear hand
 - [ ] Given a fighter **not attacking** who carries a guard band and a stale `attackMove:
-  "gyaku-zuki"`, when it renders, `handL` shows the **guard** — the yield needs a live strike
+"gyaku-zuki"`, when it renders, `handL` shows the **guard** — the yield needs a live strike
 - [ ] Given `kizami-zuki` (no descriptor), when it renders, `handR` drives and `handL` is untouched —
       the generic path is unchanged (M7)
 - [ ] Given `gyaku-zuki` committed, when it renders, **`elbowL` re-derives off the moved
@@ -132,7 +139,22 @@ no tape produces it.
 …>` may read better than a nested ternary. Only if it adds value.
 **Done when**: all six ACs green, scan clean, `/dojo` visual sign-off on `gyaku-zuki`, commit approved.
 
-### Slice 2 — the reverse punch chambers at the hip
+### ✅ Slice 2 — the reverse punch chambers at the hip — DONE (#363)
+
+_All six ACs green; scan 13 killed / 1 equivalent (hard-coding `offHandKey` to `handR`, which no
+current descriptor can distinguish). One AC lost its test: "the front elbow re-derives off the pulled
+hand" could not be made to fail for the right reason — every weaker form of it also held with the
+hand at stance, because what moves the elbow there is the M2 lean, not the pull. No test rather than
+one that cannot fail._
+
+_**The authored points stand after all.** They sit at the flank (`chamber {x:-26,y:-50}`,
+`offHand {x:-8,y:-50}`) rather than the hip, because the contact-phase shoulder is leaned 16px
+forward and an authored point outside the arm's reach renders as a stretched line. I first recorded
+that slice 3 might reduce that lean and unlock the hip — **checked, and it does not**: `gyaku-zuki`'s
+reach and the default gap are both 240k, so its hand solves to x 66, where the derived shortfall
+(66.1 − 31.3 = 34.8) caps at exactly the same 16 the heuristic gave. **The workhorse punch renders
+identically before and after slice 3**, which makes it slice 3's regression pin rather than a
+re-tuning opportunity._
 
 **Value**: kills the wind-up defect for the move that occupies 80% of screen time. Without a chamber
 the rear arm sits at stance (x −18) through startup and recovery and then _snaps_ to full extension —
@@ -182,13 +204,32 @@ fist withdrawn to the hip), then re-tuned by eye in `/dojo` — the sequence `ma
 followed. **Watch the ordering**: `offHand` must not fight the guard layer the way the strike did —
 if the off hand is `handL` on some future move, slice 1's precedence rule is the precedent to follow.
 
-### Slice 3 — a punch leans only when it cannot otherwise reach
+### ✅ Slice 3 — a punch leans only when it cannot otherwise reach — DONE
+
+_All 7 approved ACs green (10 net new tests); scan **9 killed / 2 accepted survivors**, both
+documented in `scene.ts` rather than coded around: the resting-`handR` ride is unreachable until a
+rear-hand move authors no `hikite`, and the `winding` phase gate is redundant only because slice 2's
+"authored points stay inside the limb's reach" convention makes a far chamber undrawable anyway — M9
+is a stated rule and this is where it is stated._
+
+_One AC lost its test: "root x stays truthful" is already pinned in the M2 lean block, and `poseFor`
+is never given the root x, so a second copy would assert the same guarantee against the same
+mechanism. One RED test also had to be **rewritten before it could fail**: a collinearity check on the
+resting elbow passes either way, because joints round to whole px and rounded integer coordinates are
+essentially never exactly collinear. Replaced with bone-length drift, which fails at 26%._
+
+**⚠️ The eye-check found a real cost — see "The shared shoulder" below.**
 
 **Value**: closes the item carried from **S2 · slice 3**. `strikeLean` is a heuristic
 (`min(16, handX × 0.5)`) while its lower-body counterpart `rootTravel` is _derived_ (the actual
 shortfall beyond the limb's straight reach). They agree at the workhorse distance and diverge close
 in, where the heuristic leans the torso forward **even though the arm could already reach** — a
 spurious lunge on exactly the punch this story just authored.
+
+**A second motive surfaced during slices 1–2's eye-check**: because both arms hang off the one
+`shoulder` joint, leaning it forward drags the _resting_ hand's root forward too, so the resting arm
+overstretches on **every** generic punch — not only `gyaku-zuki`, and not only close in. Same root
+cause, same fix; judge both in the one pass.
 **Path**: `poseFor` → `lean` → head/shoulder offset.
 **Class**: Behaviour change (visual output changes at close range), though it reads like a refactor.
 
@@ -203,6 +244,33 @@ spurious lunge on exactly the punch this story just authored.
 
 **Ordering note**: after slices 1–2, so the change is judged by eye on a punch that already looks
 like a reverse punch. Before slice 4, so the kick slice is not judged against a moving baseline.
+
+#### The shared shoulder — M3 bites a slice early (found 2026-07-19, slice 3's eye-check)
+
+At the workhorse distance `gyaku-zuki` and `kizami-zuki` now render **nearly the same picture** — the
+thing slices 1–2 exist to prevent. Measured at 240k / high band:
+
+|              | jab         | reverse punch                     |
+| ------------ | ----------- | --------------------------------- |
+| driven hand  | `417, −429` | `417, −429` — **pixel-identical** |
+| resting hand | `−13, −278` | `−51, −316`                       |
+
+Both arms hang off **one `shoulder` joint** and both solve to the same target, so the punching arm is
+the same picture whichever hand throws. **The entire distinction lives in the resting hand**, and
+slice 3 shrank its separation from 63px to 38px horizontally.
+
+Slice 3 did not break a guarantee — it removed a **stretch artifact**. The jab's resting arm used to
+be flung 39.4px from a 31.3px shoulder, and that overextension was accidentally carrying some of the
+distinction. Fixing the defect cost the side effect. Re-tuning `hikite` buys ~4px before the fist
+exits the arm's reach and stretches again, so it is not a tuning problem.
+
+**This is the M3 expressiveness limit the plan forecast for slice 4, arriving on punches instead**, and
+it gets slice 4's prescribed treatment: escalate, do not quietly ship two moves that look alike. The
+structural answer is that `Stance` has ONE shoulder — give it a front and a rear one and a reverse
+punch visibly travels from the back shoulder, which is what separates the techniques on a real body.
+That is a skeleton change touching every pose and stance, so it is **its own decision, taken before
+slice 4** — slice 4 is about to hit the same wall from the kick side, and a second shoulder would
+change how both are judged.
 
 ### Slice 4 — the roundhouse arcs in from the side
 
