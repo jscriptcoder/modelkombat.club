@@ -54,19 +54,19 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // spectator reads. The workhorse of every fight (~80% of committed screen time), and the first
   // authored move that appears on /watch at all. Chamber follows in S4 · Slice 2.
   // Chamber: the rear fist waits at the flank, drawn back behind its stance position. Off hand: the
-  // front fist withdraws past the centre line as the punch lands. Both sit at the same rib height,
-  // which is what a loaded and a pulling fist share anatomically.
+  // front fist withdraws toward the hip as the punch lands. Both sit at the same rib height, which is
+  // what a loaded and a pulling fist share anatomically.
   //
-  // Both were authored lower and further back first — at the hip, which is where karate actually puts
-  // them — and the /dojo eye-check showed why that cannot be drawn: an authored point must stay
-  // inside the ARM'S REACH of the shoulder (~31 local px, two ARM_BONEs), or deriveBend straightens
-  // the limb and the "withdrawn fist" renders as a long stretched line. The contact-phase shoulder is
-  // leaned 16px forward (M2), which shrinks the reachable envelope further — so the off hand is the
-  // tighter of the two. This is the same bone-length constraint S2 · Slice 3 established; authored
-  // poses are subject to it exactly like solved ones.
+  // The off hand was authored at the hip first — where karate actually puts it — then pulled forward
+  // to the flank in slice 4, because the rigid girdle slid the FRONT shoulder to x 23 and an authored
+  // point must stay inside the ARM'S REACH of its shoulder (~31 local px, two ARM_BONEs) or deriveBend
+  // straightens the limb and the withdrawn fist renders as a stretched line. S4 · Slice 5 rotates the
+  // girdle instead, so the front shoulder holds at x 7 and the reachable envelope opens back to the
+  // hip — which is where this pays off. The same bone-length constraint S2 · Slice 3 established still
+  // bounds it (span 30.4 vs a 31.3 reach), so it is eye-tuned right up to that edge, not past it.
   [
     "gyaku-zuki",
-    { limb: "handL", chamber: { x: -26, y: -50 }, offHand: { x: -8, y: -50 } },
+    { limb: "handL", chamber: { x: -26, y: -50 }, offHand: { x: -20, y: -50 } },
   ],
 ]);
 

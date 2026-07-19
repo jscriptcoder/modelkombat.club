@@ -1,10 +1,11 @@
 # Plan: S4 — the moves fighters actually throw look distinct
 
-**Branch**: next slice cuts from `main`. Shipped so far — slices 1–2 in **#363**
-(`feat/move-poses-s4-gyaku-zuki`, `4f0d3b7`); slice 3 + the M12 decision tree in **#364**
+**Branch**: slice 5 the rotation on `feat/move-poses-s4-rotate` (open PR). Shipped so far — slices 1–2
+in **#363** (`feat/move-poses-s4-gyaku-zuki`, `4f0d3b7`); slice 3 + the M12 decision tree in **#364**
 (`feat/move-poses-s4-lean`, `7800ed9`); slice 4 the girdle in **#365**
 (`feat/move-poses-s4-girdle`, `7ff7a7d`) — all merged 2026-07-19
-**Status**: Active — **4 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12)
+**Status**: Active — **5 of 6 slices done** (scope amended 2026-07-19: the shoulder girdle, M12). Only
+slice 6 (`mawashi-geri`) remains.
 **Parent story**: `plans/move-poses-stories.md` § S4 · **Decisions**: `plans/move-poses-decisions.md` (M1–M12)
 
 ## Goal
@@ -360,7 +361,12 @@ mutation**, never on clean code (verified 3× stashed, 5× on the player suite).
 perturbing the render loop, not a pre-existing flake — but it is why kill attribution must name the
 test rather than count failures.
 
-### Slice 5 — the torso rotates into the punch
+### ✅ Slice 5 — the torso rotates into the punch — DONE
+
+_All 6 approved ACs green; scan **12/12 killed**; `/dojo` sign-off taken (chamber square, contact
+rotates the rear shoulder through with `hikite` drawn to the hip inside reach, visibly distinct from a
+jab). The `~8 existing tests` the plan forecast was in fact **16** — the derived lean touches more
+blocks than the raw `LEAN_CAP` count suggested; each was revised to its new claim, none weakened._
 
 **Value**: makes the reverse punch read as a reverse punch — the rear shoulder coming through is
 the technique's signature — and **restores `hikite` to the hip**, where slice 2 wanted it and the
@@ -369,31 +375,37 @@ geometry refused.
 `lean/2`.
 **Class**: Behaviour change.
 
-**What changes**
+**What changed**
 
-1. The lean moves the **driving** shoulder by `lean`; the other stays (M12e).
+1. The lean moves the **driving** shoulder by `lean`; the other stays (M12e) — a new optional
+   `GirdleShift` on `deriveSkeleton` splits the two ends ±`lean/2` around the midpoint.
 2. `shoulder` (the midpoint) and `head` move by **`lean/2`** (M12f).
-3. The shortfall is measured from **each arm's own root** (M12d) — so a reverse punch leans more
-   than a jab at mid range.
-4. **Slice 3's hand-ride is retired.** A resting hand's shoulder no longer moves, so the rule
-   becomes "each hand keeps its offset from its own shoulder" and the ride is zero. The cause is
-   gone; the workaround goes with it.
-5. `gyaku-zuki`'s `hikite` is **re-tuned toward the hip** — the envelope now extends to about −21.
+3. The shortfall is measured from **each arm's own root** (`drivingShoulder`, ±`SHOULDER_HALF_WIDTH`,
+   M12d) — so a reverse punch leans more than a jab at mid range.
+4. **Slice 3's hand-ride is retired.** The resting shoulder no longer moves, so the ride lines are
+   simply deleted and resting hands keep their absolute stance — its test was removed, not inverted,
+   because the ride's cause is gone (criterion 6 positively pins the resting hand at stance instead).
+5. `gyaku-zuki`'s `hikite` re-tuned toward the hip (−8 → −20), inside its 31.3 reach at a 30.4 span.
 
-**Acceptance criteria** _(refined at approval time)_
+**Acceptance criteria** _(approved 2026-07-19)_
 
-- [ ] Given `gyaku-zuki` at contact, when it renders, `shoulderL` has travelled **past**
-      `shoulderR` — the torso has twisted, not slid
-- [ ] Given the same frame, the **head and midpoint move half** the driving shoulder's travel
-- [ ] Given a jab and a reverse punch at **mid range**, the reverse punch leans **more** — the
-      shortfall is measured per-arm
-- [ ] Given `gyaku-zuki` at contact, the pulled fist's arm **keeps its bone lengths** with the
-      fist authored at the hip — the thing a rigid girdle makes impossible
-- [ ] Given a **kick** or a **throw**, when it renders, no rotation occurs (both already gate the
+- [x] Given `gyaku-zuki` at contact, when it renders, `shoulderL` has travelled **past**
+      `shoulderR` — the torso has twisted, not slid (the resting front shoulder stays at stance +HALF)
+- [x] Given the same frame, the **head and midpoint move half** the driving shoulder's travel (pinned
+      as the literal half of the cap AND the 2:1 ratio)
+- [x] Given a jab and a reverse punch at **mid range**, the reverse punch leans **more** — the
+      shortfall is measured per-arm; plus the mirror (a jab drives the front shoulder, rear stays)
+- [x] Given `gyaku-zuki` at contact, the pulled fist's arm **keeps its bone lengths** with the
+      fist drawn back near the hip — inside reach, retiring slice 4's ≤10% ceiling
+- [x] Given a **kick** or a **throw**, when it renders, no rotation occurs (both already gate the
       lean to zero) — status quo preserved
+- [x] Given a jab at contact, its **resting rear hand stays at its stance position** — the ride is
+      retired with the slide that forced it
 
-**Watch**: ~8 existing tests assert `pose.shoulder` at the full `LEAN_CAP`; under rotation the
-midpoint moves half that. Revise them, don't weaken them.
+**MUTATE**: scripted scan, **12/12 killed** (girdle offsets, both girdle-shift signs, half-vs-full
+lean, both midpoint/head halves, the per-arm root, both driving-root signs, the `deriveSkeleton`
+girdle pass-through). Every kill attributed to a named failing test — kills recorded only on named
+`FAIL` lines, never exit codes (the slice-4 false-kill lesson, still load-bearing).
 
 ### Slice 6 — the roundhouse arcs in from the side
 
