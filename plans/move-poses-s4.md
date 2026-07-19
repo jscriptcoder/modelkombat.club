@@ -61,7 +61,6 @@ fallback read acceptably?), not an authoring obligation.
   exactly the distance the current bounded-stretch compromise was tuned for.
 - **Easing between phases** — S8. S4 authors _endpoints_; S8 makes them flow.
 - **The contact sheet** — S7, and deliberately after S4 so it has something to compare.
-- **`hikite`** (the non-punching hand pulling back to the hip) — see Parking lot.
 
 ---
 
@@ -108,7 +107,7 @@ no tape produces it.
 - [ ] Given that same frame **also carrying a guard band**, when it renders, `handL` still shows the
       punch — the strike wins the rear hand
 - [ ] Given a fighter **not attacking** who carries a guard band and a stale `attackMove:
-    "gyaku-zuki"`, when it renders, `handL` shows the **guard** — the yield needs a live strike
+  "gyaku-zuki"`, when it renders, `handL` shows the **guard** — the yield needs a live strike
 - [ ] Given `kizami-zuki` (no descriptor), when it renders, `handR` drives and `handL` is untouched —
       the generic path is unchanged (M7)
 - [ ] Given `gyaku-zuki` committed, when it renders, **`elbowL` re-derives off the moved
@@ -139,19 +138,49 @@ no tape produces it.
 the rear arm sits at stance (x −18) through startup and recovery and then _snaps_ to full extension —
 the S2 defect, reappearing for this move.
 **Path**: `chamberFor("gyaku-zuki")` → `poseFor`'s existing phase gate → startup/recovery draw the
-chamber.
-**Class**: Behaviour change (data on an existing mechanism + eye-tuning).
+chamber; a new `offHand` descriptor field → the non-punching hand.
+**Class**: Behaviour change (a new authored endpoint + data + eye-tuning).
 
-**Acceptance criteria** _(refined at approval time)_
+#### `hikite` was folded in here — why (decided 2026-07-19, after slice 1's visual check)
+
+Slice 1 shipped the rear-hand drive and the ACs passed, but the `/dojo` sign-off showed the
+distinction is carried by the **trailing arm, not the punching arm**. Both arms hang off a **single
+shared `shoulder` joint**, so a rear-hand punch and a front-hand punch send the _extended_ arm to
+nearly the same place; only the resting arm differs (folded at the chest for `gyaku-zuki`, trailing
+back for `kizami-zuki`). Side by side they are different poses — but the spectator-facing goal
+(_tell a reverse punch from a jab_) is served faintly.
+
+`hikite` — the non-punching hand snapping back to the hip — is what makes the punching side read,
+and it is the **same authored-endpoint mechanism** as the chamber, on the same move, judged in the
+same eye-pass. It was a non-goal when this plan was written; keeping it there would mean opening
+`gyaku-zuki` a third time and judging it by eye twice. Folded in instead.
+
+Note this is an early instance of the **M3 expressiveness limit** already flagged for slice 4: only
+the driven endpoint moves, so techniques that differ in whole-body mechanics rather than in endpoint
+destination are hard to separate. `offHand` is the first crack in that — a _second_ authored
+endpoint. Keep it a descriptor field, not a `gyaku-zuki` special case, so slice 4 can use it too.
+
+**Acceptance criteria** _(present for approval before any code)_
 
 - [ ] Given `gyaku-zuki` on a **startup** tick, when it renders, `handL` sits at the authored chamber,
       **distinct from both its stance position and its extension** (the M8.3 assertion floor)
 - [ ] Given a **recovery** tick, when it renders, `handL` returns to that same chamber
-- [ ] Given the **active** tick, when it renders, the extension is unchanged from slice 1
+- [ ] Given the **active** tick, when it renders, the punching hand's extension is **unchanged from
+      slice 1** — `hikite` must not move where contact happens
+- [ ] Given `gyaku-zuki` at **contact**, when it renders, the **front hand is drawn back toward the
+      hip**, clearly behind its stance position — so the punch reads from the punching side
+- [ ] Given a move with **no `offHand`** authored (every move but this one), when it renders, its
+      non-driven hand stays at stance — M7 totality, the fallback is the status quo
+- [ ] Given `gyaku-zuki`, when the **elbow re-derives**, it follows the pulled hand rather than
+      staying at the stance bend
 
-**RED**: chamber-distinctness assertions per phase. **MUTATE**: chamber → stance, chamber → extension,
-phase gate inverted. **Note**: authored from anatomy first (rear fist at the ribs, pulled back and
-low), then re-tuned by eye in `/dojo` — the same sequence `mae-geri`'s chamber followed.
+**RED**: chamber-distinctness assertions per phase, plus the off-hand assertions above.
+**MUTATE**: chamber → stance, chamber → extension, phase gate inverted, `offHand` dropped, `offHand`
+applied to the _driven_ hand, `offHand` leaking onto undescribed moves.
+**Note**: both points authored from anatomy first (rear fist at the ribs pulled back and low; front
+fist withdrawn to the hip), then re-tuned by eye in `/dojo` — the sequence `mae-geri`'s chamber
+followed. **Watch the ordering**: `offHand` must not fight the guard layer the way the strike did —
+if the off hand is `handL` on some future move, slice 1's precedence rule is the precedent to follow.
 
 ### Slice 3 — a punch leans only when it cannot otherwise reach
 
@@ -210,10 +239,9 @@ contact sheet is the confirming instrument. Do not quietly ship two identical ki
 
 ## Parking lot
 
-- **`hikite`** — the non-punching hand pulling back to the hip. It is the other half of what makes a
-  karate reverse punch read as karate, but it needs a _new_ mechanism (a second authored endpoint per
-  descriptor, an "off hand"), which would benefit every hand technique. Deliberately deferred:
-  slice 1 does not need it to make the move distinguishable. Revisit after S4 lands, or fold into S8.
+- ~~**`hikite`**~~ — **promoted into slice 2** after slice 1's visual check showed the rear-hand drive
+  alone reads faintly (one shared shoulder ⇒ the extended arm lands in nearly the same place either
+  way). See the note under slice 2.
 - **The eight zero-usage moves** — `uraken`, `ushiro-geri`, `yoko-geri`, `shuto`, `kizami-zuki`,
   `empi`, `hiza-geri`, `mae-geri`(authored). S7 decides whether the generic fallback reads acceptably;
   `empi`/`hiza-geri` are S5's regardless.
