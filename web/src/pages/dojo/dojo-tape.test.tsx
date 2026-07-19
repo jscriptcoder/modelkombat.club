@@ -102,7 +102,7 @@ describe("buildDojoTape — centers two posed fighters on the ring", () => {
   });
 });
 
-describe("the default dojo scene — challenger mid-strike vs an idle king, facing off at gyaku reach", () => {
+describe("the default dojo scene — challenger mid-band mae-geri vs an idle king, facing off at gyaku distance", () => {
   const defaultTape = () =>
     buildDojoTape({ a: DEFAULT_CHALLENGER, b: DEFAULT_KING, gap: DEFAULT_GAP });
 
@@ -116,7 +116,8 @@ describe("the default dojo scene — challenger mid-strike vs an idle king, faci
 
     expect(a.attacking).toBe(true);
     expect(a.attackBand).toBe(2); // mid band
-    expect(a.attackReach).toBe(240_000); // gyaku reach — lands at the default gap
+    expect(a.attackReach).toBe(270_000); // mae-geri reach
+    expect(a.attackMove).toBe("mae-geri"); // the first move with a pose of its own (S1)
     expect(a.facing).toBe(1); // faces the king on its right
     expect(a.posture).toBe(0); // a standing strike — not a crouch
     expect(a.guardBand).toBe(0); // not guarding
@@ -165,10 +166,12 @@ describe("the default dojo scene renders two fighters through the real scene()/c
     expect(stage.a.root.scale.x).toBe(1);
     expect(stage.b.root.scale.x).toBe(-1);
 
-    // The default poses render through the pipeline: the challenger's front hand LANDS on the king's
-    // near edge (x 66 local, world-scaled) at the gyaku-reach gap; the idle king's stays at its
-    // neutral stance (x 18).
-    expect(stage.a.handR.x).toBe(s(66));
+    // The default poses render through the pipeline: the challenger throws a mae-geri, so its FOOT
+    // lands on the king's near edge (x 66 local, world-scaled) while its hand stays at the stance
+    // (x 18) — the whole point of the per-move descriptor. The idle king keeps both at stance.
+    expect(stage.a.footR.x).toBe(s(66));
+    expect(stage.a.handR.x).toBe(s(18));
     expect(stage.b.handR.x).toBe(s(18));
+    expect(stage.b.footR.x).toBe(s(14));
   });
 });

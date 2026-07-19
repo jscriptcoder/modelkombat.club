@@ -315,20 +315,20 @@ describe("DojoApp — world-gap spacing control", () => {
 });
 
 describe("DojoApp — per-figure attack-reach control (M10)", () => {
-  it("opens each fighter at its default committed reach — challenger at gyaku, king idle", () => {
+  it("opens each fighter at its default committed reach — challenger at mae-geri, king idle", () => {
     const { Stage, latest } = spyStage();
     const { getByRole } = render(() => <DojoApp stage={Stage} />);
 
     const frame = latest()[0];
 
-    expect(frame.a.attackReach).toBe(240_000); // gyaku-zuki reach — lands at the default gap
+    expect(frame.a.attackReach).toBe(270_000); // mae-geri reach — the default committed move
     expect(frame.b.attackReach).toBe(0); // idle king — no committed reach
 
     // ...and each figure's slider read-out reflects that default (the control shows what it drives).
     const challenger = getByRole("group", { name: "Challenger" });
     const king = getByRole("group", { name: "King" });
 
-    expect(within(challenger).getByText("240k")).toBeTruthy();
+    expect(within(challenger).getByText("270k")).toBeTruthy();
     expect(within(king).getByText("0k")).toBeTruthy();
   });
 
@@ -363,6 +363,6 @@ describe("DojoApp — per-figure attack-reach control (M10)", () => {
     );
 
     expect(latest()[0].b.attackReach).toBe(300_000); // king's reach set
-    expect(latest()[0].a.attackReach).toBe(240_000); // challenger unchanged from default
+    expect(latest()[0].a.attackReach).toBe(270_000); // challenger unchanged from default
   });
 });

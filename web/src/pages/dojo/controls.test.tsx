@@ -35,6 +35,7 @@ const controls = (overrides: Partial<FigureControls> = {}): FigureControls => ({
   throwing: false,
   knockdown: false,
   attackReach: 0,
+  attackMove: "",
   ...overrides,
 });
 
@@ -49,6 +50,7 @@ describe("controlsToFrame — maps the lab's raw pose controls to a render frame
       throwing: true,
       knockdown: true,
       attackReach: 250_000,
+      attackMove: "mawashi-geri",
     });
 
     // Every tuned field survives verbatim; the render-only fields are filled with grounded, neutral
@@ -62,6 +64,7 @@ describe("controlsToFrame — maps the lab's raw pose controls to a render frame
       throwing: true,
       knockdown: true,
       attackReach: 250_000,
+      attackMove: "mawashi-geri",
       x: 0,
       y: 0,
       points: 0,
@@ -172,7 +175,8 @@ describe("default control states seed the pose lab's opening scene", () => {
       guardBand: 0,
       throwing: false,
       knockdown: false,
-      attackReach: 240_000, // gyaku reach — lands at the default gap
+      attackReach: 270_000, // mae-geri reach
+      attackMove: "mae-geri", // the first move with a pose of its own (S1)
     } satisfies FigureControls);
   });
 
@@ -186,6 +190,7 @@ describe("default control states seed the pose lab's opening scene", () => {
       throwing: false,
       knockdown: false,
       attackReach: 0, // idle
+      attackMove: "", // nothing committed
     } satisfies FigureControls);
   });
 });
