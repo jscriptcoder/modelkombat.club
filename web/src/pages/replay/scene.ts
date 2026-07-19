@@ -185,10 +185,19 @@ const deriveBend = (
   };
 };
 
+// The per-side forward shift of the girdle's two ends beyond the symmetric ± SHOULDER_HALF_WIDTH. A
+// committed hand strike ROTATES the girdle (S4 · Slice 5): the driving shoulder swings forward while
+// the resting one holds, so the rear shoulder comes through on a reverse punch. {L:0,R:0} for any
+// pose that does not rotate — an idle stance, a kick, a throw, a chamber — leaving a square girdle.
+type GirdleShift = { L: number; R: number };
+
 // Grow a stance's endpoints into the full articulated pose by deriving the mid-joints: the elbows bow
 // back off the straight shoulder→hand line, the knees bow forward off the straight hip→foot line
 // (Story 4) — so an arm reads shoulder→elbow→hand and a leg reads hip→knee→foot, not rigid sticks.
-const deriveSkeleton = (stance: Stance): Skeleton => {
+const deriveSkeleton = (
+  stance: Stance,
+  girdle: GirdleShift = { L: 0, R: 0 },
+): Skeleton => {
   // The girdle: `shoulder` is the MIDPOINT (the spine's top and the head's anchor), and each arm
   // hangs from its own end of a bar centred on it — the rear at −x, the front at +x, in the local
   // +x = forward frame (S4 · Slice 4). Derived, never authored, so every stance and every action
@@ -199,12 +208,12 @@ const deriveSkeleton = (stance: Stance): Skeleton => {
   // hand threw it and the whole distinction rested on the resting hand. Starting the rear arm 14px
   // further back changes the arm line itself.
   const shoulderL = {
-    x: stance.shoulder.x - SHOULDER_HALF_WIDTH,
+    x: stance.shoulder.x - SHOULDER_HALF_WIDTH + girdle.L,
     y: stance.shoulder.y,
   };
 
   const shoulderR = {
-    x: stance.shoulder.x + SHOULDER_HALF_WIDTH,
+    x: stance.shoulder.x + SHOULDER_HALF_WIDTH + girdle.R,
     y: stance.shoulder.y,
   };
 
@@ -324,10 +333,20 @@ const poseFor = (
   // by kicks, where it reads wrong: pitching the torso forward over a rising leg makes the figure
   // look like it is FALLING INTO the kick. A real front kick counterbalances. The kick's reach
   // problem is answered by the hip step below instead, which is the lower body's own mechanism.
+  // Since S4 · Slice 5 the shortfall is measured from the DRIVING arm's own shoulder (M12d) — the
+  // girdle end the driven hand hangs from — not the shared midpoint. The rear shoulder sits further
+  // from the target, so a reverse punch leans more than a jab at mid range; at the workhorse both cap.
+  const drivingShoulder: Joint = {
+    x:
+      stance.shoulder.x +
+      (limb === "handL" ? -SHOULDER_HALF_WIDTH : SHOULDER_HALF_WIDTH),
+    y: stance.shoulder.y,
+  };
+
   const lean =
     driven === null || winding || limb === "footR"
       ? 0
-      : rootTravel(stance.shoulder, driven, ARM_BONE);
+      : rootTravel(drivingShoulder, driven, ARM_BONE);
 
   // A kick whose target is beyond the leg's reach steps the HIP forward (the leg's root) — the
   // lower-body counterpart of the lean, which already does this for the arm by shifting the shoulder.
@@ -355,31 +374,30 @@ const poseFor = (
   // wrong the moment a front-hand technique authors one.
   const offHandKey = limb === "handL" ? "handR" : "handL";
 
+  // The girdle ROTATES (S4 · Slice 5): the driving shoulder swings forward by the full lean while the
+  // resting one holds, so the two ends split ± lean/2 around a midpoint that itself advances lean/2
+  // (M12 e/f). deriveSkeleton offsets each end beyond ± HALF by this much; head + shoulder below carry
+  // the other half. Zero for a kick / throw / idle, where the lean is 0 and the girdle stays square.
+  const girdle: GirdleShift = {
+    L: (limb === "handL" ? 1 : -1) * (lean / 2),
+    R: (limb === "handR" ? 1 : -1) * (lean / 2),
+  };
+
   const endpoints: Stance = {
     ...stance,
     ...(driven === null
       ? {}
       : {
-          head: { x: stance.head.x + lean, y: stance.head.y },
-          shoulder: { x: stance.shoulder.x + lean, y: stance.shoulder.y },
+          // The upper body advances HALF the driving shoulder's lean (M12f): a torso that rotated AND
+          // lunged the full amount is two motions where a body does one. The girdle ends (above) carry
+          // the other half, so the driving shoulder still reaches the full lean.
+          head: { x: stance.head.x + lean / 2, y: stance.head.y },
+          shoulder: { x: stance.shoulder.x + lean / 2, y: stance.shoulder.y },
           hip: { x: stance.hip.x + step, y: stance.hip.y },
-          // Both hands ride the lean, because both arms hang off the shoulder it moves (S4 · Slice 3).
-          // Leaving a resting hand planted while its own shoulder leaned 16px away from it opened the
-          // span to 39.4 against a 31.3px reach, so deriveBend floored its offset and each bone grew
-          // to half the span — the rubber-band arm Story 4 removed, back on every generic punch.
-          //
-          // Only a hand STILL AT ITS STANCE ends up riding: the layers below overwrite whichever hands
-          // are authored destinations — the driven endpoint, a hikite pull, a guard, a throw's grab —
-          // and a destination means "put the fist HERE", not "here relative to a leaning body". That
-          // distinction is what keeps slice 2's eye-tuned off hand where it was tuned.
-          //
-          // The handR line is EQUIVALENT under today's data and the mutator scan says so: reaching it
-          // with a non-zero lean needs a hand technique that drives handL and authors no off hand, and
-          // gyaku-zuki — the only handL driver — authors one. Kept rather than hard-coded away because
-          // "both arms hang off the shoulder" is the actual rule; the first rear-hand move without a
-          // pull (a backfist, say) would silently render a stretched arm if only handL rode.
-          handL: { x: stance.handL.x + lean, y: stance.handL.y },
-          handR: { x: stance.handR.x + lean, y: stance.handR.y },
+          // The resting hands stay at stance and are NOT rewritten here: only the driving shoulder
+          // swings now, so a resting hand's own shoulder never moves out from under it and S4 · Slice
+          // 3's hand-ride is retired with the slide that forced it. The layers below overwrite the
+          // authored destinations — the driven endpoint, a hikite pull, a guard, a throw's grab.
           // An explicit three-way rather than a computed `[limb]: driven` key. The computed form is
           // shorter, but it type-checks ANY string into the pose object — a limb the Stance has no
           // endpoint for would silently add a junk property and the strike would vanish. The ternary
@@ -408,7 +426,7 @@ const poseFor = (
     ...(grab === null ? {} : grab),
   };
 
-  return deriveSkeleton(endpoints);
+  return deriveSkeleton(endpoints, girdle);
 };
 
 // The heads-up display for the current playhead: the engine tick number + both fighters' scores,
