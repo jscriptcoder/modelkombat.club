@@ -4,7 +4,7 @@
 `plans/move-poses-decisions.md`
 **Predecessors**: S0 (#352, `attackMove`/`attackPhase` on the tape) · S1 (#353, the descriptor
 table + `mae-geri`'s foot)
-**Status**: Active
+**Status**: Active — slice 1 shipped (#355, `bbb61ee`); slice 2 next; slice 3 still conditional
 
 ## Goal
 
@@ -79,21 +79,25 @@ the archive alongside it when S2 completes.
 
 ## Acceptance Criteria
 
-- [ ] On `/watch`, a fighter throwing a technique is visibly in a different shape during
-      wind-up than at the moment of contact, and returns from it afterwards
-- [ ] `mae-geri` chambers knee-up with the foot drawn back under the hip, then extends to the
-      solved target — the phase-2 solve is retained (M3, non-negotiable)
-- [ ] In `/dojo`, a selected technique plays through its real engine duration
-      (`startup + active + recovery` ticks) and can be paused, scrubbed and frame-stepped
-- [ ] `reach-presets.ts` mirrors the engine's per-move `startup`/`active`/`recovery`,
-      pinned value-by-value
-- [ ] Every unauthored move, absent `attackPhase`, and out-of-range phase code renders
-      something sensible — no blank figure, no throw (M7 totality)
-- [ ] No `src/` change; `BENCHMARK_VERSION` stays `v19`
+- [x] On `/watch`, a fighter throwing a technique is visibly in a different shape during
+      wind-up than at the moment of contact, and returns from it afterwards — _slice 1, seen on
+      the preview at ticks 41/47/58_
+- [x] `mae-geri` chambers knee-up with the foot drawn back under the hip, then extends to the
+      solved target — the phase-2 solve is retained (M3, non-negotiable) — _slice 1, pinned by
+      test; **not yet eye-checked**, and it cannot be on `/watch` (see the move-usage finding),
+      so the eye check belongs to slice 2_
+- [x] In `/dojo`, a selected technique plays through its real engine duration
+      (`startup + active + recovery` ticks) and can be paused, scrubbed and frame-stepped —
+      _slice 2; eye-checked at ticks 0/9/14 of the default `mae-geri`_
+- [x] `reach-presets.ts` mirrors the engine's per-move `startup`/`active`/`recovery`,
+      pinned value-by-value — _slice 2, all 13 in one exhaustive assertion_
+- [x] Every unauthored move, absent `attackPhase`, and out-of-range phase code renders
+      something sensible — no blank figure, no throw (M7 totality) — _slice 1_
+- [x] No `src/` change; `BENCHMARK_VERSION` stays `v19` — _held through slice 1_
 
 ## Slices
 
-### Slice 1: a technique winds up and recovers on `/watch`
+### Slice 1: a technique winds up and recovers on `/watch` — ✅ SHIPPED #355 (`bbb61ee`)
 
 **One sentence**: `poseFor` honours `attackPhase`, so a committed technique draws a chamber
 during startup and recovery and its solved extension only at contact.
@@ -197,6 +201,37 @@ recorded, and the human approves the commit.
 **One sentence**: `/dojo` builds a multi-tick tape spanning the selected move's engine timing
 and drives it with the existing transport, so a technique can be watched, paused and stepped.
 
+**Which move gets the eye check? → `mae-geri`. RESOLVED 2026-07-19.**
+
+Slice 1 measured which moves fighters actually throw: only 5 of 13 ever appear, and **`mae-geri`
+is not one of them**, while `gyaku-zuki` alone is ~80% of committed screen time and still winds up
+through a bare stance. That raised the question of whether this slice should tune `gyaku-zuki`
+instead, putting the arc's first spectator-visible chamber one PR earlier. **Rejected**, for three
+reasons:
+
+1. **Two of this slice's three M3 questions are kick-specific** — _lean polarity for a kick_ and
+   _does the foot-through-solver assumption hold once it moves_. A punch cannot answer either, so
+   switching would leave the questions that gate S4 and S5 open and force them to be re-asked
+   against an already signed-off harness.
+2. **`gyaku-zuki` is already S4's first move.** The telemetry-bargain rule
+   (`plans/move-poses-stories.md` § The bargain) orders S4 by move-usage and `gyaku-zuki` tops it.
+   Pulling it here doesn't buy a PR of value — it merges S4's first PR into the harness PR,
+   re-bundling the "and" this three-way split exists to remove.
+3. **The extension may move underneath it.** Slice 1 measured the **arm** at ~2× its stance length
+   at contact, not just the leg, so slice 3's bone-length question — if it fires — changes how a
+   punch extends. Authoring `gyaku-zuki`'s chamber before that settles means tuning against
+   geometry that may shift.
+
+**What the measurement actually argues for is sequencing, not slice content.** `gyaku-zuki` being
+invisible is a scheduling symptom. The fix is to hold the order **slice 2 → assess slice 3 → S4
+opening on `gyaku-zuki`**, and let nothing overtake S4. That lands the dominant move one PR later
+than the switch would, against settled geometry, with the kick questions already answered.
+
+**Tripwire carried to S4** (not this slice): `gyaku-zuki` is the **rear-hand** punch, and
+`scene.ts:87` puts the guard on the rear arm precisely so a strike and a guard never contend for
+the same limb (`plans/move-poses-stories.md` § Warnings). Authoring it collides with that
+precedence rule; that is S4's first problem to solve, and it is why S4 is not a trivial table edit.
+
 **Value**: The developer gets the authoring harness. This is what makes the chamber from slice
 1 tunable by eye, and it is the tool every later slice (S3–S6) depends on to author 12 more
 moves. It also answers a question a still cannot: _does this read as a movement at true engine
@@ -241,6 +276,64 @@ real diff.
 `/dojo` and the three M3 questions are answered in writing** (recovery override? lean polarity
 for a kick? does the foot-through-solver assumption still hold once it moves?), and the human
 approves the commit.
+
+**Recorded outcome** _(2026-07-19)_:
+
+- All eight approved criteria met. 63 dojo tests (2102 repo-wide), typecheck + lint green,
+  `src/` untouched, `BENCHMARK_VERSION` still `v19`.
+- **Manual mutator scan: 27/28 killed** (scripted — applied to real source, suite run, file
+  restored; re-run in full after the refactor). One genuine **survivor found and fixed**: dropping
+  figure `b` from the span left the suite green, because the differing-moves test happened to give
+  the **challenger** the longer technique, so `max(1, spanOf(a))` returned the same answer. Killed
+  by a mirrored test where the **king** holds the longer move.
+- **One accepted survivor: "the stage ignores the playhead"** (`DojoStage` drawing `scene(tape, 0)`
+  instead of `scene(tape, props.tick)`). It is invisible to the unit layer by construction — the
+  spy stage replaces `DojoStage` wholesale, and that same seam is what makes every transport
+  transition assertable without WebGL. This follows the standing precedent for renderer wiring
+  (`ReplayPlayer`'s ticker is likewise proven by Playwright, not by unit test). It is killed
+  **empirically** by the visual check below: the mutant would freeze the figure, and the figure
+  demonstrably moves.
+- **Refactor applied**: `spanOf` was a closure inside `buildDojoTape` though it closes over nothing;
+  hoisted to module level beside `techniqueOf`/`figureAt`. **Extraction of shared playback controls
+  with `ReplayPlayer` was assessed and REJECTED** — the player carries speed buttons, restart,
+  `aria-valuetext`, disabled-at-ends and engine-tick-vs-index readout semantics the lab does not
+  want; sharing would drag `/watch` concerns into `/dojo`. Four plain controls is the smaller
+  change, exactly as this slice's REFACTOR note anticipated.
+- **Visual sign-off: DONE** (Playwright against the local dev server, `/dojo` at ticks 0/4/8/9/10/
+  11/14/20/27). The technique plays on load and auto-pauses at its final tick. Ticks 0–8 hold the
+  chamber, 9–11 the extension, 12–27 the chamber again.
+
+**The three M3 questions — answered from the moving picture:**
+
+1. **Does recovery need its own pose?** **Yes eventually, but that is not the real problem.** With
+   M3's default, tick 14 is pixel-identical to tick 4: the kick holds a chamber for 9 ticks, snaps
+   out for 3, then holds the _same_ chamber for 16. The honest finding is bigger than the question
+   asked — **nothing interpolates.** A distinct recovery pose would help; easing between the three
+   would help far more. Recorded as a new arc-level concern rather than folded silently into a later
+   slice.
+2. **Lean polarity for a kick?** **Wrong as inherited — a kick wants the opposite lean, or none.**
+   The M2 lean was authored for punches, where leaning into the reach is right. On a `mae-geri` the
+   torso pitches hard forward over a rising leg, so the figure reads as _falling into_ the kick
+   rather than kicking. Real front kicks counterbalance backward.
+3. **Does the foot-through-solver assumption hold once it moves?** **Mechanically yes, visually no.**
+   The foot reaches the target and the knee re-derives correctly at every tick. But motion makes the
+   bone-length swing more obvious, not less: you now watch a short chambered leg snap into a
+   near-horizontal pole about twice its natural length. **This settles slice 3 — it is needed.**
+
+**Chamber tuning**: left as authored. The chamber reads correctly (knee forward, foot drawn back
+under the hip); every problem the eye check found is elsewhere — lean polarity, bone length, and the
+absence of interpolation.
+
+**Usability wrinkle, not a criterion**: the lab has no Restart. Playback auto-pauses at the final
+tick, so `/dojo` now opens resting on the last recovery frame, and replaying means scrubbing to 0
+and pressing Play. Usable, but S3–S6 will do this constantly — worth a small follow-up.
+
+**Watch item — a flaky neighbour.** `ReplayPlayer`'s "auto-pauses at the end of a short fight" test
+failed once in five full-suite runs on this branch (0 in 3 on `main`). It passes in isolation. It is
+inherently ticker-timing-dependent, and this slice adds real per-frame redraw work to the two
+`/dojo` tests that mount a real Pixi app. Inconclusive at these sample sizes, and deliberately
+**not** patched here — weakening an unrelated assertion to green a run would hide exactly the kind
+of signal it exists to give.
 
 ---
 

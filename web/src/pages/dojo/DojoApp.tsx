@@ -7,6 +7,13 @@ import SpacingControl from "./SpacingControl";
 import { buildDojoTape } from "./dojo-tape";
 import { DEFAULT_GAP } from "./reach-presets";
 import {
+  advance,
+  seek,
+  startTransport,
+  step,
+  togglePlaying,
+} from "../replay/transport";
+import {
   controlsToFrame,
   DEFAULT_CHALLENGER_CONTROLS,
   DEFAULT_KING_CONTROLS,
@@ -60,6 +67,17 @@ const DojoApp: Component<DojoAppProps> = (props) => {
 
   const brandPair = (): [Brand, Brand] => [challengerBrand(), kingBrand()];
 
+  // The playback clock (the pure transport model) as page state, so the controls below are assertable
+  // without a WebGL mount; the Pixi ticker only feeds `onTick` into it. Opens PLAYING — the lab's job
+  // is to show a technique as a movement — and any manual control pauses it for tuning.
+  const [transport, setTransport] = createSignal(startTransport());
+
+  const lastTick = () => tape().length - 1;
+
+  // Clamped on read, so shortening the tape under the playhead (selecting a faster move, or dialing a
+  // fighter idle) can never leave it pointing off the end.
+  const tick = () => Math.min(Math.round(transport().playhead), lastTick());
+
   return (
     <main class="dojo">
       <h1>Dojo — pose lab</h1>
@@ -68,9 +86,60 @@ const DojoApp: Component<DojoAppProps> = (props) => {
         <Dynamic
           component={props.stage ?? DojoStage}
           tape={tape()}
+          tick={tick()}
           brands={brandPair()}
+          onTick={(delta: number) =>
+            setTransport((t) => advance(t, delta, lastTick()))
+          }
         />
       </Show>
+
+      <div class="dojo-transport" role="group" aria-label="Technique playback">
+        <button
+          type="button"
+          class="control-segment"
+          onClick={() => setTransport(togglePlaying)}
+        >
+          {transport().playing ? "Pause" : "Play"}
+        </button>
+
+        <button
+          type="button"
+          class="control-segment"
+          aria-label="Step back one tick"
+          onClick={() => setTransport(step(transport(), -1, lastTick()))}
+        >
+          ◀
+        </button>
+
+        <button
+          type="button"
+          class="control-segment"
+          aria-label="Step forward one tick"
+          onClick={() => setTransport(step(transport(), 1, lastTick()))}
+        >
+          ▶
+        </button>
+
+        <input
+          type="range"
+          class="dojo-scrub"
+          min={0}
+          max={lastTick()}
+          step={1}
+          value={tick()}
+          aria-label="Scrub to tick"
+          onInput={(e) =>
+            setTransport(
+              seek(transport(), e.currentTarget.valueAsNumber, lastTick()),
+            )
+          }
+        />
+
+        <span class="dojo-tick-readout">
+          tick {tick()} / {lastTick()}
+        </span>
+      </div>
 
       <SpacingControl gap={gap()} onChange={setGap} />
 

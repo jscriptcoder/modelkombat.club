@@ -13,10 +13,11 @@ import type { ReplayTape } from "../replay/replay-contract";
 import type { Brand } from "../../shared/lib/brand";
 
 // The pose lab's Pixi mount: like ReplayPlayer's, it attaches an Application and draws the two
-// stickmen through the pure `createStage` + `scene` — but with NO ticker/transport. A pose is static,
-// so it renders tick 0; when a control edit rebuilds the tape (props.tape), the effect re-applies the
-// shipped projection. The Scene→display mapping is unit-tested in figures.test and the control→tape
-// wiring in DojoApp.test; here we keep only the renderer wiring.
+// stickmen through the pure `createStage` + `scene`. It renders whichever tick the page hands down
+// and reports each ticker frame back up via `onTick` — the CLOCK STATE lives in DojoApp (above the
+// injectable stage seam) so every transport transition stays assertable without a WebGL mount, while
+// the impure ticker stays here at the edge. The Scene→display mapping is unit-tested in figures.test
+// and the control/transport→tape wiring in DojoApp.test; here we keep only the renderer wiring.
 
 const DEFAULT_VIEWPORT: Viewport = { width: 1200, height: 600 };
 
@@ -25,7 +26,13 @@ const BACKGROUND = 0x0b0e14;
 
 export type DojoStageProps = {
   tape: ReplayTape;
+  // The playhead to draw — owned by the page, so a control edit and a transport move are the same
+  // kind of change here: re-run the draw effect.
+  tick: number;
   brands: readonly [Brand, Brand];
+  // Each ticker frame's delta, reported up to whoever owns the clock. Absent in tests (the spy stage
+  // runs no ticker), which is what keeps transport assertions deterministic.
+  onTick?: (delta: number) => void;
   viewport?: Viewport;
 };
 
@@ -72,15 +79,20 @@ const DojoStage: Component<DojoStageProps> = (props) => {
 
     created.stage.addChild(mounted.root);
     setStage(mounted);
+
+    // Drive the page's clock. The delta is in ticks, so a technique plays at the engine's own rate.
+    created.ticker.add((ticker) => {
+      props.onTick?.(ticker.deltaTime);
+    });
   });
 
-  // Draw tick 0 of the current pose. Re-runs when the stage mounts and whenever a control edit rebuilds
-  // the tape — no clock, since a pose is static (unlike the /watch player's ticker-driven playback).
+  // Draw the current playhead. Re-runs when the stage mounts, when a control edit rebuilds the tape,
+  // and on every transport move — the three ways the drawn frame can change.
   createEffect(() => {
     const mounted = stage();
 
     if (mounted) {
-      mounted.apply(scene(props.tape, 0, viewport));
+      mounted.apply(scene(props.tape, props.tick, viewport));
     }
   });
 

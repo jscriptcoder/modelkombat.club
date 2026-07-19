@@ -19,6 +19,7 @@ import type { Brand } from "../../shared/lib/brand";
 const spyStage = () => {
   const tapes: ReplayTape[] = [];
   const brandPairs: (readonly [Brand, Brand])[] = [];
+  const ticks: number[] = [];
   let mounts = 0;
 
   const Stage: Component<DojoStageProps> = (props) => {
@@ -32,6 +33,12 @@ const spyStage = () => {
       brandPairs.push(props.brands);
     });
 
+    // The playhead the page hands down (S2). The spy never runs a clock of its own, so playback stays
+    // deterministic here — only the transport controls move it.
+    createEffect(() => {
+      ticks.push(props.tick);
+    });
+
     return <div data-testid="spy-stage" />;
   };
 
@@ -39,6 +46,7 @@ const spyStage = () => {
     Stage,
     latest: () => tapes[tapes.length - 1],
     latestBrands: () => brandPairs[brandPairs.length - 1],
+    latestTick: () => ticks[ticks.length - 1],
     mounts: () => mounts,
   };
 };
@@ -364,5 +372,98 @@ describe("DojoApp — per-figure attack-reach control (M10)", () => {
 
     expect(latest()[0].b.attackReach).toBe(300_000); // king's reach set
     expect(latest()[0].a.attackReach).toBe(270_000); // challenger unchanged from default
+  });
+});
+
+// S2 · Slice 2 — the lab plays a technique through its real duration. The transport state lives in
+// the PAGE (above the injectable stage seam) so every control transition is assertable without a
+// WebGL mount; the Pixi ticker at the impure edge only calls back into it. The clock model itself is
+// pure and already covered in transport.test — these assert the WIRING.
+describe("DojoApp — playing a technique through its duration", () => {
+  it("opens on the first tick of the technique and hands the playhead to the stage", () => {
+    const { Stage, latestTick, latest } = spyStage();
+
+    render(() => <DojoApp stage={Stage} />);
+
+    expect(latestTick()).toBe(0);
+    expect(latest()).toHaveLength(28); // the default mae-geri, spanning its 9/3/16 timing
+  });
+
+  it("steps one tick forward and back, holding at the ends of the tape", () => {
+    const { Stage, latestTick } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const forward = getByRole("button", { name: /step forward/i });
+    const back = getByRole("button", { name: /step back/i });
+
+    fireEvent.click(forward);
+    expect(latestTick()).toBe(1);
+
+    fireEvent.click(forward);
+    expect(latestTick()).toBe(2);
+
+    fireEvent.click(back);
+    expect(latestTick()).toBe(1);
+
+    // Stepping past the start holds at tick 0 rather than running negative.
+    fireEvent.click(back);
+    fireEvent.click(back);
+    expect(latestTick()).toBe(0);
+  });
+
+  it("scrubs to any tick of the technique, including its last", () => {
+    const { Stage, latestTick } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const scrub = getByRole("slider", { name: /scrub/i });
+
+    fireEvent.input(scrub, { target: { value: "9" } }); // mae-geri's contact tick
+    expect(latestTick()).toBe(9);
+
+    fireEvent.input(scrub, { target: { value: "27" } }); // its final recovery tick
+    expect(latestTick()).toBe(27);
+  });
+
+  it("pauses playback whenever the developer takes manual control", () => {
+    // `seek`/`step` always pause (transport.ts) — this pins that the page dispatches THOSE, so a
+    // running clock can never fight a developer who is scrubbing to a frame to tune it.
+    const { Stage } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    const toggle = getByRole("button", { name: /pause|play/i });
+
+    expect(toggle.textContent).toBe("Pause"); // opens playing — the technique plays on load
+
+    fireEvent.click(getByRole("button", { name: /step forward/i }));
+    expect(toggle.textContent).toBe("Play"); // a step paused it
+
+    fireEvent.click(toggle);
+    expect(toggle.textContent).toBe("Pause"); // and it resumes on demand
+
+    fireEvent.input(getByRole("slider", { name: /scrub/i }), {
+      target: { value: "5" },
+    });
+    expect(toggle.textContent).toBe("Play"); // a scrub paused it too
+  });
+
+  it("re-spans the tape and pulls the playhead back in range when a shorter technique is selected", () => {
+    // The tape length is a function of the committed move, so a control edit can shrink it out from
+    // under the playhead. Dialing the challenger idle collapses the tape to one tick.
+    const { Stage, latestTick, latest } = spyStage();
+    const { getByRole } = render(() => <DojoApp stage={Stage} />);
+
+    fireEvent.input(getByRole("slider", { name: /scrub/i }), {
+      target: { value: "27" },
+    });
+    expect(latestTick()).toBe(27);
+
+    const challenger = getByRole("group", { name: "Challenger" });
+
+    fireEvent.click(
+      within(challenger).getByRole("checkbox", { name: /attacking/i }),
+    );
+
+    expect(latest()).toHaveLength(1); // nothing committed ⇒ a single static tick
+    expect(latestTick()).toBe(0); // ...and the playhead is no longer off the end
   });
 });
