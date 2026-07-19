@@ -1093,6 +1093,22 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    stats**. Both presentation-only (no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change). All Arsenal +
    Gauntlet artifacts archived under `docs/archive/` (see the build-log entries above + the archive
    [`README.md`](archive/README.md)).
+9. **Move showcase + per-move poses — 📋 PLANNED (design resolved, no code yet; PR #350).** The next
+   replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Today `poseFor` only knows
+   `attacking` / `attackBand` / `throwing`, so all **12 strikes render as one picture** (a `mawashi-geri`
+   draws as a punch), and `attacking` stays true for a move's whole committed duration — a `gyaku-zuki`
+   holds **24 ticks (~0.4 s) frozen at full extension**. Resolved via `grill-me` → `find-gaps` →
+   `story-splitting`: an additive render-only **`attackMove` + `attackPhase`** on `RenderFrame` (the arc's
+   only `src/` touch — same invariant-safe pattern as `guardBand`/`attackReach`, and it must NOT move
+   `INPUT_HASH` or `BENCHMARK_VERSION`), then a **descriptor table + one shared solver** that drives a
+   per-move limb through the existing `reachTargetX` / `deriveBend` machinery — authored chamber, **solved**
+   extension (a fixed extension would reopen the "strikes hit the air" defect `#344`–`#347` closed). The
+   `/dojo` lab gains a **move picker** (absorbing the spacing-only "Reach preset" dropdown) and a
+   **multi-tick tape** that reuses the S4 transport, so a technique can be judged in motion at true engine
+   timing. 8 child stories, **S0** (enabling engine change) → **S1** (walking skeleton: a kick renders with
+   a **foot**) → S2 phases → S3 picker → S4+ the rest, ordered by `npm run telemetry` move-usage rather
+   than anatomy. Design source: `plans/move-poses-{decisions,stories}.md` (10 decisions + mechanics M1–M11).
+   Defense / _uke_ poses are explicitly a **later** arc.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
@@ -1107,4 +1123,6 @@ the **`/replay` API + the Pixi `/watch` viewer** (PRs #306–#327), and the **"m
 arc** (PRs #329–#349 — big jointed model-identity fighters whose strikes and grabs connect) have all since
 shipped: **you can now watch the King's fights play back as animated stickmen.** See the replay-viewer
 build-log entry above. (Several of these post-#240 features are logged only in `docs/archive/`; a full
-build-log backfill remains pending.)
+build-log backfill remains pending.) **Next up is item 9** — giving each of the 13 arsenal moves its own
+look, so a spectator can tell _which_ technique a fighter just threw (design resolved, PR #350; no code
+yet).
