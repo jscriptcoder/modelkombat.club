@@ -1225,3 +1225,50 @@ heads (S2), and strikes + grabs that land on contact and whiff short (S5) — ev
 in the permanent `/dojo` pose lab (S1). The only `src/` change in the entire arc was Story 5's additive
 byte-identical `attackReach` render field. **Deferred follow-on** (decided later in `/dojo`): per-move signature
 silhouettes + a chamber→snap→recover strike animation — both need a `move` id + move-phase render fields.
+
+## Move showcase & per-move poses — S0 + S1 ✅ COMPLETE (2/8 of the arc)
+
+The first two child stories of the **move-showcase arc**: giving each of the 13 arsenal moves a look of its
+own, so a spectator can tell _which_ technique a fighter just threw. Before this, `poseFor` knew only
+`attacking` / `attackBand` / `throwing`, so all 12 strikes drew the same picture — a `mawashi-geri` rendered
+as a punch.
+
+- **S0 — the render tape carries move identity + phase** (PR #352, `feat/move-poses-s0-fields`) — the arc's
+  **only `src/` touch**. `RenderFrame` gains render-only **`attackMove`** (the 13-id web vocabulary
+  `MoveId | "sweep" | "throw" | ""`) and **`attackPhase`** (`0` none / `1` startup / `2` active / `3`
+  recovery, mirroring the `0 = none` band-code convention). Carrying the id required `move: string` on the
+  `attacking` / `air-attacking` states so the render site reads the **committed** move rather than the live
+  action (idle for most of a strike). Framed as a **validation** slice, and it validated: `BENCHMARK_VERSION`
+  held at `v19` with determinism + replay-byte-identity green, so the id never reached the outcome path (M11).
+  Phase reuses the engine's **own** active-window inequality (`elapsed >= startup && elapsed < startup +
+active`), because a rendered frame's `elapsed` is already advanced — so the drawn extension lands on the
+  tick that resolves contact, and the air-strike landing park at `elapsed = startup + active` reads recovery.
+  The else-branch absorbs parry-extended recovery with no fourth code (M5). Mutation **95.45%** (42/2), both
+  survivors equivalent (`rules.throw?.x` is unreachable — a `throwing` state cannot exist without
+  `rules.throw`). **GOTCHA:** there are **five** attack-state construction sites, not four — the air-strike
+  landing conversion builds an `attacking` state as an object literal rather than via `startAttack`, so a
+  landed `tobi-geri` would otherwise lose its identity through its grounded recovery.
+- **S1 — a `mae-geri` draws its front foot** (PR #353, `feat/move-poses-s1-kick`) — `web/`-only. A new
+  `move-descriptors.ts` names which skeleton endpoint each technique drives; `poseFor` applies the
+  **already-solved** strike position to that endpoint instead of hard-coding `handR`. Kept separate from
+  `reach-presets.ts` (decision 10): engine mirror vs aesthetic authoring data, two test disciplines. The
+  arc's riskiest assumption **held** — a foot drives through the same `reachTargetX` solver as a hand, and
+  because the bend rule already ran on the FINAL endpoints the knee re-derives off the moved `hip → footR`
+  for free. Support leg stays planted (M8.2); undescribed moves keep the generic hand pose (M7), so the
+  viewer stays usable while descriptors are authored one slice at a time. Mutation **`N/A`** (web is outside
+  Stryker) — alternate evidence was exhaustive exact-assertion tests + a manual mutator scan + a Playwright
+  `/dojo` visual sign-off.
+
+[move-poses-s0-s1.md](move-poses-s0-s1.md) — the plan, with both slices' recorded outcomes. The arc's design
+trail (`plans/move-poses-{decisions,stories}.md` — 10 decisions, mechanics M1–M11, 8 child stories) stays
+**live in `plans/`**, since S2–S7 still run off it.
+
+**Carried findings for S2.** The kick reads **stretched rather than snapped**: the driven leg spans ~67 local
+px against a ~37 px natural length (1.8×), and at that extension the 8 px `KNEE_BEND` is nearly invisible.
+The shipped punch telescopes just as hard (2.0×), so this is the existing visual language rather than a
+regression — but a leg starting at the low hip and rising only to the mid band tolerates the stretch far
+worse than an arm does. This answers the plan's open question _"what fields fall out beyond limb + chamber"_:
+**limb alone is not enough** — a kick needs hip travel (the M2 lean moves head + shoulder only), a knee-lift
+chamber, or a length constraint on the driven bone. Relatedly, **M8.2's support-integrity assertion is now
+load-bearing**: if S2 concludes the hip must travel, that test must be changed _consciously_ — it is a
+decision record, not a bug. `attackPhase` ships emitted but deliberately **unconsumed**; phase is S2's job.
