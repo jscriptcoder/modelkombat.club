@@ -41,13 +41,13 @@ tick — no engine change, no off-by-one to chase.
 
 ## Acceptance Criteria
 
-- [ ] On a multi-tick active run, the striking limb's driven point is at **full
+- [x] On a multi-tick active run, the striking limb's driven point is at **full
       extension on every active tick** (not just the first) — so the scoring tick
-      shows the limb extended into the opponent.
-- [ ] The retract now happens during **recovery**: a recovery run's first tick is at
-      (or near) full extension and eases to the neutral stance across the run.
-- [ ] `/sheet` and `/dojo` single-tick previews render **identically** to before
-      (first-active-tick extension; all `length <= 1` fallbacks unchanged).
+      shows the limb extended into the opponent. *(Slice 1, #380)*
+- [x] The retract now happens during **recovery**: a recovery run's first tick is at
+      (or near) full extension and eases to the neutral stance across the run. *(Slice 1, #380)*
+- [x] `/sheet` and `/dojo` single-tick previews render **identically** to before
+      (first-active-tick extension; all `length <= 1` fallbacks unchanged). *(Slice 1, #380)*
 - [ ] When a fighter scores, an **impact flash appears at the struck point** and
       **fades out over ~15–30 ticks**, then disappears; no flash on non-scoring
       ticks (a blocked/defended in-range strike that scores nothing shows nothing —
@@ -75,6 +75,9 @@ scan). PR per slice; Slice 1 alone fixes the reported defect.
 
 ### Slice 1: A scored strike's limb stays extended into the opponent across the active window
 
+**Status**: ✅ Shipped — PR #380, squashed to `main`@`062c430`. Visually confirmed on
+`/watch` (Playwright stills at scoring ticks 86 `★2:1` and 153 `★10:1`, arm/kick
+driven into King). Manual mutator scan clean; `web` suite green.
 **Branch**: `feat/replay-kime-hold`
 **Value**: Actor = anyone watching a fight on `/watch`. Today, pausing on a scoring
 tick shows a chambered (retracted) limb, so the hit is invisible. After this slice
@@ -188,15 +191,12 @@ and `contact` duplicate the lookback meaningfully; only if it adds clarity.
 green, agent-browser smoke shows the flash at the landing point fading out, human
 approves the commit.
 
-## Open decisions to confirm before Slice 1 code
+## Open decisions to confirm before Slice 1 code — RESOLVED (Slice 1)
 
-- **Recovery retract feel over long runs.** Some recovery runs are 20–26 ticks;
-  `extension → stance` via `smoothstep` over that span is a slow pull-back. Options:
-  (a) plain `smoothstep` over the whole run (simplest), (b) front-load the retract
-  (fast pull, then hold stance). Recommend (a) first, tune by eye in `/dojo`.
-- **Length-1 recovery fallback.** Keep returning `chamber` (byte-identical `/dojo`
-  preview) even though multi-tick recovery now starts from `extension`. Recommend
-  keep — it is a degenerate synthetic preview, not a regression.
+- **Recovery retract feel over long runs.** ✅ Chose **(a)** plain `smoothstep` over
+  the whole recovery run (`extension → stance`). Reads fine by eye; no front-loading.
+- **Length-1 recovery fallback.** ✅ Kept returning `chamber` — the `length <= 1`
+  guard is unchanged, so `/dojo` single-tick recovery previews stay byte-identical.
 
 ## Slice 2 implementation notes (implementer-owned, pin in RED)
 

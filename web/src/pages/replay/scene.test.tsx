@@ -3940,3 +3940,218 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
     );
   });
 });
+
+describe("scene — a scored strike flashes an impact mark where it lands (Slice 2)", () => {
+  // The window a score's flash lives for (mirrors SCORE_POP_TICKS in scene.ts): a fighter's mark
+  // shows for the tick window ending at the playhead, then clears. Recomputed here from the documented
+  // constant so a widen/narrow mutant on the production window makes this disagree.
+  const FLASH_WINDOW = 30;
+
+  // The mark is anchored in ABSOLUTE screen space at the striker's landed limb — the SAME point the
+  // draw layer strokes that limb at: the figure's root pixel plus the facing-flipped, scaled joint.
+  // Derived from scene()'s own figure output (not the scale formula), so it tracks a knob re-tune and
+  // still pins the anchor. `age` is ticks since the score.
+  const markAt = (
+    fig: Scene["a"],
+    limb: "handR" | "footR",
+    age: number,
+  ): { x: number; y: number; age: number } => ({
+    x: fig.x + fig.facing * fig.pose[limb].x,
+    y: fig.y + fig.pose[limb].y,
+    age,
+  });
+
+  // Challenger `a` at x 150000 facing right, committing an in-range mid gyaku (gap 240k, reach 240k):
+  // the front hand lands at the near edge (the reach-to-target block pins the geometry). `points`
+  // drives when the score registers.
+  const aStrike = (points: number): Partial<ReplayFrame> => ({
+    attacking: true,
+    attackBand: 2,
+    attackReach: 240_000,
+    attackPhase: 2,
+    x: 150_000,
+    facing: 1,
+    points,
+  });
+
+  const opp: Partial<ReplayFrame> = { x: 390_000 };
+
+  // A tape that strikes throughout, scoring at `scoreAt`, then goes idle (no strike committed) for the
+  // rest — so a mark taken from the CURRENT playhead after the score would vanish, but one anchored at
+  // the score tick persists and ages.
+  const scoreThenIdle = (scoreAt: number, len: number): ReplayTape =>
+    Array.from({ length: len }, (_, i) =>
+      i < scoreAt
+        ? tickOf(i, aStrike(0), opp)
+        : i === scoreAt
+          ? tickOf(i, aStrike(3), opp)
+          : tickOf(i, { x: 150_000, facing: 1, points: 3 }, opp),
+    );
+
+  it("marks the scoring fighter's landed strike at age 0 on the scoring tick", () => {
+    const tape = scoreThenIdle(3, 5);
+    const at = scene(tape, 3, VIEWPORT);
+
+    expect(at.contact.a).toEqual(markAt(at.a, "handR", 0));
+    // The opponent did not score, so their side stays clear.
+    expect(at.contact.b).toBeNull();
+  });
+
+  it("anchors the mark at the scoring tick and ages in place as the fighters yame-reset", () => {
+    // Ticks after the score: challenger idle, so a mark read from the CURRENT tick would be null. The
+    // flash must instead hold the score tick's landing point and only its age advances.
+    const tape: ReplayTape = [
+      tickOf(0, aStrike(0), opp),
+      tickOf(1, aStrike(0), opp),
+      tickOf(2, aStrike(0), opp),
+      tickOf(3, aStrike(3), opp), // score
+      tickOf(4, { x: 150_000, facing: 1, points: 3 }, { x: 300_000 }),
+      tickOf(5, { x: 150_000, facing: 1, points: 3 }, { x: 300_000 }),
+      tickOf(6, { x: 150_000, facing: 1, points: 3 }, { x: 300_000 }),
+    ];
+
+    const atScore = scene(tape, 3, VIEWPORT);
+    const later = scene(tape, 6, VIEWPORT);
+
+    // Same struck point (the score tick's landing), three ticks older — not recomputed from tick 6's
+    // idle frame (which would be null) nor from tick 6's moved opponent.
+    expect(later.contact.a).toEqual(markAt(atScore.a, "handR", 3));
+  });
+
+  it("shows no mark before the score and after the flash window has elapsed", () => {
+    const tape = scoreThenIdle(3, 40);
+
+    // Before the point registers: nothing.
+    expect(scene(tape, 2, VIEWPORT).contact.a).toBeNull();
+    // The last tick the score is still inside the window (age = FLASH_WINDOW − 1).
+    expect(scene(tape, 3 + FLASH_WINDOW - 1, VIEWPORT).contact.a).toEqual(
+      markAt(scene(tape, 3, VIEWPORT).a, "handR", FLASH_WINDOW - 1),
+    );
+    // One tick later the window has passed: cleared.
+    expect(scene(tape, 3 + FLASH_WINDOW, VIEWPORT).contact.a).toBeNull();
+  });
+
+  it("flashes both fighters independently on a same-tick trade", () => {
+    // King `b` at 390000 faces left into the challenger and lands the mirror strike; both score on the
+    // same tick, so both sides mark independently.
+    const bStrike = (points: number): Partial<ReplayFrame> => ({
+      attacking: true,
+      attackBand: 2,
+      attackReach: 240_000,
+      attackPhase: 2,
+      x: 390_000,
+      facing: -1,
+      points,
+    });
+
+    const tape: ReplayTape = [
+      tickOf(0, aStrike(0), bStrike(0)),
+      tickOf(1, aStrike(0), bStrike(0)),
+      tickOf(2, aStrike(3), bStrike(3)), // both score
+    ];
+
+    const at = scene(tape, 2, VIEWPORT);
+
+    expect(at.contact.a).toEqual(markAt(at.a, "handR", 0));
+    expect(at.contact.b).toEqual(markAt(at.b, "handR", 0));
+  });
+
+  it("shows no mark for an in-range strike that scores nothing (a block, no block cue)", () => {
+    // The challenger commits a mid strike in range against a raised guard but never scores — a blocked
+    // hit draws no flash (v1 has no separate block cue).
+    const tape: ReplayTape = [
+      tickOf(0, aStrike(0), { ...opp, guardBand: 2 }),
+      tickOf(1, aStrike(0), { ...opp, guardBand: 2 }),
+      tickOf(2, aStrike(0), { ...opp, guardBand: 2 }),
+    ];
+
+    expect(scene(tape, 2, VIEWPORT).contact.a).toBeNull();
+  });
+
+  it("marks a throw at the two-hand grab point (chest height, not a band)", () => {
+    // A throw scores: the mark sits at the grab's committed target (handR at chest height GRAB_Y),
+    // the throwGrabFor solve — not a strike band. strikeHandFor rejects a grab, so a mis-pick would
+    // yield null here.
+    const grab = (points: number): Partial<ReplayFrame> => ({
+      attackMove: "throw",
+      attackReach: 240_000,
+      x: 150_000,
+      facing: 1,
+      points,
+    });
+
+    const tape: ReplayTape = [
+      tickOf(0, grab(0), opp),
+      tickOf(1, grab(0), opp),
+      tickOf(2, grab(3), opp), // throw scores
+    ];
+
+    const at = scene(tape, 2, VIEWPORT);
+
+    expect(at.contact.a).toEqual(markAt(at.a, "handR", 0));
+  });
+
+  it("falls back to the nearest in-window grab frame when the throw scores on a non-grab finish", () => {
+    // A throw scores on its FINISH tick, by which point the frame is no longer grab-committed (no
+    // attackMove), so the score tick itself has no target. The mark falls back to the last grab-
+    // committed frame in the window, aged from the score tick.
+    const grab = (points: number): Partial<ReplayFrame> => ({
+      attackMove: "throw",
+      attackReach: 240_000,
+      x: 150_000,
+      facing: 1,
+      points,
+    });
+
+    const tape: ReplayTape = [
+      tickOf(0, grab(0), opp),
+      tickOf(1, grab(0), opp), // grab committed
+      tickOf(2, grab(0), opp), // grab committed
+      tickOf(3, { x: 150_000, facing: 1, points: 3 }, opp), // finish: scores, no grab
+    ];
+
+    const at = scene(tape, 3, VIEWPORT);
+
+    // Geometry from tick 2 (the nearest grab frame), age 0 (the score just registered at tick 3).
+    expect(at.contact.a).toEqual(
+      markAt(scene(tape, 2, VIEWPORT).a, "handR", 0),
+    );
+  });
+
+  it("is a pure function of the tape at the playhead — a scrub reproduces the same mark", () => {
+    const tape = scoreThenIdle(3, 12);
+    const first = scene(tape, 8, VIEWPORT).contact.a;
+
+    scene(tape, 3, VIEWPORT); // scrub back over the score...
+    scene(tape, 0, VIEWPORT); // ...and before it
+
+    expect(scene(tape, 8, VIEWPORT).contact.a).toEqual(first);
+    // Scrubbed before the score, the mark is gone.
+    expect(scene(tape, 0, VIEWPORT).contact.a).toBeNull();
+  });
+
+  it("marks a kick at the struck point too — the limb the reach drives is immaterial", () => {
+    // A front kick (mae-geri) drives the FOOT to the target; the flash anchors at the same reach-to-
+    // target endpoint regardless of which limb lands, so it sits on the driven foot, not a hand.
+    const kick = (points: number): Partial<ReplayFrame> => ({
+      attacking: true,
+      attackMove: "mae-geri",
+      attackBand: 2,
+      attackReach: 240_000,
+      attackPhase: 2,
+      x: 150_000,
+      facing: 1,
+      points,
+    });
+
+    const tape: ReplayTape = [
+      tickOf(0, kick(0), opp),
+      tickOf(1, kick(0), opp),
+      tickOf(2, kick(3), opp), // kick scores
+    ];
+
+    const at = scene(tape, 2, VIEWPORT);
+
+    expect(at.contact.a).toEqual(markAt(at.a, "footR", 0));
+  });
+});
