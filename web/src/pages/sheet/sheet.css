@@ -1,0 +1,35 @@
+/* The /sheet contact sheet: a dark developer route. The Pixi canvas renders at a fixed internal
+   resolution (5 columns × N rows); CSS scales it down to fit narrow viewports (max-width: 100%) so the
+   page never scrolls sideways. */
+
+.sheet {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 2rem 1rem 4rem;
+}
+
+.sheet h1 {
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.sheet-blurb {
+  text-align: center;
+  color: var(--muted);
+  max-width: 44rem;
+  margin: 0 auto 1.5rem;
+}
+
+.sheet-stage {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.sheet-stage canvas {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}

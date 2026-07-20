@@ -16,6 +16,7 @@
     { "source": "/watch", "destination": "/replay.html" },
     { "source": "/watch/(.*)", "destination": "/replay.html" },
     { "source": "/dojo", "destination": "/dojo.html" },
+    { "source": "/sheet", "destination": "/sheet.html" },
     {
       "source": "/((?!api/|src/|@|node_modules/|.*\\.).*)",
       "destination": "/index.html"

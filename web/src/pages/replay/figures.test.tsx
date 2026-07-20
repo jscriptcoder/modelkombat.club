@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { BONES, brandsFor, createStage, glyphSvg } from "./figures";
-import { BODY_HEIGHT_SUB, scene, type Viewport } from "./scene";
+import {
+  BONES,
+  brandsFor,
+  createContactSheet,
+  createStage,
+  glyphSvg,
+} from "./figures";
+import { BODY_HEIGHT_SUB, scene, type Figure, type Viewport } from "./scene";
 import type {
   Fighter,
   ReplayFrame,
@@ -506,6 +512,77 @@ describe("brandsFor — a fighter pair's authoring brands (challenger, King)", (
       "generic",
       "generic",
     ]);
+  });
+});
+
+// S7 — the contact sheet: many figures laid out in a labelled grid on ONE canvas. Same draw-layer
+// discipline as createStage — build the scene-graph (no renderer, no Application), assert the display
+// objects: each cell's label text, the pose drawn into its joints, and the grid slot it lands in.
+const posedFigure = (): Figure =>
+  scene(
+    [
+      tickOf(
+        0,
+        { attacking: true, attackBand: 2, attackReach: 240_000, x: 150_000 },
+        { x: 390_000 },
+      ),
+    ],
+    0,
+    VIEWPORT,
+  ).a;
+
+const CELL_INPUT = (id: string) => ({ id, placement: posedFigure() });
+
+const SHEET_LAYOUT = { cols: 2, cellWidth: 300, cellHeight: 320, headPx: 40 };
+
+describe("createContactSheet — a labelled grid of figures on one canvas (S7)", () => {
+  it("labels each cell with its own move id", () => {
+    const sheet = createContactSheet(
+      [CELL_INPUT("empi"), CELL_INPUT("mawashi-geri"), CELL_INPUT("throw")],
+      SHEET_LAYOUT,
+    );
+
+    // Per-cell id — not a constant, not off-by-one. A shared label or a shifted index shows here.
+    expect(sheet.cells.map((c) => c.label.text)).toEqual([
+      "empi",
+      "mawashi-geri",
+      "throw",
+    ]);
+  });
+
+  it("draws each cell's pose into its figure joints", () => {
+    // The placement's pose is applied to the persistent joint nodes (the wiring — the geometry is
+    // pinned in scene.test). A cell that ignored its placement would leave the joints at the origin.
+    const placement = posedFigure();
+    const sheet = createContactSheet([{ id: "empi", placement }], SHEET_LAYOUT);
+
+    expect(sheet.cells[0].nodes.footR.x).toBe(placement.pose.footR.x);
+    expect(sheet.cells[0].nodes.handR.x).toBe(placement.pose.handR.x);
+  });
+
+  it("lays the cells out in a grid — columns advance, then wrap to the next row", () => {
+    const sheet = createContactSheet(
+      [CELL_INPUT("a"), CELL_INPUT("b"), CELL_INPUT("c")],
+      SHEET_LAYOUT,
+    );
+
+    const [c0, c1, c2] = sheet.cells;
+
+    // cols = 2: cell 1 sits to the RIGHT of cell 0 on the same row; cell 2 wraps DOWN to the next row,
+    // back at column 0. Catches a stacked-at-origin layout, a transposed grid, and an off-by-one wrap.
+    expect(c1.nodes.root.x).toBeGreaterThan(c0.nodes.root.x);
+    expect(c1.nodes.root.y).toBe(c0.nodes.root.y);
+    expect(c2.nodes.root.y).toBeGreaterThan(c0.nodes.root.y);
+    expect(c2.nodes.root.x).toBe(c0.nodes.root.x);
+  });
+
+  it("mounts one figure per cell — the attacker alone, no opponent", () => {
+    // createStage draws a PAIR (a + b); a contact-sheet cell shows the attacker only. One figure root
+    // plus one label per cell ⇒ exactly two display objects per cell on the sheet root.
+    const cells = [CELL_INPUT("a"), CELL_INPUT("b"), CELL_INPUT("c")];
+    const sheet = createContactSheet(cells, SHEET_LAYOUT);
+
+    expect(sheet.root.children.length).toBe(2 * cells.length);
   });
 });
 

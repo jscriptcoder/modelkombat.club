@@ -1,0 +1,93 @@
+import { describe, expect, it } from "vitest";
+
+import { contactSheetCells } from "./contact-sheet";
+import { REACH_PRESETS } from "../dojo/reach-presets";
+import type { Viewport } from "../replay/scene";
+
+// The contact sheet's DATA layer (S7): one attacker figure per arsenal move, each posed at its ACTIVE
+// phase, so a developer can compare every technique at a glance. Pure (no Pixi) — it drives the same
+// selectMove → buildDojoTape → scene path /watch ships, so "what a move looks like here is what it
+// looks like in a fight". These assertions follow decision 9: pin the RELATION (this endpoint reached
+// forward, this cell is airborne), never the eye-tuned literal, so re-tuning a pose never breaks them.
+
+// A fixed logical viewport sizes the figure scale; small enough for a grid cell. Same for every cell,
+// so all figures share one scale (a fair comparison).
+const FIGURE_VIEWPORT: Viewport = { width: 300, height: 300 };
+
+const cellFor = (id: string) => {
+  const cell = contactSheetCells(FIGURE_VIEWPORT).find((c) => c.id === id);
+
+  if (!cell) throw new Error(`no contact-sheet cell for "${id}"`);
+
+  return cell;
+};
+
+describe("contactSheetCells — one attacker figure per arsenal move", () => {
+  it("renders exactly one cell per move in the engine-mirror table", () => {
+    const cells = contactSheetCells(FIGURE_VIEWPORT);
+
+    // Key-set coverage (decision 10): the sheet covers precisely the arsenal, so a move added to the
+    // preset table can never be silently dropped from the sheet, and none is invented.
+    expect(cells.map((c) => c.id).sort()).toEqual(
+      REACH_PRESETS.map((p) => p.move).sort(),
+    );
+  });
+
+  it("draws the ATTACKER in every cell, not the idle opponent", () => {
+    // The challenger throws the move facing right (+1); the idle king faces left (-1). Reading the
+    // attacker's own figure (scene.a, not scene.b) is what makes each cell show a technique at all.
+    for (const cell of contactSheetCells(FIGURE_VIEWPORT)) {
+      expect(cell.placement.facing).toBe(1);
+    }
+  });
+
+  it("poses a roundhouse at its ACTIVE phase — the driven rear foot swung forward past the hip", () => {
+    // mawashi-geri drives the REAR foot (footL), which sits BEHIND the hip at stance and while
+    // chambering; only at the active phase does it swing forward to the solved target. Asserting it
+    // landed forward of the hip proves the sheet chose the active tick, not an idle / chamber one.
+    const mawashi = cellFor("mawashi-geri");
+
+    expect(mawashi.placement.pose.footL.x).toBeGreaterThan(
+      mawashi.placement.pose.hip.x,
+    );
+  });
+
+  it("renders an UNDESCRIBED move with the generic strike, not a blank figure", () => {
+    // uraken has no descriptor, so it falls back to the generic front hand (M7). Its hand must still
+    // reach forward at the active phase — a real strike — well past a move that does NOT drive the
+    // hand (mae-geri, a kick, leaves handR at stance). No blank cell.
+    const uraken = cellFor("uraken");
+    const maeGeri = cellFor("mae-geri");
+
+    expect(uraken.placement.pose.handR.x).toBeGreaterThan(
+      maeGeri.placement.pose.handR.x,
+    );
+  });
+
+  it("renders the jump kick AIRBORNE so it reads apart from a grounded front kick", () => {
+    // tobi-geri is the only airborne technique. Rendered grounded it would duplicate mae-geri (both
+    // drive footR to the band); the sheet mirrors the engine and poses it from the AIR stance, whose
+    // support foot is tucked off the ground — proven by the support foot sitting above the baseline.
+    const tobi = cellFor("tobi-geri");
+    const maeGeri = cellFor("mae-geri");
+
+    expect(tobi.placement.pose.footL.y).toBeLessThan(0); // lifted off the ground line
+    expect(tobi.placement.pose.footL.y).toBeLessThan(
+      maeGeri.placement.pose.footL.y,
+    );
+  });
+
+  it("poses each move at ITS OWN true reach — a longer-reaching move extends further", () => {
+    // Each cell spaces its idle opponent one move-reach away, so the reach-to-target solve extends the
+    // driven endpoint to that move's real contact distance — not a shared gap. uraken (200k reach) and
+    // ushiro-geri (330k) both fall back to the generic front hand, so comparing their hands isolates
+    // reach: the longer move's hand lands further forward. Pins per-move true reach (kills a fixed-gap
+    // mutant); both are currently undescribed, so authoring a descriptor for either would revisit this.
+    const uraken = cellFor("uraken");
+    const ushiroGeri = cellFor("ushiro-geri");
+
+    expect(ushiroGeri.placement.pose.handR.x).toBeGreaterThan(
+      uraken.placement.pose.handR.x,
+    );
+  });
+});
