@@ -1208,6 +1208,18 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
      closeout narrative is in [`docs/archive/README.md`](archive/README.md). The next replay-viewer work would
      be **defense / _uke_ poses** — a separate later arc (decision 7).
 
+10. **Replay strike makes visible contact — ✅ COMPLETE (2/2, PRs #380 + #381).** A follow-up viewer fix on
+    top of the move-showcase arc: a scored strike now visibly connects on `/watch` (previously the striking
+    limb had re-chambered by the tick the point registered). **S1 (#380)** — a committed strike **holds** full
+    extension across the whole active window (`easeDriven`'s active branch returns `extension`; the retract
+    moves to the recovery branch), so the drawn limb is still driven into the opponent on the scoring tick —
+    the score always falls inside the active window, so the hold is guaranteed to cover it. **S2 (#381)** — a
+    pure per-fighter `scene().contact` marks **where** the strike/throw landed with a starburst that fades in
+    place, anchored at the score tick's geometry so it does not drift when the fighters _yame_-reset. Both
+    `web/`-only (no `src/` / TCB / `v19` / `INPUT_HASH` touch), TDD RED-GREEN + a manual mutator scan; `/sheet`
+    - `/dojo` single-tick previews stay byte-identical. Archived:
+      [`docs/archive/replay-strike-contact.md`](archive/replay-strike-contact.md).
+
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
