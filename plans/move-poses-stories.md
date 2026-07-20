@@ -171,6 +171,13 @@ dispatched through the single `attackMove` descriptor lookup.
 **S7 and S8 remain, both unblocked** (dependency graph above). Pick one by value and load `planning`
 (with `grill-me`/`find-gaps` if its decisions are still fuzzy) to settle the slice split.
 
+**➡️ Selected next (2026-07-20): S7 — compare the whole arsenal at a glance (contact sheet).** Chosen
+over S8 because it is the *detector* for the arc's carried expressiveness risk — it validates that all
+13 moves read distinctly before motion polish (S8) invests in easing poses that may still need work.
+Cheaper, `web/`-only, reuses existing rendering. Branch `move-poses-s7-contact-sheet`. **Planned
+2026-07-20 → `plans/move-poses-s7.md`** (one vertical slice; decisions settled: attacker-only at
+active-phase peak, new dark `/sheet` route, one Pixi canvas + N grid cells). S8 (easing) follows.
+
 **✅ S6 outcome (closed 2026-07-20): the non-strike moves read correctly.** All three shipped PR-per-slice
 (`plans/move-poses-s6.md`, archived at `docs/archive/move-poses-s6.md`): **(1)** `sweep` → a low front-leg
 reap (`footR` driven to a fixed near-ground `targetY`, band-independent since a sweep's band is UNRESTRICTED

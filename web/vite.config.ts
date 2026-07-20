@@ -11,9 +11,9 @@ export default defineConfig(({ isSsrBuild }) => ({
   plugins: [solid({ ssr: Boolean(isSsrBuild), solid: { hydratable: true } })],
   // The client build is multi-page: the marketing home (`index.html`, prerendered + hydrated), the
   // client-rendered `/ring` submit page (`ring.html`), the client-rendered `/watch` fight viewer
-  // (`replay.html`), and the dark `/dojo` pose lab (`dojo.html`, its own `dojo.tsx` entry). The SSR
-  // build takes its input from the `--ssr` entry flag instead, so the multi-page input is applied to
-  // the client build only.
+  // (`replay.html`), the dark `/dojo` pose lab (`dojo.html`), and the dark `/sheet` arsenal contact
+  // sheet (`sheet.html`, its own `sheet.tsx` entry). The SSR build takes its input from the `--ssr`
+  // entry flag instead, so the multi-page input is applied to the client build only.
   build: isSsrBuild
     ? undefined
     : {
@@ -23,6 +23,7 @@ export default defineConfig(({ isSsrBuild }) => ({
             ring: "ring.html",
             replay: "replay.html",
             dojo: "dojo.html",
+            sheet: "sheet.html",
           },
         },
       },

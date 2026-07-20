@@ -263,3 +263,82 @@ export const createStage = (
 
   return { root, a: a.nodes, b: b.nodes, hud, apply };
 };
+
+// ─── S7: the contact sheet — the whole arsenal on one canvas ──────────────────────────────────────
+// The draw layer's second assembly (alongside createStage): a GRID of single figures rather than a
+// posed PAIR. Each cell shows one attacker (no opponent) frozen at a technique, captioned with its
+// move id, so a developer can compare every move at a glance. The pose maths is the contact-sheet
+// DATA layer's (contact-sheet.ts, which drives the same scene() /watch uses); here we only lay the
+// pre-posed figures into a grid and caption them — reusing the exact createFigure/applyFigure the ring
+// draws with, so a cell reads identically to a fighter on /watch. Pixi-only, no Application, so the
+// grid is verifiable with the same display-object assertions createStage is.
+
+// One cell to draw: the move id (its caption) and the fully-posed attacker figure. The placement's
+// x/y are the scene's ring pixels and are DISCARDED — the grid re-anchors each figure into its cell;
+// only the pose + facing carry over.
+export type ContactCellInput = { id: string; placement: Scene["a"] };
+
+// The grid geometry: how many columns, each cell's box, and the head-glyph px (sized to the figure
+// scale by the caller, the same proportion createStage gives the ring figures).
+export type SheetLayout = {
+  cols: number;
+  cellWidth: number;
+  cellHeight: number;
+  headPx: number;
+};
+
+// One rendered cell: the move id, the figure's persistent joint nodes (exposed for display-object
+// assertions, exactly as createStage exposes the ring pair's), and the caption Text.
+export type ContactCell = { id: string; nodes: FigureNodes; label: Text };
+
+// The mounted sheet: the root container to add to the Pixi stage, and every cell's nodes + caption.
+export type ContactSheet = { root: Container; cells: ContactCell[] };
+
+// The figures read shape, not identity, so every cell wears the one neutral colour + a generic head.
+const CELL_COLOR = CHALLENGER_COLOR;
+const CELL_BRAND: Brand = "generic";
+
+// Where the figure's feet plant inside its cell: 0.35 from the left leaves room for a forward-reaching
+// strike, and the feet sit FOOT_MARGIN above the cell's bottom edge so the caption clears them. The
+// caption baseline sits LABEL_MARGIN above the bottom. All eye-tunable — no test pins them (decision 9).
+const FIGURE_ANCHOR_X = 0.35;
+const FOOT_MARGIN = 64;
+const LABEL_MARGIN = 22;
+
+export const createContactSheet = (
+  cells: readonly ContactCellInput[],
+  layout: SheetLayout,
+): ContactSheet => {
+  const root = new Container();
+
+  const built = cells.map((cell, i): ContactCell => {
+    const cellLeft = (i % layout.cols) * layout.cellWidth;
+    const cellTop = Math.floor(i / layout.cols) * layout.cellHeight;
+
+    const figure = createFigure(CELL_COLOR, CELL_BRAND, layout.headPx);
+
+    // Re-anchor the figure into its cell: the scene posed it around the ring's centre, so we keep only
+    // the pose + facing and plant the feet at the cell's own baseline.
+    applyFigure(figure, {
+      x: cellLeft + layout.cellWidth * FIGURE_ANCHOR_X,
+      y: cellTop + layout.cellHeight - FOOT_MARGIN,
+      facing: cell.placement.facing,
+      pose: cell.placement.pose,
+    });
+
+    const label = new Text({
+      text: cell.id,
+      style: { fill: 0xffffff, fontSize: 16, fontFamily: "monospace" },
+    });
+
+    label.anchor.set(0.5, 0);
+    label.x = cellLeft + layout.cellWidth / 2;
+    label.y = cellTop + layout.cellHeight - LABEL_MARGIN;
+
+    root.addChild(figure.nodes.root, label);
+
+    return { id: cell.id, nodes: figure.nodes, label };
+  });
+
+  return { root, cells: built };
+};
