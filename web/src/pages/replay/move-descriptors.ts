@@ -138,6 +138,14 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // read as the same floor reap (and it draws even at band 0, unlike a banded kick). Chamber: the foot
   // cocked back and lifted before it reaps down and forward. Eye-tuned in /dojo, relations pinned.
   ["sweep", { limb: "footR", targetY: -8, chamber: { x: 4, y: -14 } }],
+  // tobi-geri (jumping front kick): the only AIRBORNE technique, and the last non-strike move to get a
+  // descriptor. The front FOOT drives to the band exactly as a grounded front kick does — but from the
+  // AIR stance, whose tucked legs already separate it from a grounded kick (no M12i escape hatch
+  // needed). No chamber: the AIR stance's tucked `footR` IS the wind-up (tuck → extend → tuck), so an
+  // authored cock would fight it. The airborne hip HOLDS rather than stepping into the reach — the jump
+  // arc supplies the closing and the leg telescopes for the residual (see the `isAirborne` gate in
+  // scene.ts), which is why this leads with `footR` yet reads apart from a lunging grounded kick.
+  ["tobi-geri", { limb: "footR" }],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this

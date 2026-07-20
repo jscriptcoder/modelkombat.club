@@ -3316,3 +3316,149 @@ describe("scene — sweep reaps low with the front foot (S6 · Slice 1)", () => 
     );
   });
 });
+
+describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
+  // The only AIRBORNE technique. Today an undescribed tobi-geri draws the generic front HAND floating
+  // in the AIR stance; this drives the front FOOT to the band while airborne — a jump kick — and HOLDS
+  // the airborne root, so the hip does NOT step in mid-air (decision 6: the jump arc supplies the
+  // closing, the leg telescopes for the residual) and a kick never leans the torso (M9). No authored
+  // chamber (decision 7): the AIR-tucked foot IS the wind-up (tuck → extend → tuck).
+  //
+  // The RED drivers are the ROUTING (foot not hand) and the AIRBORNE ROOT-HOLD. Today "tobi-geri" is
+  // undescribed ⇒ limbFor falls to the generic front HAND, which drives to the band AND leans the
+  // torso — so the foot-driven, hand-at-stance and head-upright assertions all fail. Once the foot is
+  // driven, a kick's hip WOULD step at this distance (S2 · Slice 3); the hip-held / grounded-contrast
+  // assertions then fail until the AIR gate is added — the second RED within the slice.
+  //
+  // Local-px anchors (recomputed independent of production, one sub-unit = 76/240000 local px):
+  //  · in-range — a 240k gap: centres 76 apart, near edge one BODY_HALF_WIDTH (10) nearer ⇒ 66;
+  //    tobi-geri's 250k reach caps at 250000·(76/240000) ≈ 79.2, so 66 lands in range (not capped).
+  //  · the band ladder (low −24 / mid −46 / high −68) supplies the y — tobi-geri authors no fixed
+  //    `targetY` (unlike sweep), so an unmapped band draws nothing, exactly like a grounded kick.
+  const NEUTRAL_AIR_FOOT_R = { x: 10, y: -18 }; // AIR front foot — tucked (no-strike fallback + wind-up)
+  const NEUTRAL_AIR_FOOT_L = { x: -10, y: -18 }; // AIR rear foot — the tucked (airborne) support leg
+  const NEUTRAL_AIR_HAND_R = { x: 18, y: -44 }; // AIR front hand — where a tobi-geri must NOT drive
+  const AIR_HIP = { x: 0, y: -34 }; // AIR hip — held, never stepped in the air
+  const AIR_HEAD = { x: 0, y: -76 }; // AIR head — upright, a kick never leans
+  const AIR_SHOULDER = { x: 0, y: -64 }; // AIR shoulder — upright too
+
+  const REACH = 250_000; // tobi-geri's engine reach (reach-presets)
+  const CAP_LOCAL = REACH * (76 / 240_000); // ≈79.2 — the reach cap in local px, recomputed here
+
+  const STARTUP = 1;
+  const CONTACT = 2;
+
+  // Striker `a` faces right at x 150000, AIRBORNE (posture 2), committing a tobi-geri; `b` sits `gap`
+  // sub-units in front. Band defaults to MID (2). The grounded contrast overrides posture via `extra`.
+  const poseTobi = ({
+    gap = 240_000,
+    band = 2,
+    reach = REACH,
+    extra = {},
+  }: {
+    gap?: number;
+    band?: number;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: "tobi-geri",
+            posture: 2,
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("drives the front foot to the near edge at the band while the rear foot stays AIR-tucked", () => {
+    // The core inversion: the FOOT is the driven endpoint (at the near edge, at the band), the front
+    // hand stays at its AIR stance — the opposite of today's generic hand-at-the-band fallback. The
+    // rear foot holds its AIR tuck as the (airborne) support leg.
+    const pose = poseTobi();
+
+    expect(pose.footR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(pose.footL).toEqual(scaled(NEUTRAL_AIR_FOOT_L));
+    expect(pose.handR).toEqual(scaled(NEUTRAL_AIR_HAND_R));
+  });
+
+  it("holds the airborne root and torso — no hip step and no lean, even beyond the leg's reach", () => {
+    // A jump kick's closing comes from the jump arc; the hip must NOT also step or a floating body
+    // lunges in mid-air, and a kick never leans (M9). At a 240k gap the target is past the leg's
+    // straight reach — a GROUNDED kick would step here (next test) — yet airborne the root holds.
+    const pose = poseTobi({ gap: 240_000 });
+
+    expect(pose.hip).toEqual(scaled(AIR_HIP));
+    expect(pose.head).toEqual(scaled(AIR_HEAD));
+    expect(pose.shoulder).toEqual(scaled(AIR_SHOULDER));
+  });
+
+  it("steps a GROUNDED kick's hip at the same reach — the air-hold is airborne-specific", () => {
+    // The root-hold is gated on AIR, not a blanket change to kicks: the SAME footR-driven kick on the
+    // ground steps its hip into the distance (S2 · Slice 3, exactly as mae-geri does), while airborne
+    // it holds. Deleting the AIR gate would make the air kick step too, collapsing this contrast.
+    const air = poseTobi({ gap: 240_000 });
+    const ground = poseTobi({ gap: 240_000, extra: { posture: 0 } });
+
+    expect(ground.hip.x).toBeGreaterThan(air.hip.x);
+    expect(air.hip.x).toBe(scaled(AIR_HIP).x); // airborne hip held at its stance x
+  });
+
+  it("tracks the real opponent distance — a nearer opponent is kicked at a nearer point (M8.5)", () => {
+    // The reach solve is retained for the airborne foot: a 150k gap kicks the edge at 37.5, a 240k gap
+    // at 66 — both inside tobi-geri's ~79 cap, so they land apart (not a constant forward stub).
+    expect(poseTobi({ gap: 150_000 }).footR).toEqual(scaled({ x: 37.5, y: -46 }));
+    expect(poseTobi({ gap: 240_000 }).footR).toEqual(scaled({ x: 66, y: -46 }));
+  });
+
+  it("stops the airborne foot at the move's reach cap when the opponent is beyond it (a whiff)", () => {
+    // A 400k gap is 126.7 px between centres — past tobi-geri's ~79 cap, so the foot stops at the cap
+    // rather than stretching to the edge. Pins that the airborne foot obeys the SAME clamp as a fist.
+    expect(poseTobi({ gap: 400_000 }).footR).toEqual(
+      scaled({ x: CAP_LOCAL, y: -46 }),
+    );
+  });
+
+  it("carries the air kick to whichever band it targets, and draws none for an unmapped band", () => {
+    // tobi-geri is BANDED (no fixed targetY, unlike sweep): the y is the band ladder, and band 0 / an
+    // out-of-range code means no strike to draw ⇒ the foot keeps its AIR tuck (M7).
+    expect(poseTobi({ band: 1 }).footR).toEqual(scaled({ x: 66, y: -24 }));
+    expect(poseTobi({ band: 3 }).footR).toEqual(scaled({ x: 66, y: -68 }));
+    expect(poseTobi({ band: 0 }).footR).toEqual(scaled(NEUTRAL_AIR_FOOT_R));
+    expect(poseTobi({ band: 9 }).footR).toEqual(scaled(NEUTRAL_AIR_FOOT_R));
+  });
+
+  it("winds up through the AIR tuck — no authored chamber, the tucked foot IS the wind-up", () => {
+    // decision 7: tobi-geri authors no chamber, so startup/recovery leave the foot at its AIR-tucked
+    // stance (the tuck→extend→tuck of a jump kick), distinct from the extended contact foot. This is
+    // the M7 tuck-through wind-up every unauthored move gets, read here against the AIR stance.
+    const startup = poseTobi({ extra: { attackPhase: STARTUP } }).footR;
+    const contact = poseTobi({ extra: { attackPhase: CONTACT } }).footR;
+
+    expect(startup).toEqual(scaled(NEUTRAL_AIR_FOOT_R)); // AIR-tucked, not extended
+    expect(contact).toEqual(scaled({ x: 66, y: -46 })); // driven to the band
+    expect(startup).not.toEqual(contact);
+  });
+
+  it("draws no kick when idle or when the reach is rejected (M7 fallback)", () => {
+    // The descriptor selects WHICH endpoint a committed kick drives; it never makes an idle airborne
+    // fighter kick, and a defensively-rejected reach (0 / opponent behind) keeps the foot AIR-tucked.
+    expect(poseTobi({ extra: { attacking: false } }).footR).toEqual(
+      scaled(NEUTRAL_AIR_FOOT_R),
+    );
+    expect(poseTobi({ extra: { attackReach: 0 } }).footR).toEqual(
+      scaled(NEUTRAL_AIR_FOOT_R),
+    );
+  });
+});

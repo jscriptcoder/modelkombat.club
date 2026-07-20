@@ -386,8 +386,18 @@ const poseFor = (
   // lower-body counterpart of the lean, which already does this for the arm by shifting the shoulder.
   // Horizontal only: the fighter steps in, it does not rise. Zero for a punch (the lean covers it),
   // for a chamber (always within reach), and for any non-strike layer.
+  //
+  // An AIRBORNE kick (tobi-geri, S6 · decision 6) HOLDS its root instead: the jump arc already carries
+  // the fighter's closing (rules.ts), so a hip that ALSO stepped would read as a body lunging in
+  // mid-air. The leg telescopes for whatever the jump left short — exactly as a mid-joint holds the
+  // root and lets its limb re-derive. The gate only bites for an airborne kick (a grounded kick still
+  // steps; a non-kick already answers 0 above), so no grounded technique changes.
+  const isAirborne = frame.posture === 2;
+
   const step =
-    driven === null || !isKick ? 0 : rootTravel(stance.hip, driven, LEG_BONE);
+    driven === null || !isKick || isAirborne
+      ? 0
+      : rootTravel(stance.hip, driven, LEG_BONE);
 
   // `hikite` — the OTHER hand withdrawn to the hip as the punch lands (S4 · Slice 2). Gated to the
   // ACTIVE phase for the same reason the M2 lean is (M9): a fighter pulls the off hand as the punch
