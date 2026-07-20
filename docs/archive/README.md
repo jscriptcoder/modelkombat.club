@@ -1647,3 +1647,37 @@ otherwise entirely in `web/`, with `BENCHMARK_VERSION` never leaving `v19`. **Th
 roundhouse — not by nudging where it ends) and the structural note (the body cannot span the engine's distances;
 the bounded limb-stretch is the compromise that makes contact legible, not a bug) carry forward to any future
 pose work. Defense / _uke_ is explicitly a **separate later arc** (decision 7).
+
+## Replay strike makes visible contact — a scored strike connects on `/watch` ✅ COMPLETE (2/2, 2026-07-21)
+
+Fixed the viewer defect where a scored strike looked like it whiffed: the engine only ever awards a point
+_inside_ a strike's active window, but `easeDriven` snapped the limb to full extension on the **first** active
+tick and eased it back toward the chamber across the rest — so by the time the point registered a tick or two
+later, the drawn limb had 50–100 % re-chambered and contact was a single-frame blip. Two behaviour slices, both
+entirely in `web/` (no `src/` / TCB / `v19` / `INPUT_HASH` touch), TDD RED-GREEN with a manual mutator scan (the
+`web` project is outside Stryker). The design trail (`plans/replay-strike-{decisions,…}`) folded into the plan.
+
+- **Slice 1 — a committed strike holds its extension through the scoring tick** (PR #380,
+  `feat/replay-kime-hold`) — `easeDriven`'s active branch now returns the `extension` keyframe for the **whole**
+  active window (a _kime_ hold) instead of a `chamber→extension→chamber` blend, and the retract moves to the
+  **recovery** branch (`extension→stance`). Because the score always falls inside the active window, holding
+  extension across it is guaranteed to cover the scoring tick — no engine change, no off-by-one. The `length <= 1`
+  fallbacks are untouched, so `/sheet` (the first-active-tick contact sheet) and `/dojo` single-tick previews stay
+  byte-identical.
+- **Slice 2 — a scored strike flashes an impact mark where it lands** (PR #381, `feat/replay-contact-flash`) —
+  the readability cue on top of the held limb. `scene()` gains a pure per-fighter `contact: { a, b }`
+  (`Mark = {x,y,age}`): scan back within the score-pop window to each side's last score, anchor at **that score
+  tick's** committed-action target (a strike's reach-to-target endpoint, a throw's grab hand) in absolute screen
+  px, `age` from the score tick — so the starburst is fixed in world space and fades **in place** while the
+  fighters _yame_-reset. A throw scoring on a non-grab finish falls back to the nearest in-window grab frame. The
+  Pixi layer draws a per-side starburst, alpha faded by age, cleared when `null`.
+
+[replay-strike-contact.md](replay-strike-contact.md) — the plan, with both slices' recorded outcomes, the
+constraints, and the Slice 2 implementer notes.
+
+**The lesson (both slices):** the fix lived entirely in the pure `scene()` projection + its Pixi draw layer, on
+one key enabling fact — **the score always falls within the active window** — so both "hold the limb there" and
+"mark where it landed" are guaranteed by anchoring on the active/score tick rather than chasing the exact frame.
+Every new derivation stayed a **pure scan of the tape at the playhead** (the `scoredWithin` / `phaseRunAt` idiom),
+so it is identical on replay and after any scrub, and the whole arc held `BENCHMARK_VERSION` at `v19` with `src/`
+untouched — the same web-only discipline as the move-showcase arc it builds on.
