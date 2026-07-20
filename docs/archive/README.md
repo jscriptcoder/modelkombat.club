@@ -1554,3 +1554,90 @@ through optional chaining and stay total, and a union would force every one of t
 `grab?: boolean` flag (plus making `limb` optional) kept all lookups untouched. The plan's suggestion to remove
 `poseFor`'s `grab` param was also declined: `poseFor(frame, strikeHand, grab)` pre-solves both
 opponent-dependent layers in `scene()`, and removing only `grab` would make that asymmetric.
+
+## Move showcase & per-move poses — S7: compare the whole arsenal at a glance ✅ COMPLETE (8/8 of the arc, 2026-07-20)
+
+The **detector** for the arc's carried expressiveness risk (M3 — only the driven endpoint moves, so whole-body
+character is not expressible). A dark **`/sheet`** route lays all 13 techniques in a labelled grid, each
+attacker frozen at its ACTIVE phase, so a developer can see at a glance whether any two moves read alike. Single
+slice, `web/`-only (`BENCHMARK_VERSION` held at `v19`, `src/` untouched); mutation `N/A` (`web/` is outside
+Stryker) → exact-assertion scene-graph tests + a manual mutator scan + a Playwright visual sign-off (PR #376,
+`feat/move-poses-s7-contact-sheet`).
+
+- **The pure/Pixi split mirrors `scene.ts`/`figures.ts`.** `web/src/pages/sheet/contact-sheet.ts` (pure, no
+  Pixi) is the testable heart: `contactSheetCells(viewport)` iterates `REACH_PRESETS` and drives each move
+  through the SAME `selectMove → controlsToFrame → buildDojoTape → scene(tape, preset.startup, vp).a` path
+  `/watch` ships, so "what a move looks like on the sheet is what it looks like in a fight". `figures.ts` gains
+  `createContactSheet(cells, layout)` — a grid of single figures alongside `createStage`'s posed pair,
+  **reusing the private `createFigure` / `applyFigure`** by taking pre-computed `{ id, placement }` inputs, so
+  `figures.ts` gains no `dojo` import and the shipped 2-figure ring is untouched.
+- **One Pixi canvas + N grid cells, not 13 `Application`s** — browsers cap ~16 WebGL contexts, so 13 mounted
+  apps would be fragile. A single canvas with grid-positioned sub-containers is the sound architecture and the
+  one bit of real engineering in the slice.
+- **`tobi-geri` is posed AIRBORNE** (an `AIRBORNE_MOVES` set in `contact-sheet.ts`): rendered grounded it drives
+  `footR` to the band exactly as `mae-geri` does and would be a **false look-alike** the detector wrongly flags —
+  but on `/watch` it is airborne, so the sheet mirrors that. Posture isn't in any web table, so this is a
+  localised, documented web-mirror of an engine fact.
+- **The detector worked, and confirmed the accepted trade-off.** Visual sign-off: the 8 authored moves read
+  distinctly; the 5 undescribed tail moves (`uraken`, `kizami-zuki`, `shuto`, `yoko-geri`, `ushiro-geri`) all
+  render as the generic hand and **do** read alike — exactly the outcome the S4 stopping rule parked as
+  acceptable (the rare, never-thrown tail can stay generic). Grid cosmetics (scale, cell size) are eye-tunable,
+  not test-pinned (decision 9).
+
+[move-poses-s7.md](move-poses-s7.md) — the plan, with the settled decisions and the recorded outcome.
+
+## Move showcase & per-move poses — S8: a technique flows instead of snapping between three held poses ✅ COMPLETE — **ARC COMPLETE** (2026-07-20)
+
+The arc's **finale**. Until now a committed move drew one held shape per phase — `attackPhase` picked the chamber
+(startup / recovery) or the solved extension (active) and every tick within a phase drew the identical pose — so
+the driven endpoint **teleported** at each phase boundary and froze between them (a `gyaku-zuki` held its chamber
+for 7 ticks, its extension for 3, its chamber for 14). S8 makes the driven point (and the lean / girdle /
+mid-joints derived from it) **travel** `stance → chamber → extension → chamber → stance` across the tape's
+per-phase run, on `/watch` and `/dojo` alike — the one story that changes how `/watch` looks while **authoring
+nothing new** (the keyframes are the shapes S1–S7 already authored). Single slice, `web/`-only (`BENCHMARK_VERSION`
+held at `v19`, `src/` untouched), grilled → decisions **M14** (PR #377, `feat/move-poses-s8-easing`).
+
+- **Progress is DERIVED in-web** — a new pure `phaseRunAt(tape, playhead, select)` run-length-scans the
+  contiguous ticks sharing this fighter's `attackMove` + `attackPhase` (the same pure-scan idiom as
+  `scoredWithin`). No engine / contract field (the parked `attackProgress` stayed parked), so `v19` holds and the
+  scan is replay-safe. A change of move, a change of phase, or an idle gap bounds the run — two back-to-back
+  techniques never blend into one motion.
+- **THE load-bearing insight (M14e).** `poseFor` was already structured so a single `driven` point is what the
+  lean, hip-step, girdle rotation, `deriveSkeleton` mid-joints, and the mid-joint write-back all flow from. So the
+  core change is one line of intent: replace the discrete `isChamberPhase` pick with a continuous **smoothstep
+  keyframe blend** (`easeDriven`). Because the whole chain re-derives from `driven`, **body-coherence and the
+  fixed bone lengths (S2 · Slice 3) hold for free** — `deriveSkeleton` re-solves each mid-joint at fixed length
+  from the eased endpoints. Lerping the RESOLVED skeleton joint-by-joint was rejected: it would drift a mid-joint
+  off its bone length mid-travel and reopen that stretch scar.
+- **The extension lands on the FIRST active tick — a `kime` commit — revised during TDD.** The original M14(c)
+  put full extension at the mid-active PEAK; that broke 4 tests, because the **S7 contact sheet and the S2 dojo
+  default both render each move at its first active tick (`preset.startup`) and require the solved extension
+  there**, and every pre-S8 single-tick test reads a lone active tick as the extension. Anchoring the extension
+  at the first active tick (easing back to the chamber across the rest of active) keeps those surfaces
+  byte-identical, still moves within the active phase, and reads as an explosive strike. The lesson: **a shipped
+  detector doubles as a regression oracle** — S7 pinned the invariant that caught the peak-model mistake within
+  minutes.
+- **Totality keeps every existing single-tick test green.** A run of length 1 (a synthetic single-tick tape, or a
+  lone phase tick) makes `easeDriven` return the phase's primary keyframe exactly, reproducing the pre-S8 discrete
+  pick; a chamber-less move eases through its stance; an idle / unknown / non-`{1,2,3}` phase draws the extension
+  as before.
+- **Mutation `N/A` → manual scan + two real mutation kills.** The run-scan's boundary is `attackMove === … && attackPhase === …`; each half was genuinely mutated on the real source and the run re-run: dropping the
+  `attackMove` check failed the move-change test, dropping the `attackPhase` check failed the 3→1 phase-drop test.
+  Curve-coefficient mutants that stay monotonic 0→1 survive **by design** — the curve is the eye-tuned swappable
+  seam (decision 9). 598 web / 2233 full-suite green. The `dojo-tape.test.tsx` default-scene tests were updated to
+  characterise the eased wind-up: tick 0 is now the stance (wind-up start), and the chamber is reached at the last
+  startup tick — the S2 "tick 0 = chamber" assumption is outdated by easing.
+
+[move-poses-s8.md](move-poses-s8.md) — the plan, with the recorded outcome and the TDD refinement.
+
+**The arc is complete — all of S0–S8 shipped, and the full design trail is now archived.** Alongside the eight
+per-slice plans (`move-poses-{s0-s1,s2,s3,s4,s5,s6,s7,s8}.md`), the two remaining live design documents were
+archived in this closeout: [move-poses-decisions.md](move-poses-decisions.md) (the 10 decisions + mechanics
+**M1–M14**) and [move-poses-stories.md](move-poses-stories.md) (the story split). **The retrospective in one
+line:** each of the 13 arsenal moves reads as its own technique on `/watch`, can be compared on the `/sheet`
+contact sheet, and now flows — built across 9 stories and ~20 PRs, on a single additive engine field (S0) and
+otherwise entirely in `web/`, with `BENCHMARK_VERSION` never leaving `v19`. **The unifying design lesson**
+(when two techniques land the same endpoint, separate them by where the limb STARTS — the girdle and the rear-leg
+roundhouse — not by nudging where it ends) and the structural note (the body cannot span the engine's distances;
+the bounded limb-stretch is the compromise that makes contact legible, not a bug) carry forward to any future
+pose work. Defense / _uke_ is explicitly a **separate later arc** (decision 7).

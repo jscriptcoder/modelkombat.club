@@ -1,7 +1,7 @@
 # Plan: S7 — compare the whole arsenal at a glance (contact sheet)
 
 **Branch**: move-poses-s7-contact-sheet
-**Status**: Active
+**Status**: ✅ Complete — shipped #376 (`7199f04`); archived 2026-07-20 in the arc closeout
 
 Split from `plans/move-poses-stories.md` (S7) via `planning` (2026-07-20), after web-render
 reconnaissance of the `/dojo` + `scene()` seams and two settled design decisions (below). Feeds TDD.
@@ -24,19 +24,19 @@ undescribed, rarely-thrown moves (`plans/move-poses-stories.md:84`).
 
 ## Settled design decisions (2026-07-20)
 
-| # | Decision | Choice | Why |
-| - | -------- | ------ | --- |
-| A | **Cell content** | **Attacker only**, at active-phase peak; opponent omitted | The arc's thesis is the _attacker's_ limb shape ("does the side kick read like the back kick?"). Solo sidesteps the **accepted** close-range overlap (`empi` 95k / `hiza-geri` 110k interpenetrate at true reach, decision g) — noise in a comparison grid. The driven endpoint still solves to its true-reach target; we just don't draw `b`. |
-| B | **Placement** | **New dark `/sheet` route** (like `/dojo`: not in Nav, not prerendered) | Keeps the single-figure tuning stage focused; the grid is a separate layout + concern. MPA mechanics are cheap and known (HTML shell + `.tsx` mount + `vite.config.ts` input + `vercel.json` rewrite). |
-| C | **Frame** | **Static**, one frame per move at its **active phase** (tick = `preset.startup`, where `phaseAt` → 2, the driven endpoint at the solved target, not the chamber) | Peak extension is when a technique is most itself. Motion between phases is **S8's** job — S7 must not pull it forward. |
-| D | **Rendering** | **One Pixi canvas, N grid-positioned sub-containers** — not 13 `Application`s | 13 `Application`s = 13 WebGL contexts (browsers cap ~16 — fragile). One canvas + a single-figure draw primitive is the sound architecture and the one bit of real engineering here. |
-| E | **Labels** | Raw **move id** per cell (the `Text` HUD idiom, `figures.ts:241`) | The story AC is "labelled with its move id." Editorial glosses ("jab", "roundhouse") stay parked (parking lot). |
+| #   | Decision         | Choice                                                                                                                                                           | Why                                                                                                                                                                                                                                                                                                                                            |
+| --- | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A   | **Cell content** | **Attacker only**, at active-phase peak; opponent omitted                                                                                                        | The arc's thesis is the _attacker's_ limb shape ("does the side kick read like the back kick?"). Solo sidesteps the **accepted** close-range overlap (`empi` 95k / `hiza-geri` 110k interpenetrate at true reach, decision g) — noise in a comparison grid. The driven endpoint still solves to its true-reach target; we just don't draw `b`. |
+| B   | **Placement**    | **New dark `/sheet` route** (like `/dojo`: not in Nav, not prerendered)                                                                                          | Keeps the single-figure tuning stage focused; the grid is a separate layout + concern. MPA mechanics are cheap and known (HTML shell + `.tsx` mount + `vite.config.ts` input + `vercel.json` rewrite).                                                                                                                                         |
+| C   | **Frame**        | **Static**, one frame per move at its **active phase** (tick = `preset.startup`, where `phaseAt` → 2, the driven endpoint at the solved target, not the chamber) | Peak extension is when a technique is most itself. Motion between phases is **S8's** job — S7 must not pull it forward.                                                                                                                                                                                                                        |
+| D   | **Rendering**    | **One Pixi canvas, N grid-positioned sub-containers** — not 13 `Application`s                                                                                    | 13 `Application`s = 13 WebGL contexts (browsers cap ~16 — fragile). One canvas + a single-figure draw primitive is the sound architecture and the one bit of real engineering here.                                                                                                                                                            |
+| E   | **Labels**       | Raw **move id** per cell (the `Text` HUD idiom, `figures.ts:241`)                                                                                                | The story AC is "labelled with its move id." Editorial glosses ("jab", "roundhouse") stay parked (parking lot).                                                                                                                                                                                                                                |
 
 ## Non-negotiable constraints
 
 - **`web/` only.** No `src/`, no engine, no TCB, no `BENCHMARK_VERSION` bump. The pure render path
   (`REACH_PRESETS` → `selectMove` + `controlsToFrame` → `buildDojoTape` → `scene(tape, preset.startup,
-  viewport).a`) is entirely reused; S7 adds a new page + a grid draw layer around it.
+viewport).a`) is entirely reused; S7 adds a new page + a grid draw layer around it.
 - **The shipped 2-figure ring stays untouched.** `createStage`/`scene`'s `{a, b, hud}` contract and the
   `/dojo` + `/watch` pages must not regress. Expose the single-figure draw primitive by **widening
   visibility** (add `export`) or a new module — do not restructure the ring.
@@ -89,6 +89,7 @@ small local draw helper.
 **Acceptance criteria**: the story ACs above. **Present to the human and get confirmation before
 writing any code.**
 **RED (failing behavior tests, in increment order):**
+
 1. **Seam first (the risk):** a headless test builds the contact-sheet stage for a **single** move and
    asserts one figure's driven-limb node is placed at the active-phase strike position within its cell
    container (relation, not literal — decision 9). Proves one-figure-in-a-shared-canvas end to end.
@@ -100,19 +101,19 @@ writing any code.**
 5. **Key-set coverage:** the set of cell ids === the set of `REACH_PRESETS` keys.
 6. **Fallback totality:** an undescribed move id still produces a non-empty posed figure (generic hand).
 7. **Page wiring:** `SheetApp` with an injected `sheet` spy feeds all 13 move ids to the stage.
-**GREEN**: export (or locally replicate) a single-figure draw primitive from `figures.ts` without
-touching `createStage`; new `contact-sheet` module builds one canvas + N grid cells (figure + label)
-from `scene(...).a`; new `/sheet` page (shell + mount + `vite.config.ts` input + `vercel.json` rewrite).
-Minimum grid layout — a simple wrapping grid sized to fit 13 cells.
-**MUTATE**: N/A (Stryker excludes `web/`) → **manual mutator scan** over the new module against
-`resources/mutator-rules.md` (wrong-limb, collapsed-phase, dropped-cell, off-by-one grid index, label
-mismatch), recorded in the PR; exact-assertion tests are the alternate evidence.
-**KILL MUTANTS**: strengthen tests for any scan-surfaced gap; ask the human when a survivor's value is
-ambiguous.
-**REFACTOR**: assess the figure-primitive extraction (export vs local helper) and grid-layout math for
-clarity; only if it adds value; keep the 2-figure ring green.
-**Done when**: all ACs met; suite + typecheck + lint + format clean; manual mutator scan recorded; the
-human approves the commit.
+   **GREEN**: export (or locally replicate) a single-figure draw primitive from `figures.ts` without
+   touching `createStage`; new `contact-sheet` module builds one canvas + N grid cells (figure + label)
+   from `scene(...).a`; new `/sheet` page (shell + mount + `vite.config.ts` input + `vercel.json` rewrite).
+   Minimum grid layout — a simple wrapping grid sized to fit 13 cells.
+   **MUTATE**: N/A (Stryker excludes `web/`) → **manual mutator scan** over the new module against
+   `resources/mutator-rules.md` (wrong-limb, collapsed-phase, dropped-cell, off-by-one grid index, label
+   mismatch), recorded in the PR; exact-assertion tests are the alternate evidence.
+   **KILL MUTANTS**: strengthen tests for any scan-surfaced gap; ask the human when a survivor's value is
+   ambiguous.
+   **REFACTOR**: assess the figure-primitive extraction (export vs local helper) and grid-layout math for
+   clarity; only if it adds value; keep the 2-figure ring green.
+   **Done when**: all ACs met; suite + typecheck + lint + format clean; manual mutator scan recorded; the
+   human approves the commit.
 
 **Fallback split (only if the seam fights back):** if the single-figure-in-shared-canvas draw proves
 harder than the reconnaissance suggests, split into **1a** (seam + one-cell walking skeleton, RED #1)
@@ -135,5 +136,5 @@ not the plan.
 - **Per-phase columns** (startup/active/recovery side by side = 39 figures) — the AC is one frame per move.
 
 ---
-*Delete this file (archive under `docs/archive/` per project convention — [[archive-plans-not-delete]])
-when the plan is complete. If `plans/` is empty, delete the directory.*
+
+_Archived 2026-07-20 (arc closeout). Shipped as PR #376; the contact sheet is live at `/sheet`._
