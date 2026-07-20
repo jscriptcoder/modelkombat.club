@@ -3611,44 +3611,51 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
     expect(handAt(tape, 0).x).toBeLessThanOrEqual(scaled(STANCE_HAND_L).x);
   });
 
-  it("snaps to full extension as the active window opens, then re-chambers (M14c)", () => {
-    // Three active ticks. The strike reaches the solved extension on the FIRST active tick — a kime
-    // commit as the contact window opens — then eases back toward the chamber across the rest of the
-    // active phase. Contact is unshifted (it lands exactly on the extension) and the run still MOVES.
+  it("holds full extension across the whole active window (kime hold, S1)", () => {
+    // The strike commits to full extension on the FIRST active tick and HOLDS it for every remaining
+    // active tick — the retract has moved into recovery (Slice 1). The engine only ever scores inside
+    // the active window, so whichever active tick the point lands on now shows the limb extended into
+    // the opponent, not a chambered one. (Was: the active phase re-chambered across its own window, so
+    // the score usually registered a tick or two after the limb had already retracted — the defect.)
     const tape = gyakuRun([CONTACT, CONTACT, CONTACT]);
 
-    // First active tick = full extension, forward of the chamber (a real punch, not a held chamber).
+    // Full extension, forward of the chamber (a real punch, not a held chamber).
     expect(handAt(tape, 0).x).toBeGreaterThan(scaled(CHAMBER_HAND_L).x);
     expect(handAt(tape, 0)).not.toEqual(scaled(CHAMBER_HAND_L));
 
-    // The active phase re-chambers by its last tick, and the endpoint MOVED between them.
-    expect(handAt(tape, 2)).toEqual(scaled(CHAMBER_HAND_L));
+    // HELD: every active tick draws the SAME extension — the last active tick equals the first, and
+    // neither has re-chambered (RED today — the old blend re-chambers to the chamber by the last tick).
+    expect(handAt(tape, 1)).toEqual(handAt(tape, 0));
+    expect(handAt(tape, 2)).toEqual(handAt(tape, 0));
+    expect(handAt(tape, 2)).not.toEqual(scaled(CHAMBER_HAND_L));
+  });
+
+  it("retracts the driving hand from full extension back to the stance during recovery (S1)", () => {
+    // The retract now lives in recovery: it STARTS at the held contact extension (continuous with the
+    // active hold that ended there) and eases back to the stance, reaching the stance at the last
+    // recovery tick. (Was: recovery started at the CHAMBER, because the active phase had already
+    // re-chambered the hand before recovery began.)
+    const tape = gyakuRun([RECOVER, RECOVER, RECOVER]);
+
+    // Boundary: recovery STARTS at full extension, forward of the chamber (RED today — started at the
+    // chamber).
+    expect(handAt(tape, 0).x).toBeGreaterThan(scaled(CHAMBER_HAND_L).x);
+    expect(handAt(tape, 0)).not.toEqual(scaled(CHAMBER_HAND_L));
+
+    // ...and returns to the stance by the end.
+    expect(handAt(tape, 2)).toEqual(scaled(STANCE_HAND_L));
     expect(handAt(tape, 0)).not.toEqual(handAt(tape, 2));
 
-    // Directional retract extension → chamber: the chamber sits behind (−x), so x DECREASES.
+    // Directional retract extension → stance: the extension sits forward (+x) of the stance, so x
+    // DECREASES monotonically across the recovery.
     expect(handAt(tape, 0).x).toBeGreaterThan(handAt(tape, 1).x);
     expect(handAt(tape, 1).x).toBeGreaterThan(handAt(tape, 2).x);
   });
 
-  it("retracts the driving hand from the chamber back to the stance during recovery (M14d)", () => {
-    // Three recovery ticks. Today recovery freezes at the chamber for its whole duration; eased, the
-    // hand re-chambers then travels back to the stance, reaching the stance at the last recovery tick.
-    const tape = gyakuRun([RECOVER, RECOVER, RECOVER]);
-
-    // Boundary authored (M14d): recovery STARTS at the chamber, symmetric with the wind-up.
-    expect(handAt(tape, 0)).toEqual(scaled(CHAMBER_HAND_L));
-    // Returns to the stance by the end (RED today — recovery froze at the chamber).
-    expect(handAt(tape, 2)).toEqual(scaled(STANCE_HAND_L));
-    expect(handAt(tape, 0)).not.toEqual(handAt(tape, 2));
-
-    // Directional travel chamber → stance: the stance sits forward (+x) of the chamber, so x INCREASES.
-    expect(handAt(tape, 2).x).toBeGreaterThan(handAt(tape, 1).x);
-    expect(handAt(tape, 1).x).toBeGreaterThan(handAt(tape, 0).x);
-  });
-
-  it("passes through all five keyframes across a full-duration technique (stance→chamber→extension→chamber→stance)", () => {
-    // A real gyaku-zuki span — 7 startup, 3 active, 14 recovery — proving the whole arc lands its
-    // authored keyframes exactly at the phase boundaries while every interior tick is in motion.
+  it("passes through its keyframes across a full-duration technique (stance→chamber→extension-hold→stance)", () => {
+    // A real gyaku-zuki span — 7 startup, 3 active, 14 recovery. The arc is now FOUR keyframes: the
+    // active window HOLDS the extension (no mid re-chamber), so the active→recovery boundary is the
+    // extension and the retract flows continuously from it back to the stance.
     const full = gyakuRun([
       ...Array<number>(7).fill(STARTUP),
       ...Array<number>(3).fill(CONTACT),
@@ -3657,13 +3664,18 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
 
     expect(handAt(full, 0)).toEqual(scaled(STANCE_HAND_L)); // commit: still at the stance
     expect(handAt(full, 6)).toEqual(scaled(CHAMBER_HAND_L)); // startup→active boundary: chamber
-    expect(handAt(full, 10)).toEqual(scaled(CHAMBER_HAND_L)); // active→recovery boundary: re-chambered
     expect(handAt(full, 23)).toEqual(scaled(STANCE_HAND_L)); // recovery end: back to the stance
 
-    // The active window opens at the solved extension (global tick 7 = the first active tick), forward
-    // of the chamber and distinct from it.
+    // The active window opens at the solved extension (global tick 7) and HOLDS it: the first active
+    // tick and the last active tick (global 9) are the same forward extension, distinct from the chamber.
     expect(handAt(full, 7).x).toBeGreaterThan(scaled(CHAMBER_HAND_L).x);
     expect(handAt(full, 7)).not.toEqual(scaled(CHAMBER_HAND_L));
+    expect(handAt(full, 9)).toEqual(handAt(full, 7));
+
+    // Active→recovery boundary is the held extension, not a re-chamber: global tick 10 (the first
+    // recovery tick) starts the retract FROM the extension. RED today — tick 10 was the re-chambered
+    // chamber.
+    expect(handAt(full, 10)).toEqual(handAt(full, 7));
   });
 
   it("keeps the reach-to-target solve at contact — two gaps land two contact points (M8.5)", () => {
@@ -3694,34 +3706,41 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
     expect(contactAt(300_000).x).not.toBe(contactAt(390_000).x);
   });
 
-  it("re-derives the mid-joint and leans the torso WITH the eased hand — coherence, fixed bones (M14e)", () => {
-    // Five active ticks: the hand eases from full extension (tick 0) back to the chamber (tick 4), so
-    // tick 1 is a genuine interior point. The driving arm's two bones stay EQUAL there — the elbow is
-    // re-derived from the eased endpoint, not lerped (which would drift it off its bone length and
-    // reopen the S2 · Slice 3 stretch scar).
-    const tape = gyakuRun([CONTACT, CONTACT, CONTACT, CONTACT, CONTACT]);
-    const pose = scene(tape, 1, VIEWPORT).a.pose;
+  it("re-derives the mid-joint through the recovery retract, and commits the lean to contact (M14e, S1)", () => {
+    // Recovery is now the phase that MOVES (extension → stance), so an interior recovery tick is a
+    // genuine in-between. The driving arm's two bones stay EQUAL there — the elbow is re-derived from
+    // the eased endpoint, not lerped (which would drift it off its bone length and reopen the
+    // S2 · Slice 3 stretch scar).
+    const recovery = gyakuRun([RECOVER, RECOVER, RECOVER, RECOVER, RECOVER]);
+    const interior = scene(recovery, 1, VIEWPORT).a.pose;
     const bone = (p: Joint, q: Joint) => Math.hypot(p.x - q.x, p.y - q.y);
 
     expect(
       Math.abs(
-        bone(pose.shoulderL, pose.elbowL) - bone(pose.elbowL, pose.handL),
+        bone(interior.shoulderL, interior.elbowL) -
+          bone(interior.elbowL, interior.handL),
       ),
     ).toBeLessThan(1.5);
 
-    // The torso lean follows the eased hand: the head is advanced when the punch is at full extension
-    // (tick 0) and upright once the hand has re-chambered (tick 4) — the lean is not snapped on, it
-    // tracks the driven point.
-    const headX = (playhead: number) =>
-      scene(tape, playhead, VIEWPORT).a.pose.head.x;
+    // The lean is committed to the CONTACT, not the retract (M9 gates it to the active phase): the head
+    // is advanced while the strike is held at full extension, and upright once it has recovered to the
+    // stance — so the fighter leans into the held strike and straightens as it withdraws.
+    const headAtContact = scene(
+      gyakuRun([CONTACT, CONTACT, CONTACT]),
+      1,
+      VIEWPORT,
+    ).a.pose.head.x;
 
-    expect(headX(0)).toBeGreaterThan(headX(4));
+    const headRecovered = scene(recovery, 4, VIEWPORT).a.pose.head.x; // last recovery tick = stance
+
+    expect(headAtContact).toBeGreaterThan(headRecovered);
   });
 
-  it("eases an UNDESCRIBED move through its stance — still moves at contact (M7 totality)", () => {
+  it("holds an UNDESCRIBED move at full extension across the active window (M7 totality, S1)", () => {
     // kizami-zuki has no descriptor, so its chamber IS its stance: it does not wind up (startup holds
-    // the stance), but it STILL travels stance → extension → stance across the active phase. So an
-    // unauthored move eases too — the fallback is a real movement, not a frozen figure.
+    // the stance). During the active window it punches forward to the solved extension and now HOLDS
+    // it — every active tick draws the same forward point, not a re-chamber back to the stance. So the
+    // hold is total: it covers the unauthored moves too, not just the authored ones.
     const STANCE_HAND_R = { x: 18, y: -44 }; // STAND front hand — kizami-zuki's undescribed limb
 
     const unauthored = (phases: readonly number[]): ReplayTape =>
@@ -3750,12 +3769,12 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
     expect(handR(su, 0)).toEqual(scaled(STANCE_HAND_R));
     expect(handR(su, 2)).toEqual(scaled(STANCE_HAND_R));
 
-    // Active: eases extension → stance (its chamber ≡ stance), so it still MOVES — the first active
-    // tick punches forward to the solved extension, and it re-chambers to the stance by the last tick.
+    // Active: punches forward to the solved extension and HOLDS it — the last active tick equals the
+    // first (RED today — the old blend re-chambers back to the stance by the last tick).
     const ac = unauthored([CONTACT, CONTACT, CONTACT]);
 
     expect(handR(ac, 0).x).toBeGreaterThan(scaled(STANCE_HAND_R).x);
-    expect(handR(ac, 2)).toEqual(scaled(STANCE_HAND_R));
+    expect(handR(ac, 2)).toEqual(handR(ac, 0));
   });
 
   it("renders a lone tick inside a multi-tick tape as the discrete keyframe (single-keyframe totality)", () => {
@@ -3824,6 +3843,100 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
 
     expect(scene(twoMoves, 0, VIEWPORT).a.pose.handL).toEqual(
       scaled(CHAMBER_HAND_L),
+    );
+  });
+
+  it("holds an AIRBORNE strike at full extension across the active window too (S1)", () => {
+    // The hold is stance-independent: a jumping kick (tobi-geri, posture 2, no authored chamber — the
+    // AIR tuck IS its wind-up) also holds its extended foot across every active tick, so a mid-air
+    // scoring tick reads as a connected kick and not a foot already tucked back under the fighter.
+    const airRun = (phases: readonly number[]): ReplayTape =>
+      phases.map((attackPhase, i) =>
+        tickOf(
+          i,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: 240_000,
+            attackMove: "tobi-geri",
+            x: 150_000,
+            y: 60_000, // off the ground
+            posture: 2, // airborne
+            facing: 1,
+            attackPhase,
+          },
+          { x: 390_000 },
+        ),
+      );
+
+    const footAt = (tape: ReplayTape, playhead: number) =>
+      scene(tape, playhead, VIEWPORT).a.pose.footR;
+
+    const tape = airRun([CONTACT, CONTACT, CONTACT]);
+
+    // HELD across the window: every active tick draws the same extended foot (RED today — the old blend
+    // re-chambers to the AIR-tuck by the last active tick).
+    expect(footAt(tape, 1)).toEqual(footAt(tape, 0));
+    expect(footAt(tape, 2)).toEqual(footAt(tape, 0));
+    // ...and it is a genuine extension, not the tucked wind-up shape a startup tick draws.
+    expect(footAt(tape, 0)).not.toEqual(footAt(airRun([STARTUP]), 0));
+  });
+
+  it("cuts a cancelled strike's held extension straight to the next move — no interpolated retract (S1)", () => {
+    // A cancel replaces recovery: a DIFFERENT move on the very next tick cuts the active window short.
+    // The run scan (phaseRunAt) bounds the gyaku's active run to its OWN ticks, so its last active tick
+    // still HOLDS the solved extension — no retract is interpolated toward the cancelling move — and the
+    // mawashi begins a fresh startup run. Nothing special-cases the cancel; the hold + run scan do it.
+    const cancel: ReplayTape = [
+      tickOf(
+        0,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: 240_000,
+          attackMove: "gyaku-zuki",
+          x: 150_000,
+          facing: 1,
+          attackPhase: CONTACT,
+        },
+        { x: 390_000 },
+      ),
+      tickOf(
+        1,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: 240_000,
+          attackMove: "gyaku-zuki",
+          x: 150_000,
+          facing: 1,
+          attackPhase: CONTACT,
+        },
+        { x: 390_000 },
+      ),
+      tickOf(
+        2,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: 270_000,
+          attackMove: "mawashi-geri",
+          x: 150_000,
+          facing: 1,
+          attackPhase: STARTUP,
+        },
+        { x: 390_000 },
+      ),
+    ];
+
+    // The gyaku active run (ticks 0-1) holds: its last active tick equals the first (full extension),
+    // forward of the chamber — not eased toward the cancelling mawashi. RED today — the old blend
+    // re-chambers the second active tick.
+    expect(scene(cancel, 1, VIEWPORT).a.pose.handL).toEqual(
+      scene(cancel, 0, VIEWPORT).a.pose.handL,
+    );
+    expect(scene(cancel, 1, VIEWPORT).a.pose.handL.x).toBeGreaterThan(
+      scaled(CHAMBER_HAND_L).x,
     );
   });
 });
