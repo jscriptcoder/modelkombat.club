@@ -1093,8 +1093,8 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    stats**. Both presentation-only (no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change). All Arsenal +
    Gauntlet artifacts archived under `docs/archive/` (see the build-log entries above + the archive
    [`README.md`](archive/README.md)).
-9. **Move showcase + per-move poses — 🚧 IN PROGRESS (6 of 8 child stories shipped; PRs #350, #352,
-   #353, #355–#361, #363–#367, #369, #370).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
+9. **Move showcase + per-move poses — 🚧 IN PROGRESS (7 of 8 child stories shipped; PRs #350, #352,
+   #353, #355–#361, #363–#367, #369, #370, #372–#374).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
    `poseFor` knew only `attacking` / `attackBand` / `throwing`, so all **12 strikes rendered as one
    picture** (a `mawashi-geri` drew as a punch), and `attacking` stays true for a move's whole committed
    duration — a `gyaku-zuki` holds **24 ticks (~0.4 s) frozen at full extension**. Design resolved via
@@ -1105,8 +1105,9 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    archived at [`docs/archive/move-poses-s0-s1.md`](archive/move-poses-s0-s1.md),
    [`docs/archive/move-poses-s2.md`](archive/move-poses-s2.md),
    [`docs/archive/move-poses-s3.md`](archive/move-poses-s3.md),
-   [`docs/archive/move-poses-s4.md`](archive/move-poses-s4.md) and
-   [`docs/archive/move-poses-s5.md`](archive/move-poses-s5.md). Defense / _uke_ poses are explicitly a
+   [`docs/archive/move-poses-s4.md`](archive/move-poses-s4.md),
+   [`docs/archive/move-poses-s5.md`](archive/move-poses-s5.md) and
+   [`docs/archive/move-poses-s6.md`](archive/move-poses-s6.md). Defense / _uke_ poses are explicitly a
    **later** arc.
 
    - **S0 ✅ (PR #352)** — the arc's **only `src/` touch**: additive render-only **`attackMove` +
@@ -1178,8 +1179,19 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
      **overlap** S3 made visible (M13g): at `empi`'s 95k / `hiza-geri`'s 110k reach the figures interpenetrate,
      and the `/dojo` sign-off **accepted** it as reading _infighting_, not a z-fighting bug (the tripwire held).
      `BENCHMARK_VERSION` held at `v19`, `src/` untouched every slice (M11).
-   - **Next: S6 / S7 / S8** — the remaining child stories (all unblocked since S4; see the dependency graph in
-     `plans/move-poses-stories.md`).
+   - **S6 ✅ (PRs #372, #373, #374)** — `web/`-only, **three** slices, the non-strike trio (`sweep`,
+     `tobi-geri`, `throw`) — the moves that don't drive a single limb to a band. **`sweep`** reaps the front
+     foot to a **fixed near-ground height** (new `MoveDescriptor.targetY`), band-independent because the engine
+     leaves a sweep's band unrestricted. **`tobi-geri`**, the only airborne technique, drives the front foot
+     from the AIR stance while an `isAirborne` gate **holds the hip** — the jump arc supplies the closing, so a
+     stepping hip would read as a mid-air lunge. **`throw`** retires the arc's last non-descriptor render path:
+     the grab now dispatches on `attackMove:"throw"` (an `isGrab` descriptor flag) instead of the
+     `frame.throwing` boolean, so the `/dojo` picker finally draws the grab (not a generic hand) while `/watch`
+     stays byte-identical (the engine emits `attackMove:"throw"` on every throw frame); the redundant `/dojo`
+     `throwing` control was removed. **This completes the 13-move roster** — every move now dispatches through
+     the single `attackMove` lookup. `BENCHMARK_VERSION` held at `v19`, `src/` untouched every slice (M11).
+   - **Next: S7 / S8** — the remaining child stories (the contact sheet + phase interpolation, both unblocked;
+     see the dependency graph in `plans/move-poses-stories.md`).
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
