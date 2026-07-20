@@ -112,6 +112,18 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
     "empi",
     { limb: "elbowR", chamber: { x: -10, y: -42 }, tuck: { x: -12, y: -8 } },
   ],
+  // hiza-geri (knee strike): the LEG mirror of empi, and the second move to lead with a MID-JOINT. The
+  // KNEE is the driven point — it drives up to the opponent's near edge at the mid band while the foot
+  // folds back behind and below it (`tuck`, relative to the knee so it rides across every phase, M13c).
+  // Rooted at the single `hip` (no girdle), a knee strike neither steps nor leans (M13f); the OTHER leg
+  // (footL) holds as the support. scene.ts writes the driven knee back over the derived hip→foot bend,
+  // exactly as it does the elbow for empi (S5 · Slice 2). Chamber: the knee cocked LOW (near hip
+  // height) before it drives up and forward to the band — the foot rides with it via the same relative
+  // tuck. Both eye-tuned in /dojo, relations pinned.
+  [
+    "hiza-geri",
+    { limb: "kneeR", chamber: { x: 6, y: -30 }, tuck: { x: -8, y: 14 } },
+  ],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this

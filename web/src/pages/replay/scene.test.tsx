@@ -3003,3 +3003,167 @@ describe("scene — empi leads with the elbow (S5 · Slice 1)", () => {
     expect(startup.handR.x).toBeLessThan(startup.elbowR.x);
   });
 });
+
+describe("scene — hiza-geri leads with the knee (S5 · Slice 2)", () => {
+  // The LEG branch of the mid-joint mechanism slice 1 built for the arm. empi drives the elbow and
+  // folds the fist; hiza-geri drives the KNEE up to the mid band and folds the FOOT back under the hip,
+  // while the OTHER leg (footL) stays planted as the support. Same inversion, other classification arm:
+  // where every kick so far drives a FOOT and lets deriveBend compute the knee, this drives the knee.
+  //
+  // The RED driver is the ROUTING, exactly as in slice 1. Today "hiza-geri" is undescribed, so limbFor
+  // falls to the generic front hand — the FIST drives to the target and kneeR is only the derived
+  // hip→footR bisector, the foot left at its stance. The inversion assertions (knee AT the target, foot
+  // FOLDED behind/below it) fail for that reason until the kneeR route exists.
+  //
+  // Local-px anchors, recomputed independent of production (one sub-unit = 76/240000 local px) — the
+  // reach solve is limb-agnostic, so these are the SAME edges the empi and strike blocks use:
+  //  · CLOSE anchor — hiza-geri's REAL reach (110k) at a 120k gap: centres 38 local px apart, near edge
+  //    one BODY_HALF_WIDTH (10) nearer ⇒ 28; the knee's cap is 110000·(76/240000) = 34.83, so 28 lands
+  //    in range. This is the in-character close-range picture (where M13g's overlap lives — by eye in
+  //    /dojo, not asserted here).
+  //  · FAR anchor — a controlled 240k reach at a 240k gap ⇒ edge 66. A HAND at this reach LEANS 16
+  //    (rootTravel over 2·ARM_BONE); a mid-joint must NOT (M13f: hold the root). Using the far anchor is
+  //    what makes the no-lean gate load-bearing and the root-held test a real RED driver, not a vacuum.
+  const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand — untouched by a LEG strike
+  const NEUTRAL_HAND_L = { x: -18, y: -44 }; // STAND rear hand — likewise untouched
+  const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND support foot — planted (the knee strike is the
+  const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // driving leg); STAND driving foot — its pre-strike stance
+
+  const STARTUP = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+
+  // Striker `a` faces right at x 150000 committing hiza-geri; `b` sits `gap` sub-units in front.
+  // Defaults to the CLOSE anchor (hiza-geri's real 110k reach); the far cases override reach + gap.
+  const poseHiza = ({
+    gap = 120_000,
+    band = 2,
+    reach = 110_000,
+    extra = {},
+  }: {
+    gap?: number;
+    band?: number;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: "hiza-geri",
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("leads with the knee — the knee drives to the near edge, the foot folded behind and below it", () => {
+    // The inversion (guard 7, anti-clobber). The DRIVEN point is kneeR, landing ON the near edge (28)
+    // at the mid band — NOT the deriveBend(hip → footR) bisector the old front-hand path leaves there.
+    // The foot folds BEHIND the knee tip (kneeR.x > footR.x) AND BELOW it (footR.y > kneeR.y — a larger
+    // y is lower on screen): the knee-strike shape of a raised knee over a tucked foot, the reverse of a
+    // front kick where the foot leads. The below-relation also pins the tuck's vertical sign (a foot
+    // folded ABOVE the knee would read as a flick-up, not a knee).
+    const pose = poseHiza();
+
+    expect(pose.kneeR).toEqual(scaled({ x: 28, y: -46 }));
+    expect(pose.kneeR.x).toBeGreaterThan(pose.footR.x);
+    expect(pose.footR.y).toBeGreaterThan(pose.kneeR.y);
+  });
+
+  it("folds the shin at an angle — the knee reads jointed, the foot tucked behind the tip", () => {
+    // Guard 6 (jointedness). The foot tucks back RELATIVE to the knee (M13c), so the shin kneeR→footR
+    // bends off the thigh hip→kneeR — non-collinear, via their cross product — and the foot sits behind
+    // the tip (footR.x < kneeR.x). Today the foot IS at its stance (the front-hand path never touches
+    // it), so the fold-back assertion fails until the tuck exists.
+    const pose = poseHiza();
+
+    const cross =
+      (pose.kneeR.x - pose.hip.x) * (pose.footR.y - pose.kneeR.y) -
+      (pose.kneeR.y - pose.hip.y) * (pose.footR.x - pose.kneeR.x);
+
+    expect(cross).not.toBe(0);
+    expect(pose.footR.x).toBeLessThan(pose.kneeR.x);
+    // The foot actually FOLDED — it left its stance rather than being ignored (kills a mutant that drops
+    // the trailing-endpoint write, which would leave the stance foot on the ground and still satisfy the
+    // two checks above, since a planted foot at y 0 sits below and behind a raised knee).
+    expect(pose.footR).not.toEqual(scaled(NEUTRAL_FOOT_L)); // not the support foot's stance
+    expect(pose.footR).not.toEqual(scaled(NEUTRAL_FOOT_R)); // nor its own STAND.footR — it FOLDED
+  });
+
+  it("holds the root — a mid-joint strike does not step or lean, even at a far target (M13f)", () => {
+    // M13f: suppress the forward-root motion for a mid-joint. At the FAR anchor a HAND would lean 16
+    // (head + shoulder advancing); a leg-mid-joint neither leans nor steps — the knee reaches the far
+    // edge (66) while the head, shoulder, hip (no step) and the SUPPORT foot all hold their stance.
+    const pose = poseHiza({ gap: 240_000, reach: 240_000 });
+
+    expect(pose.kneeR).toEqual(scaled({ x: 66, y: -46 })); // it DID reach far — not a no-op
+    expect(pose.head).toEqual(scaled({ x: 0, y: -76 })); // no lean
+    expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+    expect(pose.hip).toEqual(scaled({ x: 0, y: -34 })); // no step
+    expect(pose.footL).toEqual(scaled(NEUTRAL_FOOT_L)); // support foot planted
+  });
+
+  it("tracks the real opponent distance — the knee solve is retained (guard 5)", () => {
+    // The knee tracks true distance through the SAME reachTargetX a fist uses, not a fixed authored
+    // extension: two gaps, two knee endpoints (28 and 66), both inside a 240k reach cap (76).
+    expect(poseHiza({ gap: 120_000, reach: 240_000 }).kneeR).toEqual(
+      scaled({ x: 28, y: -46 }),
+    );
+    expect(poseHiza({ gap: 240_000, reach: 240_000 }).kneeR).toEqual(
+      scaled({ x: 66, y: -46 }),
+    );
+  });
+
+  it("leaves the other limbs at their stance — support foot planted, arms home (root held)", () => {
+    // A knee strike drives one leg; the arms and the support leg hold their stance. Only the driving
+    // leg (kneeR + its trailing foot) moves — the support knee kneeL re-derives from an unmoved hip and
+    // footL, so it is identical to the idle figure's.
+    const pose = poseHiza();
+    const idleKneeL = poseHiza({ extra: { attacking: false } }).kneeL;
+
+    expect(pose.handL).toEqual(scaled(NEUTRAL_HAND_L));
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
+    expect(pose.footL).toEqual(scaled(NEUTRAL_FOOT_L));
+    expect(pose.kneeL).toEqual(idleKneeL);
+  });
+
+  it("chambers the knee during startup, then drives it up to contact (guards 3/4)", () => {
+    // A wind-up is a different SHAPE, not a shorter reach (M3): the knee cocks low, then rises to the
+    // mid band at contact. The chamber routes through the SAME winding path as every other move
+    // (driven = winding ? chamberFor : target), now landing on the KNEE instead of a hand or foot.
+    const chambered = poseHiza({ extra: { attackPhase: STARTUP } }).kneeR;
+    const extended = poseHiza({ extra: { attackPhase: CONTACT } }).kneeR;
+    const resting = poseHiza({ extra: { attacking: false } }).kneeR;
+
+    // Guard 3 (phase distinctness): the cocked knee is a different shape from the contact knee.
+    expect(chambered).not.toEqual(extended);
+    // Guard 4 (direction): the knee RISES from its cock to contact (a smaller y is higher on screen),
+    // never drops — the leg's signature, as the elbow EXTENDS forward for empi.
+    expect(chambered.y).toBeGreaterThan(extended.y);
+    // ...and the chamber is a distinct COCKED position, not the resting leg — kills "no chamber
+    // authored" (which would leave the wind-up at the idle knee, identical to `resting`).
+    expect(chambered).not.toEqual(resting);
+  });
+
+  it("recovers through the same chamber, the foot riding with the cocked knee (guard 3)", () => {
+    // Startup and recovery both draw the chamber — a technique returns through its wind-up shape, the
+    // mirror of how it entered. And the foot rides WITH the cocked knee (folded behind it), not left at
+    // stance during the wind-up: the tuck is relative to the knee, so it tracks it across phases.
+    const startup = poseHiza({ extra: { attackPhase: STARTUP } });
+    const recovery = poseHiza({ extra: { attackPhase: RECOVER } });
+
+    expect(recovery.kneeR).toEqual(startup.kneeR);
+    expect(startup.footR).not.toEqual(scaled(NEUTRAL_FOOT_R));
+    expect(startup.footR.x).toBeLessThan(startup.kneeR.x);
+  });
+});

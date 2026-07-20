@@ -1,7 +1,7 @@
 # Plan: S5 — close-range techniques lead with the elbow / knee
 
 **Branch**: `feat/move-poses-s5-empi` (Slice 1); `feat/move-poses-s5-hiza-geri` (Slice 2)
-**Status**: Active — Slice 1 ready for AC confirmation
+**Status**: Active — **Slice 1 `empi` MERGED (#369, `b4b2df2`)**; Slice 2 (`hiza-geri`) next
 **Parent story**: `plans/move-poses-stories.md` § S5 · **Decisions**: `plans/move-poses-decisions.md` § **M13** (a–j), building on M1–M12
 
 ## Goal
@@ -21,7 +21,7 @@ against a 240k body the figures interpenetrate, and this is the slice that confr
 
 ## Acceptance Criteria (S5 overall)
 
-- [ ] A spectator can tell an `empi` from a punch — the **elbow** leads to contact and the fist folds back
+- [x] A spectator can tell an `empi` from a punch — the **elbow** leads to contact and the fist folds back _(Slice 1, #369)_
 - [ ] A spectator can tell a `hiza-geri` from a kick — the **knee** leads to contact and the foot folds back
 - [ ] `deriveSkeleton` does **not** overwrite the driven elbow / knee (M13i-7 — the assertion the slice turns on)
 - [ ] At their true (short) reach the figures overlap and the strike still reads _as a strike_ (M13g accepted, with the `/dojo` sign-off tripwire)
@@ -137,23 +137,23 @@ the ternary branch — and its killing test) + `/dojo` sign-off.
 line most likely to read badly once four mid-joints exist), and whether `strikeHandFor` / `driven`
 should be renamed to "driven point" now that they land on an elbow. Only if it adds value.
 
-**Acceptance criteria (Slice 1 — present and confirm before any code)**:
+**Acceptance criteria (Slice 1 — present and confirm before any code)** — ✅ **all met, MERGED in #369**:
 
-- [ ] A committed `empi` at the active phase drives `elbowR` to the opponent's near edge at the band; the
+- [x] A committed `empi` at the active phase drives `elbowR` to the opponent's near edge at the band; the
       fist `handR` folds to its tuck; the root does not lean or step
-- [ ] The final `elbowR` is the solved target, **not** the `deriveBend` bisector (guard 7)
-- [ ] The limb reads jointed — `handR` is not collinear with `shoulderR → elbowR` (guard 6)
-- [ ] Startup / active / recovery give three different `elbowR` positions, active forward of startup
+- [x] The final `elbowR` is the solved target, **not** the `deriveBend` bisector (guard 7)
+- [x] The limb reads jointed — `handR` is not collinear with `shoulderR → elbowR` (guard 6)
+- [x] Startup / active / recovery give three different `elbowR` positions, active forward of startup
       (guards 3 + 4); recovery reuses the chamber
-- [ ] Two opponent gaps give two different active `elbowR.x` (guard 5, solve retained)
-- [ ] `footL` / `footR` / `handL` and the head/shoulder x are unchanged from stance (guards 1 + 2, root held)
-- [ ] Every other move renders exactly as before (M7 totality — an unknown / absent `attackMove` still
+- [x] Two opponent gaps give two different active `elbowR.x` (guard 5, solve retained)
+- [x] `footL` / `footR` / `handL` and the head/shoulder x are unchanged from stance (guards 1 + 2, root held)
+- [x] Every other move renders exactly as before (M7 totality — an unknown / absent `attackMove` still
       falls to the generic front hand)
-- [ ] `/dojo` sign-off: select `empi`, scrub the phases, confirm the elbow reads _and_ the M13g overlap
-      tripwire (infighting, not a z-fighting bug)
+- [x] `/dojo` sign-off: select `empi`, scrub the phases, confirm the elbow reads _and_ the M13g overlap
+      tripwire (infighting, not a z-fighting bug) — overlap read as infighting, tripwire did **not** fire
 
-**Done when**: all Slice-1 criteria met, the manual mutator scan is clean, typecheck + lint + the full
-web suite are green, and the human approves the commit.
+**Done**: ✅ all Slice-1 criteria met; 7 tests added (550 web green); manual scan found & killed 1 survivor
+(dropped-fist-write → `handR ≠ stance`); `/dojo` sign-off passed. **MERGED in #369 (`b4b2df2`).**
 
 ---
 

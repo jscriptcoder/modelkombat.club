@@ -428,19 +428,21 @@ const poseFor = (
           // is shorter, but it type-checks ANY string into the pose object — a limb the Stance has no
           // endpoint for would silently add a junk property and the strike would vanish. The ternary
           // routes anything unrecognised to the generic front hand instead, which is M7 totality.
-          // A driven MID-JOINT writes its TRAILING endpoint here (the fist folded behind the elbow),
-          // NOT the driven point — that lands on the mid-joint itself, applied over the derived bend
-          // after deriveSkeleton (below). So an elbowR strike sets handR = elbow + tuck; hiza-geri
-          // (kneeR → footR) follows in Slice 2.
+          // A driven MID-JOINT writes its TRAILING endpoint here (the fist folded behind the elbow, the
+          // foot folded behind the knee), NOT the driven point — that lands on the mid-joint itself,
+          // applied over the derived bend after deriveSkeleton (below). So an elbowR strike sets
+          // handR = elbow + tuck; a kneeR strike sets footR = knee + tuck.
           ...(limb === "footR"
             ? { footR: driven }
             : limb === "footL"
               ? { footL: driven }
               : limb === "elbowR"
                 ? { handR: foldFrom(driven, tuck) }
-                : limb === "handL"
-                  ? { handL: driven }
-                  : { handR: driven }),
+                : limb === "kneeR"
+                  ? { footR: foldFrom(driven, tuck) }
+                  : limb === "handL"
+                    ? { handL: driven }
+                    : { handR: driven }),
           // The pull rides in the SAME layer as the strike that causes it. Note this puts it BEFORE
           // the guard below: an off hand landing on handL would lose to a raised guard, where the
           // strike wins. No move authors that today (the only off hand is handR, and a technique
@@ -462,14 +464,19 @@ const poseFor = (
 
   const skeleton = deriveSkeleton(endpoints, girdle);
 
-  // A driven MID-JOINT (elbow) IS the solved point. deriveSkeleton just bent an elbow off the trailing
-  // fist we placed above; here we write the driven point back over that derived value (M13b), so the
-  // fist keeps its folded endpoint while the elbow keeps the reach. Only elbowR leads a mid-joint today
-  // (S5 · Slice 1); hiza-geri adds the kneeR branch in Slice 2. A total, additive final layer — every
-  // endpoint-driving move returns deriveSkeleton's result untouched.
-  return driven !== null && limb === "elbowR"
-    ? { ...skeleton, elbowR: driven }
-    : skeleton;
+  // A driven MID-JOINT (elbow / knee) IS the solved point. deriveSkeleton just bent it off the trailing
+  // fist / foot we placed above; here we write the driven point back over that derived value (M13b), so
+  // the endpoint keeps its folded position while the mid-joint keeps the reach. elbowR (empi) and kneeR
+  // (hiza-geri) each lead a mid-joint (S5). A total, additive final layer — every endpoint-driving move
+  // returns deriveSkeleton's result untouched. (Generalising the two branches with the endpoint ternary
+  // above into one mid-joint→endpoint map is the standing REFACTOR candidate now that both exist.)
+  return driven === null
+    ? skeleton
+    : limb === "elbowR"
+      ? { ...skeleton, elbowR: driven }
+      : limb === "kneeR"
+        ? { ...skeleton, kneeR: driven }
+        : skeleton;
 };
 
 // The heads-up display for the current playhead: the engine tick number + both fighters' scores,
