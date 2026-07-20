@@ -171,6 +171,17 @@ and are proven. Four authored strikes now read as their own techniques on `/watc
 by value and load `planning` (with `grill-me`/`find-gaps` if its decisions are still fuzzy) to settle
 the slice split.
 
+**➡ SELECTED + PLANNED (2026-07-20): S6 — the non-strike moves read correctly.** Chosen because all
+three of its moves (`throw`, `sweep`, `tobi-geri`) appear in the telemetry "actually thrown" list, so
+authoring them completes the set of moves a spectator sees on `/watch` — the arc's telemetry-first
+bargain. Branch `feat/move-poses-s6-non-strike-moves`. Planned via `planning` + `grill-me` into
+**3 PR-sized slices** in `plans/move-poses-s6.md`: **(1)** `sweep` → low front-leg sweep (`footR`, fixed
+near-ground `targetY`, chamber); **(2)** `tobi-geri` → flying front kick (`footR`, holds the root in the
+air, AIR tuck is the wind-up); **(3)** `throw` → dispatched through the one `attackMove` lookup (grab-kind
+vocabulary, retire the `frame.throwing` render path + the `/dojo` `throwing` control; `/watch` stays
+byte-identical). `web/`-only, no engine/TCB/version change. Next: load `tdd`/`testing`/`mutation-testing`/
+`refactoring` and implement Slice 1.
+
 **S5 outcome (closed):** both close-range moves render as mid-joint techniques — the elbow / knee
 leads to contact and the trailing fist / foot folds back (M13b/c), rooted mid-joints hold the root
 (M13f). The **close-range overlap** the harness surfaced in S3 · Slice 3 (M13g) was **accepted**: at
