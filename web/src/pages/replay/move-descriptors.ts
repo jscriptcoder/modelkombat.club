@@ -59,11 +59,18 @@ export type StrikeLimb =
 // RELATIVE to the driven elbow / knee (M13c), so it rides with the joint across every phase (chamber
 // and contact alike) for free. Only a mid-joint move authors one; an endpoint-driving move leaves it
 // absent and its endpoint is the driven point itself.
+// A FIXED near-ground / fixed-height y (local px) the driven endpoint targets, OVERRIDING the band
+// height (S6). A `sweep` has no meaningful band — the engine leaves it UNRESTRICTED, so `attackBand`
+// is whatever the bot asked for — but it always reaps along the FLOOR, so its height is a drawing
+// constant, not a band read. Mirrors how the throw grab pins to a fixed chest height rather than a
+// band. Only a move whose height is band-independent authors one; every banded strike leaves it
+// absent and takes `bandHeight(attackBand)` as before. Optional, so the reach solve still supplies x.
 export type MoveDescriptor = {
   limb: StrikeLimb;
   chamber?: Joint;
   offHand?: Joint;
   tuck?: Joint;
+  targetY?: number;
 };
 
 const DESCRIPTORS = new Map<string, MoveDescriptor>([
@@ -124,6 +131,13 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
     "hiza-geri",
     { limb: "kneeR", chamber: { x: 6, y: -30 }, tuck: { x: -8, y: 14 } },
   ],
+  // sweep (ashi-barai): the first NON-strike technique to get a descriptor, and the first to drive its
+  // endpoint to a FIXED height rather than a band. The front FOOT reaps forward to the opponent's near
+  // edge — the same reach-to-target solve a kick uses — but at `targetY` near the floor, not at the
+  // requested band: the engine leaves sweep's band UNRESTRICTED, so a sweep committed high/mid/low all
+  // read as the same floor reap (and it draws even at band 0, unlike a banded kick). Chamber: the foot
+  // cocked back and lifted before it reaps down and forward. Eye-tuned in /dojo, relations pinned.
+  ["sweep", { limb: "footR", targetY: -8, chamber: { x: 4, y: -14 } }],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this
@@ -158,3 +172,10 @@ export const offHandFor = (move: string | undefined): Joint | null =>
 // unknown-id / "" / absent-field fallbacks). TOTAL, same shape as chamberFor / offHandFor.
 export const tuckFor = (move: string | undefined): Joint | null =>
   DESCRIPTORS.get(move ?? "")?.tuck ?? null;
+
+// The fixed near-ground / fixed-height y this move drives its endpoint to, OVERRIDING the band height,
+// or `null` when the move takes its height from `attackBand` as usual (every banded strike, plus the
+// unknown-id / "" / absent-field fallbacks). Only `sweep` authors one today. TOTAL, same shape as the
+// three lookups above.
+export const targetYFor = (move: string | undefined): number | null =>
+  DESCRIPTORS.get(move ?? "")?.targetY ?? null;

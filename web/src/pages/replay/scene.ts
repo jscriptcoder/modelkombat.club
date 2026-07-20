@@ -1,5 +1,11 @@
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
-import { chamberFor, limbFor, offHandFor, tuckFor } from "./move-descriptors";
+import {
+  chamberFor,
+  limbFor,
+  offHandFor,
+  targetYFor,
+  tuckFor,
+} from "./move-descriptors";
 
 // The world→screen projection: a pure function from (tape, playhead, viewport) to the on-screen
 // state the Pixi layer draws. Kept free of Pixi and of any engine import (web/src never imports
@@ -598,7 +604,11 @@ const strikeHandFor = (
 ): Joint | null => {
   if (!striker.attacking) return null;
 
-  const y = bandHeight(striker.attackBand);
+  // The target height: a move with a fixed-height descriptor (a sweep reaps at a floor y, S6) takes
+  // that; every banded strike takes `bandHeight(attackBand)` as before. `null` (an unmapped band on a
+  // banded move) still means no strike to draw — but a fixed-height move never hits it, so a sweep
+  // draws at any band, including the 0 / out-of-range codes a banded kick would decline.
+  const y = targetYFor(striker.attackMove) ?? bandHeight(striker.attackBand);
 
   if (y === null) return null;
 
