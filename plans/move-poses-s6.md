@@ -58,7 +58,7 @@ retires the last non-descriptor dispatch path.
 Classified per the `planning` contract. All three are **behavior changes** (RED-GREEN); mutation testing
 is `N/A` (`web/` not under Stryker) with the manual-mutator-scan substitute named on each.
 
-### Slice 1: sweep renders as a low front-leg sweep
+### Slice 1: sweep renders as a low front-leg sweep — ✅ DONE (#372, `main`@`33c8048`)
 
 **Value**: Actor = the `/watch` spectator (and `/dojo` developer). A leg sweep that today draws as a
 front hand at the bot's requested band renders as a foot reaping near the floor — a recognizable
@@ -71,16 +71,16 @@ Stryker) ⇒ manual mutator scan; `refactoring` assessed at green.
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (present + confirm before code):
-- [ ] Given a frame with `attackMove:"sweep"`, `attacking:true`, a positive `attackReach`, and the
+- [x] Given a frame with `attackMove:"sweep"`, `attacking:true`, a positive `attackReach`, and the
       opponent in range, when the **active** phase renders, `footR` is the driven endpoint and `handR`
       stays at its stance position (no generic hand strike).
-- [ ] Given that active sweep, when it renders, `footR.y` sits at the fixed near-ground height
+- [x] Given that active sweep, when it renders, `footR.y` sits at the fixed near-ground height
       **regardless of `attackBand`** (a sweep committed at mid/high does not lift the foot to that band).
-- [ ] Given two different fighter gaps, when each active sweep renders, `footR.x` differs (the
+- [x] Given two different fighter gaps, when each active sweep renders, `footR.x` differs (the
       reach-to-target solve is retained — the foot tracks the opponent's near edge, M8.5).
-- [ ] Given a **startup** or **recovery** phase, when the sweep renders, `footR` sits at the authored
+- [x] Given a **startup** or **recovery** phase, when the sweep renders, `footR` sits at the authored
       chamber, distinct from its active position (the wind-up reads, M8.3).
-- [ ] Given `attackMove:"sweep"` with a defensively-rejected reach (reach ≤ 0 / opponent behind), when it
+- [x] Given `attackMove:"sweep"` with a defensively-rejected reach (reach ≤ 0 / opponent behind), when it
       renders, `footR` keeps its stance position (M7 idle fallback — no crash, no backward foot).
 **RED / preservation baseline**: assert the driven endpoint + near-ground y for an active sweep — fails
 today because `limbFor("sweep")` → `GENERIC_LIMB` (`handR`) and there is no `targetY` mechanism, so the
