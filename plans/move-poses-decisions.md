@@ -313,6 +313,19 @@ REACH_PRESETS` (a subset), so adding two keys is clean.
     renders true tape positions, so a real `empi` overlaps on a live replay too — accepting it is a
     `/watch` decision, not just a lab one.
 
+  **Outcome (S5 CLOSED — 2026-07-20, PRs #369, #370).** Both slices shipped exactly as sliced (h).
+  `empi` (S5 · 1, #369) built the mid-joint framework end to end — the elbow drives, the fist folds
+  (b / c), rooted, no lean / step (f); `hiza-geri` (S5 · 2, #370) added the LEG branch — the knee
+  drives, the foot folds, the support foot plants, no step. The **M13g tripwire did NOT fire**: at
+  `empi`'s 95k and `hiza-geri`'s 110k the figures interpenetrate, and both `/dojo` sign-offs read the
+  clinch as **infighting**, not a z-fighting bug — so the overlap is **accepted** and no bespoke
+  close-range treatment was built. The `isKick` → mid-joint generalisation (consequence 1) and the
+  `strikeHandFor` / `driven` rename (consequence 2) were **assessed and deferred** on each slice: only
+  the two RIGHT-side mid-joints are authored, so the explicit per-limb routing still matches the file's
+  M7 style, and a standing marker is left for when a left-side mid-joint (4 total) makes the map earn
+  its keep. Test floor (i) held; the anti-clobber guard (7) is the assertion each slice turned on.
+  `BENCHMARK_VERSION` held at `v19`, `src/` untouched (M11).
+
 ## Slice ladder
 
 1. **Engine** — `attackMove` + `attackPhase` on `RenderFrame`. Additive, render-only, outcome

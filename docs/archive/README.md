@@ -1443,6 +1443,46 @@ and the plan forecast this would collapse the four kicks into one picture. It bi
 move: when two techniques land the same endpoint, separate them by _where the limb starts_, not by nudging
 where it ends.
 
+## Move showcase & per-move poses — S5: close-range techniques lead with the elbow / knee ✅ COMPLETE (6/8 of the arc, 2026-07-20)
+
+The story that **inverts** the pose model, and the one that closes the arc's structural close-range overlap.
+Every strike S1–S4 authored drives an ENDPOINT (a hand, a foot) and lets the bend rule DERIVE the mid-joint;
+`empi` (elbow) and `hiza-geri` (knee) are the only two moves whose striking surface IS the mid-joint, so they
+drive the joint and let the endpoint TRAIL, folded back behind it. S5 promoted the mid-joint to a first-class
+driven `StrikeLimb` (M13) and confronted the close-range **overlap** (M13g) that S3 · Slice 3 had surfaced. Both
+slices were `web/`-only — `BENCHMARK_VERSION` held at `v19`, `git diff main -- src/` empty (M11) — with mutation
+`N/A` (`web/` is outside Stryker); substitute evidence was exact-assertion tests, a manual mutator scan, and a
+Playwright `/dojo` visual sign-off.
+
+- **Slice 1 — `empi` leads with the elbow** (PR #369, `feat/move-poses-s5-empi`) — the **mechanism carrier**.
+  `StrikeLimb` gains the four mid-joints; a driven `elbowR` routes through the SAME `reachTargetX` solve to the
+  opponent's near edge, the fist folds back via an authored **relative `tuck`** (M13c, so it rides chamber →
+  contact for free), and the driven joint is written back over `deriveSkeleton`'s derived bend as a final layer
+  (M13b). A driven mid-joint **holds the root** — `lean` and `step` gate to 0 (M13f). The RED driver was the
+  routing: `elbowR` fell through to the generic front hand, so the fist led and the elbow was only the bisector.
+- **Slice 2 — `hiza-geri` leads with the knee** (PR #370, `feat/move-poses-s5-hiza-geri`) — the **leg branch +
+  reuse**. A driven `kneeR` folds `footR` (not the fist), rooted at the single `hip` with the other leg planted
+  as the support and no step. The same two routing edits as slice 1, mirrored onto the leg; the manual scan
+  found one survivor — the `tuck.y` sign (foot folding ABOVE the knee) — killed by a `footR.y > kneeR.y`
+  relation and verified by an induced failure.
+
+[move-poses-s5.md](move-poses-s5.md) — the plan, with both slices' recorded outcomes, the manual-scan survivor,
+and the M13g overlap sign-off. The design trail (`plans/move-poses-{decisions,stories}.md`) stays **live in
+`plans/`**, since S6–S8 still run off it.
+
+**The close-range overlap was accepted, not faked.** At `empi`'s 95k and `hiza-geri`'s 110k reach the two
+figures interpenetrate — the truthful consequence of clinch distance against a body that stands one height from
+its opponent. The M13g **tripwire** (would `/dojo` read the clinch as a z-fighting BUG?) did NOT fire on either
+move: a knee or elbow driving INTO the opponent at that range reads as **infighting**, which is what contact at
+clinch range looks like. No bespoke spacing treatment was built — the arc's "root x is truthful, compromises are
+cosmetic" rule since S2 · Slice 3 held to the end.
+
+**When two techniques land the same endpoint, separate them by where the limb STARTS.** S4 · Slice 6 learned it
+for the two foot-kicks (drive a different leg); S5 generalised it — `empi` and `hiza-geri` land near the same
+close-range target a punch would, and what separates them is the DIFFERENT limb that leads (the mid-joint) and
+the DIFFERENT root it hangs from (shoulder vs hip). A 2-D side view cannot show a lateral turn, so the
+distinction must live in which joint drives, not in where it ends up.
+
 **GOTCHA — never trust an exit code as a kill signal.** The slice-4 scan reported a **false kill**: `execSync`
 goes non-zero for runner errors as well as test failures, so a mutant that broke the harness read as "killed"
 while it was alive. Every scan since records a kill only when the run **names a failing test**. A transport

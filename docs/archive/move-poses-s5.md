@@ -1,7 +1,7 @@
 # Plan: S5 — close-range techniques lead with the elbow / knee
 
 **Branch**: `feat/move-poses-s5-empi` (Slice 1); `feat/move-poses-s5-hiza-geri` (Slice 2)
-**Status**: Active — **Slice 1 `empi` MERGED (#369, `b4b2df2`)**; Slice 2 (`hiza-geri`) next
+**Status**: ✅ **COMPLETE & ARCHIVED** — Slice 1 `empi` MERGED (#369, `b4b2df2`), Slice 2 `hiza-geri` MERGED (#370, `26ffee3`). M13g overlap **accepted** (tripwire held). Closes S5.
 **Parent story**: `plans/move-poses-stories.md` § S5 · **Decisions**: `plans/move-poses-decisions.md` § **M13** (a–j), building on M1–M12
 
 ## Goal
@@ -200,4 +200,4 @@ fired → bespoke treatment parked).
 
 ---
 
-_Delete this file when S5 is complete (both slices merged + archived). If `plans/` is empty, delete the directory._
+_Archived 2026-07-20 (both slices merged: #369 + #370). Per the arc convention, completed plans are moved to `docs/archive/`, not deleted; indexed in `docs/archive/README.md`. The design trail (`plans/move-poses-{decisions,stories}.md`) stays live for S6–S8._
