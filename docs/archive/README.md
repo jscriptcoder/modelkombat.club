@@ -1437,8 +1437,7 @@ decision tree, and slice 6's honest `/dojo` read. The design trail
 (`plans/move-poses-{decisions,stories}.md`) stays **live in `plans/`**, since S5–S8 still run off it.
 
 **The expressiveness limit was diagnosed AND treated — twice.** M3 accepts "only the driven endpoint moves",
-and the plan forecast this would collapse the four kicks into one picture. It bit first on **punches** (slice
-3) — because both hands shared one shoulder — and the treatment was the girdle. It bit again on **kicks**
+and the plan forecast this would collapse the four kicks into one picture. It bit first on **punches** (slice 3) — because both hands shared one shoulder — and the treatment was the girdle. It bit again on **kicks**
 (slice 6) as forecast, and the treatment was to drive a **different limb** (the rear leg). Both are the same
 move: when two techniques land the same endpoint, separate them by _where the limb starts_, not by nudging
 where it ends.
@@ -1502,3 +1501,56 @@ Single-line, uniquely-identifying anchors are robust; span-a-newline ones are no
 measured from the shared `shoulder` midpoint — a fictional bone that passed under the old hand-ride (arm rigid
 vs a moving midpoint) but drifted 35% under rotation. Rooted at `shoulderL` (the arm's actual origin) it read
 true.
+
+## Move showcase & per-move poses — S6: the non-strike moves read correctly ✅ COMPLETE (7/8 of the arc, 2026-07-20)
+
+The story that **completes the 13-move roster** and retires the arc's last non-descriptor render path. S1–S5
+authored every move that drives a single limb to a height band; S6 is the trio that doesn't — a `sweep` that
+reaps along the floor, a `tobi-geri` thrown from the air, and a `throw` that grips with both hands. All three
+slices were `web/`-only — `BENCHMARK_VERSION` held at `v19`, `git diff main -- src/` empty (M11) — with mutation
+`N/A` (`web/` is outside Stryker); substitute evidence was exact-assertion tests, a manual mutator scan, and a
+Playwright `/dojo` visual sign-off.
+
+- **Slice 1 — `sweep` reaps low with the front foot** (PR #372, `feat/move-poses-s6-non-strike-moves`) — the
+  **first non-strike descriptor** and the first driven endpoint at a **fixed height** rather than a band. A
+  sweep's band is UNRESTRICTED (the engine gates it by hurtbox occupancy, not `bandLegal`), so its height
+  cannot come from `attackBand` the way a kick's does — a new optional **`MoveDescriptor.targetY`** pins the
+  reap near the floor, resolved as `targetYFor(move) ?? bandHeight(attackBand)` (every banded strike unchanged).
+  The `footR` reaps at any band, including the band-0 / unmapped codes a banded kick declines.
+- **Slice 2 — `tobi-geri` is a flying front kick** (PR #373, `feat/move-poses-s6-tobi-geri`) — the only
+  **airborne** technique. Descriptor `{ limb: "footR" }` (no chamber — the AIR-tucked foot IS the wind-up; no
+  `targetY` — it is banded). One new production line, `isAirborne = posture === 2`, gates the hip **step** to 0
+  for an airborne kick: the jump arc (`rules.ts`) supplies the closing, so a stepping hip on a floating body
+  would read as a mid-air lunge, and the leg telescopes for the residual (as a mid-joint holds its root). The
+  grounded-vs-air hip-contrast test (same move, posture 0 vs 2) is the tightest guard on the gate.
+- **Slice 3 — `throw` dispatches through the descriptor** (PR #374, `feat/move-poses-s6-throw-dispatch`) — the
+  **last non-descriptor render path retires**. The grab now dispatches on `attackMove:"throw"` (an `isGrab`
+  descriptor flag, `MoveDescriptor.limb` made optional) instead of the `frame.throwing` boolean. `strikeHandFor`
+  returns null for a grab, suppressing the phantom strike layer so a `/dojo` throw renders identically to
+  `/watch`. The dead `/dojo` `throwing` control was removed (`FigureControls.throwing` dropped; `throwing` kept
+  on the `ReplayFrame` wire). The `/dojo` picker, which stamps the move id but never the flag, finally draws
+  the two-hand grab instead of a generic hand.
+
+[move-poses-s6.md](move-poses-s6.md) — the plan, with all three slices' recorded outcomes, the grill decisions,
+and the byte-identical `/watch` proof. The design trail (`plans/move-poses-{decisions,stories}.md`) stays
+**live in `plans/`**, since S7–S8 still run off it.
+
+**Byte-identical `/watch` came for free from the engine's own emission.** `renderFrameOf` sets `throwing`,
+`attackMove:"throw"`, and `attackReach` from the SAME `state.kind === "throwing"`, so every real throw frame
+(startup → active → recovery) carries `attackMove:"throw"`. Moving the grab's gate from the boolean to the
+descriptor therefore renders every shipped throw frame unchanged — the existing exact-coordinate throw tests,
+given both flags, became the characterisation guard (green before and after). The lesson: **before regating a
+render path, check whether the two gates are emitted from one source** — if they are, the migration is free.
+
+**A dispatch change can leave the tests it needs already written.** Slice 3 touched eight files, but most were
+collateral: `controls.test`, `DojoApp.test`, and `figures.test` each built throw frames with `throwing:true`
+alone, which the regate stopped drawing until `attackMove:"throw"` was added. The RED drivers were only two —
+the `/dojo` grab (throw move, no flag) and the gate-switch (stale flag, no throw move) — and the rest was
+propagating the new frame shape through the suite.
+
+**GOTCHA — a "flag" descriptor beats a discriminated union here.** A grab authors no `limb`, so a
+`{ kind: "strike" | "grab" }` union was tempting; but the lookups (`limbFor`, `chamberFor`, …) all read fields
+through optional chaining and stay total, and a union would force every one of them to narrow. A lighter
+`grab?: boolean` flag (plus making `limb` optional) kept all lookups untouched. The plan's suggestion to remove
+`poseFor`'s `grab` param was also declined: `poseFor(frame, strikeHand, grab)` pre-solves both
+opponent-dependent layers in `scene()`, and removing only `grab` would make that asymmetric.

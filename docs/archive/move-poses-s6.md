@@ -1,7 +1,7 @@
 # Plan: S6 — the non-strike moves read correctly
 
-**Branch**: feat/move-poses-s6-non-strike-moves
-**Status**: Active
+**Branch**: feat/move-poses-s6-non-strike-moves (slices on `feat/move-poses-s6-tobi-geri`, `feat/move-poses-s6-throw-dispatch`)
+**Status**: ✅ COMPLETE & ARCHIVED — all 3 slices merged (#372, #373, #374), 2026-07-20
 
 Split from `plans/move-poses-stories.md` (S6) via `planning` + `grill-me` (2026-07-20). Feeds TDD,
 **PR per slice**. Every slice loads `tdd`, `testing`, `mutation-testing`, `refactoring` before code
@@ -48,7 +48,7 @@ retires the last non-descriptor dispatch path.
 5. **Tobi-geri leg**: `footR` (flying front kick); AIR stance already separates it from grounded kicks.
 6. **Tobi-geri root**: **holds the root in the air** — no local hip-step and no torso lean (the jump arc
    supplies the closing, `rules.ts:255`; the leg telescopes for the residual). New `air + kick → root
-   held` gate, consistent with how mid-joint strikes already hold the root.
+held` gate, consistent with how mid-joint strikes already hold the root.
 7. **Tobi-geri chamber**: none — the AIR stance's tucked `footR` IS the wind-up (tuck → extend → tuck).
 8. **`/dojo` `throwing` control**: removed as redundant once dispatch keys on `attackMove`; `frame.throwing`
    kept in the `ReplayFrame` wire mirror (it mirrors what the engine emits; harmless, unread).
@@ -71,6 +71,7 @@ Stryker) ⇒ manual mutator scan; `refactoring` assessed at green.
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (present + confirm before code):
+
 - [x] Given a frame with `attackMove:"sweep"`, `attacking:true`, a positive `attackReach`, and the
       opponent in range, when the **active** phase renders, `footR` is the driven endpoint and `handR`
       stays at its stance position (no generic hand strike).
@@ -82,18 +83,18 @@ Stryker) ⇒ manual mutator scan; `refactoring` assessed at green.
       chamber, distinct from its active position (the wind-up reads, M8.3).
 - [x] Given `attackMove:"sweep"` with a defensively-rejected reach (reach ≤ 0 / opponent behind), when it
       renders, `footR` keeps its stance position (M7 idle fallback — no crash, no backward foot).
-**RED / preservation baseline**: assert the driven endpoint + near-ground y for an active sweep — fails
-today because `limbFor("sweep")` → `GENERIC_LIMB` (`handR`) and there is no `targetY` mechanism, so the
-sweep draws a hand at `bandHeight(attackBand)`.
-**GREEN / preservation change**: add `sweep` to the descriptor table (`{ limb:"footR", targetY:<near-
+      **RED / preservation baseline**: assert the driven endpoint + near-ground y for an active sweep — fails
+      today because `limbFor("sweep")` → `GENERIC_LIMB` (`handR`) and there is no `targetY` mechanism, so the
+      sweep draws a hand at `bandHeight(attackBand)`.
+      **GREEN / preservation change**: add `sweep` to the descriptor table (`{ limb:"footR", targetY:<near-
 ground>, chamber:{…} }`), add an optional `targetY` to `MoveDescriptor`, and teach the strike-layer
-target-y to prefer the descriptor's `targetY` over `bandHeight(attackBand)` when present. Minimum to pass.
-**MUTATE / alternate evidence**: Stryker `N/A` (`web/`). Manual mutator scan over the new `targetY`
-branch and the `footR` routing (boundary, conditional-negation, block-removal) — record survivors killed.
-**KILL MUTANTS**: strengthen tests for any survivor (ask if value ambiguous).
-**REFACTOR**: assess whether `targetY` and the existing `bandHeight` path want a shared "resolve target
-y" helper — only if it adds value.
-**Done when**: all criteria pass, manual scan clean, typecheck + lint green, commit approved.
+      target-y to prefer the descriptor's `targetY` over `bandHeight(attackBand)` when present. Minimum to pass.
+      **MUTATE / alternate evidence**: Stryker `N/A` (`web/`). Manual mutator scan over the new `targetY`
+      branch and the `footR` routing (boundary, conditional-negation, block-removal) — record survivors killed.
+      **KILL MUTANTS**: strengthen tests for any survivor (ask if value ambiguous).
+      **REFACTOR**: assess whether `targetY` and the existing `bandHeight` path want a shared "resolve target
+      y" helper — only if it adds value.
+      **Done when**: all criteria pass, manual scan clean, typecheck + lint green, commit approved.
 
 ### Slice 2: tobi-geri renders as a flying front kick — ✅ DONE (#373)
 
@@ -107,6 +108,7 @@ with the kick descriptor → `footR` driven to the band, root held → visible o
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (present + confirm before code):
+
 - [x] Given a frame with `attackMove:"tobi-geri"`, `attacking:true`, `posture:AIR`, a positive
       `attackReach`, and the opponent in range, when the **active** phase renders, `footR` is the driven
       endpoint at the band height while `footL` keeps its AIR-tucked position (the AIR stance composes
@@ -121,18 +123,18 @@ with the kick descriptor → `footR` driven to the band, root held → visible o
       extended active position.
 - [x] Given `attackMove:"tobi-geri"` with a rejected reach, when it renders, `footR` keeps its AIR
       stance position (M7 fallback).
-**RED / preservation baseline**: assert `footR` driven to the band + hip held for an active airborne
-tobi-geri — fails today (generic `handR` strike + the kick path would step the hip if `footR` were driven
-without the air gate).
-**GREEN / preservation change**: add `tobi-geri` to the descriptor table (`{ limb:"footR" }`); gate the
-hip-step and lean to `0` when the posture is AIR and the driven limb is a kick. Minimum to pass.
-**MUTATE / alternate evidence**: Stryker `N/A`. Manual mutator scan over the new air-root gate (and the
-`isKick`/AIR conjunction — conditional-negation, `&&`→`||`, block-removal) — record survivors killed.
-**KILL MUTANTS**: strengthen tests for survivors; the grounded-vs-air hip contrast criterion above is the
-primary guard against the gate being deleted.
-**REFACTOR**: assess whether "airborne kick holds the root" reads clearly next to the mid-joint root-hold
-— only if it adds value.
-**Done when**: all criteria pass, manual scan clean, typecheck + lint green, commit approved.
+      **RED / preservation baseline**: assert `footR` driven to the band + hip held for an active airborne
+      tobi-geri — fails today (generic `handR` strike + the kick path would step the hip if `footR` were driven
+      without the air gate).
+      **GREEN / preservation change**: add `tobi-geri` to the descriptor table (`{ limb:"footR" }`); gate the
+      hip-step and lean to `0` when the posture is AIR and the driven limb is a kick. Minimum to pass.
+      **MUTATE / alternate evidence**: Stryker `N/A`. Manual mutator scan over the new air-root gate (and the
+      `isKick`/AIR conjunction — conditional-negation, `&&`→`||`, block-removal) — record survivors killed.
+      **KILL MUTANTS**: strengthen tests for survivors; the grounded-vs-air hip contrast criterion above is the
+      primary guard against the gate being deleted.
+      **REFACTOR**: assess whether "airborne kick holds the root" reads clearly next to the mid-joint root-hold
+      — only if it adds value.
+      **Done when**: all criteria pass, manual scan clean, typecheck + lint green, commit approved.
 
 ### Slice 3: throw dispatched through the one lookup
 
@@ -149,6 +151,7 @@ at chest height via the shared reach-to-target → visible on `/watch` and `/doj
 `reduce-system-complexity` program — no ledger required).
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (present + confirm before code):
+
 - [ ] Given a frame with `attackMove:"throw"`, `throwing:false`, a positive `attackReach`, and the
       opponent in range (as the `/dojo` picker produces it), when it renders, **both** `handR` and
       `handL` reach the grab at chest height (front hand on the near edge, rear hand a spread behind) —
@@ -162,22 +165,22 @@ at chest height via the shared reach-to-target → visible on `/watch` and `/doj
       no grab is drawn (the reach gate, not a raw boolean, decides).
 - [ ] Given the `/dojo` control surface, when the lab loads, there is no `throwing` checkbox; a throw is
       previewed by selecting "throw" in the move picker (M10 free-combos with posture/guard preserved).
-**RED / preservation baseline**: (a) assert the grab renders for `attackMove:"throw"` + `throwing:false`
-— fails today (draws a generic hand); (b) a **characterisation test** pinning the current real-throw grab
-skeleton, to guard byte-identical `/watch`.
-**GREEN / preservation change**: add a grab-kind to the descriptor vocabulary + a `throw` entry; route
-the grab layer in `poseFor` off the descriptor keyed on `attackMove` using the shared reach solve; remove
-`throwGrabFor`'s `frame.throwing` gate and the `grab` param on `poseFor`; remove the `throwing` field from
-`/dojo` `FigureControls` + its control. Keep `throwing` in `ReplayFrame`.
-**MUTATE / alternate evidence**: Stryker `N/A`. Manual mutator scan over the grab-kind dispatch + the
-two-hand spread (`GRAB_Y`/`GRAB_SPREAD` boundaries, conditional-negation on the reach gate) — record
-survivors killed. The characterisation test is the primary guard against a silent `/watch` regression.
-**KILL MUTANTS**: strengthen tests for survivors (ask if value ambiguous).
-**REFACTOR**: assess whether the descriptor type is cleanest as a discriminated union (`kind:"strike" |
+      **RED / preservation baseline**: (a) assert the grab renders for `attackMove:"throw"` + `throwing:false`
+      — fails today (draws a generic hand); (b) a **characterisation test** pinning the current real-throw grab
+      skeleton, to guard byte-identical `/watch`.
+      **GREEN / preservation change**: add a grab-kind to the descriptor vocabulary + a `throw` entry; route
+      the grab layer in `poseFor` off the descriptor keyed on `attackMove` using the shared reach solve; remove
+      `throwGrabFor`'s `frame.throwing` gate and the `grab` param on `poseFor`; remove the `throwing` field from
+      `/dojo` `FigureControls` + its control. Keep `throwing` in `ReplayFrame`.
+      **MUTATE / alternate evidence**: Stryker `N/A`. Manual mutator scan over the grab-kind dispatch + the
+      two-hand spread (`GRAB_Y`/`GRAB_SPREAD` boundaries, conditional-negation on the reach gate) — record
+      survivors killed. The characterisation test is the primary guard against a silent `/watch` regression.
+      **KILL MUTANTS**: strengthen tests for survivors (ask if value ambiguous).
+      **REFACTOR**: assess whether the descriptor type is cleanest as a discriminated union (`kind:"strike" |
 "grab"`) or a lighter flag — settle in this slice; also revisit the standing "generalise the mid-joint→
-endpoint branches" candidate noted in `scene.ts` now that dispatch is unified. Only if it adds value.
-**Done when**: all criteria pass (incl. byte-identical `/watch`), manual scan clean, typecheck + lint
-green, commit approved.
+      endpoint branches" candidate noted in `scene.ts` now that dispatch is unified. Only if it adds value.
+      **Done when**: all criteria pass (incl. byte-identical `/watch`), manual scan clean, typecheck + lint
+      green, commit approved.
 
 ## Pre-PR Quality Gate (each slice)
 
@@ -204,5 +207,6 @@ When all three slices are merged: mark S6 done in `plans/move-poses-stories.md`,
 `docs/STATUS.md` + the `move-showcase-arc` memory. S7 (contact sheet) and S8 (easing) remain.
 
 ---
-*Archive to `docs/archive/` when complete (do not delete — project override of the planning skill's
-delete footer).*
+
+_ARCHIVED 2026-07-20 (all 3 slices merged, #372–#374). Kept, not deleted — project override of the
+planning skill's delete footer. See `docs/archive/README.md` for the closeout summary._
