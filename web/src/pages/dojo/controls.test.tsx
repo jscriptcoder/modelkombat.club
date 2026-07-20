@@ -32,7 +32,6 @@ const controls = (overrides: Partial<FigureControls> = {}): FigureControls => ({
   attacking: false,
   attackBand: 0,
   guardBand: 0,
-  throwing: false,
   knockdown: false,
   attackReach: 0,
   attackMove: "",
@@ -47,7 +46,6 @@ describe("controlsToFrame — maps the lab's raw pose controls to a render frame
       attacking: true,
       attackBand: 3,
       guardBand: 2,
-      throwing: true,
       knockdown: true,
       attackReach: 250_000,
       attackMove: "mawashi-geri",
@@ -55,13 +53,14 @@ describe("controlsToFrame — maps the lab's raw pose controls to a render frame
 
     // Every tuned field survives verbatim; the render-only fields are filled with grounded, neutral
     // defaults (x is owned by the builder's centering, y 0 plants the fighter on the ring floor).
+    // `throwing` is no longer a control (S6 · Slice 3), so it is filled `false` for the wire frame.
     expect(frame).toEqual({
       posture: 1,
       facing: -1,
       attacking: true,
       attackBand: 3,
       guardBand: 2,
-      throwing: true,
+      throwing: false,
       knockdown: true,
       attackReach: 250_000,
       attackMove: "mawashi-geri",
@@ -85,13 +84,13 @@ describe("controlsToFrame — maps the lab's raw pose controls to a render frame
     expect(controlsToFrame(controls({ posture: 5 })).posture).toBe(5);
   });
 
-  it("passes an engine-impossible knockdown+throwing combo through unchanged", () => {
-    const frame = controlsToFrame(
-      controls({ knockdown: true, throwing: true }),
-    );
+  it("passes an engine-impossible knockdown+attacking combo through unchanged", () => {
+    // Free combos (M10): the lab exposes raw fields, so a downed fighter can also be marked attacking —
+    // a state the engine never emits — and controlsToFrame passes it through for poseFor to resolve.
+    const frame = controlsToFrame(controls({ knockdown: true, attacking: true }));
 
     expect(frame.knockdown).toBe(true);
-    expect(frame.throwing).toBe(true);
+    expect(frame.attacking).toBe(true);
   });
 });
 
@@ -144,11 +143,12 @@ describe("the mapped control frame renders through the real scene()/poseFor proj
     );
   });
 
-  it("reaches both grab hands forward for a throw (floored point-blank)", () => {
-    // The throw control reaches the same reach-to-target solve as a strike (M8). a === b here, so the
-    // fighters overlap and both grab hands floor to the point-blank forward technique: the lead hand at
-    // x 24, the rear hand a spread (8) behind at 16 — the in-range landing is exercised in scene.test.
-    const pose = poseOf(controls({ throwing: true, attackReach: 120_000 }));
+  it("reaches both grab hands forward for a throw MOVE (floored point-blank)", () => {
+    // Selecting `throw` in the move picker (attackMove:"throw") is what draws the grab now, not a
+    // `throwing` flag (S6 · Slice 3). The grab reaches the same reach-to-target solve as a strike (M8):
+    // a === b here, so the fighters overlap and both grab hands floor to the point-blank forward
+    // technique — the lead hand at x 24, the rear a spread (8) behind at 16 (in-range in scene.test).
+    const pose = poseOf(controls({ attackMove: "throw", attackReach: 120_000 }));
 
     expect(pose.handR).toEqual(scaled({ x: 24, y: -44 })); // lead hand, floored forward
     expect(pose.handL).toEqual(scaled({ x: 16, y: -44 })); // rear hand a spread behind
@@ -157,7 +157,7 @@ describe("the mapped control frame renders through the real scene()/poseFor proj
   it("lays the fighter prone for a knockdown, overriding a simultaneous throw (precedence)", () => {
     // PRONE wins by poseFor precedence (an early return) — even a live, reachable throw renders prone.
     const pose = poseOf(
-      controls({ knockdown: true, throwing: true, attackReach: 120_000 }),
+      controls({ knockdown: true, attackMove: "throw", attackReach: 120_000 }),
     );
 
     expect(pose.head).toEqual(scaled({ x: -40, y: -10 })); // PRONE head at the ground, not a grab
@@ -173,7 +173,6 @@ describe("default control states seed the pose lab's opening scene", () => {
       attacking: true,
       attackBand: 2,
       guardBand: 0,
-      throwing: false,
       knockdown: false,
       attackReach: 270_000, // mae-geri reach
       attackMove: "mae-geri", // the first move with a pose of its own (S1)
@@ -187,7 +186,6 @@ describe("default control states seed the pose lab's opening scene", () => {
       attacking: false,
       attackBand: 0,
       guardBand: 0,
-      throwing: false,
       knockdown: false,
       attackReach: 0, // idle
       attackMove: "", // nothing committed

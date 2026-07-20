@@ -95,7 +95,7 @@ branch and the `footR` routing (boundary, conditional-negation, block-removal) �
 y" helper — only if it adds value.
 **Done when**: all criteria pass, manual scan clean, typecheck + lint green, commit approved.
 
-### Slice 2: tobi-geri renders as a flying front kick
+### Slice 2: tobi-geri renders as a flying front kick — ✅ DONE (#373)
 
 **Value**: Actor = the `/watch` spectator. The only airborne technique, today a hand floating in the AIR
 stance, renders as a foot snapping to the band while airborne — a recognizable jump kick.
@@ -107,19 +107,19 @@ with the kick descriptor → `footR` driven to the band, root held → visible o
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
 **Acceptance criteria** (present + confirm before code):
-- [ ] Given a frame with `attackMove:"tobi-geri"`, `attacking:true`, `posture:AIR`, a positive
+- [x] Given a frame with `attackMove:"tobi-geri"`, `attacking:true`, `posture:AIR`, a positive
       `attackReach`, and the opponent in range, when the **active** phase renders, `footR` is the driven
       endpoint at the band height while `footL` keeps its AIR-tucked position (the AIR stance composes
       with the kick descriptor).
-- [ ] Given that active air kick, when it renders, the **hip and shoulder/head hold** (no local hip-step,
+- [x] Given that active air kick, when it renders, the **hip and shoulder/head hold** (no local hip-step,
       no torso lean) — the airborne root does not travel even when the target is beyond the leg's reach.
-- [ ] Given a grounded kick at the same reach (e.g. `mae-geri`) versus this air kick, when both render,
+- [x] Given a grounded kick at the same reach (e.g. `mae-geri`) versus this air kick, when both render,
       the grounded kick's hip **steps** and the air kick's hip **does not** (the air-root-hold is
       specific to airborne, not a global change to kicks).
-- [ ] Given a **startup** or **recovery** phase, when the tobi-geri renders, `footR` sits at its
+- [x] Given a **startup** or **recovery** phase, when the tobi-geri renders, `footR` sits at its
       AIR-tucked stance position (no authored chamber ⇒ M7 tuck-through wind-up), distinct from the
       extended active position.
-- [ ] Given `attackMove:"tobi-geri"` with a rejected reach, when it renders, `footR` keeps its AIR
+- [x] Given `attackMove:"tobi-geri"` with a rejected reach, when it renders, `footR` keeps its AIR
       stance position (M7 fallback).
 **RED / preservation baseline**: assert `footR` driven to the band + hip held for an active airborne
 tobi-geri — fails today (generic `handR` strike + the kick path would step the hip if `footR` were driven

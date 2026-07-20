@@ -109,7 +109,10 @@ describe("DojoApp — per-figure pose controls", () => {
     expect(latest()[0].a.posture).toBe(0); // challenger unchanged from default
   });
 
-  it("reaches an engine-impossible combo — knockdown AND throwing on one fighter (free combos)", () => {
+  it("reaches an engine-impossible combo — knockdown AND a committed throw on one fighter (free combos)", () => {
+    // A throw is now committed through the MOVE picker (attackMove:"throw"), not a `throwing` checkbox
+    // (S6 · Slice 3). The lab still reaches engine-impossible states freely: a downed fighter also
+    // carrying a throw is a combination the engine never emits, reached here through the two controls.
     const { Stage, latest } = spyStage();
     const { getByRole } = render(() => <DojoApp stage={Stage} />);
 
@@ -118,12 +121,12 @@ describe("DojoApp — per-figure pose controls", () => {
     fireEvent.click(
       within(challenger).getByRole("checkbox", { name: "Knockdown" }),
     );
-    fireEvent.click(
-      within(challenger).getByRole("checkbox", { name: "Throwing" }),
-    );
+    fireEvent.change(within(challenger).getByRole("combobox", { name: "Move" }), {
+      target: { value: "throw" },
+    });
 
     expect(latest()[0].a.knockdown).toBe(true);
-    expect(latest()[0].a.throwing).toBe(true);
+    expect(latest()[0].a.attackMove).toBe("throw");
   });
 
   it("sets a fighter's guard band from its control", () => {

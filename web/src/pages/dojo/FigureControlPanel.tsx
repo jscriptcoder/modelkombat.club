@@ -189,15 +189,9 @@ const FigureControlPanel: Component<FigureControlPanelProps> = (props) => {
         </select>
       </div>
 
-      <label class="control-check">
-        <input
-          type="checkbox"
-          checked={props.controls.throwing}
-          onChange={(e) => patch({ throwing: e.currentTarget.checked })}
-        />
-        Throwing
-      </label>
-
+      {/* No `throwing` checkbox: a throw is previewed by selecting `throw` in the move picker above,
+          which the renderer dispatches off `attackMove` (S6 · Slice 3). The `frame.throwing` boolean
+          is no longer read, so a checkbox for it would be a dead control. */}
       <label class="control-check">
         <input
           type="checkbox"
