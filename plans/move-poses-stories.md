@@ -41,7 +41,7 @@ single-tick tape.
 | ✅ **S5** — close-range techniques lead with the elbow / knee — **both slices shipped #369, #370, archived** | `empi` and `hiza-geri` are the only moves whose driven point is a **mid-joint**, currently derived rather than authored. Distinct technical risk. | `empi`, `hiza-geri`; mid-joint promoted to a drivable endpoint                                                                                                                                           | —                                                                                       | Given `empi` active, when it renders, `elbowR` is the driven endpoint and the derived-bend rule does not overwrite it                                                                                                                                                                                                                                                     | Shippable                          |
 | **S6** — the non-strike moves read correctly                                                                 | Completes the 13. `throw` already has a look; `sweep` and `tobi-geri` compose with existing layers.                                               | `throw`, `sweep`, `tobi-geri` descriptors routed through the same lookup (M2 vocabulary)                                                                                                                 | —                                                                                       | Given `attackMove: "throw"`, when it renders, the two-hand grab draws via the descriptor lookup, not a `throwing` special case · Given `tobi-geri`, when it renders, the `AIR` stance composes with the kick descriptor                                                                                                                                                   | Shippable                          |
 | **S8** — a technique flows instead of snapping between three held poses _(new, from S2's eye check)_         | The largest remaining gap between "the phases are correct" and "this reads as a movement". Affects all 13 moves and `/watch` as well as `/dojo`.  | Easing between the phase endpoints — stance → chamber → extension → chamber — so the limb travels rather than teleporting; the phase-boundary tick positions stay exactly where the engine puts them     | Which easing curve; whether a distinct recovery pose is still wanted once motion exists | Given a committed technique, when consecutive ticks within one phase render, the driven endpoint has MOVED between them · Given the tick at each phase boundary, when it renders, the endpoint is the authored one (easing must not shift where contact happens) · Given an unauthored move, when it renders, it still eases through its stance (M7 totality)             | Shippable                          |
-| **S7** — compare the whole arsenal at a glance                                                               | Catches "the side kick and the back kick read the same" — the arc's carried expressiveness risk.                                                  | Contact sheet: all 13 rendered simultaneously                                                                                                                                                            | —                                                                                       | Given the contact sheet, when it loads, 13 figures render, each labelled with its move id                                                                                                                                                                                                                                                                                 | Shippable, deferred until S4 lands |
+| ✅ **S7** — compare the whole arsenal at a glance — **shipped #376**                                          | Catches "the side kick and the back kick read the same" — the arc's carried expressiveness risk.                                                  | Contact sheet: all 13 rendered simultaneously                                                                                                                                                            | —                                                                                       | Given the contact sheet, when it loads, 13 figures render, each labelled with its move id                                                                                                                                                                                                                                                                                 | Shippable, deferred until S4 lands |
 
 ## The bargain — order S4 by telemetry, not anatomy
 
@@ -159,24 +159,44 @@ lands. It is also the one story that changes how `/watch` looks without authorin
 
 ## Next step
 
-Load `planning` for **one of S7 / S8** — the remaining child stories. **S0–S6 have all shipped**
-(#352, #353, #355–#367, #369, #370, #372–#374; plans archived at `docs/archive/move-poses-s0-s1.md`,
-`-s2.md`, `-s3.md`, `-s4.md`, `-s5.md` and `-s6.md`), so the descriptor mechanism, the driven-endpoint
-solve, phase-correct playback at engine timing, a limb that keeps its bone lengths, the shoulder girdle +
-torso rotation (M12), the **mid-joint-as-driven-endpoint inversion** (M13), the non-strike moves (a
-fixed-height sweep, an airborne kick, a descriptor-dispatched throw), and a working authoring harness all
-exist and are proven. **The full 13-move roster now reads as its own technique on `/watch`**, every move
-dispatched through the single `attackMove` descriptor lookup.
+Load `planning` for **S8** — the arc's **last remaining child story**. **S0–S7 have all shipped**
+(#352, #353, #355–#367, #369, #370, #372–#374, #376; plans archived at `docs/archive/move-poses-s0-s1.md`,
+`-s2.md`, `-s3.md`, `-s4.md`, `-s5.md` and `-s6.md`; **S7's `plans/move-poses-s7.md` is still live —
+archive it in the arc closeout**), so the descriptor mechanism, the driven-endpoint solve, phase-correct
+playback at engine timing, a limb that keeps its bone lengths, the shoulder girdle + torso rotation (M12),
+the **mid-joint-as-driven-endpoint inversion** (M13), the non-strike moves (a fixed-height sweep, an
+airborne kick, a descriptor-dispatched throw), a working authoring harness, and **the `/sheet` contact
+sheet detector** all exist and are proven. **The full 13-move roster now reads as its own technique on
+`/watch`**, every move dispatched through the single `attackMove` descriptor lookup.
 
-**S7 and S8 remain, both unblocked** (dependency graph above). Pick one by value and load `planning`
-(with `grill-me`/`find-gaps` if its decisions are still fuzzy) to settle the slice split.
+**Only S8 remains, unblocked** (dependency graph above). Load `planning` (with `grill-me`/`find-gaps` if
+its decisions are still fuzzy) to settle the slice split — chiefly the two open questions the story
+already flags: **which easing curve**, and **whether a distinct recovery pose is still wanted once motion
+exists**.
 
-**➡️ Selected next (2026-07-20): S7 — compare the whole arsenal at a glance (contact sheet).** Chosen
-over S8 because it is the *detector* for the arc's carried expressiveness risk — it validates that all
-13 moves read distinctly before motion polish (S8) invests in easing poses that may still need work.
-Cheaper, `web/`-only, reuses existing rendering. Branch `move-poses-s7-contact-sheet`. **Planned
-2026-07-20 → `plans/move-poses-s7.md`** (one vertical slice; decisions settled: attacker-only at
-active-phase peak, new dark `/sheet` route, one Pixi canvas + N grid cells). S8 (easing) follows.
+**➡️ Selected next (2026-07-20): S8 — a technique flows instead of snapping between three held poses.**
+The arc's final story and the largest remaining gap between "the phases are correct" and "this reads as
+a movement". Unlike every prior slice it changes how **`/watch`** looks without authoring anything new —
+it eases between the phase endpoints (stance → chamber → extension → chamber) so the limb *travels*,
+while the phase-boundary tick positions stay exactly where the engine puts them (easing must not shift
+where contact happens). Deliberately sequenced last (per the dependency notes): easing is only worth
+building once the endpoints it interpolates are the right ones, which S4–S7 established. `web/`-only,
+`BENCHMARK_VERSION` held. Branch `move-poses-s8-easing`. **Grilled + planned 2026-07-20 →
+`plans/move-poses-s8.md`** (decisions in `move-poses-decisions.md` **M14**: progress derived in-web via
+tape run-length scan, one shared smoothstep curve on a swappable seam, reuse the chamber as the retract
+waypoint — author nothing new — and the core insight that making `driven` a continuous keyframe blend
+preserves body-coherence + the fixed-bone-length invariant for free). One vertical slice; its PR closes
+the arc and archives S7 + S8.
+
+**✅ S7 outcome (shipped #376, 2026-07-20): compare the whole arsenal at a glance.** A dark `/sheet`
+contact sheet renders all 13 techniques in a labelled grid, each attacker posed at its ACTIVE phase — the
+**detector** for M3's carried expressiveness risk. Pure `contact-sheet.ts` (`contactSheetCells`, mirroring
+the `selectMove → buildDojoTape → scene` path `/watch` ships) + `figures.ts` `createContactSheet` (a grid
+of single figures on one Pixi canvas, reusing the private `createFigure`/`applyFigure`; one canvas + N
+grid cells, not 13 WebGL contexts). `tobi-geri` is posed AIRBORNE so it doesn't false-flag as `mae-geri`.
+`web/`-only, `BENCHMARK_VERSION` held at `v19`. **Sign-off confirmed the detector works**: the 8 authored
+moves read distinctly; the 5 undescribed tail moves read alike via the generic fallback — **accepted**,
+per the S4 stopping rule (line 84). Live plan `plans/move-poses-s7.md` (archive in closeout).
 
 **✅ S6 outcome (closed 2026-07-20): the non-strike moves read correctly.** All three shipped PR-per-slice
 (`plans/move-poses-s6.md`, archived at `docs/archive/move-poses-s6.md`): **(1)** `sweep` → a low front-leg

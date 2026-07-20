@@ -294,6 +294,65 @@ const isChamberPhase = (phase: number | undefined): boolean =>
 const foldFrom = (joint: Joint, tuck: Joint | null): Joint =>
   tuck === null ? joint : { x: joint.x + tuck.x, y: joint.y + tuck.y };
 
+// ─── S8: a technique EASES between its phase keyframes ────────────────────────────────────────────
+// `attackPhase` picks WHICH keyframe a committed move draws (chamber while winding, the solved
+// extension at contact); until now every tick within a phase drew the IDENTICAL held shape, so the
+// driven point teleported at each phase boundary and froze between them (a gyaku-zuki held its
+// chamber for 7 ticks, its extension for 3, its chamber for 14). S8 eases the driven point along the
+// real per-phase run of ticks in the tape: stance → chamber → extension → chamber → stance. Only the
+// DRIVEN point is blended here — the lean, hip-step, girdle and mid-joints all re-derive from it
+// downstream (M14e), so body-coherence and the fixed bone lengths (S2 · Slice 3) hold for free.
+
+// smoothstep: 0→0, 1→1, zero slope at both ends — accelerate out of a keyframe, decelerate into the
+// next (M14b). One swappable pure curve; per-segment curves (ease-in for kime) are a /dojo follow-up.
+// Clamped so an out-of-range t never overshoots a keyframe.
+const smoothstep = (t: number): number => {
+  const c = Math.max(0, Math.min(1, t));
+
+  return c * c * (3 - 2 * c);
+};
+
+// Linear blend between two joints, parameterised by an already-eased t.
+const lerpJoint = (from: Joint, to: Joint, t: number): Joint => ({
+  x: from.x + (to.x - from.x) * t,
+  y: from.y + (to.y - from.y) * t,
+});
+
+// The driven point's position `index` ticks into a `length`-tick run of its phase, eased between the
+// phase's keyframes (M14c). Startup travels stance → chamber; recovery travels chamber → stance (the
+// reverse path); the active phase travels chamber → extension → chamber, PEAKING at the solved
+// extension mid-run so contact is the reach-to-target solve, unshifted. A length-1 run — a single-tick
+// tape, or the degenerate synthetic case — returns the phase's primary keyframe exactly (chamber for
+// startup/recovery, extension for active), reproducing the pre-S8 discrete pick byte-for-byte.
+const easeDriven = (
+  phase: number,
+  index: number,
+  length: number,
+  stance: Joint,
+  chamber: Joint,
+  extension: Joint,
+): Joint => {
+  if (phase === 2) {
+    // The strike snaps to full extension as the contact window OPENS — the first active tick, a kime
+    // commit — then re-chambers across the rest of the active phase. So the extension lands exactly on
+    // the first active tick: a single-tick tape, and the contact-sheet's active-phase still (S7), both
+    // read the solved extension byte-for-byte, while the run still MOVES (extension → chamber).
+    if (length <= 1) return extension;
+
+    const e = smoothstep((length - 1 - index) / (length - 1));
+
+    return lerpJoint(chamber, extension, e);
+  }
+
+  if (length <= 1) return chamber;
+
+  const u = smoothstep(index / (length - 1));
+
+  return phase === 3
+    ? lerpJoint(chamber, stance, u)
+    : lerpJoint(stance, chamber, u);
+};
+
 // The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
 // over everything (highest precedence — an early return, so a downed fighter is never also striking
 // or throwing, and it keeps its OWN authored mid-joints rather than the derived bend); otherwise the
@@ -308,10 +367,14 @@ const foldFrom = (joint: Joint, tuck: Joint | null): Joint =>
 // with a strike/guard. Finally the mid-joints are DERIVED from the resulting endpoints, so a strike /
 // guard / throw re-bends the elbow to follow the moved hand. Gates: knockdown ← `knockdown`, strike ←
 // `strikeHand` (non-null), guard ← `guardBand` (0 = none), throw ← `grab` (non-null).
+// Where the playhead sits within the run of ticks S8 eases across (see `phaseRunAt`).
+type PhaseRun = { index: number; length: number };
+
 const poseFor = (
   frame: ReplayFrame,
   strikeHand: Joint | null,
   grab: Pick<Stance, "handL" | "handR"> | null,
+  run: PhaseRun,
 ): Skeleton => {
   if (frame.knockdown) return PRONE;
 
@@ -343,14 +406,31 @@ const poseFor = (
   // endpoint-driving move — see foldFrom).
   const tuck = tuckFor(frame.attackMove);
 
-  // WHERE that endpoint sits this phase (S2). `strikeHand` remains the gate: no strike to draw (idle,
-  // unmapped band, rejected reach) ⇒ no layer at all, so a stale move id can never make an idle
-  // fighter chamber. Given a strike, the phase picks the point — the chamber while winding up and
-  // recovering, the solved target at contact. A move with no authored chamber winds up through its
-  // STANCE instead (`chamberFor` ⇒ null ⇒ no layer), which is why every move gains a wind-up here,
-  // not just the authored ones.
+  // WHERE that endpoint sits this tick (S2 → S8). `strikeHand` remains the gate: no strike to draw
+  // (idle, unmapped band, rejected reach) ⇒ no layer at all, so a stale move id can never make an idle
+  // fighter chamber. A phase code that is not a chamber/active/recovery value (0 idle, an absent or
+  // out-of-range value) draws the extension — today's fallback (M7). Otherwise the point EASES along
+  // its phase's keyframes across the tape `run` (S8): a single-tick run reproduces the pre-S8 discrete
+  // chamber/extension pick byte-for-byte, a multi-tick run travels. A move with no authored chamber
+  // eases through its STANCE (`chamberFor` ⇒ null ⇒ the stance point stands in), so every move winds
+  // up, not just the authored ones. The eased point flows unchanged into the lean / step / girdle /
+  // deriveSkeleton chain below, which is why body-coherence and the fixed bone lengths come for free.
+  const phase = frame.attackPhase;
+  const stanceDriven = deriveSkeleton(stance)[limb];
+
   const driven =
-    strikeHand === null || !winding ? strikeHand : chamberFor(frame.attackMove);
+    strikeHand === null
+      ? null
+      : phase !== 1 && phase !== 2 && phase !== 3
+        ? strikeHand
+        : easeDriven(
+            phase,
+            run.index,
+            run.length,
+            stanceDriven,
+            chamberFor(frame.attackMove) ?? stanceDriven,
+            strikeHand,
+          );
 
   // A drawn HAND strike leans the upper body forward into the reach (M2) — gated to the ACTIVE phase
   // (M9), because leaning fully forward during the chamber is backwards: a fighter leans INTO a
@@ -527,6 +607,46 @@ const scoredWithin = (
   );
 
   return window.some((i) => points(tape[i]) > points(tape[i - 1]));
+};
+
+// Where the playhead sits within the contiguous run of ticks that share this fighter's committed
+// `attackMove` + `attackPhase` — the span S8 eases the driven point across (M14a). Pure tape
+// derivation, no engine field: a change of move, a change of phase, or an idle gap bounds the run, so
+// two back-to-back techniques (a `3 → 1` phase drop) never blend into one motion. `index` is how many
+// matching ticks precede the playhead inside the run; `length` is the whole run. A run of 1 (a
+// single-tick synthetic tape) makes `easeDriven` fall back to the discrete keyframe. Mirrors
+// `scoredWithin`'s pure-scan idiom — no cross-frame state, identical on replay and any scrub.
+const phaseRunAt = (
+  tape: ReplayTape,
+  playhead: number,
+  select: (tick: ReplayTick) => ReplayFrame,
+): PhaseRun => {
+  const here = select(tape[playhead]);
+
+  const matches = (i: number): boolean =>
+    select(tape[i]).attackMove === here.attackMove &&
+    select(tape[i]).attackPhase === here.attackPhase;
+
+  // Indices stepping away from the playhead in each direction, nearest first; the run extends as far
+  // as they keep matching (`findIndex` of the first miss is the count of matches before it).
+  const runFrom = (indices: number[]): number => {
+    const miss = indices.findIndex((i) => !matches(i));
+
+    return miss === -1 ? indices.length : miss;
+  };
+
+  const back = runFrom(
+    Array.from({ length: playhead }, (_, k) => playhead - 1 - k),
+  );
+
+  const forward = runFrom(
+    Array.from(
+      { length: tape.length - 1 - playhead },
+      (_, k) => playhead + 1 + k,
+    ),
+  );
+
+  return { index: back, length: back + forward + 1 };
 };
 
 export type Scene = { a: Figure; b: Figure; hud: Hud };
@@ -720,8 +840,13 @@ export const scene = (
 
   // Each fighter's pose needs the OTHER's frame: the reach-to-target solves aim the striking hand and
   // the throw grab at the opponent's near edge (strikeHandFor / throwGrabFor). Everything else is a
-  // pure function of the one frame; the opponent only feeds the reach-to-target layers.
-  const figure = (frame: ReplayFrame, opponent: ReplayFrame): Figure => ({
+  // pure function of the one frame plus the phase run (S8), which the opponent does not touch; the
+  // opponent only feeds the reach-to-target layers.
+  const figure = (
+    frame: ReplayFrame,
+    opponent: ReplayFrame,
+    run: PhaseRun,
+  ): Figure => ({
     x: frame.x * pxPerSubunit,
     y: groundY - frame.y * pxPerSubunit,
     facing: frame.facing,
@@ -730,6 +855,7 @@ export const scene = (
         frame,
         strikeHandFor(frame, opponent),
         throwGrabFor(frame, opponent),
+        run,
       ),
       scale,
     ),
@@ -739,8 +865,16 @@ export const scene = (
   const at = tape[p];
 
   return {
-    a: figure(at.a, at.b),
-    b: figure(at.b, at.a),
+    a: figure(
+      at.a,
+      at.b,
+      phaseRunAt(tape, p, (t) => t.a),
+    ),
+    b: figure(
+      at.b,
+      at.a,
+      phaseRunAt(tape, p, (t) => t.b),
+    ),
     hud: {
       tick: at.tick,
       scoreA: at.a.points,

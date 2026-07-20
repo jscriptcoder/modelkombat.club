@@ -276,7 +276,9 @@ describe("the default dojo scene renders two fighters through the real scene()/c
 
     const stage = createStage(VIEWPORT, ["generic", "generic"]);
 
-    stage.apply(scene(tape, 0, VIEWPORT));
+    // Tick 8 is mae-geri's LAST startup tick: S8 eases the wind-up from the stance (tick 0) to the
+    // authored chamber, reaching it here at the startup→active boundary.
+    stage.apply(scene(tape, 8, VIEWPORT));
 
     // Two distinct roots; centered pair at pxPerSubunit 0.002 → 180000·0.002=360, 420000·0.002=840.
     expect(stage.a.root.x).toBe(360);
@@ -293,18 +295,19 @@ describe("the default dojo scene renders two fighters through the real scene()/c
 
     // The default poses render through the pipeline: the challenger throws a mae-geri, so its FOOT is
     // the driven limb while its hand stays at the stance (x 18) — the whole point of the per-move
-    // descriptor. Tick 0 is the technique's STARTUP (S2), so the foot sits at the authored chamber
-    // (x 4), drawn back under the hip rather than out at the target. The idle king keeps both at
-    // stance.
+    // descriptor. By the last startup tick the eased wind-up has reached the authored chamber (x 4),
+    // drawn back under the hip rather than out at the target. The idle king keeps both at stance.
     expect(stage.a.footR.x).toBe(s(4));
     expect(stage.a.handR.x).toBe(s(18));
     expect(stage.b.handR.x).toBe(s(18));
     expect(stage.b.footR.x).toBe(s(14));
   });
 
-  it("drives the technique through the real pipeline — the foot leaves the chamber and reaches the target at contact", () => {
-    // The end-to-end proof of the slice: ONE tape, rendered at two playheads, through the shipped
-    // scene()/createStage. The dojo now shows a movement, not a frozen contact frame.
+  it("drives the technique through the real pipeline — the foot eases stance → chamber, then reaches the target at contact", () => {
+    // The end-to-end proof of the slice: ONE tape, rendered at three playheads, through the shipped
+    // scene()/createStage. Since S8 the dojo shows a MOVEMENT: the foot begins at the stance (the
+    // wind-up's start), eases BACK under the hip to the authored chamber by the last startup tick,
+    // then drives FORWARD to the target as the contact window opens.
     const tape = buildDojoTape({
       a: DEFAULT_CHALLENGER,
       b: DEFAULT_KING,
@@ -313,15 +316,20 @@ describe("the default dojo scene renders two fighters through the real scene()/c
 
     const stage = createStage(VIEWPORT, ["generic", "generic"]);
 
-    stage.apply(scene(tape, 0, VIEWPORT)); // startup — chambered
+    stage.apply(scene(tape, 0, VIEWPORT)); // first startup tick — the wind-up begins at the stance
+    const stanced = stage.a.footR.x;
+
+    stage.apply(scene(tape, 8, VIEWPORT)); // last startup tick — eased back to the chamber
     const chambered = stage.a.footR.x;
 
-    stage.apply(scene(tape, 9, VIEWPORT)); // active — mae-geri's contact tick
+    stage.apply(scene(tape, 9, VIEWPORT)); // first active tick — mae-geri's contact
     const extended = stage.a.footR.x;
 
-    expect(chambered).toBe(s(4)); // drawn back under the hip
+    expect(stanced).toBe(s(14)); // the wind-up starts at the stance foot
+    expect(chambered).toBe(s(4)); // drawn back under the hip by the end of the wind-up
     expect(extended).toBe(s(66)); // out on the king's near edge
-    expect(extended).toBeGreaterThan(chambered); // the kick travels FORWARD to its target
+    expect(chambered).toBeLessThan(stanced); // the wind-up draws the foot BACK
+    expect(extended).toBeGreaterThan(chambered); // then the kick travels FORWARD to its target
 
     // ...and the support foot never moves while it does (M8.2 support integrity).
     expect(stage.a.footL.x).toBe(s(-14));
