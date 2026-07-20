@@ -1,7 +1,7 @@
 # Plan: S8 — a technique flows instead of snapping between three held poses (easing)
 
 **Branch**: move-poses-s8-easing
-**Status**: Active
+**Status**: ✅ Complete — shipped #377 (`8f5a761`); archived 2026-07-20 in the arc closeout (the arc's final story)
 
 Split from `plans/move-poses-stories.md` (S8) via `planning` (2026-07-20), after `grill-me` settled the
 four load-bearing decisions into `plans/move-poses-decisions.md` **M14** and a reconnaissance of the
@@ -26,14 +26,14 @@ authoring anything new — the keyframes are the very shapes S1–S7 already aut
 
 ## Settled design decisions — see `move-poses-decisions.md` M14 (grilled 2026-07-20)
 
-| # | Decision | Choice | Why (full rationale in M14) |
-| - | -------- | ------ | --- |
-| a | **Progress source** | **Derived in the web layer** — `scene()` run-length-scans the tape around the playhead (contiguous same-`attackMove`, monotonic `attackPhase`) for tick-within-move | No engine/contract field; `BENCHMARK_VERSION` stays `v19`; `scene()` already scans the tape (`scoredWithin`), so this is the file's idiom. Pure ⇒ replay-safe. The parked `attackProgress` contract field stays parked. |
-| b | **Easing curve** | **One shared smoothstep** `t·t·(3−2t)`, a single swappable pure fn on every segment, eye-tuned in `/dojo` | The AC is curve-agnostic ("moved between ticks" + "boundary is authored"), so this is an eye question (decision 9). Symmetric; one-line pure fn; a swappable seam so per-segment _kime_ curves can follow. |
-| c | **Keyframe anchoring** | **Five keyframes** `stance → chamber → extension → chamber → stance`; the solved extension lands on the **first active tick** (a _kime_ commit as the contact window opens), easing back to the chamber across the rest of active | Every interior tick moves — including within the active phase (extension→chamber) — which satisfies "endpoint moved between consecutive ticks within one phase"; boundary ticks stay authored; the extension is the reach-to-target solve, so contact is not shifted. **Revised during TDD from an earlier mid-run PEAK sketch** — the S7 contact sheet + S2 dojo default render each move at its first active tick and require the extension there (see M14c). |
-| d | **Recovery path** | **Reuse the chamber as the retract waypoint** — ease extension → chamber → stance; author NOTHING new | S8's premise. Re-chambering before setting down is correct karate form (esp. kicks); symmetric with the wind-up. A distinct recovery pose (13× authoring) and a direct extension→stance drop both rejected. |
-| e | **WHERE the blend lives** | **Make `driven` a continuous keyframe blend, not a discrete phase pick** — everything downstream unchanged | The load-bearing insight: `poseFor` already flows lean, hip-step, girdle rotation, `deriveSkeleton` mid-joints, and the mid-joint write-back from the single `driven` point. So blending `driven` gives body-coherence AND the fixed-bone-length invariant (S2 · Slice 3) **for free** — `deriveSkeleton` re-solves each mid-joint at fixed length from the blended endpoints. Lerping the resolved skeleton joint-by-joint is **rejected** (a mid-joint would drift off its bone length mid-travel, reopening that scar). |
-| f | **Totality** | **TOTAL** — a chamber-less move eases through its STANCE; an idle / unknown frame is byte-identical to today | M7. A single-keyframe span has nothing to blend ⇒ renders exactly as today; an unauthored move (stance≡chamber) still eases stance→extension→stance, so it still MOVES. |
+| #   | Decision                  | Choice                                                                                                                                                                                                                            | Why (full rationale in M14)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| a   | **Progress source**       | **Derived in the web layer** — `scene()` run-length-scans the tape around the playhead (contiguous same-`attackMove`, monotonic `attackPhase`) for tick-within-move                                                               | No engine/contract field; `BENCHMARK_VERSION` stays `v19`; `scene()` already scans the tape (`scoredWithin`), so this is the file's idiom. Pure ⇒ replay-safe. The parked `attackProgress` contract field stays parked.                                                                                                                                                                                                                                                                                                    |
+| b   | **Easing curve**          | **One shared smoothstep** `t·t·(3−2t)`, a single swappable pure fn on every segment, eye-tuned in `/dojo`                                                                                                                         | The AC is curve-agnostic ("moved between ticks" + "boundary is authored"), so this is an eye question (decision 9). Symmetric; one-line pure fn; a swappable seam so per-segment _kime_ curves can follow.                                                                                                                                                                                                                                                                                                                 |
+| c   | **Keyframe anchoring**    | **Five keyframes** `stance → chamber → extension → chamber → stance`; the solved extension lands on the **first active tick** (a _kime_ commit as the contact window opens), easing back to the chamber across the rest of active | Every interior tick moves — including within the active phase (extension→chamber) — which satisfies "endpoint moved between consecutive ticks within one phase"; boundary ticks stay authored; the extension is the reach-to-target solve, so contact is not shifted. **Revised during TDD from an earlier mid-run PEAK sketch** — the S7 contact sheet + S2 dojo default render each move at its first active tick and require the extension there (see M14c).                                                            |
+| d   | **Recovery path**         | **Reuse the chamber as the retract waypoint** — ease extension → chamber → stance; author NOTHING new                                                                                                                             | S8's premise. Re-chambering before setting down is correct karate form (esp. kicks); symmetric with the wind-up. A distinct recovery pose (13× authoring) and a direct extension→stance drop both rejected.                                                                                                                                                                                                                                                                                                                |
+| e   | **WHERE the blend lives** | **Make `driven` a continuous keyframe blend, not a discrete phase pick** — everything downstream unchanged                                                                                                                        | The load-bearing insight: `poseFor` already flows lean, hip-step, girdle rotation, `deriveSkeleton` mid-joints, and the mid-joint write-back from the single `driven` point. So blending `driven` gives body-coherence AND the fixed-bone-length invariant (S2 · Slice 3) **for free** — `deriveSkeleton` re-solves each mid-joint at fixed length from the blended endpoints. Lerping the resolved skeleton joint-by-joint is **rejected** (a mid-joint would drift off its bone length mid-travel, reopening that scar). |
+| f   | **Totality**              | **TOTAL** — a chamber-less move eases through its STANCE; an idle / unknown frame is byte-identical to today                                                                                                                      | M7. A single-keyframe span has nothing to blend ⇒ renders exactly as today; an unauthored move (stance≡chamber) still eases stance→extension→stance, so it still MOVES.                                                                                                                                                                                                                                                                                                                                                    |
 
 ## Non-negotiable constraints
 
@@ -106,6 +106,7 @@ defer.
 **Acceptance criteria**: the story ACs above. **Present to the human and get confirmation before writing
 any code.**
 **RED (failing behavior tests, in increment order):**
+
 1. **Progress deriver (the seam / risk):** a pure helper computes tick-within-move + the phase-segment
    run lengths from a synthetic tape at a playhead by scanning contiguous same-`attackMove` frames; assert
    the segment + local position for a full gyaku-zuki span, AND that an **attack-instance boundary** — a
@@ -121,25 +122,25 @@ any code.**
 5. **Solve retained (M8.5):** two opponent gaps yield two different contact-tick x — contact is still the
    live `reachTargetX`, not a frozen authored point.
 6. **Coherence + bone length:** at an interior startup tick, the driven limb's mid-joint (elbow / knee)
-   is at fixed bone length from its endpoints (re-derived), and the shoulder / head lean x sits *between*
+   is at fixed bone length from its endpoints (re-derived), and the shoulder / head lean x sits _between_
    the stance and extension lean (moves WITH the endpoint) — the S2 · Slice 3 anti-scar guard.
 7. **Totality:** an unauthored move (no chamber) eases through its stance (still moves); an idle frame
    (`attackPhase 0`), an unknown id, and a single-keyframe span each render byte-identical to today.
-**GREEN**: add a pure progress deriver (run-length scan) in `scene.ts` or a small sibling module; add a
-shared `smoothstep` pure fn (swappable seam); replace the discrete `driven` pick in `poseFor` with the
-keyframe blend, keeping the discrete behavior as the fallback when progress is absent (backward-compat /
-single keyframe); wire `scene()` to derive progress per figure and pass it into `poseFor`. Minimum needed
-to pass — no per-segment curves, no recovery override.
-**MUTATE**: `N/A` (Stryker excludes `web/`) → **manual mutator scan** over the new logic against
-`resources/mutator-rules.md` (smoothstep coefficients, segment-boundary off-by-one, keyframe order flip,
-lerp-direction flip, the run-length instance-boundary condition, the progress-absent fallback), recorded
-in the PR; relational tests are the alternate evidence.
-**KILL MUTANTS**: strengthen tests for any scan-surfaced gap; ask the human when a survivor's value is
-ambiguous.
-**REFACTOR**: assess the pure-module extraction (deriver + smoothstep) for testability, `isChamberPhase`
-demotion to a selector, and the `driven` rename; only if it adds value; keep `/dojo` + `/watch` green.
-**Done when**: all ACs met; suite + typecheck + lint + format clean; manual mutator scan recorded;
-`BENCHMARK_VERSION` unchanged at `v19`; the human approves the commit.
+   **GREEN**: add a pure progress deriver (run-length scan) in `scene.ts` or a small sibling module; add a
+   shared `smoothstep` pure fn (swappable seam); replace the discrete `driven` pick in `poseFor` with the
+   keyframe blend, keeping the discrete behavior as the fallback when progress is absent (backward-compat /
+   single keyframe); wire `scene()` to derive progress per figure and pass it into `poseFor`. Minimum needed
+   to pass — no per-segment curves, no recovery override.
+   **MUTATE**: `N/A` (Stryker excludes `web/`) → **manual mutator scan** over the new logic against
+   `resources/mutator-rules.md` (smoothstep coefficients, segment-boundary off-by-one, keyframe order flip,
+   lerp-direction flip, the run-length instance-boundary condition, the progress-absent fallback), recorded
+   in the PR; relational tests are the alternate evidence.
+   **KILL MUTANTS**: strengthen tests for any scan-surfaced gap; ask the human when a survivor's value is
+   ambiguous.
+   **REFACTOR**: assess the pure-module extraction (deriver + smoothstep) for testability, `isChamberPhase`
+   demotion to a selector, and the `driven` rename; only if it adds value; keep `/dojo` + `/watch` green.
+   **Done when**: all ACs met; suite + typecheck + lint + format clean; manual mutator scan recorded;
+   `BENCHMARK_VERSION` unchanged at `v19`; the human approves the commit.
 
 **Fallback split (only if the seam fights back):** if the run-length scan + blend proves larger than the
 reconnaissance suggests, split into **1a** (progress deriver + smoothstep, RED #1, green with the blend
@@ -174,5 +175,6 @@ S8's PR closes the move-showcase arc. Its closeout (a follow-up `docs(archive)` 
 `docs/STATUS.md`. Per [[archive-plans-not-delete]] these plans are archived, not deleted.
 
 ---
-*Delete this file (archive under `docs/archive/` per project convention — [[archive-plans-not-delete]])
-when the plan is complete. If `plans/` is empty, delete the directory.*
+
+_Archived 2026-07-20 (arc closeout). Shipped as PR #377 — the move-showcase arc's final story; every
+technique now flows on `/watch` and `/dojo`._

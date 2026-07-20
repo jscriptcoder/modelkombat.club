@@ -1093,22 +1093,21 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
    stats**. Both presentation-only (no `INPUT_HASH` / `BENCHMARK_VERSION` / TCB change). All Arsenal +
    Gauntlet artifacts archived under `docs/archive/` (see the build-log entries above + the archive
    [`README.md`](archive/README.md)).
-9. **Move showcase + per-move poses — 🚧 IN PROGRESS (7 of 8 child stories shipped; PRs #350, #352,
-   #353, #355–#361, #363–#367, #369, #370, #372–#374).** The current replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
+9. **Move showcase + per-move poses — ✅ COMPLETE (all 9 stories S0–S8 shipped; PRs #350, #352,
+   #353, #355–#361, #363–#367, #369, #370, #372–#374, #376, #377).** A replay-viewer arc: **each of the 13 arsenal moves gets its own look**. Before it,
    `poseFor` knew only `attacking` / `attackBand` / `throwing`, so all **12 strikes rendered as one
    picture** (a `mawashi-geri` drew as a punch), and `attacking` stays true for a move's whole committed
    duration — a `gyaku-zuki` holds **24 ticks (~0.4 s) frozen at full extension**. Design resolved via
    `grill-me` → `find-gaps` → `story-splitting` (PR #350): 10 decisions + mechanics M1–M11, 8 child
    stories ordered S0 → S1 → S2 phases → S3 picker → S4+ the rest, the tail sequenced by
-   `npm run telemetry` move-usage rather than anatomy. Design source:
-   `plans/move-poses-{decisions,stories}.md` (still live — S6–S8 run off it); the completed plans are
-   archived at [`docs/archive/move-poses-s0-s1.md`](archive/move-poses-s0-s1.md),
-   [`docs/archive/move-poses-s2.md`](archive/move-poses-s2.md),
-   [`docs/archive/move-poses-s3.md`](archive/move-poses-s3.md),
-   [`docs/archive/move-poses-s4.md`](archive/move-poses-s4.md),
-   [`docs/archive/move-poses-s5.md`](archive/move-poses-s5.md) and
-   [`docs/archive/move-poses-s6.md`](archive/move-poses-s6.md). Defense / _uke_ poses are explicitly a
-   **later** arc.
+   `npm run telemetry` move-usage rather than anatomy. **The whole design trail is now archived** (arc
+   complete): the decisions record + story split at
+   [`docs/archive/move-poses-decisions.md`](archive/move-poses-decisions.md) and
+   [`docs/archive/move-poses-stories.md`](archive/move-poses-stories.md), and the per-slice plans at
+   [`move-poses-s0-s1.md`](archive/move-poses-s0-s1.md), [`-s2`](archive/move-poses-s2.md),
+   [`-s3`](archive/move-poses-s3.md), [`-s4`](archive/move-poses-s4.md), [`-s5`](archive/move-poses-s5.md),
+   [`-s6`](archive/move-poses-s6.md), [`-s7`](archive/move-poses-s7.md) and
+   [`-s8`](archive/move-poses-s8.md). Defense / _uke_ poses are explicitly a **later** arc.
 
    - **S0 ✅ (PR #352)** — the arc's **only `src/` touch**: additive render-only **`attackMove` +
      `attackPhase`** on `RenderFrame`, with the move id threaded onto the committed `attacking` /
@@ -1190,8 +1189,24 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
      stays byte-identical (the engine emits `attackMove:"throw"` on every throw frame); the redundant `/dojo`
      `throwing` control was removed. **This completes the 13-move roster** — every move now dispatches through
      the single `attackMove` lookup. `BENCHMARK_VERSION` held at `v19`, `src/` untouched every slice (M11).
-   - **Next: S7 / S8** — the remaining child stories (the contact sheet + phase interpolation, both unblocked;
-     see the dependency graph in `plans/move-poses-stories.md`).
+   - **S7 ✅ (PR #376)** — `web/`-only, a single slice: a dark **`/sheet`** route renders all 13 techniques in
+     a labelled grid, each attacker at its ACTIVE phase — the **detector** for M3's expressiveness risk. One
+     Pixi canvas + N grid cells (not 13 WebGL contexts, which browsers cap at ~16); the pure `contact-sheet.ts`
+     drives the same `scene()` path `/watch` ships. Sign-off confirmed the 8 authored moves read distinctly
+     while the 5 undescribed tail moves read alike via the generic fallback — the accepted trade-off the S4
+     stopping rule parked.
+   - **S8 ✅ (PR #377)** — `web/`-only, the arc's **finale**: a committed technique now **eases** stance →
+     chamber → extension → chamber → stance across the tape's per-phase run instead of teleporting between
+     three held poses, on `/watch` and `/dojo` alike, **authoring nothing new**. Progress is derived in-web by
+     run-length-scanning the tape (no engine field, `v19` held); the driven point becomes a smoothstep keyframe
+     blend fed into the existing `poseFor` chain, so **body-coherence and the fixed bone lengths (S2 · Slice 3)
+     hold for free** — `deriveSkeleton` re-solves each mid-joint from the eased endpoints (M14). The solved
+     extension lands on the **first active tick** (a _kime_ commit — revised during TDD from a mid-active-peak
+     that broke the S7 sheet + dojo default). `src/` untouched (M11).
+   - **Arc complete.** All of S0–S8 shipped on a single additive engine field (S0) and otherwise entirely in
+     `web/`, `BENCHMARK_VERSION` held at `v19` throughout. The design trail is archived (links above); the
+     closeout narrative is in [`docs/archive/README.md`](archive/README.md). The next replay-viewer work would
+     be **defense / _uke_ poses** — a separate later arc (decision 7).
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
