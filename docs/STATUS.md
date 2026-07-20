@@ -767,7 +767,7 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   `"house"`), and `model` is now STRIPPED from `INPUT_HASH` — inert provenance never trips
   the scoring guard, so it forces no `BENCHMARK_VERSION` bump and never resets the ladder.)**
   **S1 (`GET /spec`) is
-  COMPLETE.** Design source of truth: `plans/platform-http-api-{decisions,stories}.md`; the finished
+  COMPLETE.** Design source of truth: `docs/archive/platform-http-api-{decisions,stories}.md`; the finished
   S1 plan is archived at `docs/archive/platform-http-api-s1-spec.md`. Remaining platform work: **S2
   `POST /validate`**, **S3 `POST /fight`** (gauntlet gate → title fight vs the version-scoped KotH
   throne), the **KotH ladder** (stateful), and the **Pixi viewer**.
@@ -792,7 +792,7 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   `api/validate.ts` (44/44) + the `api/spec.ts` envelope diff; typecheck (base + `tsconfig.api.json`) / lint
   / format clean. Every change keeps `INPUT_HASH` / `BENCHMARK_VERSION` unchanged (the endpoint is not a
   scoring input; the `docs/spec.md` drift test stays green). Design source of truth:
-  `plans/platform-http-api-{decisions,stories}.md`; the finished S2 plan is archived at
+  `docs/archive/platform-http-api-{decisions,stories}.md`; the finished S2 plan is archived at
   `docs/archive/platform-http-api-s2-validate.md`. **S2 (`POST /validate`) is COMPLETE.** Remaining platform
   work: **S3 `POST /fight`** (gauntlet gate → title fight vs the version-scoped KotH throne), the **KotH
   ladder** (stateful), and the **Pixi viewer**.
@@ -827,7 +827,7 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   version-neutral** result fields (result shape, not a scoring input) ⇒ `INPUT_HASH` / `BENCHMARK_VERSION`
   unchanged and the `benchmark-config.ts` guard + `docs/spec.md` drift test stay green throughout. 1259
   tests; mutation 100% on changed regions each slice (`fight-report.ts`, the `benchmark.ts` tallies,
-  `api/spec.ts` 49/49). Design source of truth: `plans/platform-http-api-{decisions,stories}.md`; the
+  `api/spec.ts` 49/49). Design source of truth: `docs/archive/platform-http-api-{decisions,stories}.md`; the
   finished S3 plan is archived at `docs/archive/platform-http-api-s3-fight.md`. **S3 (`POST /fight`) is
   COMPLETE.** Remaining platform work: the **KotH throne + ladder** (stateful) and the **Pixi viewer**.
 - DONE (**platform HTTP API — S4 (the version-scoped KotH throne), PRs #184–#188**): the **first stateful
@@ -858,7 +858,7 @@ overtime N   jogai fouls: bot=N opp=N`; ranking keys untouched (decision 7), no 
   store iff both `UPSTASH_*` vars are set, else the in-memory fake. A shared `runThroneStoreContract` spec pins
   the port for both stores (fake in the ordinary suite; live Upstash in an env-gated smoke on throwaway UUID keys plus cleanup — live Redis is not exercised in CI). 1311 tests; mutation 100% on the changed regions each slice
   (`handle-fight.ts`, `throne-store.ts`, `throne-store-upstash.ts`, `throne-store-select.ts`). Design source:
-  `plans/platform-http-api-{decisions,stories}.md`; the finished S4 plan is archived at
+  `docs/archive/platform-http-api-{decisions,stories}.md`; the finished S4 plan is archived at
   `docs/archive/platform-http-api-s4-throne.md`. **S4 is COMPLETE — durable persistence is LIVE** (2026-07-07):
   Upstash was provisioned via the Vercel Marketplace + connected to the project, the env-gated smoke passed
   against live Redis, and **PR #190** widened `selectThroneStore` to resolve the REST URL/token across the
@@ -1069,7 +1069,7 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    crown → fresh-seeded title fight → dethrone on `> 0.5` (else king-retained), atomic-CAS'd (`409`
    throne-moved), incumbent identity + `X-Author-Handle`, **durably persisted on Upstash Redis** (raw `fetch`,
    no SDK; in-memory fake fallback when `UPSTASH_*` unset). TCB / `INPUT_HASH` / `BENCHMARK_VERSION` ("v19")
-   untouched throughout. See the build-log entries above. Design source: `plans/platform-http-api-{decisions,
+   untouched throughout. See the build-log entries above. Design source: `docs/archive/platform-http-api-{decisions,
 stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-api-s{1,2,3}-*.md` +
    `platform-http-api-s4-throne.md`. **S4 durable persistence is LIVE** (Upstash provisioned on the Vercel
    Marketplace; `selectThroneStore` resolves the injected prefixed env-var names — PR #190). **The platform

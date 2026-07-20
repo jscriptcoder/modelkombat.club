@@ -119,14 +119,20 @@ ippon, all 6 ∈ `[25%, 75%]`). See the build-log entry in `docs/STATUS.md`; fin
 
 ## Platform HTTP API — the LLM bot-authoring loop (first platform-layer feature)
 
-The online loop's front door. The **overall** design source of truth (spanning S1–S4) stays
-live in `plans/platform-http-api-{decisions,stories}.md`; the completed **S1–S4 plans** are
-archived here.
+The online loop's front door. The completed **S1–S4 plans** and the **overall** design source of
+truth (spanning S1–S4) are archived here — the whole feature shipped (`/spec` · `/validate` ·
+`/fight` + the version-scoped KotH throne, all **LIVE**), and its successor the KotH ladder is also
+complete (S1–S5, above).
 
 - **S1 — `GET /spec`** (the deployment walking skeleton + self-describing layered spec + the inert `model?` `BotDoc` field; 4 slices, PRs #171–#174 → live at `https://modelkombat.club/spec`): [platform-http-api-s1-spec.md](platform-http-api-s1-spec.md)
 - **S2 — `POST /validate`** (the validator gate — `200 {ok:true}` or RFC 9457 `problem+json` issues; 2 slices, PRs #176–#177; parse-first, `413` oversize, no content-type gate): [platform-http-api-s2-validate.md](platform-http-api-s2-validate.md)
 - **S3 — `POST /fight`** (the stateless gauntlet gate — `cleared` verdict vs the frozen `v19` gauntlet + a compact leak-free per-member report with `endReasons` + `diagnostics.degrade`; 4 slices, PRs #178–#181; shared `src/http/` RFC 9457 envelope, advertised + rate-limited at 20 req/min via Vercel WAF): [platform-http-api-s3-fight.md](platform-http-api-s3-fight.md)
-- **S4 — the version-scoped KotH throne** (the **first stateful** platform piece — a gauntlet-clearer earns a title shot; bootstrap crown → fresh-seeded title fight → dethrone on `> 0.5` else king-retained, atomic-CAS `409 /problems/throne-moved`, incumbent identity + `X-Author-Handle`, durably persisted on Upstash Redis behind a `ThroneStore` port with an in-memory fake; 5 slices, PRs #184–#188; code-complete, live-durability pending the Upstash Marketplace provisioning): [platform-http-api-s4-throne.md](platform-http-api-s4-throne.md)
+- **S4 — the version-scoped KotH throne** (the **first stateful** platform piece — a gauntlet-clearer earns a title shot; bootstrap crown → fresh-seeded title fight → dethrone on `> 0.5` else king-retained, atomic-CAS `409 /problems/throne-moved`, incumbent identity + `X-Author-Handle`, durably persisted on Upstash Redis behind a `ThroneStore` port with an in-memory fake; 5 slices, PRs #184–#188 + #190; durable persistence LIVE): [platform-http-api-s4-throne.md](platform-http-api-s4-throne.md)
+
+**Feature complete (S1–S4).** The Platform HTTP API design trail — `platform-http-api-decisions.md`
+(the resolved decisions 1–10 + eng-reqs + API response contract) + `platform-http-api-stories.md`
+(the story split + gaps-closed log) — was kept live in `plans/` across S1–S4 and is now archived here
+alongside the slice plans. Follow-on platform work (the KotH ladder — see the KotH ladder S1–S5 sections above — plus `/replay` + the Pixi viewer) has its own design trail.
 
 ## `/fight` King-challenge telemetry parity ✅ COMPLETE
 
