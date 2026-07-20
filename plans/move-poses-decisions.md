@@ -267,6 +267,52 @@ Decisions that tighten the table above into something implementable without re-a
   - `SHOULDER_HALF_WIDTH` starts at **7** (Hero's 0.18) and is eye-tuned under decision 9.
     Smaller gives more `hikite` room, larger gives more arm-span separation.
 
+- **M13 — the close-range mid-joint strikes: the elbow / knee LEADS** _(grilled 2026-07-20, for
+  S5)_. `empi` (elbow) and `hiza-geri` (knee) are the only two moves whose driven point is a joint
+  the bend rule currently _computes_ rather than one the descriptor _authors_ — and they invert the
+  whole pose model built so far. Every strike to date drives an ENDPOINT and lets `deriveBend`
+  compute the mid-joint; these drive the MID-JOINT and the endpoint trails, folded back. They also
+  land the arc's structural close-range overlap (S3 · Slice 3's finding): at `empi`'s 95k reach
+  against a 240k body the two figures sit **0.40 body-heights apart** and interpenetrate.
+
+  Resolved, in dependency order:
+
+  | #   | Question                          | Choice                                                                                                                                                    | Why                                                                                                                                                                                                                                                                                                                                     |
+  | --- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | a   | The drawn picture                 | **Mid-joint leads, trailing endpoint folds back**: `empi` = shoulder → **elbow (driven)** → fist tucked; `hiza-geri` = hip → **knee (driven)** → foot tucked | The elbow / knee IS the striking surface, so it is the leading point; the forearm / shin points backward. This is the inverse of every strike authored so far, which is exactly what makes them read as their own techniques.                                                                                                             |
+  | b   | Representation                    | **Uniform** — mid-joints become first-class `StrikeLimb`s (`elbowR/L`, `kneeR/L`); one `Map`/`limbFor` lookup; the SAME `reachTargetX` solve at the band; `deriveSkeleton` skips only the driven mid-joint | Keeps decision 3's "one table, one solver, one test discipline" intact rather than forking a second render path for the inversion. The reach math genuinely applies: at `empi`'s 95k the elbow lands ~24 local px forward, stretching the upper arm ~1.6× — the same bounded rubber-band a punch arm already lives with.                    |
+  | c   | Trailing endpoint (the fold)      | **Authored relative tuck** — descriptor authors `tuck: Joint` as an offset from the driven joint; `fist/foot = drivenJoint + tuck`                          | Rides rigidly with the driven joint as it drives chamber → extension, so no rubber-band (the scar an ABSOLUTE tuck would reopen — M12b / S2 · Slice 3). Fits the `chamber`/`offHand` authoring idiom. The trailing bone's LENGTH is deliberately not enforced: it folds rather than reaches, so a foreshortened forearm / shin is the correct read. |
+  | d   | Which arm does `empi` drive?      | **`elbowR` (front arm)** — forced by geometry, not aesthetics                                                                                              | At 95k the elbow sits ~24px forward; the front shoulder (+7) spans that in ~1.1× `ARM_BONE`, the rear (−7) in ~2.0× — and with an AUTHORED elbow there is no bend to absorb it, so a rear elbow draws a freak-length upper arm. Front lands cleanly. (Rear would carry the `gyaku-zuki` rotational-power connotation but cannot be drawn here.) |
+  | e   | Which leg does `hiza-geri` drive? | **`kneeR` (front knee)** — a freer choice than `empi`                                                                                                      | Both knees root at the single `hip` (no hip girdle, M12i), so geometry is neutral; only which foot tucks vs plants changes. Front knee up over a planted REAR base reads as a stable clinch knee, and it spreads the three leg techniques across BOTH legs (`mae` front foot, `mawashi` rear foot, `hiza` front knee) — max distinctness for S7. |
+  | f   | Forward-root motion (lean / step) | **Suppressed** — hold the root; `lean` and `step` gate to 0 for a driven mid-joint                                                                         | These are the shortest reaches in the game; the single reaching bone already spans the target at a bounded ~1.4–1.6× stretch (within tolerance), so the lean / step would only shave it — while shoving the torso / hip FORWARD, straight into the overlap S5 exists to confront. Consequence: the girdle stays SQUARE (rotation is `lean`-driven ⇒ 0). |
+  | g   | The close-range overlap           | **Accept it** with rationale + tripwire (no spacing change)                                                                                                | Truthful fighter positions beat faked spacing (the arc's "root x is truthful; compromises are cosmetic" rule since S2 · Slice 3), and clinch range genuinely overlaps — two infighters throwing elbows ARE that close; the driven mid-joint leads INTO the opponent, which is contact. Draw-order is verified at sign-off; **tripwire:** if `/dojo` reads the clinch as a z-fighting BUG rather than infighting, escalate to a bespoke close-range treatment — parked, not pre-built. |
+  | h   | Slicing                           | **Two** — S5 · 1 `empi` (the mechanism carrier), S5 · 2 `hiza-geri` (the leg branch + reuse)                                                               | Mirrors the arc's rhythm: a walking-skeleton slice proves the risky architecture on one move (S1 `mae-geri`, S4 `gyaku-zuki`), then a reuse slice adds the second and exercises the other branch (S4 `mawashi-geri`). `empi` builds the mid-joint framework end to end; `hiza-geri` adds the LEG-mid-joint routing (driven `kneeR`, `footR` folds, rooted at `hip`, no step) and authors the knee. Isolates the mechanism risk in one revertable PR. |
+  | i   | Test floor                        | **The M8 six, translated to the mid-joint, + a new anti-clobber guard**                                                                                   | Same discipline (relations only, no pinned numbers, decision 9): (1) the driven mid-joint at the solved target, its trailing endpoint at the tuck, nothing on the other three limbs moving; (2) support-foot integrity; (3) phase distinctness on the mid-joint; (4) direction; (5) solve retained across two gaps; (6) jointedness (trailing endpoint NOT collinear with root→mid-joint, non-driven mid-joints still derive); **(7) `deriveSkeleton` does not overwrite the driven joint** — the story's own AC, the one assertion the slice turns on. |
+  | j   | Chambers / recovery               | **Both author a chamber**; **recovery reuses the chamber** (M3 default), eye-tuned                                                                         | `empi` chambers the elbow COCKED BACK toward the flank; `hiza-geri` chambers the knee LOW and slightly back (leg not yet raised), then drives up. A chamber makes the wind-up read as a movement (S2). Recovery snapping back to the loaded chamber reads as a retract; promoted to a bespoke recovery point only if the `/dojo` eye demands it. All `Joint` values tuned by eye, relations pinned. |
+
+  **Consequences to expect, not discover:**
+
+  - **`isKick` generalises to an arm-vs-leg classification.** Today `limb === "footR" || "footL"`;
+    it must now also route `elbow*` as arm-like (would-be lean, now suppressed) and `knee*` as
+    leg-like (would-be step, now suppressed), and it decides which trailing endpoint folds. The
+    endpoint-routing ternary (`footR`/`footL`/`handL`/`handR`) extends with the four mid-joints the
+    same way S4 · Slice 6 extended it for `footL`.
+  - **`strikeHandFor` / `driven` are now misnomers** — the solved point lands on an elbow / knee as
+    readily as a hand. The concept generalises to "the driven point"; renaming is a judgement call
+    for the refactor step, not a behaviour change.
+  - **`reachTargetX` is untouched** and reads the tape's own `attackReach` (`empi` 95k / `hiza-geri`
+    110k). `STRIKE_FLOOR_X` (24) dominates at these tiny reaches, so the mid-joint lands ~24px
+    forward regardless of the exact gap — but assertion (5) still pins that two DIFFERENT gaps yield
+    two different active positions (the floor only bites when the opponent is nearer than ~24px).
+  - **Blast radius is `move-descriptors.ts` + `scene.ts` + `scene.test.tsx` only.** No `src/` touch
+    (render-only; `empi`/`hiza-geri` have carried engine reach / timing / bands / score since
+    Batch-1), no `BENCHMARK_VERSION` bump, **no `reach-presets.ts` change** (both moves already
+    mirrored), no `Arsenal.tsx` change. The descriptor coverage test asserts `DESCRIBED_MOVES ⊆
+    REACH_PRESETS` (a subset), so adding two keys is clean.
+  - **The overlap decision spans BOTH surfaces.** `/dojo` stands the pair at true reach and `/watch`
+    renders true tape positions, so a real `empi` overlaps on a live replay too — accepting it is a
+    `/watch` decision, not just a lab one.
+
 ## Slice ladder
 
 1. **Engine** — `attackMove` + `attackPhase` on `RenderFrame`. Additive, render-only, outcome
@@ -276,7 +322,8 @@ Decisions that tighten the table above into something implementable without re-a
    mechanism + **`mae-geri`** fully phased. Proves a foot drives through the same solver.
 3. **Kicks** — `mawashi-geri`, `yoko-geri`, `ushiro-geri`. Where arc expressiveness gets forced.
 4. **Punches** — `kizami-zuki`, `gyaku-zuki` (**rear** hand), `uraken`, `shuto`.
-5. **Close** — `empi`, `hiza-geri`. Mid-joint (elbow/knee) as a driven endpoint.
+5. **Close** — `empi`, `hiza-geri`. Mid-joint (elbow/knee) as a driven endpoint. **Grilled → M13**
+   (2026-07-20): the mid-joint LEADS and the fist / foot folds back; two slices, `empi` first.
 6. **Special** — `throw`, `sweep`, `tobi-geri`.
 7. _(deferred)_ Contact sheet — all 13 side by side.
 
