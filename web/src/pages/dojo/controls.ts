@@ -11,7 +11,6 @@ export type FigureControls = {
   attacking: boolean;
   attackBand: number;
   guardBand: number;
-  throwing: boolean;
   knockdown: boolean;
   // The committed action's reach in world sub-units (Story 5): how far the strike reaches toward the
   // opponent. 0 for an idle fighter. The default challenger carries a gyaku-zuki reach so the opening
@@ -27,8 +26,13 @@ export type FigureControls = {
 // field through untouched (no clamping — free combos), and fills the fields the render pipeline needs
 // but the lab doesn't tune: `x` is owned by the builder's ring-centering, `y` 0 plants the fighter on
 // the ground line, `points`/`stamina` are render-neutral defaults (they don't affect the pose).
+//
+// `throwing` is no longer a control (S6 · Slice 3): a throw is previewed by selecting `throw` in the
+// move picker, which the renderer dispatches off `attackMove` — the `frame.throwing` boolean is not
+// read. It stays on the `ReplayFrame` wire (a /watch tape carries it), so it is filled `false` here.
 export const controlsToFrame = (controls: FigureControls): ReplayFrame => ({
   ...controls,
+  throwing: false,
   x: 0,
   y: 0,
   points: 0,
@@ -70,7 +74,6 @@ export const DEFAULT_CHALLENGER_CONTROLS: FigureControls = {
   attacking: true,
   attackBand: 2,
   guardBand: 0,
-  throwing: false,
   knockdown: false,
   attackReach: 270_000, // mae-geri reach
   attackMove: "mae-geri", // the first technique with a pose of its own (S1) — opens the lab on it
@@ -82,7 +85,6 @@ export const DEFAULT_KING_CONTROLS: FigureControls = {
   attacking: false,
   attackBand: 0,
   guardBand: 0,
-  throwing: false,
   knockdown: false,
   attackReach: 0, // idle — no committed reach
   attackMove: "", // idle — nothing committed

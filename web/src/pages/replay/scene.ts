@@ -1,6 +1,7 @@
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
 import {
   chamberFor,
+  isGrab,
   limbFor,
   offHandFor,
   targetYFor,
@@ -614,6 +615,13 @@ const strikeHandFor = (
 ): Joint | null => {
   if (!striker.attacking) return null;
 
+  // A GRAB (throw) is not a strike — it draws BOTH hands into a grip (throwGrabFor), so it suppresses
+  // the single-hand strike layer here (S6 · Slice 3). Without this, a /dojo throw — which the picker
+  // stamps `attacking:true` alongside `attackMove:"throw"` — would compute a phantom strike hand (and
+  // its M2 lean) beneath the grab that overrides it, leaning the torso where a shipped /watch throw
+  // (never `attacking`) does not. Suppressing it makes /dojo render the throw exactly as /watch does.
+  if (isGrab(striker.attackMove)) return null;
+
   // The target height: a move with a fixed-height descriptor (a sweep reaps at a floor y, S6) takes
   // that; every banded strike takes `bandHeight(attackBand)` as before. `null` (an unmapped band on a
   // banded move) still means no strike to draw — but a fixed-height move never hits it, so a sweep
@@ -632,13 +640,19 @@ const strikeHandFor = (
 // Where a throw's TWO grab hands land (M8): both reach the reach-to-target x at chest height, so the
 // grab lands on the opponent instead of grabbing air — the same solve as a strike, applied to both
 // hands. The front hand (handR) leads onto the near edge; the rear hand (handL) closes a GRAB_SPREAD
-// behind it, so two arms read as a two-handed grab. `null` when there is no throw to draw (not
-// throwing, or a defensively-rejected reach ⇒ the stance hands stay, the M7 idle fallback).
+// behind it, so two arms read as a two-handed grab. `null` when there is no grab to draw.
+//
+// The gate is the DESCRIPTOR (`isGrab(attackMove)`), not the `frame.throwing` boolean it used to read
+// (S6 · Slice 3) — the throw was the last move drawn off a special-case flag rather than the descriptor
+// table. The engine emits `attackMove:"throw"` on every throw frame (the same `state.kind` that sets
+// `throwing`), so a real /watch throw renders byte-identically; the /dojo picker, which stamps the move
+// id but never the flag, now draws the grab instead of a generic hand. Still gated on a valid reach, so
+// a stale id with no committed reach draws nothing (the M7 idle fallback).
 const throwGrabFor = (
   thrower: ReplayFrame,
   opponent: ReplayFrame,
 ): Pick<Stance, "handL" | "handR"> | null => {
-  if (!thrower.throwing) return null;
+  if (!isGrab(thrower.attackMove)) return null;
 
   const x = reachTargetX(thrower, opponent);
 

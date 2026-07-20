@@ -669,7 +669,13 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
         tickOf(
           0,
           {
+            // A REAL /watch throw carries BOTH flags — the engine emits `throwing` and
+            // `attackMove:"throw"` from the same `state.kind === "throwing"`, on every throw frame
+            // (startup → active → recovery). These exact-coordinate cases are therefore the
+            // CHARACTERISATION of the shipped grab: they pass identically before and after the
+            // dispatch moves from `frame.throwing` to the descriptor, guarding byte-identical /watch.
             throwing: true,
+            attackMove: "throw",
             attackReach: reach,
             x: 150_000,
             facing: 1,
@@ -702,7 +708,13 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
       [
         tickOf(
           0,
-          { throwing: true, attackReach: 240_000, x: 400_000, facing: -1 },
+          {
+            throwing: true,
+            attackMove: "throw",
+            attackReach: 240_000,
+            x: 400_000,
+            facing: -1,
+          },
           { x: 160_000 }, // 240k to the thrower's left = in front of a left-facer
         ),
       ],
@@ -750,11 +762,71 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     expect(pose.handR.x).toBeGreaterThan(0);
   });
 
-  it("keeps the hands at their neutral stance when not throwing", () => {
-    // The `throwing` flag is the gate: an idle fighter carrying a stale reach must not throw a phantom
-    // grab (kills the "drop the throwing gate" mutant).
+  it("renders the two-hand grab for attackMove:\"throw\" without the throwing flag (the /dojo picker)", () => {
+    // The dispatch moved from `frame.throwing` to the descriptor keyed on attackMove (S6 · Slice 3).
+    // The /dojo move picker stamps attackMove:"throw" + attacking:true but never sets throwing; today
+    // that draws a generic front HAND (the broken picker). Now it draws the two-hand grab — and the
+    // throw's own strike layer is SUPPRESSED, so there is no phantom lean under the grab and /dojo
+    // renders identically to a shipped /watch throw. gap 120k at reach 120k ⇒ lead edge 28, rear 20.
     const pose = scene(
-      [tickOf(0, { throwing: false, attackReach: 120_000 }, { x: 270_000 })],
+      [
+        tickOf(
+          0,
+          {
+            attackMove: "throw",
+            attacking: true,
+            attackBand: 2,
+            attackReach: 120_000,
+            x: 150_000,
+            facing: 1,
+          },
+          { x: 270_000 }, // 120k in front — in range
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    // Both hands reach the grab at chest height — lead on the near edge, rear a spread behind — not a
+    // generic single-hand strike (a strike would leave handL back at the stance, x < 0).
+    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y }));
+    expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y }));
+    // ...and the torso does NOT lean — a grab suppresses its strike layer, so /dojo == /watch.
+    expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
+    expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+  });
+
+  it("no longer gates on the throwing flag — a stale throwing:true without the throw MOVE draws nothing", () => {
+    // The flag is no longer the gate: a frame carrying throwing:true but NOT attackMove:"throw" (never
+    // emitted together by the engine, but reachable) must draw no grab. Kills the "left the gate on
+    // frame.throwing" mutant — under the old dispatch this frame WOULD have thrown a phantom grab.
+    const pose = scene(
+      [
+        tickOf(
+          0,
+          { throwing: true, attackMove: "", attackReach: 120_000, x: 150_000 },
+          { x: 270_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    expect(pose.handL).toEqual(scaled(NEUTRAL_HANDS.handL));
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HANDS.handR));
+  });
+
+  it("draws no grab for a stale attackMove:\"throw\" with no committed reach (the reach gate decides)", () => {
+    // attackMove:"throw" is necessary but not sufficient: a fighter carrying the id with reach 0 (idle)
+    // draws no grab — the reach gate, not the raw descriptor flag, is what puts hands on the opponent.
+    const pose = scene(
+      [
+        tickOf(
+          0,
+          { attackMove: "throw", attackReach: 0, x: 150_000 },
+          { x: 270_000 },
+        ),
+      ],
       0,
       VIEWPORT,
     ).a.pose;
@@ -815,17 +887,18 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     expect(grab.handL.x).toBeGreaterThan(0);
   });
 
-  it("wins over a strike and a guard — the grab is applied last", () => {
-    // A frame both throwing AND striking AND guarding (the engine never emits this, but /dojo can):
-    // the grab overrides BOTH hands, so both land at the grab height (−44), not the strike band (−46)
-    // or the guard reach. Pins the throw's last-applied precedence.
+  it("wins over an attacking flag and a guard — grab-only, applied last", () => {
+    // A throw frame ALSO carrying attacking + a guard (the engine never emits this, but /dojo can):
+    // the throw suppresses its own strike layer (a grab is not a strike, S6 · Slice 3), and the grab
+    // is applied after the guard, so BOTH hands land at the grab height (−44) — not the strike band
+    // (−46) nor the guard reach. Pins the strike-suppression AND the grab's last-applied precedence.
     const pose = poseThrowing({
       gap: 120_000,
       reach: 120_000,
       extra: { attacking: true, attackBand: 2, guardBand: 3 },
     });
 
-    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y })); // grab, not the strike (would be y −46)
+    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y })); // grab, not a strike (would be y −46)
     expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y })); // grab, not the guard
   });
 
@@ -847,7 +920,7 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     const tape: ReplayTape = [
       tickOf(
         0,
-        { throwing: true, attackReach: 120_000, x: 150_000 },
+        { throwing: true, attackMove: "throw", attackReach: 120_000, x: 150_000 },
         { x: 270_000 },
       ),
       tickOf(1, {}, {}),

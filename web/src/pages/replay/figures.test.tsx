@@ -194,7 +194,12 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
         [
           tickOf(
             0,
-            { throwing: true, attackReach: 120_000, x: 150_000 },
+            {
+              throwing: true,
+              attackMove: "throw",
+              attackReach: 120_000,
+              x: 150_000,
+            },
             { x: 270_000 },
           ),
         ],

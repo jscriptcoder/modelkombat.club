@@ -65,12 +65,21 @@ export type StrikeLimb =
 // constant, not a band read. Mirrors how the throw grab pins to a fixed chest height rather than a
 // band. Only a move whose height is band-independent authors one; every banded strike leaves it
 // absent and takes `bandHeight(attackBand)` as before. Optional, so the reach solve still supplies x.
+// A GRAB (throw): this move drives BOTH hands into a two-handed grip on the opponent's near edge
+// rather than a single limb to a band (S6 · Slice 3). It is the last move to dispatch through the
+// descriptor table — before this the throw was drawn off a separate `frame.throwing` boolean, the one
+// non-descriptor render path left. A grab authors no `limb` (it drives two hands, not one) and no band
+// (the grip is at a fixed chest height, solved in scene.ts); the flag is all the table carries — the
+// grab GEOMETRY lives with the reach solve, exactly as band heights do for a strike.
 export type MoveDescriptor = {
-  limb: StrikeLimb;
+  // Absent for a grab — a throw drives two hands, not one endpoint. `limbFor` falls back to the generic
+  // hand for it, which is never consulted because a grab suppresses its own strike layer (scene.ts).
+  limb?: StrikeLimb;
   chamber?: Joint;
   offHand?: Joint;
   tuck?: Joint;
   targetY?: number;
+  grab?: boolean;
 };
 
 const DESCRIPTORS = new Map<string, MoveDescriptor>([
@@ -146,6 +155,13 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // arc supplies the closing and the leg telescopes for the residual (see the `isAirborne` gate in
   // scene.ts), which is why this leads with `footR` yet reads apart from a lunging grounded kick.
   ["tobi-geri", { limb: "footR" }],
+  // throw: the last move to get a descriptor, and the only GRAB. It authors no limb and no band —
+  // the two-hand grip is solved at a fixed chest height in scene.ts (`throwGrabFor`). Adding it here
+  // retires the last non-descriptor render path: the grab now dispatches on `attackMove:"throw"` (which
+  // the engine emits on every throw frame) instead of the `frame.throwing` boolean, so a real /watch
+  // throw renders byte-identically while the /dojo picker — which stamps the move id but never the
+  // flag — finally draws the grab instead of a generic hand.
+  ["throw", { grab: true }],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this
@@ -187,3 +203,10 @@ export const tuckFor = (move: string | undefined): Joint | null =>
 // three lookups above.
 export const targetYFor = (move: string | undefined): number | null =>
   DESCRIPTORS.get(move ?? "")?.targetY ?? null;
+
+// Whether this move is a two-hand GRAB (a throw), so the renderer draws both hands into a grip instead
+// of a single limb to a band — and suppresses the move's strike layer (a grab is not a strike). TOTAL:
+// only `throw` answers true; an unknown id, the "" idle sentinel, an absent field, and every strike
+// answer false, so a strike is never mistaken for a grab. Same `Map`-lookup safety as the lookups above.
+export const isGrab = (move: string | undefined): boolean =>
+  DESCRIPTORS.get(move ?? "")?.grab ?? false;
