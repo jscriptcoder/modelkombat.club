@@ -619,3 +619,96 @@ describe("glyphSvg — canvas-ready brand-glyph markup for Pixi's Graphics.svg()
     expect(grok).toContain(`stroke="${GROK_CANVAS_INK}"`);
   });
 });
+
+describe("figures — the impact flash draws where a fighter scored (Slice 2)", () => {
+  // Challenger `a` lands an in-range mid gyaku and scores at `scoreAt`, then goes idle — the same
+  // shape scene.test uses, so the flash rides scene()'s `contact` mark.
+  const aStrike = (points: number): Partial<ReplayFrame> => ({
+    attacking: true,
+    attackBand: 2,
+    attackReach: 240_000,
+    attackPhase: 2,
+    x: 150_000,
+    facing: 1,
+    points,
+  });
+
+  const scoreThenIdle = (scoreAt: number, len: number): ReplayTape =>
+    Array.from({ length: len }, (_, i) =>
+      i < scoreAt
+        ? tickOf(i, aStrike(0), { x: 390_000 })
+        : i === scoreAt
+          ? tickOf(i, aStrike(3), { x: 390_000 })
+          : tickOf(i, { x: 150_000, facing: 1, points: 3 }, { x: 390_000 }),
+    );
+
+  it("shows the flash at the scene's contact point when a fighter scores", () => {
+    const tape = scoreThenIdle(3, 6);
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+    const sc = scene(tape, 3, VIEWPORT);
+
+    stage.apply(sc);
+
+    expect(sc.contact.a).not.toBeNull();
+    expect(stage.flashes.a.visible).toBe(true);
+    expect({ x: stage.flashes.a.x, y: stage.flashes.a.y }).toEqual({
+      x: sc.contact.a?.x,
+      y: sc.contact.a?.y,
+    });
+    // The opponent did not score, so their flash stays hidden.
+    expect(stage.flashes.b.visible).toBe(false);
+  });
+
+  it("fades the flash as it ages — a later tick draws it dimmer", () => {
+    const tape = scoreThenIdle(3, 20);
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    stage.apply(scene(tape, 3, VIEWPORT)); // age 0
+    const fresh = stage.flashes.a.alpha;
+
+    stage.apply(scene(tape, 13, VIEWPORT)); // age 10, still inside the window
+    const aged = stage.flashes.a.alpha;
+
+    expect(fresh).toBeGreaterThan(aged);
+    expect(aged).toBeGreaterThan(0);
+  });
+
+  it("clears the flash when the scene carries no contact for that side", () => {
+    const tape = scoreThenIdle(3, 6);
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    stage.apply(scene(tape, 3, VIEWPORT)); // scored → shown
+    expect(stage.flashes.a.visible).toBe(true);
+
+    stage.apply(scene(tape, 1, VIEWPORT)); // before the score → cleared
+    expect(stage.flashes.a.visible).toBe(false);
+  });
+
+  it("draws both flashes on a same-tick trade, each at its own scorer's point", () => {
+    const bStrike = (points: number): Partial<ReplayFrame> => ({
+      attacking: true,
+      attackBand: 2,
+      attackReach: 240_000,
+      attackPhase: 2,
+      x: 390_000,
+      facing: -1,
+      points,
+    });
+
+    const tape: ReplayTape = [
+      tickOf(0, aStrike(0), bStrike(0)),
+      tickOf(1, aStrike(0), bStrike(0)),
+      tickOf(2, aStrike(3), bStrike(3)),
+    ];
+
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+    const sc = scene(tape, 2, VIEWPORT);
+
+    stage.apply(sc);
+
+    expect(stage.flashes.a.visible).toBe(true);
+    expect(stage.flashes.b.visible).toBe(true);
+    expect(stage.flashes.a.x).toBe(sc.contact.a?.x);
+    expect(stage.flashes.b.x).toBe(sc.contact.b?.x);
+  });
+});

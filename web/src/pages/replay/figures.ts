@@ -218,6 +218,50 @@ const POP_MARKER = "★";
 const scoreLabel = (score: number, scored: boolean): string =>
   scored ? `${POP_MARKER}${score}` : `${score}`;
 
+// The impact flash: a small starburst stroked ONCE into a per-side Graphics at its own origin, then
+// moved to the scene's contact point and faded by age in `apply`. Fixed screen size (not world-scaled)
+// — a punchy hit cue, not a body part. Colour, size, and fade span are eye-tunable in /dojo; no test
+// pins the exact values, only the monotone fade and the clear-when-null (decision-9 style).
+const FLASH_COLOR = 0xffe066;
+const FLASH_INNER = 4;
+const FLASH_OUTER = 16;
+const FLASH_SPOKES = 8;
+const FLASH_FADE_TICKS = 30;
+
+// Stroke the radiating spokes at the Graphics' origin (the flash is positioned by moving the whole
+// object, so the path itself is drawn once and never redrawn per frame).
+const drawStarburst = (flash: Graphics): void => {
+  for (let i = 0; i < FLASH_SPOKES; i++) {
+    const angle = (i / FLASH_SPOKES) * Math.PI * 2;
+
+    flash
+      .moveTo(Math.cos(angle) * FLASH_INNER, Math.sin(angle) * FLASH_INNER)
+      .lineTo(Math.cos(angle) * FLASH_OUTER, Math.sin(angle) * FLASH_OUTER);
+  }
+
+  flash.stroke({ width: 3, color: FLASH_COLOR });
+};
+
+// Opacity falls linearly from the score (age 0 → full) to the end of the fade span, clamped ≥ 0 so a
+// stale age never drives a negative alpha. Monotone decreasing by construction.
+const flashAlpha = (age: number): number =>
+  Math.max(0, 1 - age / FLASH_FADE_TICKS);
+
+// Show the flash at a fighter's contact mark (positioned + faded by age), or hide it when the side has
+// no live score. The starburst path is already drawn; only the transform + alpha + visibility change.
+const applyFlash = (flash: Graphics, mark: Scene["contact"]["a"]): void => {
+  if (mark === null) {
+    flash.visible = false;
+
+    return;
+  }
+
+  flash.visible = true;
+  flash.x = mark.x;
+  flash.y = mark.y;
+  flash.alpha = flashAlpha(mark.age);
+};
+
 // The mounted stage: the root container to add to the Pixi stage, the two fighters' joint nodes
 // (exposed for display-object assertions), and the HUD text, plus `apply` — the pure Scene →
 // display projection the player calls every frame.
@@ -226,6 +270,9 @@ export type Stage = {
   a: FigureNodes;
   b: FigureNodes;
   hud: Text;
+  // The two impact-flash Graphics (challenger `a`, King `b`), exposed for display-object assertions —
+  // positioned + faded per frame by `apply`, hidden when that side has no live score.
+  flashes: { a: Graphics; b: Graphics };
   apply: (scene: Scene) => void;
 };
 
@@ -247,13 +294,24 @@ export const createStage = (
   hud.x = viewport.width / 2;
   hud.y = 24;
 
+  // The impact flashes sit ABOVE the fighters (drawn after them) but below the HUD, and start hidden.
+  const flashA = new Graphics();
+  const flashB = new Graphics();
+
+  drawStarburst(flashA);
+  drawStarburst(flashB);
+  flashA.visible = false;
+  flashB.visible = false;
+
   const root = new Container();
 
-  root.addChild(a.nodes.root, b.nodes.root, hud);
+  root.addChild(a.nodes.root, b.nodes.root, flashA, flashB, hud);
 
   const apply = (scene: Scene): void => {
     applyFigure(a, scene.a);
     applyFigure(b, scene.b);
+    applyFlash(flashA, scene.contact.a);
+    applyFlash(flashB, scene.contact.b);
 
     const scoreA = scoreLabel(scene.hud.scoreA, scene.hud.scoredA);
     const scoreB = scoreLabel(scene.hud.scoreB, scene.hud.scoredB);
@@ -261,7 +319,14 @@ export const createStage = (
     hud.text = `tick ${scene.hud.tick}    ${scoreA} : ${scoreB}`;
   };
 
-  return { root, a: a.nodes, b: b.nodes, hud, apply };
+  return {
+    root,
+    a: a.nodes,
+    b: b.nodes,
+    hud,
+    flashes: { a: flashA, b: flashB },
+    apply,
+  };
 };
 
 // ─── S7: the contact sheet — the whole arsenal on one canvas ──────────────────────────────────────

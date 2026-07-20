@@ -647,7 +647,20 @@ const phaseRunAt = (
   return { index: back, length: back + forward + 1 };
 };
 
-export type Scene = { a: Figure; b: Figure; hud: Hud };
+// The impact flash for a fighter's most recent score: WHERE the committed action landed (absolute
+// screen px — a strike's reach-to-target endpoint, a throw's grab hand) and HOW LONG ago it scored
+// (`age` in ticks, which the draw layer fades by). Fixed at the SCORE tick's geometry, so it stays put
+// while the fighters yame-reset during the fade — not recomputed from the moving current frame.
+export type Mark = { x: number; y: number; age: number };
+
+export type Scene = {
+  a: Figure;
+  b: Figure;
+  hud: Hud;
+  // Per scorer: `a` is where challenger `a`'s strike/throw landed on the King, `b` the mirror. Each
+  // side is independent, so a same-tick trade flashes both; `null` when that side has no live score.
+  contact: { a: Mark | null; b: Mark | null };
+};
 
 // The canvas the scene is drawn into (supplied by the Pixi layer; fixed in tests for exact maths).
 export type Viewport = { width: number; height: number };
@@ -862,6 +875,65 @@ export const scene = (
   const p = clampPlayhead(playhead, tape.length);
   const at = tape[p];
 
+  // The most recent tick in the flash window (p−N, p] where this fighter's points rose — the score the
+  // flash marks — or -1 for none. Scans newest-first so a fresh score supersedes an older one still
+  // fading. The same window + rise test as `scoredWithin`, so the HUD pop and the flash agree on when a
+  // point counts. Pure tape scan (no cross-frame state), identical on replay and any scrub.
+  const lastScoreTick = (points: (t: ReplayTick) => number): number => {
+    const from = Math.max(1, p - SCORE_POP_TICKS + 1);
+
+    for (let i = p; i >= from; i--) {
+      if (points(tape[i]) > points(tape[i - 1])) return i;
+    }
+
+    return -1;
+  };
+
+  // The scoring fighter's committed-action landing point in the pose's LOCAL frame — a strike's
+  // reach-to-target endpoint (`strikeHandFor`) or a throw's front grab hand (`throwGrabFor`), or `null`
+  // when nothing is committed (an idle / finish frame). Reuses the exact solves the pose is drawn from,
+  // so the mark sits on the drawn limb whichever it is (hand, foot, elbow, knee).
+  const targetLocal = (self: ReplayFrame, opp: ReplayFrame): Joint | null =>
+    strikeHandFor(self, opp) ?? throwGrabFor(self, opp)?.handR ?? null;
+
+  // Project a LOCAL pose point to absolute screen px with the SAME transform `figure()` draws a limb
+  // by: the fighter's root pixel plus the facing-flipped, scaled-and-rounded joint. So the flash lands
+  // exactly where the striking limb is stroked.
+  const project = (
+    self: ReplayFrame,
+    local: Joint,
+  ): { x: number; y: number } => ({
+    x: self.x * pxPerSubunit + self.facing * Math.round(local.x * scale),
+    y: groundY - self.y * pxPerSubunit + Math.round(local.y * scale),
+  });
+
+  // The impact mark for one fighter: find their last score in the window, then anchor at that score
+  // tick's committed target. A strike always commits ON its score tick (the point falls inside the
+  // active window), so the anchor is the score tick itself; a throw can score on a non-grab finish, so
+  // we fall back to the nearest committed frame back to the window start — `null` if none commits. The
+  // `age` counts from the score tick regardless, so the fade always starts when the point registered.
+  const contactFor = (
+    selfAt: (t: ReplayTick) => ReplayFrame,
+    oppAt: (t: ReplayTick) => ReplayFrame,
+    points: (t: ReplayTick) => number,
+  ): Mark | null => {
+    const scoreTick = lastScoreTick(points);
+
+    if (scoreTick < 0) return null;
+
+    const from = Math.max(1, p - SCORE_POP_TICKS + 1);
+
+    for (let j = scoreTick; j >= from; j--) {
+      const local = targetLocal(selfAt(tape[j]), oppAt(tape[j]));
+
+      if (local !== null) {
+        return { ...project(selfAt(tape[j]), local), age: p - scoreTick };
+      }
+    }
+
+    return null;
+  };
+
   return {
     a: figure(
       at.a,
@@ -879,6 +951,18 @@ export const scene = (
       scoreB: at.b.points,
       scoredA: scoredWithin(tape, p, (t) => t.a.points),
       scoredB: scoredWithin(tape, p, (t) => t.b.points),
+    },
+    contact: {
+      a: contactFor(
+        (t) => t.a,
+        (t) => t.b,
+        (t) => t.a.points,
+      ),
+      b: contactFor(
+        (t) => t.b,
+        (t) => t.a,
+        (t) => t.b.points,
+      ),
     },
   };
 };
