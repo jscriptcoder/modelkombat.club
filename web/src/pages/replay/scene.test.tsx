@@ -3167,3 +3167,152 @@ describe("scene — hiza-geri leads with the knee (S5 · Slice 2)", () => {
     expect(startup.footR.x).toBeLessThan(startup.kneeR.x);
   });
 });
+
+describe("scene — sweep reaps low with the front foot (S6 · Slice 1)", () => {
+  // The first NON-strike descriptor. A sweep (ashi-barai) drives the front FOOT — like a kick — but to
+  // a FIXED near-ground height, not a band: the engine leaves sweep's band UNRESTRICTED (the bot picks
+  // any band), so its height cannot come from `attackBand` the way a kick's does. A new optional
+  // `targetY` on the descriptor pins the reap near the floor, mirroring how the throw grab pins to a
+  // fixed chest height rather than a band. The reach-to-target solve is unchanged — the same one that
+  // aims a fist aims the sweeping foot along the floor.
+  //
+  // The RED driver is the ROUTING plus the fixed height. Today "sweep" is undescribed, so limbFor falls
+  // to the generic front HAND: the fist drives to (edge, band height) and the foot rests in stance. The
+  // foot-at-near-ground and hand-at-stance assertions fail for exactly that reason until the sweep
+  // descriptor (footR + targetY) exists.
+  //
+  // Local-px anchors (recomputed independent of production, one sub-unit = 76/240000 local px):
+  //  · in-range anchor — a 150k gap: centres 47.5 local px apart, near edge one BODY_HALF_WIDTH (10)
+  //    nearer ⇒ 37.5; sweep's cap is 180000·(76/240000) = 57, so 37.5 lands in range (not capped).
+  //  · nearer anchor — a 120k gap ⇒ edge 28, also inside the cap, so the two land at different points.
+  //  · SWEEP_Y (−8) is the authored near-ground knob: below the low band (−24), just off the floor
+  //    (STAND foot at 0) — the height a reap hooks an ankle at. A re-tune in /dojo re-flows these.
+  const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // STAND front foot — the no-descriptor fallback
+  const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot — the planted support leg
+  const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand — where a sweep must NOT drive
+
+  const SWEEP_Y = -8; // the fixed near-ground reap height (band-independent)
+
+  const STARTUP = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+
+  // Striker `a` faces right at x 150000 committing a sweep; `b` sits `gap` sub-units in front. Band
+  // defaults to MID (2) deliberately — a sweep drawn at the band would land at −46, so a mid default
+  // makes the fixed near-ground height a load-bearing assertion rather than one that could pass by luck.
+  const poseSweep = ({
+    gap = 150_000,
+    band = 2,
+    reach = 180_000,
+    extra = {},
+  }: {
+    gap?: number;
+    band?: number;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: "sweep",
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("reaps the front FOOT low to the near edge, leaving the hand at stance", () => {
+    // The core inversion of today's generic pose: the FOOT is the driven endpoint (at the near edge,
+    // near the floor), and the front hand stays where the stance put it — the opposite of the fist-driven
+    // fallback that draws a hand at the mid band.
+    const pose = poseSweep();
+
+    expect(pose.footR).toEqual(scaled({ x: 37.5, y: SWEEP_Y }));
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
+  });
+
+  it("keeps the reap near the floor whatever band the bot committed, and draws at every band", () => {
+    // The height is FIXED near-ground, not the requested band — sweep's band is UNRESTRICTED, so a sweep
+    // committed low, mid or high draws the same floor reap. And unlike a banded kick (which draws nothing
+    // for band 0 / an unmapped code), the sweep still draws there: its height never came from the band.
+    [0, 1, 2, 3, 9].forEach((band) => {
+      expect(poseSweep({ band }).footR).toEqual(scaled({ x: 37.5, y: SWEEP_Y }));
+    });
+  });
+
+  it("keeps the support leg planted while the sweeping leg reaps (M8.2)", () => {
+    expect(poseSweep().footL).toEqual(scaled(NEUTRAL_FOOT_L));
+  });
+
+  it("tracks the real opponent distance — a nearer opponent is reaped at a nearer point (M8.5)", () => {
+    // The reach solve is retained for the foot, not replaced by a constant forward stub: a 120k gap
+    // reaps the edge at 28, a 150k gap at 37.5 — both inside sweep's 57 cap, so they land apart.
+    expect(poseSweep({ gap: 120_000 }).footR).toEqual(
+      scaled({ x: 28, y: SWEEP_Y }),
+    );
+    expect(poseSweep({ gap: 150_000 }).footR).toEqual(
+      scaled({ x: 37.5, y: SWEEP_Y }),
+    );
+  });
+
+  it("stops the sweeping foot at the move's reach cap when the opponent is beyond it", () => {
+    // A 400k gap is 126.7 px between centres — past sweep's 57 cap, so the foot stops at the cap rather
+    // than stretching to the edge. Pins that the foot obeys the SAME clamp as a fist, at the near-ground y.
+    expect(poseSweep({ gap: 400_000 }).footR).toEqual(
+      scaled({ x: 57, y: SWEEP_Y }),
+    );
+  });
+
+  it("chambers the sweeping foot cocked back and lifted, then reaps forward at contact", () => {
+    // A wind-up is a different SHAPE, not a shorter reach (M3): the foot cocks back and lifts off the
+    // floor, then reaps forward-and-low to contact. The chamber routes through the SAME winding path as
+    // every other move (driven = winding ? chamberFor : target), landing on the foot.
+    const chambered = poseSweep({ extra: { attackPhase: STARTUP } }).footR;
+    const extended = poseSweep({ extra: { attackPhase: CONTACT } }).footR;
+    const resting = poseSweep({ extra: { attacking: false } }).footR;
+
+    // Distinct shape from contact, and it EXTENDS forward from the cock (never retracts into the reap).
+    expect(chambered).not.toEqual(extended);
+    expect(chambered.x).toBeLessThan(extended.x);
+    // Lifted off the ground — a cocked reap is a foot raised to load, not resting in stance.
+    expect(chambered.y).toBeLessThan(0);
+    // ...and it is a distinct authored COCK, not the idle foot — kills "no chamber authored" (which
+    // would leave the wind-up at the resting foot, identical to `resting`).
+    expect(chambered).not.toEqual(resting);
+  });
+
+  it("returns to the chamber during recovery (M3 default, no per-move recovery pose)", () => {
+    expect(poseSweep({ extra: { attackPhase: RECOVER } }).footR).toEqual(
+      poseSweep({ extra: { attackPhase: STARTUP } }).footR,
+    );
+  });
+
+  it("draws no sweep when idle or when the reach is rejected (M7 fallback)", () => {
+    // The descriptor selects WHICH endpoint a committed sweep drives; it never makes an idle fighter
+    // sweep, and a defensively-rejected reach (0 / opponent behind) keeps the foot at stance.
+    expect(poseSweep({ extra: { attacking: false } }).footR).toEqual(
+      scaled(NEUTRAL_FOOT_R),
+    );
+    expect(poseSweep({ extra: { attackReach: 0 } }).footR).toEqual(
+      scaled(NEUTRAL_FOOT_R),
+    );
+  });
+
+  it("floors the reap forward when the opponent is behind, never retracting the foot", () => {
+    // The point-blank floor (M3): with the opponent overlapping/behind, the sweep still reaps FORWARD to
+    // the floor-x rather than swinging the foot backward or falling to stance — a reap into space.
+    expect(poseSweep({ gap: -100_000 }).footR).toEqual(
+      scaled({ x: 24, y: SWEEP_Y }),
+    );
+  });
+});
