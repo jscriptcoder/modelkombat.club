@@ -319,11 +319,16 @@ const lerpJoint = (from: Joint, to: Joint, t: number): Joint => ({
 });
 
 // The driven point's position `index` ticks into a `length`-tick run of its phase, eased between the
-// phase's keyframes (M14c). Startup travels stance → chamber; recovery travels chamber → stance (the
-// reverse path); the active phase travels chamber → extension → chamber, PEAKING at the solved
-// extension mid-run so contact is the reach-to-target solve, unshifted. A length-1 run — a single-tick
-// tape, or the degenerate synthetic case — returns the phase's primary keyframe exactly (chamber for
-// startup/recovery, extension for active), reproducing the pre-S8 discrete pick byte-for-byte.
+// phase's keyframes (M14c). Startup travels stance → chamber; the active phase HOLDS the solved
+// extension across its WHOLE window (S1 · replay-kime-hold) — the strike is drawn extended into the
+// opponent on every active tick, not just the first; recovery then travels extension → stance,
+// retracting from the held contact. The engine only ever awards a point inside a strike's active
+// window, so holding extension there guarantees the scoring tick shows the connected limb rather than
+// a limb already re-chambered (the pre-S1 blend peaked on the first active tick and re-chambered
+// across the rest, so the point — registering a tick or two later — landed on a retracted limb). A
+// length-1 run — a single-tick tape, or the degenerate synthetic case — returns the phase's primary
+// keyframe exactly (chamber for startup/recovery, extension for active), reproducing the pre-S8
+// discrete pick byte-for-byte, so /sheet and /dojo single-tick previews are unchanged.
 const easeDriven = (
   phase: number,
   index: number,
@@ -332,24 +337,17 @@ const easeDriven = (
   chamber: Joint,
   extension: Joint,
 ): Joint => {
-  if (phase === 2) {
-    // The strike snaps to full extension as the contact window OPENS — the first active tick, a kime
-    // commit — then re-chambers across the rest of the active phase. So the extension lands exactly on
-    // the first active tick: a single-tick tape, and the contact-sheet's active-phase still (S7), both
-    // read the solved extension byte-for-byte, while the run still MOVES (extension → chamber).
-    if (length <= 1) return extension;
-
-    const e = smoothstep((length - 1 - index) / (length - 1));
-
-    return lerpJoint(chamber, extension, e);
-  }
+  // Contact is the reach-to-target solve, unshifted, HELD for the whole active window. Length is
+  // irrelevant here: a single-tick tape and the contact-sheet's active-phase still (S7) read the same
+  // extension byte-for-byte, and every interior active tick reads it too.
+  if (phase === 2) return extension;
 
   if (length <= 1) return chamber;
 
   const u = smoothstep(index / (length - 1));
 
   return phase === 3
-    ? lerpJoint(chamber, stance, u)
+    ? lerpJoint(extension, stance, u)
     : lerpJoint(stance, chamber, u);
 };
 
