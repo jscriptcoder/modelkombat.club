@@ -2845,3 +2845,161 @@ describe("scene — the roundhouse kicks with the rear leg (S4 · Slice 6)", () 
     expect(front.footL).toEqual(scaled(NEUTRAL_FOOT_L));
   });
 });
+
+describe("scene — empi leads with the elbow (S5 · Slice 1)", () => {
+  // Every strike so far drives an ENDPOINT (a hand, a foot) and lets deriveBend COMPUTE the mid-joint.
+  // empi inverts that: the driven point is the ELBOW — a joint the bend rule currently computes — and
+  // the fist TRAILS, folded back behind the elbow tip. This is the mechanism-carrier slice (M13): it
+  // promotes a mid-joint to a first-class driven StrikeLimb end to end.
+  //
+  // The RED driver is the ROUTING. Today "empi" is undescribed, so limbFor falls to the generic front
+  // hand — the FIST drives to the target and elbowR is only the derived shoulderR→handR bisector. The
+  // inversion assertions (elbow AT the target, fist BEHIND it) fail for exactly that reason until the
+  // elbowR route exists.
+  //
+  // Local-px anchors, recomputed independent of production (one sub-unit = 76/240000 local px):
+  //  · CLOSE anchor — empi's REAL reach (95k) at a 120k gap: centres 38 local px apart, near edge one
+  //    BODY_HALF_WIDTH (10) nearer ⇒ 28; empi's cap is 95000·(76/240000) = 30.08, so 28 lands in range.
+  //    This is the in-character close-range picture the elbow strike actually draws (and where M13g's
+  //    figure overlap lives — confirmed by eye in /dojo, not asserted here).
+  //  · FAR anchor — a controlled 240k reach at a 240k gap ⇒ edge 66, the standard anchor the strike and
+  //    throw blocks share. A HAND at this reach LEANS 16 (rootTravel over 2·ARM_BONE); a mid-joint must
+  //    NOT (M13f: hold the root). Using the far anchor is what makes the lean gate load-bearing and the
+  //    root-held test a real RED driver rather than a vacuum — the same reason the strike block probes
+  //    reach with controlled values.
+  const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand — the fist's stance, which it LEAVES
+  const NEUTRAL_HAND_L = { x: -18, y: -44 }; // STAND rear hand — untouched by a front-elbow strike
+  const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND feet — a mid-joint strike is not a kick, so they
+  const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // stay planted (no step)
+
+  const STARTUP = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+
+  // Striker `a` faces right at x 150000 committing empi; `b` sits `gap` sub-units in front. Defaults to
+  // the CLOSE anchor (empi's real 95k reach); the far cases override reach + gap.
+  const poseEmpi = ({
+    gap = 120_000,
+    band = 2,
+    reach = 95_000,
+    extra = {},
+  }: {
+    gap?: number;
+    band?: number;
+    reach?: number;
+    extra?: Partial<ReplayFrame>;
+  } = {}) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: band,
+            attackReach: reach,
+            attackMove: "empi",
+            x: 150_000,
+            facing: 1,
+            ...extra,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("leads with the elbow — the elbow drives to the near edge and the fist trails behind it", () => {
+    // The inversion (guard 7, anti-clobber). The DRIVEN point is elbowR, landing ON the near edge (28)
+    // at the mid band — NOT the deriveBend bisector the old front-hand path leaves there. The fist rides
+    // BEHIND the elbow tip (elbowR.x > handR.x), the reverse of a punch where the hand leads.
+    const pose = poseEmpi();
+
+    expect(pose.elbowR).toEqual(scaled({ x: 28, y: -46 }));
+    expect(pose.elbowR.x).toBeGreaterThan(pose.handR.x);
+  });
+
+  it("folds the forearm at an angle — the elbow reads jointed, the fist tucked behind the tip", () => {
+    // Guard 6 (jointedness). The fist tucks back RELATIVE to the elbow (M13c), so the forearm
+    // elbowR→handR bends off the upper arm shoulderR→elbowR — non-collinear, via their cross product —
+    // and the fist sits behind the tip (handR.x < elbowR.x). Today the fist IS the driven target, so it
+    // sits FORWARD of the derived elbow; the fold-back assertion fails until the tuck exists.
+    const pose = poseEmpi();
+
+    const cross =
+      (pose.elbowR.x - pose.shoulderR.x) * (pose.handR.y - pose.elbowR.y) -
+      (pose.elbowR.y - pose.shoulderR.y) * (pose.handR.x - pose.elbowR.x);
+
+    expect(cross).not.toBe(0);
+    expect(pose.handR.x).toBeLessThan(pose.elbowR.x);
+    // The fist actually FOLDED — it left its stance rather than being ignored (kills a mutant that
+    // drops the trailing-endpoint write, which would leave the stance hand behind the elbow tip and
+    // still satisfy the two checks above).
+    expect(pose.handR).not.toEqual(scaled(NEUTRAL_HAND_R));
+  });
+
+  it("holds the root — a mid-joint strike does not lean the torso, even at a far target (M13f)", () => {
+    // M13f: suppress the forward-root motion for a mid-joint. At the FAR anchor a HAND would lean 16
+    // (head + girdle midpoint advancing 8, the driving shoulder swinging through); the elbow reaches
+    // the far edge (66) with the head, girdle midpoint and BOTH shoulders held at their square stance —
+    // absolute ±7 shoulders, because the equidistant-from-midpoint check is invariant under rotation.
+    const pose = poseEmpi({ gap: 240_000, reach: 240_000 });
+
+    expect(pose.elbowR).toEqual(scaled({ x: 66, y: -46 })); // it DID reach far — not a no-op
+    expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
+    expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+    expect(pose.shoulderL).toEqual(scaled({ x: -SHOULDER_HALF_WIDTH, y: -64 }));
+    expect(pose.shoulderR).toEqual(scaled({ x: SHOULDER_HALF_WIDTH, y: -64 }));
+    expect(pose.hip).toEqual(scaled({ x: 0, y: -34 }));
+  });
+
+  it("tracks the real opponent distance — the elbow solve is retained (guard 5)", () => {
+    // The elbow tracks true distance through the SAME reachTargetX a fist uses, not a fixed authored
+    // extension: two gaps, two phase-2 elbow endpoints (28 and 66), both inside a 240k reach cap (76).
+    expect(poseEmpi({ gap: 120_000, reach: 240_000 }).elbowR).toEqual(
+      scaled({ x: 28, y: -46 }),
+    );
+    expect(poseEmpi({ gap: 240_000, reach: 240_000 }).elbowR).toEqual(
+      scaled({ x: 66, y: -46 }),
+    );
+  });
+
+  it("leaves the other limbs at their stance — feet planted, rear hand home (root held)", () => {
+    // A front-elbow strike is not a kick and pulls no hikite, so the support feet and the rear hand hold
+    // their stance — only the driving arm (elbowR + its trailing fist) moves.
+    const pose = poseEmpi();
+
+    expect(pose.footL).toEqual(scaled(NEUTRAL_FOOT_L));
+    expect(pose.footR).toEqual(scaled(NEUTRAL_FOOT_R));
+    expect(pose.handL).toEqual(scaled(NEUTRAL_HAND_L));
+  });
+
+  it("chambers the elbow during startup, then drives it forward to contact (guards 3/4)", () => {
+    // A wind-up is a different SHAPE, not a shorter reach (M3): the elbow cocks back, then extends to
+    // the target at contact. The chamber routes through the SAME winding path as every other move
+    // (driven = winding ? chamberFor : target), now landing on the elbow instead of a hand or foot.
+    const chambered = poseEmpi({ extra: { attackPhase: STARTUP } }).elbowR;
+    const extended = poseEmpi({ extra: { attackPhase: CONTACT } }).elbowR;
+    const resting = poseEmpi({ extra: { attacking: false } }).elbowR;
+
+    // Guard 3 (phase distinctness): the cocked elbow is a different shape from the contact elbow.
+    expect(chambered).not.toEqual(extended);
+    // Guard 4 (direction): the elbow EXTENDS forward from its cock to contact, never retracts.
+    expect(chambered.x).toBeLessThan(extended.x);
+    // ...and the chamber is a distinct COCKED position, not the resting arm — kills "no chamber
+    // authored" (which would leave the wind-up at the idle elbow, identical to `resting`).
+    expect(chambered).not.toEqual(resting);
+  });
+
+  it("recovers through the same chamber, the fist riding with the cocked elbow (guard 3)", () => {
+    // Startup and recovery both draw the chamber — a technique returns through its wind-up shape, the
+    // mirror of how it entered. And the fist rides WITH the cocked elbow (folded behind it), not left
+    // at stance during the wind-up: the tuck is relative to the elbow, so it tracks it across phases.
+    const startup = poseEmpi({ extra: { attackPhase: STARTUP } });
+    const recovery = poseEmpi({ extra: { attackPhase: RECOVER } });
+
+    expect(recovery.elbowR).toEqual(startup.elbowR);
+    expect(startup.handR).not.toEqual(scaled(NEUTRAL_HAND_R));
+    expect(startup.handR.x).toBeLessThan(startup.elbowR.x);
+  });
+});
