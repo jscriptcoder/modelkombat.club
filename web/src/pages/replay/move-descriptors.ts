@@ -27,7 +27,21 @@ import type { Joint } from "./scene";
 // drive a foot to the same solved target, so under M3 (only the driven endpoint moves) driving the
 // same foot would render them identically; the roundhouse takes the M12i escape hatch and drives the
 // OTHER leg, which is the one distinction a 2-D side view can show that a lateral hip turn cannot.
-export type StrikeLimb = "handR" | "handL" | "footR" | "footL";
+//
+// `elbowR` / `kneeR` (+ their L mirrors) — the close-range INVERSION (S5). Every endpoint above drives
+// a hand / foot and lets the bend rule DERIVE the mid-joint; an empi (elbow) or hiza-geri (knee) leads
+// with the MID-JOINT — it drives to the target while the trailing fist / foot folds back behind it
+// (see `tuck`). scene.ts writes the driven joint back over the derived bend, so the elbow / knee keeps
+// the reach and the endpoint keeps its fold.
+export type StrikeLimb =
+  | "handR"
+  | "handL"
+  | "footR"
+  | "footL"
+  | "elbowR"
+  | "elbowL"
+  | "kneeR"
+  | "kneeL";
 
 // Where the driven endpoint sits while the technique is WINDING UP or RECOVERING (S2). A chambered
 // technique is a different SHAPE, not a shorter reach (M3) — scaling the extension down reads as a
@@ -41,10 +55,15 @@ export type StrikeLimb = "handR" | "handL" | "footR" | "footL";
 // the extended arm lands in nearly the same place whichever hand throws. Pulling the off hand back is
 // what makes the punch read from the punching side. Optional — a move that authors none keeps its
 // stance hand, which is what every move did before this existed.
+// Where the trailing fist / foot folds when the driven `limb` is a MID-JOINT (S5) — the fold is
+// RELATIVE to the driven elbow / knee (M13c), so it rides with the joint across every phase (chamber
+// and contact alike) for free. Only a mid-joint move authors one; an endpoint-driving move leaves it
+// absent and its endpoint is the driven point itself.
 export type MoveDescriptor = {
   limb: StrikeLimb;
   chamber?: Joint;
   offHand?: Joint;
+  tuck?: Joint;
 };
 
 const DESCRIPTORS = new Map<string, MoveDescriptor>([
@@ -82,6 +101,17 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // never draws. Chamber: the rear knee cocked up and back, so the wind-up reads as a leg loading to
   // whip around rather than the front leg's straight knee-up. Eye-tuned in /dojo, relations pinned.
   ["mawashi-geri", { limb: "footL", chamber: { x: -8, y: -30 } }],
+  // empi (elbow strike): the first CLOSE-RANGE technique, and the first that leads with a MID-JOINT.
+  // The ELBOW is the driven point — it drives to the opponent's near edge at the band while the fist
+  // folds back behind it (`tuck`, relative to the elbow so it rides across every phase, M13c). Every
+  // other strike drives an ENDPOINT and lets the bend rule derive the elbow; this inverts that, and
+  // scene.ts writes the driven elbow back over the derived bend (S5 · Slice 1). Chamber: the elbow
+  // cocked BACK and up (a loaded elbow) before it drives forward to contact — the fist rides with it
+  // via the same relative tuck. Both eye-tuned in /dojo, relations pinned.
+  [
+    "empi",
+    { limb: "elbowR", chamber: { x: -10, y: -42 }, tuck: { x: -12, y: -8 } },
+  ],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this
@@ -110,3 +140,9 @@ export const chamberFor = (move: string | undefined): Joint | null =>
 // two lookups above.
 export const offHandFor = (move: string | undefined): Joint | null =>
   DESCRIPTORS.get(move ?? "")?.offHand ?? null;
+
+// Where this move's trailing fist / foot folds, RELATIVE to the driven mid-joint (S5) — or `null` when
+// the move drives an endpoint and has no fold (every move but empi / hiza-geri today, plus the usual
+// unknown-id / "" / absent-field fallbacks). TOTAL, same shape as chamberFor / offHandFor.
+export const tuckFor = (move: string | undefined): Joint | null =>
+  DESCRIPTORS.get(move ?? "")?.tuck ?? null;

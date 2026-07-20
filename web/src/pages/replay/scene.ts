@@ -1,5 +1,5 @@
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
-import { chamberFor, limbFor, offHandFor } from "./move-descriptors";
+import { chamberFor, limbFor, offHandFor, tuckFor } from "./move-descriptors";
 
 // The world→screen projection: a pure function from (tape, playhead, viewport) to the on-screen
 // state the Pixi layer draws. Kept free of Pixi and of any engine import (web/src never imports
@@ -280,6 +280,13 @@ const rootTravel = (root: Joint, target: Joint, bone: number): number =>
 const isChamberPhase = (phase: number | undefined): boolean =>
   phase === 1 || phase === 3;
 
+// The trailing endpoint of a driven MID-JOINT: the fist / foot folded back RELATIVE to the joint the
+// technique leads with (S5, M13c) — so an empi's elbow drives to the target and this places the fist
+// behind the tip. Falls back to the joint itself when a mid-joint move authors no tuck (totality): a
+// straight, unfolded limb rather than a crash. Endpoint-driving moves never reach it.
+const foldFrom = (joint: Joint, tuck: Joint | null): Joint =>
+  tuck === null ? joint : { x: joint.x + tuck.x, y: joint.y + tuck.y };
+
 // The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
 // over everything (highest precedence — an early return, so a downed fighter is never also striking
 // or throwing, and it keeps its OWN authored mid-joints rather than the derived bend); otherwise the
@@ -314,6 +321,20 @@ const poseFor = (
   // a 2-D side view can show. Everything downstream that used to test `limb === "footR"` means "is a
   // kick", so it asks this instead; the routing below still splits which foot.
   const isKick = limb === "footR" || limb === "footL";
+
+  // A driven MID-JOINT — an elbow / knee that LEADS to the target while its trailing fist / foot folds
+  // back behind it (S5). Where a kick STEPS the hip and a punch LEANS the torso, a mid-joint strike
+  // HOLDS the root (M13f): the lean gates to 0 below, and the step already does (a mid-joint is not a
+  // kick). The close-range techniques land inside the body's reach, so there is nothing to lean toward.
+  const isMidJoint =
+    limb === "elbowR" ||
+    limb === "elbowL" ||
+    limb === "kneeR" ||
+    limb === "kneeL";
+
+  // Where this move's trailing fist / foot folds, relative to the driven mid-joint (`null` for every
+  // endpoint-driving move — see foldFrom).
+  const tuck = tuckFor(frame.attackMove);
 
   // WHERE that endpoint sits this phase (S2). `strikeHand` remains the gate: no strike to draw (idle,
   // unmapped band, rejected reach) ⇒ no layer at all, so a stale move id can never make an idle
@@ -351,7 +372,7 @@ const poseFor = (
   };
 
   const lean =
-    driven === null || winding || isKick
+    driven === null || winding || isKick || isMidJoint
       ? 0
       : rootTravel(drivingShoulder, driven, ARM_BONE);
 
@@ -407,13 +428,19 @@ const poseFor = (
           // is shorter, but it type-checks ANY string into the pose object — a limb the Stance has no
           // endpoint for would silently add a junk property and the strike would vanish. The ternary
           // routes anything unrecognised to the generic front hand instead, which is M7 totality.
+          // A driven MID-JOINT writes its TRAILING endpoint here (the fist folded behind the elbow),
+          // NOT the driven point — that lands on the mid-joint itself, applied over the derived bend
+          // after deriveSkeleton (below). So an elbowR strike sets handR = elbow + tuck; hiza-geri
+          // (kneeR → footR) follows in Slice 2.
           ...(limb === "footR"
             ? { footR: driven }
             : limb === "footL"
               ? { footL: driven }
-              : limb === "handL"
-                ? { handL: driven }
-                : { handR: driven }),
+              : limb === "elbowR"
+                ? { handR: foldFrom(driven, tuck) }
+                : limb === "handL"
+                  ? { handL: driven }
+                  : { handR: driven }),
           // The pull rides in the SAME layer as the strike that causes it. Note this puts it BEFORE
           // the guard below: an off hand landing on handL would lose to a raised guard, where the
           // strike wins. No move authors that today (the only off hand is handR, and a technique
@@ -433,7 +460,16 @@ const poseFor = (
     ...(grab === null ? {} : grab),
   };
 
-  return deriveSkeleton(endpoints, girdle);
+  const skeleton = deriveSkeleton(endpoints, girdle);
+
+  // A driven MID-JOINT (elbow) IS the solved point. deriveSkeleton just bent an elbow off the trailing
+  // fist we placed above; here we write the driven point back over that derived value (M13b), so the
+  // fist keeps its folded endpoint while the elbow keeps the reach. Only elbowR leads a mid-joint today
+  // (S5 · Slice 1); hiza-geri adds the kneeR branch in Slice 2. A total, additive final layer — every
+  // endpoint-driving move returns deriveSkeleton's result untouched.
+  return driven !== null && limb === "elbowR"
+    ? { ...skeleton, elbowR: driven }
+    : skeleton;
 };
 
 // The heads-up display for the current playhead: the engine tick number + both fighters' scores,
