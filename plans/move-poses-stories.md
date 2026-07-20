@@ -37,7 +37,7 @@ single-tick tape.
 | ✅ **S1** — a kick renders with a foot — **shipped #353**                                            | A spectator sees a front kick as a **kick**. Dev learns whether the foot-through-solver assumption holds.                                         | Descriptor table + shared solver; `mae-geri` descriptor (active phase only); `/dojo` default scene set to it; M7 fallbacks; M8 assertion floor                                                           | Chamber/recovery, picker, other 12 moves                                                | Given the challenger throwing `mae-geri` in range, when the active phase renders, `footR` is the driven endpoint at the mid band and `handR` stays at stance · Given two different fighter gaps, when each renders, the phase-2 `footR.x` differs (solve retained, M8.5) · Given `attackMove: "gyaku-zuki"` (no descriptor), when it renders, the generic hand pose draws | Shippable to `/watch` (M6)         |
 | ✅ **S2** — a technique winds up and recovers — **all 3 slices shipped #355, #356, #357**            | Kills the 0.4 s-frozen-at-full-extension defect. Techniques read as _movements_. Unlocks tuning for every later move.                             | Multi-tick `buildDojoTape` spanning real duration; `reach-presets.ts` gains `startup`/`active`/`recovery` (M4); S4 transport reuse; `mae-geri` chamber authored; fixed bone lengths + a capped root step | Per-move chambers for the other 12                                                      | Given `mae-geri` selected, when the dojo tape builds, it spans `startup+active+recovery` ticks and the playhead drives `attackPhase` · Given the playhead on a startup tick, when it renders, `footR` sits at the authored chamber, distinct from its active position (M8.3) · Given the transport, when ◀/▶ steps, playback pauses                                       | Shippable                          |
 | ✅ **S3** — browse the arsenal in `/dojo` — **all 4 slices shipped #358, #359, #360, #361**          | **The original ask**, and by the time it was built, the blocker. Select any of the 13 and see it. The authoring harness S4+ depends on.           | Restart; per-figure move picker absorbing the "Reach preset" dropdown; write-through stamping band + reach + gap (decision 6); `bands` added to the engine mirror; `aria-labelledby` naming (M10)        | Contact sheet                                                                           | Given the picker, when `mawashi-geri` is selected, the pose updates **and** the gap snaps to 300k · Given a move selected, when the gap slider moves, the selected move does not change · Given a stamped band, when the band control is changed, the pose follows (M10 free-combos preserved)                                                                            | Shippable                          |
-| **S4** — the moves fighters actually throw look distinct                                             | Most spectator-visible value per PR. See **bargain** below.                                                                                       | Descriptors for the highest-usage moves, ordered by `npm run telemetry` move-usage                                                                                                                       | Low-usage tail                                                                          | Given each authored move, when its active phase renders, its driven endpoint differs from every other authored move's · Given the contact of two authored moves at the same band, when both render, they are visually distinguishable                                                                                                                                     | Shippable, per-move PRs            |
+| ✅ **S4** — the moves fighters actually throw look distinct — **6/6 slices shipped #363–#367, archived**   | Most spectator-visible value per PR. See **bargain** below.                                                                                       | Descriptors for the highest-usage moves, ordered by `npm run telemetry` move-usage                                                                                                                       | Low-usage tail                                                                          | Given each authored move, when its active phase renders, its driven endpoint differs from every other authored move's · Given the contact of two authored moves at the same band, when both render, they are visually distinguishable                                                                                                                                     | Shippable, per-move PRs            |
 | **S5** — close-range techniques lead with the elbow / knee                                           | `empi` and `hiza-geri` are the only moves whose driven point is a **mid-joint**, currently derived rather than authored. Distinct technical risk. | `empi`, `hiza-geri`; mid-joint promoted to a drivable endpoint                                                                                                                                           | —                                                                                       | Given `empi` active, when it renders, `elbowR` is the driven endpoint and the derived-bend rule does not overwrite it                                                                                                                                                                                                                                                     | Shippable                          |
 | **S6** — the non-strike moves read correctly                                                         | Completes the 13. `throw` already has a look; `sweep` and `tobi-geri` compose with existing layers.                                               | `throw`, `sweep`, `tobi-geri` descriptors routed through the same lookup (M2 vocabulary)                                                                                                                 | —                                                                                       | Given `attackMove: "throw"`, when it renders, the two-hand grab draws via the descriptor lookup, not a `throwing` special case · Given `tobi-geri`, when it renders, the `AIR` stance composes with the kick descriptor                                                                                                                                                   | Shippable                          |
 | **S8** — a technique flows instead of snapping between three held poses _(new, from S2's eye check)_ | The largest remaining gap between "the phases are correct" and "this reads as a movement". Affects all 13 moves and `/watch` as well as `/dojo`.  | Easing between the phase endpoints — stance → chamber → extension → chamber — so the limb travels rather than teleporting; the phase-boundary tick positions stay exactly where the engine puts them     | Which easing curve; whether a distinct recovery pose is still wanted once motion exists | Given a committed technique, when consecutive ticks within one phase render, the driven endpoint has MOVED between them · Given the tick at each phase boundary, when it renders, the endpoint is the authored one (easing must not shift where contact happens) · Given an unauthored move, when it renders, it still eases through its stance (M7 totality)             | Shippable                          |
@@ -159,25 +159,29 @@ lands. It is also the one story that changes how `/watch` looks without authorin
 
 ## Next step
 
-Load `planning` for **S4**. S0–S3 have all shipped (#352, #353, #355–#361; plans archived at
-`docs/archive/move-poses-s0-s1.md`, `-s2.md` and `-s3.md`), so the descriptor mechanism, the
-driven-endpoint solve, phase-correct playback at engine timing, a limb that keeps its bone lengths,
-and a working authoring harness all exist and are proven.
+Load `planning` for **S5 — close-range techniques lead with the elbow / knee**. S0–S4 have all
+shipped (#352, #353, #355–#367; plans archived at `docs/archive/move-poses-s0-s1.md`, `-s2.md`,
+`-s3.md` and `-s4.md`), so the descriptor mechanism, the driven-endpoint solve, phase-correct
+playback at engine timing, a limb that keeps its bone lengths, the shoulder girdle + torso rotation
+(M12), and a working authoring harness all exist and are proven. Two authored strikes now read as
+their own techniques on `/watch`: `gyaku-zuki` (~80% of committed time) and `mawashi-geri` (~13%).
 
-**Everything blocking S4 is now cleared.** `/dojo` can select any of the 13, stands the pair at the
-move's true reach, poses it at a legal band, and replays it from tick 0 — so a move can be authored
-and judged without editing source, which is what S2 · Slice 3 had to do.
+**S5 is the sequenced next, but S6/S7/S8 are also unblocked** now that S4 has landed (dependency
+graph above). S5 is chosen because it carries the distinct technical risk the earlier slices did
+not touch, and it now owns a problem the harness surfaced.
 
-**S4 opens on `gyaku-zuki`** by the telemetry bargain (~80% of all committed on-screen time), and
-nothing overtakes it. Its geometry is settled — the bone-length and lean-polarity questions open
-when S4 was written have both been answered — but it carries two live items:
+**S5 opens on two live problems:**
 
-- **The rear-hand precedence rule.** `gyaku-zuki` is the _reverse_ hand, and `scene.ts:87` puts the
-  guard on the rear arm specifically so a strike and a guard never fight over the same limb. This
-  is the slice that breaks that (already in the parking lot).
-- **Unifying `strikeLean` (heuristic) with `rootTravel` (derived)** — carried from S2 · Slice 3. It
-  changes how punches look at close range, so it belongs where a punch is judged by eye.
+- **The driven point is a _mid-joint_, not an endpoint.** `empi` (elbow) and `hiza-geri` (knee)
+  are the only moves whose driven point is a joint the derived-bend rule currently _computes_
+  rather than one the descriptor _authors_. `deriveBend` (`scene.ts`) must not overwrite a driven
+  mid-joint — the elbow/knee has to become a drivable endpoint the bend rule respects.
+- **The close-range overlap, inherited from S3 · Slice 3.** Standing the pair at each move's true
+  reach makes `empi` (95k) render as two interpenetrating figures — heads overlapping — because
+  the body cannot _not_ reach a distance shorter than its own limbs (see Warnings, "The body
+  cannot reach the engine's distances"). S5 must confront this head-on, not inherit it: it is the
+  first slice whose moves are close enough that the figures collide.
 
-**S5 has grown.** It is no longer only "close-range techniques lead with the elbow/knee" — S3's gap
-snap showed `empi` and `hiza-geri` cannot currently be drawn at their true distances without the
-figures overlapping (see Warnings). S5 owns that problem now.
+Before planning, decide the S5 slice boundary — likely (a) promote the mid-joint to a drivable
+endpoint + author `empi`, (b) author `hiza-geri`, (c) resolve the close-range overlap — but let
+`planning` (with `grill-me`/`find-gaps` if the overlap decision is still fuzzy) settle the split.
