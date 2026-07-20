@@ -762,7 +762,7 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     expect(pose.handR.x).toBeGreaterThan(0);
   });
 
-  it("renders the two-hand grab for attackMove:\"throw\" without the throwing flag (the /dojo picker)", () => {
+  it('renders the two-hand grab for attackMove:"throw" without the throwing flag (the /dojo picker)', () => {
     // The dispatch moved from `frame.throwing` to the descriptor keyed on attackMove (S6 · Slice 3).
     // The /dojo move picker stamps attackMove:"throw" + attacking:true but never sets throwing; today
     // that draws a generic front HAND (the broken picker). Now it draws the two-hand grab — and the
@@ -816,7 +816,7 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     expect(pose.handR).toEqual(scaled(NEUTRAL_HANDS.handR));
   });
 
-  it("draws no grab for a stale attackMove:\"throw\" with no committed reach (the reach gate decides)", () => {
+  it('draws no grab for a stale attackMove:"throw" with no committed reach (the reach gate decides)', () => {
     // attackMove:"throw" is necessary but not sufficient: a fighter carrying the id with reach 0 (idle)
     // draws no grab — the reach gate, not the raw descriptor flag, is what puts hands on the opponent.
     const pose = scene(
@@ -920,7 +920,12 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     const tape: ReplayTape = [
       tickOf(
         0,
-        { throwing: true, attackMove: "throw", attackReach: 120_000, x: 150_000 },
+        {
+          throwing: true,
+          attackMove: "throw",
+          attackReach: 120_000,
+          x: 150_000,
+        },
         { x: 270_000 },
       ),
       tickOf(1, {}, {}),
@@ -3319,7 +3324,9 @@ describe("scene — sweep reaps low with the front foot (S6 · Slice 1)", () => 
     // committed low, mid or high draws the same floor reap. And unlike a banded kick (which draws nothing
     // for band 0 / an unmapped code), the sweep still draws there: its height never came from the band.
     [0, 1, 2, 3, 9].forEach((band) => {
-      expect(poseSweep({ band }).footR).toEqual(scaled({ x: 37.5, y: SWEEP_Y }));
+      expect(poseSweep({ band }).footR).toEqual(
+        scaled({ x: 37.5, y: SWEEP_Y }),
+      );
     });
   });
 
@@ -3491,7 +3498,9 @@ describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
   it("tracks the real opponent distance — a nearer opponent is kicked at a nearer point (M8.5)", () => {
     // The reach solve is retained for the airborne foot: a 150k gap kicks the edge at 37.5, a 240k gap
     // at 66 — both inside tobi-geri's ~79 cap, so they land apart (not a constant forward stub).
-    expect(poseTobi({ gap: 150_000 }).footR).toEqual(scaled({ x: 37.5, y: -46 }));
+    expect(poseTobi({ gap: 150_000 }).footR).toEqual(
+      scaled({ x: 37.5, y: -46 }),
+    );
     expect(poseTobi({ gap: 240_000 }).footR).toEqual(scaled({ x: 66, y: -46 }));
   });
 
@@ -3532,6 +3541,289 @@ describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
     );
     expect(poseTobi({ extra: { attackReach: 0 } }).footR).toEqual(
       scaled(NEUTRAL_AIR_FOOT_R),
+    );
+  });
+});
+
+describe("scene — a technique eases between its phase keyframes (S8)", () => {
+  // Until now a committed move drew ONE held shape per phase: `attackPhase` picked the chamber
+  // (startup / recovery) or the solved extension (active), and every tick within a phase drew the
+  // IDENTICAL pose — so the driven endpoint TELEPORTED at each phase boundary and froze between them
+  // (a gyaku-zuki held its chamber for 7 ticks, its extension for 3, its chamber again for 14). S8
+  // makes the driven point TRAVEL: it eases stance → chamber → extension → chamber → stance across the
+  // real per-phase run of ticks in the tape, so a technique reads as a movement.
+  //
+  // The progress is DERIVED from the tape (M14a): no engine/contract field — `scene()` reads the run
+  // of consecutive ticks that share this fighter's `attackMove` + `attackPhase` and eases within it.
+  // These assertions pin RELATIONS (decision 9): the endpoint MOVED between consecutive ticks, and the
+  // phase-boundary tick is the AUTHORED keyframe — never an eye-tuned literal.
+  const STARTUP = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+
+  // gyaku-zuki — the workhorse (~80% of committed screen time), drives the REAR hand (handL). During
+  // startup the lean/girdle are gated off (M9), so the driving hand eases cleanly from its STANCE to
+  // the authored CHAMBER with nothing else moving.
+  const STANCE_HAND_L = { x: -18, y: -44 }; // STAND rear hand
+  const CHAMBER_HAND_L = { x: -26, y: -50 }; // gyaku-zuki authored chamber
+
+  // A run of `phases` ticks, every one a committed gyaku-zuki at a 240k gap (opponent at 390000), the
+  // per-tick `attackPhase` taken from the array. The playhead then indexes into the run.
+  const gyakuRun = (phases: readonly number[]): ReplayTape =>
+    phases.map((attackPhase, i) =>
+      tickOf(
+        i,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: 240_000,
+          attackMove: "gyaku-zuki",
+          x: 150_000,
+          facing: 1,
+          attackPhase,
+        },
+        { x: 390_000 },
+      ),
+    );
+
+  const handAt = (tape: ReplayTape, playhead: number) =>
+    scene(tape, playhead, VIEWPORT).a.pose.handL;
+
+  it("eases the driving hand across consecutive startup ticks (motion within a phase)", () => {
+    // Three consecutive startup ticks. Today all three draw the frozen chamber, so the hand does not
+    // move — this is the headline defect S8 kills. Eased, the hand travels from stance toward the
+    // chamber, reaching the authored chamber at the last startup tick (the startup→active boundary).
+    const tape = gyakuRun([STARTUP, STARTUP, STARTUP]);
+
+    // Motion: the first and last startup ticks are DIFFERENT positions (RED today — both are chamber).
+    expect(handAt(tape, 0)).not.toEqual(handAt(tape, 2));
+
+    // Boundary authored (M14c): the last startup tick has reached the authored chamber.
+    expect(handAt(tape, 2)).toEqual(scaled(CHAMBER_HAND_L));
+
+    // Directional travel stance → chamber: the chamber sits behind (more −x) and below the stance, so
+    // the driving hand's x DECREASES monotonically across the wind-up.
+    expect(handAt(tape, 0).x).toBeGreaterThan(handAt(tape, 1).x);
+    expect(handAt(tape, 1).x).toBeGreaterThan(handAt(tape, 2).x);
+
+    // The first startup tick has NOT yet reached the chamber — it is still back toward the stance.
+    expect(handAt(tape, 0).x).toBeGreaterThan(scaled(CHAMBER_HAND_L).x);
+    expect(handAt(tape, 0).x).toBeLessThanOrEqual(scaled(STANCE_HAND_L).x);
+  });
+
+  it("snaps to full extension as the active window opens, then re-chambers (M14c)", () => {
+    // Three active ticks. The strike reaches the solved extension on the FIRST active tick — a kime
+    // commit as the contact window opens — then eases back toward the chamber across the rest of the
+    // active phase. Contact is unshifted (it lands exactly on the extension) and the run still MOVES.
+    const tape = gyakuRun([CONTACT, CONTACT, CONTACT]);
+
+    // First active tick = full extension, forward of the chamber (a real punch, not a held chamber).
+    expect(handAt(tape, 0).x).toBeGreaterThan(scaled(CHAMBER_HAND_L).x);
+    expect(handAt(tape, 0)).not.toEqual(scaled(CHAMBER_HAND_L));
+
+    // The active phase re-chambers by its last tick, and the endpoint MOVED between them.
+    expect(handAt(tape, 2)).toEqual(scaled(CHAMBER_HAND_L));
+    expect(handAt(tape, 0)).not.toEqual(handAt(tape, 2));
+
+    // Directional retract extension → chamber: the chamber sits behind (−x), so x DECREASES.
+    expect(handAt(tape, 0).x).toBeGreaterThan(handAt(tape, 1).x);
+    expect(handAt(tape, 1).x).toBeGreaterThan(handAt(tape, 2).x);
+  });
+
+  it("retracts the driving hand from the chamber back to the stance during recovery (M14d)", () => {
+    // Three recovery ticks. Today recovery freezes at the chamber for its whole duration; eased, the
+    // hand re-chambers then travels back to the stance, reaching the stance at the last recovery tick.
+    const tape = gyakuRun([RECOVER, RECOVER, RECOVER]);
+
+    // Boundary authored (M14d): recovery STARTS at the chamber, symmetric with the wind-up.
+    expect(handAt(tape, 0)).toEqual(scaled(CHAMBER_HAND_L));
+    // Returns to the stance by the end (RED today — recovery froze at the chamber).
+    expect(handAt(tape, 2)).toEqual(scaled(STANCE_HAND_L));
+    expect(handAt(tape, 0)).not.toEqual(handAt(tape, 2));
+
+    // Directional travel chamber → stance: the stance sits forward (+x) of the chamber, so x INCREASES.
+    expect(handAt(tape, 2).x).toBeGreaterThan(handAt(tape, 1).x);
+    expect(handAt(tape, 1).x).toBeGreaterThan(handAt(tape, 0).x);
+  });
+
+  it("passes through all five keyframes across a full-duration technique (stance→chamber→extension→chamber→stance)", () => {
+    // A real gyaku-zuki span — 7 startup, 3 active, 14 recovery — proving the whole arc lands its
+    // authored keyframes exactly at the phase boundaries while every interior tick is in motion.
+    const full = gyakuRun([
+      ...Array<number>(7).fill(STARTUP),
+      ...Array<number>(3).fill(CONTACT),
+      ...Array<number>(14).fill(RECOVER),
+    ]);
+
+    expect(handAt(full, 0)).toEqual(scaled(STANCE_HAND_L)); // commit: still at the stance
+    expect(handAt(full, 6)).toEqual(scaled(CHAMBER_HAND_L)); // startup→active boundary: chamber
+    expect(handAt(full, 10)).toEqual(scaled(CHAMBER_HAND_L)); // active→recovery boundary: re-chambered
+    expect(handAt(full, 23)).toEqual(scaled(STANCE_HAND_L)); // recovery end: back to the stance
+
+    // The active window opens at the solved extension (global tick 7 = the first active tick), forward
+    // of the chamber and distinct from it.
+    expect(handAt(full, 7).x).toBeGreaterThan(scaled(CHAMBER_HAND_L).x);
+    expect(handAt(full, 7)).not.toEqual(scaled(CHAMBER_HAND_L));
+  });
+
+  it("keeps the reach-to-target solve at contact — two gaps land two contact points (M8.5)", () => {
+    // Easing must not shift where contact happens: the contact tick is the live reach-to-target solve,
+    // not a frozen authored extension. Two different opponent gaps therefore drive the hand to two
+    // different forward points — the standing guard against S8 regressing M3 into a fixed extension.
+    const contactAt = (oppX: number) =>
+      scene(
+        [CONTACT, CONTACT, CONTACT].map((attackPhase, i) =>
+          tickOf(
+            i,
+            {
+              attacking: true,
+              attackBand: 2,
+              attackReach: 240_000,
+              attackMove: "gyaku-zuki",
+              x: 150_000,
+              facing: 1,
+              attackPhase,
+            },
+            { x: oppX },
+          ),
+        ),
+        0, // the first active tick — the contact peak
+        VIEWPORT,
+      ).a.pose.handL;
+
+    expect(contactAt(300_000).x).not.toBe(contactAt(390_000).x);
+  });
+
+  it("re-derives the mid-joint and leans the torso WITH the eased hand — coherence, fixed bones (M14e)", () => {
+    // Five active ticks: the hand eases from full extension (tick 0) back to the chamber (tick 4), so
+    // tick 1 is a genuine interior point. The driving arm's two bones stay EQUAL there — the elbow is
+    // re-derived from the eased endpoint, not lerped (which would drift it off its bone length and
+    // reopen the S2 · Slice 3 stretch scar).
+    const tape = gyakuRun([CONTACT, CONTACT, CONTACT, CONTACT, CONTACT]);
+    const pose = scene(tape, 1, VIEWPORT).a.pose;
+    const bone = (p: Joint, q: Joint) => Math.hypot(p.x - q.x, p.y - q.y);
+
+    expect(
+      Math.abs(
+        bone(pose.shoulderL, pose.elbowL) - bone(pose.elbowL, pose.handL),
+      ),
+    ).toBeLessThan(1.5);
+
+    // The torso lean follows the eased hand: the head is advanced when the punch is at full extension
+    // (tick 0) and upright once the hand has re-chambered (tick 4) — the lean is not snapped on, it
+    // tracks the driven point.
+    const headX = (playhead: number) =>
+      scene(tape, playhead, VIEWPORT).a.pose.head.x;
+
+    expect(headX(0)).toBeGreaterThan(headX(4));
+  });
+
+  it("eases an UNDESCRIBED move through its stance — still moves at contact (M7 totality)", () => {
+    // kizami-zuki has no descriptor, so its chamber IS its stance: it does not wind up (startup holds
+    // the stance), but it STILL travels stance → extension → stance across the active phase. So an
+    // unauthored move eases too — the fallback is a real movement, not a frozen figure.
+    const STANCE_HAND_R = { x: 18, y: -44 }; // STAND front hand — kizami-zuki's undescribed limb
+
+    const unauthored = (phases: readonly number[]): ReplayTape =>
+      phases.map((attackPhase, i) =>
+        tickOf(
+          i,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: 210_000,
+            attackMove: "kizami-zuki",
+            x: 150_000,
+            facing: 1,
+            attackPhase,
+          },
+          { x: 390_000 },
+        ),
+      );
+
+    const handR = (tape: ReplayTape, playhead: number) =>
+      scene(tape, playhead, VIEWPORT).a.pose.handR;
+
+    // Startup: no authored chamber ⇒ chamber ≡ stance ⇒ the wind-up holds the stance (no motion).
+    const su = unauthored([STARTUP, STARTUP, STARTUP]);
+
+    expect(handR(su, 0)).toEqual(scaled(STANCE_HAND_R));
+    expect(handR(su, 2)).toEqual(scaled(STANCE_HAND_R));
+
+    // Active: eases extension → stance (its chamber ≡ stance), so it still MOVES — the first active
+    // tick punches forward to the solved extension, and it re-chambers to the stance by the last tick.
+    const ac = unauthored([CONTACT, CONTACT, CONTACT]);
+
+    expect(handR(ac, 0).x).toBeGreaterThan(scaled(STANCE_HAND_R).x);
+    expect(handR(ac, 2)).toEqual(scaled(STANCE_HAND_R));
+  });
+
+  it("renders a lone tick inside a multi-tick tape as the discrete keyframe (single-keyframe totality)", () => {
+    // A phase-2 tick with a startup before and a recovery after is a run of length 1: nothing to ease,
+    // so it draws the discrete extension — byte-identical to the pre-S8 single-tick pick. This is what
+    // keeps every existing single-tick test green.
+    const soloExtension = scene(gyakuRun([CONTACT]), 0, VIEWPORT).a.pose.handL;
+
+    expect(
+      scene(gyakuRun([STARTUP, CONTACT, RECOVER]), 1, VIEWPORT).a.pose.handL,
+    ).toEqual(soloExtension);
+  });
+
+  it("does not blend across an attack-instance boundary — a 3→1 phase drop starts a fresh run", () => {
+    // Two back-to-back gyaku instances: a 3-tick recovery followed by a 3-tick startup. Each run is
+    // bounded by the phase change, so the recovery reaches the stance at ITS last tick and the next
+    // startup begins at the stance at ITS first tick — never merged into one long six-tick motion. If
+    // the run scan ignored the phase (keying on the move alone), neither boundary tick would reach the
+    // stance.
+    const twoInstances = gyakuRun([
+      RECOVER,
+      RECOVER,
+      RECOVER,
+      STARTUP,
+      STARTUP,
+      STARTUP,
+    ]);
+
+    expect(handAt(twoInstances, 2)).toEqual(scaled(STANCE_HAND_L)); // recovery run ends at stance
+    expect(handAt(twoInstances, 3)).toEqual(scaled(STANCE_HAND_L)); // startup run starts at stance
+  });
+
+  it("does not blend across a MOVE change — a different technique next tick starts a fresh run", () => {
+    // Two DIFFERENT moves on adjacent ticks, both in startup: the move change bounds each run to length
+    // 1, so the gyaku-zuki tick draws its discrete chamber — not eased from the neighbouring move's
+    // stance. Kills the run-scan mutant that keys on the phase alone and would merge the two into one
+    // length-2 run (which would draw the gyaku tick at the stance, not the chamber).
+    const twoMoves: ReplayTape = [
+      tickOf(
+        0,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: 240_000,
+          attackMove: "gyaku-zuki",
+          x: 150_000,
+          facing: 1,
+          attackPhase: STARTUP,
+        },
+        { x: 390_000 },
+      ),
+      tickOf(
+        1,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: 270_000,
+          attackMove: "mae-geri",
+          x: 150_000,
+          facing: 1,
+          attackPhase: STARTUP,
+        },
+        { x: 390_000 },
+      ),
+    ];
+
+    expect(scene(twoMoves, 0, VIEWPORT).a.pose.handL).toEqual(
+      scaled(CHAMBER_HAND_L),
     );
   });
 });

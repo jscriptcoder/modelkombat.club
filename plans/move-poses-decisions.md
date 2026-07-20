@@ -326,6 +326,74 @@ REACH_PRESETS` (a subset), so adding two keys is clean.
   its keep. Test floor (i) held; the anti-clobber guard (7) is the assertion each slice turned on.
   `BENCHMARK_VERSION` held at `v19`, `src/` untouched (M11).
 
+- **M14 — the technique FLOWS: easing between the phase keyframes** _(grilled 2026-07-20, for S8 —
+  the arc's LAST story)_. The pose model to date selects a shape from the DISCRETE `attackPhase` code
+  (`scene.ts` `isChamberPhase` — phase 1 **and** 3 both draw the authored `chamber`, phase 2 the solved
+  extension), so every tick within a phase draws the identical shape and the driven endpoint
+  **teleports** at each phase boundary. This is the S2 eye-check's carried defect: "the phases are
+  correct" is not yet "this reads as a movement". S8 makes the driven point (and everything derived
+  from it) TRAVEL between the phase keyframes. It is the one arc story that changes how **`/watch`**
+  looks **without authoring anything new** — the keyframes are the very shapes S1–S7 already authored.
+
+  Resolved, in dependency order:
+
+  | #   | Question                              | Choice                                                                                                                                                                            | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+  | --- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | a   | Progress signal source                | **Derived in the web layer** — `scene()` run-length-scans the tape around the playhead (same `attackMove`, monotonic `attackPhase`) for tick-within-move. No engine/contract field | Keeps the web-only streak (S1–S7) and `BENCHMARK_VERSION` at `v19`; `scene()` already receives the whole tape + playhead and already scans it (`scoredWithin`), so this is the file's existing idiom, not a new capability. The parked `attackProgress` contract field (Q4 / parking lot) stays parked — an engine touch + likely version bump for data the tape already implies. Pure ⇒ replay-safe, identical on any scrub. Works for BOTH surfaces: a `/watch` real tape and a `/dojo` synthetic `buildDojoTape` span carry the two fields per tick alike. |
+  | b   | Easing curve                          | **One shared smoothstep** `t·t·(3−2t)`, a single swappable pure function on every segment, eye-tuned in `/dojo`                                                                    | The AC only requires "moved between consecutive ticks" + "boundary tick is the authored position" — any curve satisfies it, so this is how the motion READS, an eye question (decision 9). Smoothstep reads natural (accelerate out of a keyframe, decelerate into the next), is symmetric so wind-up and retract share one rule, and is a one-line pure function pinned by relation. Kept a swappable seam so per-segment curves (ease-IN into contact for _kime_) can follow as a `/dojo` tuning follow-up. Linear rejected (robotic, no _kime_ snap); per-segment rejected as premature (3 knobs before the single curve is judged). |
+  | c   | Keyframe set + anchoring              | **Five keyframes: stance → chamber → extension → chamber → stance**; the solved extension lands on the FIRST active tick (a _kime_ commit as the contact window opens), easing back to the chamber across the rest of the active phase | Falls out of (d) + the two ACs. The driven endpoint passes THROUGH the authored keyframe exactly at each phase boundary — chamber at the last startup tick, the **solved extension on the first active tick** ("easing must not shift where contact happens" ✓), chamber again by the last active tick — and MOVES on every interior tick, including within the active phase (extension → chamber), which satisfies "the endpoint has moved between consecutive ticks within one phase" and forbids the frozen-extension hold today's code shows. **Revised during TDD** from an earlier "extension at the active-phase PEAK (mid-run)" sketch: the S7 contact sheet AND the S2 dojo default both render a technique at its FIRST active tick (`preset.startup`, where `phaseAt → 2`) and require the solved extension there, and every pre-S8 single-tick test reads a lone active tick as the extension — a mid-run peak drew the chamber at the first active tick and broke all three (4 tests). Extension-at-contact-open keeps them byte-identical and reads as an explosive strike; the one remaining fast transition is the chamber→extension _kime_ snap at the startup→active boundary, which is what a committed strike IS. |
+  | d   | Recovery path / a new pose?           | **Reuse the chamber as the retract waypoint** — ease extension → chamber → stance; author NOTHING new                                                                            | S8's whole premise is "change `/watch` without new authoring" — the keyframes are the shapes S1–S7 authored. Re-chambering before setting down is correct karate form (esp. kicks), and it is symmetric with stance→chamber→extension. M3 / M13j already DEFAULT recovery to the chamber — S8 makes that reuse VISIBLE (a travel through it) rather than a held still. A distinct per-move recovery pose (13× authoring) is rejected (contradicts the premise); a direct extension→stance drop is rejected (a kick collapsing straight from full extension skips the re-chamber, reads as the leg giving way). |
+  | e   | WHERE the blend lives (architecture)  | **Make `driven` a continuous keyframe blend, not a discrete phase pick** — everything downstream is unchanged _(proposed — object if wrong)_                                       | The load-bearing insight from grilling `scene.ts`: `poseFor` is ALREADY structured so a single `driven` point is the input the lean, hip-step, girdle rotation, `deriveSkeleton` mid-joints, and the mid-joint write-back all flow from. So S8's core change is one line of intent — replace `driven = winding ? chamber : strikeHand` (the `isChamberPhase` step function) with `driven = blendAlongKeyframes(stance, chamber, extension, tickInMove, ease)` (continuous). Because the whole chain re-derives from `driven`: **(1)** body coherence is free — the torso/girdle/head lean interpolates WITH the endpoint (no torn torso), and **(2)** the fixed-bone-length invariant S2 · Slice 3 fought for is PRESERVED for free — `deriveSkeleton` re-solves each mid-joint at fixed bone length from the blended endpoints, so no interior tick drifts (the alternative — lerping the resolved skeleton joint-by-joint — would let a mid-joint slide off its bone length mid-travel and reopen that scar; **rejected**). |
+  | f   | Totality (unauthored / idle frames)   | **TOTAL** — a chamber-less move eases through its STANCE; an idle / unknown frame is byte-identical to today                                                                       | M7. A move with no authored chamber has stance≡chamber, so it eases stance→extension→stance — still MOVES (the AC's "an unauthored move still eases through its stance"). An idle fighter (`attackPhase 0`), an unknown id, or a single-keyframe span has nothing to blend ⇒ renders exactly as today. The blend degenerates to the current discrete pick at the keyframe ticks, so authored moves are unchanged AT the boundaries and only the interior ticks are new. |
+
+  **Consequences to expect, not discover:**
+
+  - **Blast radius is `scene.ts` + `scene.test.tsx` (+ maybe one small pure helper), web-only.** No
+    `src/` touch, no `BENCHMARK_VERSION` bump (render-only, as every slice since S1), and **no
+    `move-descriptors.ts` / `reach-presets.ts` / `Arsenal.tsx` change** — the chamber and extension the
+    descriptor already authors ARE the keyframes, unchanged. The change is the largest single-file logic
+    change of the arc, but the narrowest blast radius.
+  - **`poseFor` gains a progress input; `scene()` gains the tape scan.** Today `poseFor(frame,
+    strikeHand, grab)` returns one shape from the discrete phase. S8 threads the tick-within-move (and
+    the move's phase durations, to locate the segment) so `driven` can blend among the three keyframe
+    positions it ALREADY has in scope (stance from `stanceFor`, chamber from `chamberFor`, extension from
+    the passed `strikeHand`). Backward-compatible: absent progress ⇒ today's behaviour. Exact seam (extra
+    param vs a sibling that `scene` blends) is a planning/refactor call, not a design one.
+  - **`isChamberPhase` survives only as the keyframe SELECTOR, not the final pose.** It stops choosing
+    _which shape_ and starts bounding _which segment_ a tick sits in. The step function it encodes is the
+    thing being replaced.
+  - **`/watch` visibly changes for the 5 moves ever thrown** (telemetry: `gyaku-zuki` ~80%,
+    `mawashi-geri`, `tobi-geri`, `sweep`, `throw`) — the first arc slice whose value lands on real
+    replays with zero authoring. The other 8 (never thrown) change on `/dojo` only. **The `/sheet`
+    contact sheet is unaffected** — it renders a single ACTIVE-phase still per move (no timeline to ease).
+  - **The run-length scan needs an attack-instance boundary rule.** Back-to-back techniques read as
+    phase runs `1,2,3,1,2,3`; a phase DROP (`3→1`), a `phase 0` gap, or a change of `attackMove` starts a
+    new instance. Pure and tape-derivable, but the scan must define the boundary or two adjacent strikes
+    blend into one motion.
+
+  **Test floor (decision 9 / M8, translated to motion):**
+
+  1. **Motion within a phase** — consecutive ticks in the same phase yield DIFFERENT driven-endpoint
+     positions (the story's headline AC; kills the frozen hold today's code has).
+  2. **Boundary exactness** — at each phase boundary the driven endpoint equals the authored keyframe
+     (chamber at the two active boundaries, the solved extension at the active peak); contact is not
+     shifted.
+  3. **Directional travel** — the endpoint advances toward extension across startup→active and retreats
+     across recovery (per-segment direction).
+  4. **Solve retained across easing** — two opponent gaps still yield two different extension x (M8.5
+     survives: the peak is the reach-to-target solve, not a frozen authored point).
+  5. **Totality** — an unauthored move eases through its stance; an idle / unknown frame is byte-identical
+     to today (single keyframe, no blend).
+  6. **Coherence** — the dependent layers (lean / step / girdle) and the mid-joints move WITH the endpoint
+     at interior ticks: a mid-joint stays on its fixed bone length throughout (not only at the boundaries),
+     the guard against reopening the S2 · Slice 3 stretch scar.
+
+  **Slicing: ONE vertical slice** (like S7). The progress derivation (tape scan) and the keyframe blend
+  are coupled — neither ships value alone (a half-eased technique is not shippable) — and it reuses every
+  authored pose, shipping to `/watch` + `/dojo` at once. If the scan + blend proves larger than expected
+  at TDD time, the internal fault line is (1) progress derivation green first, then (2) the blend — but as
+  ONE PR. Being the arc's last story, its closeout also **archives S7's still-live `plans/move-poses-s7.md`**.
+
 ## Slice ladder
 
 1. **Engine** — `attackMove` + `attackPhase` on `RenderFrame`. Additive, render-only, outcome
