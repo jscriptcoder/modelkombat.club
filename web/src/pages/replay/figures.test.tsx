@@ -28,6 +28,18 @@ const VIEWPORT: Viewport = { width: 1200, height: 600 };
 const BODY_SCALE = (BODY_HEIGHT_SUB * (1200 / 600_000)) / 76;
 const s = (n: number) => Math.round(n * BODY_SCALE);
 
+// World sub-units → reference LOCAL px, and the reach-to-target LANDING (scene.ts reachTargetX):
+// recomputed from the imported knob so the reach anchors below re-flow on a BODY_HEIGHT_SUB re-tune,
+// exactly as scene.test's own helpers do. REF = 76 (STAND head→foot span), half-width 10, floor 24.
+const subToLocal = (subunits: number) => (subunits * 76) / BODY_HEIGHT_SUB;
+
+const landingLocal = (gap: number, reach: number) => {
+  const cap = subToLocal(reach);
+  const floor = Math.min(24, cap);
+
+  return Math.max(floor, Math.min(subToLocal(gap) - 10, cap));
+};
+
 const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
   x: 150_000,
   y: 0,
@@ -139,7 +151,7 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
   it("extends the striking arm's hand joint for an attacking fighter", () => {
     // Applying a strike scene moves the persistent front-hand joint forward + up toward the band
     // height (scene-graph state, not pixels). A gyaku-reach strike at gyaku distance lands the hand
-    // on the opponent's near edge (x 66 local); the reach maths itself lives in scene.test.
+    // on the opponent's near edge (landingLocal); the reach maths itself lives in scene.test.
     const stage = createStage(VIEWPORT, ["generic", "generic"]);
 
     stage.apply(scene([tickOf(0, { attacking: false }, {})], 0, VIEWPORT));
@@ -165,7 +177,7 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     );
 
     expect(neutralHandX).toBe(s(18));
-    expect(stage.a.handR.x).toBe(s(66));
+    expect(stage.a.handR.x).toBe(s(landingLocal(240_000, 240_000)));
     expect(stage.a.handR.y).toBe(s(-46));
     expect(stage.a.handR.x).toBeGreaterThan(neutralHandX); // reached forward
   });
@@ -187,8 +199,8 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
   it("reaches both hands forward into a grab for a throwing fighter", () => {
     // A throwing fighter reaches BOTH grab hands to the opponent's near edge (M8): an in-range throw
-    // (gap 120k at reach 120k) lands the lead hand ON the near edge (28) and the rear hand a spread
-    // behind (20) — proven through the persistent hand joints the draw layer swings.
+    // (gap 120k at reach 120k) lands the lead hand ON the near edge (landingLocal) and the rear hand a
+    // GRAB_SPREAD (8) behind — proven through the persistent hand joints the draw layer swings.
     const stage = createStage(VIEWPORT, ["generic", "generic"]);
 
     stage.apply(scene([tickOf(0, { throwing: false }, {})], 0, VIEWPORT));
@@ -216,8 +228,8 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     expect(neutralL).toBe(s(-18));
     expect(neutralR).toBe(s(18));
-    expect(stage.a.handR.x).toBe(s(28)); // front hand on the opponent's near edge
-    expect(stage.a.handL.x).toBe(s(20)); // rear hand on the grab, a spread behind the lead
+    expect(stage.a.handR.x).toBe(s(landingLocal(120_000, 120_000))); // front hand on the opponent's near edge
+    expect(stage.a.handL.x).toBe(s(landingLocal(120_000, 120_000) - 8)); // rear hand on the grab, a spread behind the lead
     expect(stage.a.handL.x).toBeGreaterThan(neutralL); // rear hand swung forward
     expect(stage.a.handR.x).toBeGreaterThan(neutralR); // front hand reached further forward
   });
@@ -457,13 +469,13 @@ describe("figures — the head glyph scales to 0.3× the body height (Story 3 ·
     const glyphA = stage.a.head.children[0];
     const glyphB = stage.b.head.children[0];
 
-    // 1200-wide viewport: 0.3 × (240k × 0.002 = 480px body) = 144px head → scale 144/24 = 6.
-    expect(glyphA.scale.x).toBe(6);
+    // 1200-wide viewport: 0.3 × (210k × 0.002 = 420px body) = 126px head → scale 126/24 = 5.25.
+    expect(glyphA.scale.x).toBe(5.25);
     expect(glyphA.scale.x).toBe(headGlyphScale(1200));
     expect(glyphA.scale.y).toBe(headGlyphScale(1200)); // uniform on both axes
-    expect(glyphB.scale.x).toBe(6); // BOTH fighters sized, not just the challenger
+    expect(glyphB.scale.x).toBe(5.25); // BOTH fighters sized, not just the challenger
 
-    // The head box is exactly 0.3 × the rendered STAND body span (s(76) = 480px) — a fixed
+    // The head box is exactly 0.3 × the rendered STAND body span (s(76) = 420px) — a fixed
     // proportion of the SAME height knob the body scales from, so the two grow together.
     expect(glyphA.scale.x * 24).toBe(0.3 * s(76));
   });
@@ -479,10 +491,10 @@ describe("figures — the head glyph scales to 0.3× the body height (Story 3 ·
       "generic",
     ]);
 
-    // Doubling the viewport doubles the head box (6 → 12); halving halves it (6 → 3).
-    expect(wide.a.head.children[0].scale.x).toBe(12);
+    // Doubling the viewport doubles the head box (5.25 → 10.5); halving halves it (5.25 → 2.625).
+    expect(wide.a.head.children[0].scale.x).toBe(10.5);
     expect(wide.a.head.children[0].scale.x).toBe(headGlyphScale(2400));
-    expect(narrow.a.head.children[0].scale.x).toBe(3);
+    expect(narrow.a.head.children[0].scale.x).toBe(2.625);
     expect(narrow.a.head.children[0].scale.x).toBe(headGlyphScale(600));
 
     // Linear in viewport width — a fixed-px head (dropping pxPerSubunit) would be equal, not 2×.

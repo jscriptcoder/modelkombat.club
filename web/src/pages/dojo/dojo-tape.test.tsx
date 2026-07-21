@@ -11,6 +11,17 @@ import { DEFAULT_GAP, REACH_PRESETS } from "./reach-presets";
 const s = (n: number) =>
   Math.round((n * BODY_HEIGHT_SUB * (1200 / 600_000)) / 76);
 
+// World sub-units → reference LOCAL px, and the reach-to-target LANDING (scene.ts reachTargetX),
+// recomputed from the imported knob so the reach anchor below re-flows on a BODY_HEIGHT_SUB re-tune.
+const subToLocal = (subunits: number) => (subunits * 76) / BODY_HEIGHT_SUB;
+
+const landingLocal = (gap: number, reach: number) => {
+  const cap = subToLocal(reach);
+  const floor = Math.min(24, cap);
+
+  return Math.max(floor, Math.min(subToLocal(gap) - 10, cap));
+};
+
 // The dojo's synthetic-tape builder centers two hand-posed fighters on the ring so the pose lab
 // renders them through the SAME scene()/createStage pipeline that /watch ships — "what you tune is
 // what ships". Pure maths, exhaustively asserted: web/ is not Stryker-reachable, so exact cases stand
@@ -327,7 +338,7 @@ describe("the default dojo scene renders two fighters through the real scene()/c
 
     expect(stanced).toBe(s(14)); // the wind-up starts at the stance foot
     expect(chambered).toBe(s(4)); // drawn back under the hip by the end of the wind-up
-    expect(extended).toBe(s(66)); // out on the king's near edge
+    expect(extended).toBe(s(landingLocal(240_000, 270_000))); // out on the king's near edge
     expect(chambered).toBeLessThan(stanced); // the wind-up draws the foot BACK
     expect(extended).toBeGreaterThan(chambered); // then the kick travels FORWARD to its target
 

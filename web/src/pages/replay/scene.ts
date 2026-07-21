@@ -678,10 +678,12 @@ const GROUND_RATIO = 0.9;
 
 // The fighter's body height in world sub-units — the single tunable knob every body dimension
 // derives from (decision 3 / M2). Projected by the SAME pxPerSubunit that positions the fighter, so
-// the body grows with the ring instead of staying a fixed ~76px across a void of empty world. ~240k
-// ≈ a reference mid-punch reach; a starting guess, refined by eye in /dojo (M2 / M12 vertical-fit).
+// the body grows with the ring instead of staying a fixed ~76px across a void of empty world. Tuned
+// by eye in /dojo: 210k reads a touch smaller than the ~240k workhorse reach, so the fighters no
+// longer fill the frame (M2 / M12 vertical-fit); a smaller body stands further from its opponent in
+// body-heights, so a committed strike telescopes a little more to connect (bounded — see rootTravel).
 // Exported so the head glyph (Slice 2) can size itself as a proportion of the same height.
-export const BODY_HEIGHT_SUB = 240_000;
+export const BODY_HEIGHT_SUB = 210_000;
 
 // The reference skeleton's head-to-foot span in local px (feet planted at y 0, head at STAND.head.y)
 // — the unit the pose constants (STAND/CROUCH/AIR/PRONE + the reach layers) are authored in. Derived

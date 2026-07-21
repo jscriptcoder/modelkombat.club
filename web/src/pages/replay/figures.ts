@@ -208,7 +208,7 @@ const applyFigure = (figure: Figure, placement: Scene["a"]): void => {
     bones.moveTo(pose[from].x, pose[from].y).lineTo(pose[to].x, pose[to].y);
   }
 
-  bones.stroke({ width: 4, color });
+  bones.stroke({ width: 5, color });
 };
 
 // The score-pop marker: a colourblind-safe glyph (not hue alone) prefixed onto a fighter's HUD
