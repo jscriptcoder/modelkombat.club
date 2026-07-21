@@ -21,7 +21,7 @@ const VIEWPORT: Viewport = { width: 1200, height: 600 };
 // Story 3 — world scale. The body is authored in a reference frame whose head-to-foot span is 76px
 // (STAND: head at −76, feet at 0); the projection scales it so that span becomes the height knob
 // projected to screen, i.e. BODY_HEIGHT_SUB · pxPerSubunit. At the test viewport that is
-// 240000 · 0.002 = 480px, so every reference coordinate renders at ×(480/76), rounded to whole px.
+// 210000 · 0.002 = 420px, so every reference coordinate renders at ×(420/76), rounded to whole px.
 // BODY_SCALE is recomputed here from the documented knob + fixed viewport (NOT from the production
 // scale fn), so a scale-formula mutant makes production disagree with these `scaled(...)` expectations
 // while a deliberate knob re-tune re-flows them (only the literal-480 magnitude tests above pin the
@@ -32,6 +32,30 @@ const scaled = (joint: { x: number; y: number }) => ({
   x: Math.round(joint.x * BODY_SCALE),
   y: Math.round(joint.y * BODY_SCALE),
 });
+
+// scene.ts maps a WORLD distance into the pose's reference LOCAL-px frame by
+// SUBUNIT_TO_LOCAL = REF_BODY_HEIGHT_PX / BODY_HEIGHT_SUB (REF = 76, the STAND head→foot span). The
+// reach / grab / kick anchors below are world distances, so they recompute through that SAME ratio
+// from the imported knob — a deliberate BODY_HEIGHT_SUB re-tune re-flows every reach anchor, exactly
+// as BODY_SCALE re-flows the stance anchors (only the literal body-height magnitude tests pin the knob
+// itself). REF is the 76 literal, written independently of production, so a body-proportion mutant
+// still makes production disagree.
+const subToLocal = (subunits: number) => (subunits * 76) / BODY_HEIGHT_SUB;
+
+// The reach-to-target LANDING in reference LOCAL px (scene.ts reachTargetX): the facing-relative
+// near-edge distance (subToLocal(gap) − BODY_HALF_WIDTH) clamped into [floor, cap], where
+// cap = subToLocal(reach) and floor = min(STRIKE_FLOOR_X, cap). `gap` is the sub-unit distance to the
+// opponent's CENTRE (negative = behind the facing). Mirrors the production clamp with independently
+// authored constants (half-width, floor), so a clamp / offset / cap mutant still makes production
+// disagree while a knob re-tune re-flows every landing below.
+const landingLocal = (gap: number, reach: number) => {
+  const BODY_HALF_WIDTH = 10; // opponent's near-surface offset from centre (scene.ts)
+  const STRIKE_FLOOR_X = 24; // point-blank forward floor (scene.ts)
+  const cap = subToLocal(reach);
+  const floor = Math.min(STRIKE_FLOOR_X, cap);
+
+  return Math.max(floor, Math.min(subToLocal(gap) - BODY_HALF_WIDTH, cap));
+};
 
 // A complete render frame with neutral defaults — override only the fields a case exercises.
 const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
@@ -141,8 +165,8 @@ describe("scene — the pure tape → screen projection", () => {
 describe("scene — world-scaled body (Story 3)", () => {
   // The body is defined in world sub-units and projected by the SAME pxPerSubunit that positions
   // the fighter, so it grows with the ring instead of staying a fixed ~76px. At the test viewport
-  // (1200 wide, pxPerSubunit = 1200/600000 = 0.002) the height knob BODY_HEIGHT_SUB = 240000
-  // sub-units projects to 240000 · 0.002 = 480px tall. Every expected number below is derived from
+  // (1200 wide, pxPerSubunit = 1200/600000 = 0.002) the height knob BODY_HEIGHT_SUB = 210000
+  // sub-units projects to 210000 · 0.002 = 420px tall. Every expected number below is derived from
   // those documented facts, not from the production scale — so a scale mutant is caught.
   const poseAt = (posture: number, viewport: Viewport = VIEWPORT) =>
     scene([tickOf(0, { posture }, {})], 0, viewport).a.pose;
@@ -150,9 +174,9 @@ describe("scene — world-scaled body (Story 3)", () => {
   it("scales a standing body to the world height knob, not a fixed ~76px", () => {
     const pose = poseAt(0);
 
-    // Head-to-foot span is the projected knob height (240000 · 0.002 = 480), a big fighter.
-    expect(pose.footL.y - pose.head.y).toBe(480);
-    expect(pose.head).toEqual({ x: 0, y: -480 });
+    // Head-to-foot span is the projected knob height (210000 · 0.002 = 420).
+    expect(pose.footL.y - pose.head.y).toBe(420);
+    expect(pose.head).toEqual({ x: 0, y: -420 });
     // Feet stay planted on the local ground line (y 0) at any scale.
     expect(pose.footL.y).toBe(0);
     expect(pose.footR.y).toBe(0);
@@ -164,8 +188,8 @@ describe("scene — world-scaled body (Story 3)", () => {
 
     const spanOf = (p: typeof small) => p.footL.y - p.head.y;
 
-    expect(spanOf(small)).toBe(480); // 240000 · (1200/600000)
-    expect(spanOf(big)).toBe(960); // 240000 · (2400/600000) — exactly twice
+    expect(spanOf(small)).toBe(420); // 210000 · (1200/600000)
+    expect(spanOf(big)).toBe(840); // 210000 · (2400/600000) — exactly twice
   });
 });
 
@@ -229,13 +253,13 @@ describe("scene — strike reach-to-target", () => {
   // A committed strike AIMS its front arm (handR) at the OPPONENT's near body edge, clamped to the
   // move's true reach — not a fixed forward stub (Story 5). The reach is viewport-independent in
   // LOCAL px: the reference body is 76px tall (STAND: head −76, feet 0) and that height is projected
-  // to BODY_HEIGHT_SUB (240k) world sub-units, so one sub-unit is exactly 76/240000 local px — a
-  // world gap of 240k is one body height (76 local px) between centres. The near edge is one body
-  // half-width (10) nearer, so an in-range gyaku strike lands at 76 − 10 = 66; the reach clamps to
-  // [STRIKE_FLOOR_X (24), attackReach·(76/240000)]. The y is the band height (low −24 / mid −46 /
-  // high −68), unchanged. Every expected x below is that physical anchor, recomputed independently
-  // of the production formula. Reach is a fixed LOCAL direction (+x forward); the container flip
-  // (S1 facing) turns it on-screen — the geometry never reads facing itself.
+  // to BODY_HEIGHT_SUB world sub-units, so one sub-unit is subToLocal local px (from the imported
+  // knob). The near edge is one body half-width (10) inside the centre gap, so an in-range strike
+  // lands at landingLocal(gap, reach); the reach clamps to [STRIKE_FLOOR_X (24), subToLocal(reach)].
+  // The y is the band height (low −24 / mid −46 / high −68), unchanged. Every expected x below is that
+  // physical anchor, recomputed independently of the production formula. Reach is a fixed LOCAL
+  // direction (+x forward); the container flip (S1 facing) turns it on-screen — the geometry never
+  // reads facing itself.
   const STRIKE_FLOOR_X = 24; // point-blank floor (a minimal forward technique), mirrors scene.ts
   const NEUTRAL_HAND = { x: 18, y: -44 }; // the STAND front hand (the no-reach fallback)
 
@@ -276,9 +300,11 @@ describe("scene — strike reach-to-target", () => {
     // the near edge one BODY_HALF_WIDTH nearer ⇒ the fist lands at 76 − 10 = 66 local px forward.
     const handR = poseStriking({ gap: 240_000, band: 2 }).handR;
 
-    expect(handR).toEqual(scaled({ x: 66, y: -46 }));
-    // ...and it lands ON the near edge, short of the opponent's centre (76), not through it.
-    expect(handR.x).toBeLessThan(scaled({ x: 76, y: 0 }).x);
+    expect(handR).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
+    );
+    // ...and it lands ON the near edge, short of the opponent's centre (subToLocal(gap)), not through it.
+    expect(handR.x).toBeLessThan(scaled({ x: subToLocal(240_000), y: 0 }).x);
   });
 
   it("aims by the facing — a left-facing striker lands on an opponent to its LEFT", () => {
@@ -304,7 +330,9 @@ describe("scene — strike reach-to-target", () => {
       VIEWPORT,
     ).a.pose;
 
-    expect(pose.handR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
+    );
   });
 
   it("keeps the striking hand at its stance pose when attackReach is exactly 0 (idle value)", () => {
@@ -327,22 +355,24 @@ describe("scene — strike reach-to-target", () => {
   it("carries the strike to whichever band it targets — low, mid, high", () => {
     // The reach x is the same in-range landing (66); the y is the band ladder, ascending up-screen.
     expect(poseStriking({ gap: 240_000, band: 1 }).handR).toEqual(
-      scaled({ x: 66, y: -24 }),
+      scaled({ x: landingLocal(240_000, 240_000), y: -24 }),
     );
     expect(poseStriking({ gap: 240_000, band: 2 }).handR).toEqual(
-      scaled({ x: 66, y: -46 }),
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
     );
     expect(poseStriking({ gap: 240_000, band: 3 }).handR).toEqual(
-      scaled({ x: 66, y: -68 }),
+      scaled({ x: landingLocal(240_000, 240_000), y: -68 }),
     );
   });
 
   it("stops the hand short at the reach cap when the opponent is beyond reach (a whiff)", () => {
-    // Opponent at ushiro distance (330k) but only a gyaku reach (240k): the near edge is 94.5 local
-    // px away, past the cap of 240k·(76/240000) = 76 — the hand stops at 76, short of the surface.
+    // Opponent at ushiro distance (330k) but only a gyaku reach (240k): the near edge sits past the
+    // reach cap (subToLocal(reach)), so the hand stops at the cap, short of the surface.
     const handR = poseStriking({ gap: 330_000, band: 2, reach: 240_000 }).handR;
 
-    expect(handR).toEqual(scaled({ x: 76, y: -46 }));
+    expect(handR).toEqual(
+      scaled({ x: landingLocal(330_000, 240_000), y: -46 }),
+    );
     // The in-range landing would have been 66; a whiff extends FURTHER (to the cap) yet still short.
     expect(handR.x).toBeGreaterThan(poseStriking({ gap: 240_000 }).handR.x);
   });
@@ -366,11 +396,11 @@ describe("scene — strike reach-to-target", () => {
   });
 
   it("never reaches past its own attackReach cap, even point-blank (short move)", () => {
-    // A reach whose whole projection (60000·76/240000 = 19 local px) is SHORTER than the floor:
-    // point-blank, the hand stops at the cap (19), not the floor (24) — reach bounds the floor.
+    // A reach whose whole projection (subToLocal(60k) local px) is SHORTER than the floor:
+    // point-blank, the hand stops at the cap, not the floor (24) — reach bounds the floor.
     const handR = poseStriking({ gap: 0, band: 2, reach: 60_000 }).handR;
 
-    expect(handR).toEqual(scaled({ x: 19, y: -46 }));
+    expect(handR).toEqual(scaled({ x: landingLocal(0, 60_000), y: -46 }));
     expect(handR.x).toBeLessThan(scaled({ x: STRIKE_FLOOR_X, y: 0 }).x);
   });
 
@@ -436,7 +466,9 @@ describe("scene — strike reach-to-target", () => {
     expect(pose.footL).toEqual(scaled({ x: -10, y: -18 }));
     expect(pose.footR).toEqual(scaled({ x: 10, y: -18 }));
     // ...while the strike lands the front hand on the near edge on the same tick.
-    expect(pose.handR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
+    );
   });
 
   it("is a pure function of the frame — a backward scrub re-lands the same hand", () => {
@@ -455,7 +487,9 @@ describe("scene — strike reach-to-target", () => {
     const backAgain = scene(tape, 0, VIEWPORT).a.pose.handR; // ...then scrub back
 
     expect(backAgain).toEqual(atStrike);
-    expect(backAgain).toEqual(scaled({ x: 66, y: -46 }));
+    expect(backAgain).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
+    );
   });
 
   // ─── M2 lean: a committed strike leans the upper body INTO the reach ──────────────────────────────
@@ -479,7 +513,9 @@ describe("scene — strike reach-to-target", () => {
 
     expect(pose.shoulder).toEqual(scaled({ x: LEAN_CAP / 2, y: -64 }));
     expect(pose.head).toEqual(scaled({ x: LEAN_CAP / 2, y: -76 }));
-    expect(pose.handR).toEqual(scaled({ x: 66, y: -46 })); // target unchanged — the arm telescopes
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
+    ); // target unchanged — the arm telescopes
   });
 
   it("keeps the LOWER body planted while the upper body leans", () => {
@@ -642,8 +678,8 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
   // (M8), so a grab lands on the opponent instead of grabbing air. The front hand (handR) leads ONTO
   // the near edge; the rear hand (handL) closes a hand's-width (GRAB_SPREAD 8) behind it, so two arms
   // read as a two-handed grab. Chest height is a fixed GRAB_Y (−44), no band. The reach is viewport-
-  // independent LOCAL px (one sub-unit = 76/240000), the near edge one BODY_HALF_WIDTH (10) short of
-  // the opponent's centre, the reach clamped to [STRIKE_FLOOR_X (24), attackReach·(76/240000)] —
+  // independent LOCAL px (one sub-unit = subToLocal, from the imported knob), the near edge one
+  // BODY_HALF_WIDTH (10) short of the opponent's centre, the reach clamped to [STRIKE_FLOOR_X (24), cap] —
   // identical machinery to the strike, so a whiff stops short and an overlap floors forward. Every
   // expected x is that physical anchor, recomputed independently of the production formula. Reach is a
   // fixed LOCAL +x direction; the container flip (S1 facing) turns it on-screen.
@@ -689,20 +725,26 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     ).a.pose;
 
   it("lands both grab hands on the opponent's near edge when in range", () => {
-    // Throw gap (120k) at throw reach (120k): the centres are 38 local px apart, the near edge one
-    // BODY_HALF_WIDTH nearer ⇒ the lead hand lands at 38 − 10 = 28; the rear hand closes 8 behind.
+    // Throw gap (120k) at throw reach (120k): the lead hand lands one BODY_HALF_WIDTH inside the
+    // centre gap (subToLocal(gap) − 10); the rear hand closes a GRAB_SPREAD behind it.
     const pose = poseThrowing({ gap: 120_000, reach: 120_000 });
 
-    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y })); // lead hand ON the near edge
-    expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y })); // rear hand a spread behind
-    // ...and the lead hand lands SHORT of the opponent's centre (38), not through it.
-    expect(pose.handR.x).toBeLessThan(scaled({ x: 38, y: 0 }).x);
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000), y: GRAB_Y }),
+    ); // lead hand ON the near edge
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000) - GRAB_SPREAD, y: GRAB_Y }),
+    ); // rear hand a spread behind
+    // ...and the lead hand lands SHORT of the opponent's centre (subToLocal(gap)), not through it.
+    expect(pose.handR.x).toBeLessThan(
+      scaled({ x: subToLocal(120_000), y: 0 }).x,
+    );
   });
 
   it("aims by the facing — a left-facing thrower grabs an opponent to its LEFT", () => {
     // The grab reach is a fixed LOCAL +x direction; the thrower's facing decides which way it maps in
     // the world. A left-facer (facing −1) with the opponent one gyaku gap (240k) to its LEFT reaches
-    // the SAME local landing (66) as a right-facer — the container flip turns it leftward. Kills a
+    // the SAME local landing as a right-facer — the container flip turns it leftward. Kills a
     // facing-sign / "drop facing" mutant.
     const pose = scene(
       [
@@ -722,18 +764,26 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
       VIEWPORT,
     ).a.pose;
 
-    expect(pose.handR).toEqual(scaled({ x: 66, y: GRAB_Y }));
-    expect(pose.handL).toEqual(scaled({ x: 66 - GRAB_SPREAD, y: GRAB_Y }));
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: GRAB_Y }),
+    );
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000) - GRAB_SPREAD, y: GRAB_Y }),
+    );
   });
 
   it("stops both hands short at the reach cap when the opponent is beyond reach (a whiff)", () => {
-    // Opponent at a gyaku distance (240k) but only a throw reach (120k): the near edge is 66 local px
-    // away, past the cap of 120k·(76/240000) = 38 — both hands stop at 38, short of the surface.
+    // Opponent at a gyaku distance (240k) but only a throw reach (120k): the near edge sits past the
+    // reach cap (subToLocal(reach)) — both hands stop at the cap, short of the surface.
     const pose = poseThrowing({ gap: 240_000, reach: 120_000 });
 
-    expect(pose.handR).toEqual(scaled({ x: 38, y: GRAB_Y }));
-    expect(pose.handL).toEqual(scaled({ x: 38 - GRAB_SPREAD, y: GRAB_Y }));
-    // The in-range lead landing would be 28; a whiff extends FURTHER (to the cap) yet still short.
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(240_000, 120_000), y: GRAB_Y }),
+    );
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(240_000, 120_000) - GRAB_SPREAD, y: GRAB_Y }),
+    );
+    // The in-range lead landing sits nearer; a whiff extends FURTHER (to the cap) yet still short.
     expect(pose.handR.x).toBeGreaterThan(
       poseThrowing({ gap: 120_000, reach: 120_000 }).handR.x,
     );
@@ -767,7 +817,7 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     // The /dojo move picker stamps attackMove:"throw" + attacking:true but never sets throwing; today
     // that draws a generic front HAND (the broken picker). Now it draws the two-hand grab — and the
     // throw's own strike layer is SUPPRESSED, so there is no phantom lean under the grab and /dojo
-    // renders identically to a shipped /watch throw. gap 120k at reach 120k ⇒ lead edge 28, rear 20.
+    // renders identically to a shipped /watch throw. gap 120k at reach 120k ⇒ lead on the near edge.
     const pose = scene(
       [
         tickOf(
@@ -789,8 +839,12 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
 
     // Both hands reach the grab at chest height — lead on the near edge, rear a spread behind — not a
     // generic single-hand strike (a strike would leave handL back at the stance, x < 0).
-    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y }));
-    expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y }));
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000), y: GRAB_Y }),
+    );
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000) - GRAB_SPREAD, y: GRAB_Y }),
+    );
     // ...and the torso does NOT lean — a grab suppresses its strike layer, so /dojo == /watch.
     expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
     expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
@@ -898,8 +952,12 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
       extra: { attacking: true, attackBand: 2, guardBand: 3 },
     });
 
-    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y })); // grab, not a strike (would be y −46)
-    expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y })); // grab, not the guard
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000), y: GRAB_Y }),
+    ); // grab, not a strike (would be y −46)
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000) - GRAB_SPREAD, y: GRAB_Y }),
+    ); // grab, not the guard
   });
 
   it("composes with the crouch stance — the grab reaches while the crouch feet stay planted", () => {
@@ -910,8 +968,12 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     });
 
     // Both hands reach the grab...
-    expect(pose.handR).toEqual(scaled({ x: 28, y: GRAB_Y }));
-    expect(pose.handL).toEqual(scaled({ x: 28 - GRAB_SPREAD, y: GRAB_Y }));
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000), y: GRAB_Y }),
+    );
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000) - GRAB_SPREAD, y: GRAB_Y }),
+    );
     // ...while the CROUCH stance survives (feet planted a touch wider).
     expect(pose.footL).toEqual(scaled({ x: -16, y: 0 }));
   });
@@ -937,7 +999,9 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     const backAgain = scene(tape, 0, VIEWPORT).a.pose.handR; // ...then scrub back
 
     expect(backAgain).toEqual(atThrow);
-    expect(backAgain).toEqual(scaled({ x: 28, y: GRAB_Y }));
+    expect(backAgain).toEqual(
+      scaled({ x: landingLocal(120_000, 120_000), y: GRAB_Y }),
+    );
   });
 });
 
@@ -1180,7 +1244,10 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     ).a.pose;
 
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 23, y: -64 }, { x: 66, y: -46 }),
+      scaledElbow(
+        { x: 23, y: -64 },
+        { x: landingLocal(240_000, 240_000), y: -46 },
+      ),
     );
     // ...distinct from the resting-stance elbow (proves it tracked the hand, not a fixed value).
     expect(pose.elbowR).not.toEqual(
@@ -1218,7 +1285,10 @@ describe("scene — arms bend at the elbow (Story 4 · Slice 1)", () => {
     ).a.pose;
 
     expect(pose.elbowR).toEqual(
-      scaledElbow({ x: 23, y: -64 }, { x: 66, y: -68 }),
+      scaledElbow(
+        { x: 23, y: -64 },
+        { x: landingLocal(240_000, 240_000), y: -68 },
+      ),
     );
   });
 
@@ -1436,9 +1506,9 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
   // a fist aims the foot, and the knee re-derives off the moved `hip → footR` for free.
   //
   // Local-px anchors (recomputed here, independent of the production formula): one sub-unit is
-  // 76/240000 local px, so a 240k gap is 76 px between centres and the near edge sits one
-  // BODY_HALF_WIDTH (10) nearer ⇒ 66. mae-geri's 270k reach caps at 270000·(76/240000) = 85.5, so
-  // an in-range kick lands on the edge at 66, not the cap.
+  // subToLocal local px (from the imported knob), so the near edge sits one BODY_HALF_WIDTH (10)
+  // inside the centre gap — landingLocal(gap, reach). mae-geri's 270k reach caps at subToLocal(270k),
+  // so at the workhorse gap the in-range kick lands on the edge, not the cap.
   const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // STAND front foot — the no-descriptor fallback
   const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot — the support leg
   const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
@@ -1479,7 +1549,9 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
   it("drives the front FOOT to the opponent's near edge for a mae-geri, leaving the hand at stance", () => {
     const pose = poseKicking();
 
-    expect(pose.footR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(pose.footR).toEqual(
+      scaled({ x: landingLocal(240_000, 270_000), y: -46 }),
+    );
     // The front hand is NOT the driven endpoint for a kick — it stays where the stance put it.
     expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
   });
@@ -1490,22 +1562,22 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
   });
 
   it("tracks the real opponent distance — a nearer opponent is kicked at a nearer point (M8.5)", () => {
-    // The solve is retained for the foot, not replaced by a constant forward stub. A 150k gap is
-    // 47.5 px between centres ⇒ the edge sits at 37.5; a 240k gap ⇒ 66. Both are inside
-    // mae-geri's 85.5 cap, so the two land at genuinely different points.
+    // The solve is retained for the foot, not replaced by a constant forward stub. A nearer (150k)
+    // gap lands the edge nearer than the workhorse (240k) gap; both are inside mae-geri's
+    // subToLocal(270k) cap, so the two land at genuinely different points.
     expect(poseKicking({ gap: 150_000 }).footR).toEqual(
-      scaled({ x: 37.5, y: -46 }),
+      scaled({ x: landingLocal(150_000, 270_000), y: -46 }),
     );
     expect(poseKicking({ gap: 240_000 }).footR).toEqual(
-      scaled({ x: 66, y: -46 }),
+      scaled({ x: landingLocal(240_000, 270_000), y: -46 }),
     );
   });
 
   it("stops the kicking foot at the move's reach cap when the opponent is beyond it (a whiff)", () => {
-    // A 400k gap is 126.7 px between centres — past mae-geri's 85.5 cap, so the foot stops at the
-    // cap rather than stretching to the edge. Pins that the foot obeys the SAME clamp as a fist.
+    // A 400k gap sits past mae-geri's subToLocal(270k) cap, so the foot stops at the cap rather than
+    // stretching to the edge. Pins that the foot obeys the SAME clamp as a fist.
     expect(poseKicking({ gap: 400_000 }).footR).toEqual(
-      scaled({ x: 85.5, y: -46 }),
+      scaled({ x: landingLocal(400_000, 270_000), y: -46 }),
     );
   });
 
@@ -1577,7 +1649,9 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
     generic.forEach((extra) => {
       const pose = poseKicking({ extra });
 
-      expect(pose.handR).toEqual(scaled({ x: 66, y: -46 })); // the hand drives
+      expect(pose.handR).toEqual(
+        scaled({ x: landingLocal(240_000, 270_000), y: -46 }),
+      ); // the hand drives
       expect(pose.footR).toEqual(scaled(NEUTRAL_FOOT_R)); // the foot stays home
     });
   });
@@ -1592,8 +1666,12 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
   });
 
   it("carries the kick to whichever band it targets, and draws none for an unmapped band", () => {
-    expect(poseKicking({ band: 1 }).footR).toEqual(scaled({ x: 66, y: -24 }));
-    expect(poseKicking({ band: 3 }).footR).toEqual(scaled({ x: 66, y: -68 }));
+    expect(poseKicking({ band: 1 }).footR).toEqual(
+      scaled({ x: landingLocal(240_000, 270_000), y: -24 }),
+    );
+    expect(poseKicking({ band: 3 }).footR).toEqual(
+      scaled({ x: landingLocal(240_000, 270_000), y: -68 }),
+    );
     // Band 0 / out-of-range ⇒ no strike to draw ⇒ the foot keeps its stance.
     expect(poseKicking({ band: 0 }).footR).toEqual(scaled(NEUTRAL_FOOT_R));
     expect(poseKicking({ band: 9 }).footR).toEqual(scaled(NEUTRAL_FOOT_R));
@@ -1697,8 +1775,9 @@ describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
     // 13 moves rather than only mae-geri.
     const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
     // kizami-zuki (the jab) is the stand-in for "real move, still unauthored" — gyaku-zuki held this
-    // role until S4 · Slice 1 gave it a descriptor. Its 210k reach caps at 66.5px, so the in-range
-    // edge at 66 is unchanged and the contact expectation below still reads the same number.
+    // role until S4 · Slice 1 gave it a descriptor. Its 210k reach caps at subToLocal(210k), and
+    // landingLocal(gap, reach) lands on whichever of the near edge or that cap binds, so the contact
+    // expectation below tracks the knob.
     const unauthored = { attackMove: "kizami-zuki", attackReach: 210_000 };
 
     expect(poseAtPhase({ ...unauthored, attackPhase: CHAMBER }).handR).toEqual(
@@ -1709,7 +1788,7 @@ describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
     );
     // ...and it still punches at contact.
     expect(poseAtPhase({ ...unauthored, attackPhase: CONTACT }).handR).toEqual(
-      scaled({ x: 66, y: -46 }),
+      scaled({ x: landingLocal(240_000, 210_000), y: -46 }),
     );
   });
 
@@ -1718,7 +1797,7 @@ describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
     // and any out-of-range or nonsense code all fall back to the extension — today's look — so no
     // tape can regress into a blank or frozen figure. A non-numeric value is total by construction:
     // `isChamberPhase` compares with `===` against numeric literals.
-    const extended = scaled({ x: 66, y: -46 });
+    const extended = scaled({ x: landingLocal(240_000, 270_000), y: -46 });
 
     [undefined, 0, 7, -1, NaN].forEach((attackPhase) =>
       expect(footAt(attackPhase)).toEqual(extended),
@@ -1806,7 +1885,13 @@ describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
 
     expect(crossAt(CHAMBER)).not.toBe(0);
     expect(crossAt(RECOVER)).not.toBe(0);
-    expect(crossAt(CONTACT)).toBe(0);
+    // At CONTACT the leg draws straight: its cross-product is orders of magnitude below the folded
+    // chamber's — a few px² of pixel-rounding noise, not a bend. (Exact zero held by a rounding
+    // coincidence at the old body scale; the smaller body leaves a little rounding residue, so this
+    // asserts "far straighter than the chamber" rather than a brittle literal 0.)
+    expect(Math.abs(crossAt(CONTACT))).toBeLessThan(
+      Math.abs(crossAt(CHAMBER)) / 10,
+    );
   });
 });
 
@@ -1914,18 +1999,20 @@ describe("scene — limbs keep their bone lengths (S2 · Slice 3)", () => {
   });
 
   it("bounds how far the kicking leg may stretch once the step is spent", () => {
-    // The step is capped, so beyond it the limb still stretches — but boundedly. At the workhorse
-    // distance the overrun falls from 0.72 (the defect this slice exists to kill) to under 0.3.
+    // The step is capped, so beyond it the limb still stretches — but boundedly, well under the 0.72
+    // overrun that was the defect this slice exists to kill. The residual scales with the body knob: a
+    // smaller body stands further from its opponent in body-heights, so the kicking leg telescopes more
+    // at the workhorse distance (≈0.55 at the current knob, vs ≈0.25 when the body filled the ring).
     const contact = poseOf({ gap: 240_000, attackPhase: 2 });
 
-    expect(boneDrift(contact, "hip", "kneeR")).toBeLessThan(0.3);
+    expect(boneDrift(contact, "hip", "kneeR")).toBeLessThan(0.65);
   });
 
   it("still lands the kicking foot on its target once the leg is constrained", () => {
     // The S5 guarantee (#344-#347): a strike CONNECTS. Constraining the limb must not quietly undo
     // it — the foot lands on the opponent's near edge exactly as it did before this slice.
     expect(poseOf({ gap: 240_000, attackPhase: 2 }).footR).toEqual(
-      scaled({ x: 66, y: -46 }),
+      scaled({ x: landingLocal(240_000, 270_000), y: -46 }),
     );
   });
 
@@ -1946,9 +2033,9 @@ describe("scene — the reverse punch is thrown with the rear arm (S4 · Slice 1
   // `handL` as the driven endpoint is what separates them.
   //
   // Local-px anchors, recomputed here independently of the production formula: one sub-unit is
-  // 76/240000 local px, so a 240k gap is 76px between centres and the near edge sits one
-  // BODY_HALF_WIDTH (10) nearer ⇒ 66. gyaku-zuki's reach is also 240k ⇒ a 76px cap, so an in-range
-  // punch lands on the edge at 66, not the cap. Its first legal band is high ⇒ y −68.
+  // subToLocal local px (from the imported knob), so the near edge sits one BODY_HALF_WIDTH (10)
+  // inside the centre gap — landingLocal(gap, reach). gyaku-zuki's reach is also 240k, so at the
+  // workhorse gap the punch lands on the near edge, not the cap. Its first legal band is high ⇒ y −68.
   const NEUTRAL_HAND_L = { x: -18, y: -44 }; // STAND rear hand — the guard arm
   const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
   const GUARD_MID = { x: 8, y: -46 }; // a raised mid guard, for the precedence cases
@@ -1991,11 +2078,15 @@ describe("scene — the reverse punch is thrown with the rear arm (S4 · Slice 1
   it("drives the REAR hand to the opponent's near edge for a gyaku-zuki", () => {
     const pose = posePunching();
 
-    expect(pose.handL).toEqual(scaled({ x: 66, y: -68 }));
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -68 }),
+    );
     // The front hand is not the driven endpoint — only ONE hand reaches the target. This pinned the
     // front hand to its stance until S4 · Slice 2 pulled it back (hikite), so it now asserts the part
     // that is actually this slice's claim; where the other hand goes is slice 2's.
-    expect(pose.handR).not.toEqual(scaled({ x: 66, y: -68 }));
+    expect(pose.handR).not.toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -68 }),
+    );
   });
 
   it("lets the committed punch win the rear arm when the fighter is also guarding", () => {
@@ -2006,7 +2097,9 @@ describe("scene — the reverse punch is thrown with the rear arm (S4 · Slice 1
     // the sim) but reachable in /dojo by design (M10 free combos), so the rule is exercised for real.
     const pose = posePunching({ extra: { guardBand: 2 } });
 
-    expect(pose.handL).toEqual(scaled({ x: 66, y: -68 }));
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -68 }),
+    );
   });
 
   it("keeps the guard on the rear arm when no strike is being drawn, even carrying a move id", () => {
@@ -2021,10 +2114,13 @@ describe("scene — the reverse punch is thrown with the rear arm (S4 · Slice 1
   it("still drives the FRONT hand for a punch with no descriptor, leaving the rear arm at stance", () => {
     // M7 totality: the generic path is the status quo, not a degraded state. `kizami-zuki` (the jab)
     // has no descriptor, so it must draw exactly as every hand technique drew before this slice.
-    // Its 210k reach caps at 66.5px, so the in-range edge at 66 is still what it lands on.
+    // Its 210k reach caps at subToLocal(210k); landingLocal(gap, reach) lands on whichever of the
+    // near edge or that cap binds.
     const pose = posePunching({ move: "kizami-zuki", reach: 210_000 });
 
-    expect(pose.handR).toEqual(scaled({ x: 66, y: -68 }));
+    expect(pose.handR).toEqual(
+      scaled({ x: landingLocal(240_000, 210_000), y: -68 }),
+    );
     // The rear arm is not driven — it stays at its stance position. Asserted as an ABSOLUTE again
     // (S4 · Slice 5): the resting arm hangs off the rear shoulder, which a rotating girdle leaves put,
     // so the hand-ride S4 · Slice 3 introduced for the sliding shoulder is retired with the slide.
@@ -2054,7 +2150,9 @@ describe("scene — the reverse punch is thrown with the rear arm (S4 · Slice 1
     // widening it did not knock the kick into the wrong branch.
     const pose = posePunching({ move: "mae-geri", band: 2, reach: 270_000 });
 
-    expect(pose.footR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(pose.footR).toEqual(
+      scaled({ x: landingLocal(240_000, 270_000), y: -46 }),
+    );
     expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
     expect(pose.handL).toEqual(scaled(NEUTRAL_HAND_L));
   });
@@ -2125,10 +2223,12 @@ describe("scene — the reverse punch chambers and pulls (S4 · Slice 2)", () =>
 
   it("leaves the contact geometry exactly where slice 1 put it", () => {
     // The load-bearing guard: hikite is COSMETIC, and where contact happens is what the engine
-    // actually cares about. A 240k gap puts the near edge at 66 local px, inside gyaku-zuki's 76 cap,
-    // and the first legal band is high ⇒ y −68. Asserted exactly (a SOLVED value, not an eye-tuned
+    // actually cares about. A 240k gap puts the near edge inside gyaku-zuki's cap (landingLocal), and
+    // the first legal band is high ⇒ y −68. Asserted exactly (a SOLVED value, not an eye-tuned
     // one), so re-tuning either authored point can never quietly move the punch.
-    expect(poseAt(CONTACT).handL).toEqual(scaled({ x: 66, y: -68 }));
+    expect(poseAt(CONTACT).handL).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -68 }),
+    );
   });
 
   it("pulls the front fist back toward the hip as the punch lands (hikite)", () => {
@@ -2279,33 +2379,51 @@ describe("scene — a punch leans only as far as it must reach (S4 · Slice 3)",
     ).a.pose;
 
   it("does not lean at all when the arm can already reach the target", () => {
-    // The headline change, shown on the FRONT arm (a jab): a 120k gap puts the near edge at 28px and a
-    // high target 4px above the front shoulder, so the arm spans 21.4 against a 31.3 reach — it gets
-    // there on its own, and the torso stays upright. The old heuristic lunged for it regardless. (At
+    // The headline change, shown on the FRONT arm (a jab): a 120k gap puts the near edge inside the
+    // front arm's ~31.3 reach with a high target just above the front shoulder, so the arm gets
+    // there on its own and the torso stays upright. The old heuristic lunged for it regardless. (At
     // this same gap a REVERSE punch's rear arm still falls short and leans — the per-arm point criterion
     // 3 of the slice-5 block pins; here it is the jab that proves "reachable ⇒ no lean".)
     const pose = poseOf({ move: "kizami-zuki", gap: 120_000 });
 
     expect(pose.shoulder).toEqual(
-      scaled({ x: midFor(ROOT_R, 28, -68), y: -64 }),
+      scaled({
+        x: midFor(ROOT_R, landingLocal(120_000, 240_000), -68),
+        y: -64,
+      }),
     );
-    expect(pose.head).toEqual(scaled({ x: midFor(ROOT_R, 28, -68), y: -76 }));
+    expect(pose.head).toEqual(
+      scaled({
+        x: midFor(ROOT_R, landingLocal(120_000, 240_000), -68),
+        y: -76,
+      }),
+    );
   });
 
   it("leans by the shortfall — not by half the reach — when the arm falls short", () => {
     // The uncapped middle of the range, where a derived lean and a proportional one disagree most
-    // visibly. A reverse punch at a 130k gap / mid band puts the target 42.2 from the REAR shoulder:
-    // 10.9 past the arm's reach, so the driving shoulder covers 10.9 and the midpoint carries half of
-    // it. The heuristic would have covered its full 16px cap.
-    const pose = poseOf({ move: "gyaku-zuki", gap: 130_000, band: 2 });
+    // visibly. A reverse punch at a mid-range gap puts the target a bounded distance past the REAR
+    // shoulder's reach, so the driving shoulder covers exactly that shortfall (below the cap) and the
+    // midpoint carries half of it — where the heuristic would have covered its full 16px cap. The gap
+    // is chosen so the lean stays UNCAPPED at the current body knob (a smaller body reaches further,
+    // saturating the cap at larger gaps), which is what makes landingLocal below re-flow cleanly.
+    const pose = poseOf({ move: "gyaku-zuki", gap: 120_000, band: 2 });
 
     expect(pose.shoulder).toEqual(
-      scaled({ x: midFor(ROOT_L, 31.1666, -46), y: -64 }),
+      scaled({
+        x: midFor(ROOT_L, landingLocal(120_000, 240_000), -46),
+        y: -64,
+      }),
     );
     expect(pose.head).toEqual(
-      scaled({ x: midFor(ROOT_L, 31.1666, -46), y: -76 }),
+      scaled({
+        x: midFor(ROOT_L, landingLocal(120_000, 240_000), -46),
+        y: -76,
+      }),
     );
-    expect(leanFor(ROOT_L, 31.1666, -46)).toBeLessThan(LEAN_CAP);
+    expect(leanFor(ROOT_L, landingLocal(120_000, 240_000), -46)).toBeLessThan(
+      LEAN_CAP,
+    );
   });
 
   it("reads the vertical drop to the target, not just the forward reach", () => {
@@ -2319,22 +2437,30 @@ describe("scene — a punch leans only as far as it must reach (S4 · Slice 3)",
 
     expect(mid.shoulder.x).toBeGreaterThan(high.shoulder.x);
     expect(high.shoulder).toEqual(
-      scaled({ x: midFor(ROOT_L, 31.1666, -68), y: -64 }),
+      scaled({
+        x: midFor(ROOT_L, landingLocal(130_000, 240_000), -68),
+        y: -64,
+      }),
     );
     expect(mid.shoulder).toEqual(
-      scaled({ x: midFor(ROOT_L, 31.1666, -46), y: -64 }),
+      scaled({
+        x: midFor(ROOT_L, landingLocal(130_000, 240_000), -46),
+        y: -64,
+      }),
     );
   });
 
   it("caps the lean, so the workhorse punch's torso leans a bounded, halved amount", () => {
     // The regression pin for the move this story authored. gyaku-zuki's reach and the dojo's default
-    // gap are both 240k, so its hand solves to 66 and the rear-shoulder shortfall (41.8) saturates the
-    // 16px cap — the DRIVING shoulder still steps the full 16, but the midpoint now carries half (8,
-    // S4 · Slice 5). The driven hand is untouched by the lean whatever the torso does.
+    // gap are both 240k, so the rear-shoulder shortfall saturates the 16px cap — the DRIVING shoulder
+    // still steps the full 16, but the midpoint now carries half (8, S4 · Slice 5). The driven hand is
+    // untouched by the lean whatever the torso does.
     const pose = poseOf({ move: "gyaku-zuki", gap: 240_000, band: 3 });
 
     expect(pose.shoulder).toEqual(scaled({ x: LEAN_CAP / 2, y: -64 }));
-    expect(pose.handL).toEqual(scaled({ x: 66, y: -68 })); // the driven hand does NOT ride the lean
+    expect(pose.handL).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -68 }),
+    ); // the driven hand does NOT ride the lean
   });
 
   it("keeps the upper body upright while the punch is still chambering", () => {
@@ -2672,9 +2798,11 @@ describe("scene — the torso rotates into the punch (S4 · Slice 5)", () => {
   it("leans a reverse punch more than a jab at mid range, measuring each from its own shoulder", () => {
     // Criterion 3. The girdle's payoff where the arm-span axis is weakest. At a gap the FRONT arm can
     // already span, a jab stands upright while the rear arm still falls short, so a reverse punch to
-    // the same spot leans in. Measured per-arm: a shared-root lean would move both identically.
-    const reverse = poseOf({ move: "gyaku-zuki", gap: 120_000, band: 2 });
-    const jab = poseOf({ move: "kizami-zuki", gap: 120_000, band: 2 });
+    // the same spot leans in. Measured per-arm: a shared-root lean would move both identically. The gap
+    // is chosen so the FRONT arm reaches at the current body scale (a smaller body reaches less far, so
+    // a gap the jab spanned at a larger knob would tip it into a small lean).
+    const reverse = poseOf({ move: "gyaku-zuki", gap: 110_000, band: 2 });
+    const jab = poseOf({ move: "kizami-zuki", gap: 110_000, band: 2 });
 
     expect(jab.shoulder).toEqual(scaled({ x: 0, y: -64 })); // front arm reaches ⇒ upright
     expect(reverse.shoulder.x).toBeGreaterThan(jab.shoulder.x); // rear arm short ⇒ leans
@@ -2761,9 +2889,10 @@ describe("scene — the roundhouse kicks with the rear leg (S4 · Slice 6)", () 
   // hip turn is not. Same solve (reachTargetX), same phase machinery — only the endpoint it lands on
   // differs, which is exactly the descriptor-plus-shared-solver bet.
   //
-  // Local-px anchors, recomputed independent of production: one sub-unit is 76/240000 local px, so a
-  // 240k gap is 76px between centres and the near edge sits one BODY_HALF_WIDTH (10) nearer ⇒ 66.
-  // mawashi-geri's 300k reach caps at 300000·(76/240000) = 95, so an in-range kick lands on the edge.
+  // Local-px anchors, recomputed independent of production: one sub-unit is subToLocal local px (from
+  // the imported knob), so the near edge sits one BODY_HALF_WIDTH (10) inside the centre gap —
+  // landingLocal(gap, reach). mawashi-geri's 300k reach caps at subToLocal(300k), so at the workhorse
+  // gap the kick lands on the edge, not the cap.
   const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot — the DRIVEN leg here
   const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // STAND front foot — the SUPPORT leg here
 
@@ -2826,8 +2955,10 @@ describe("scene — the roundhouse kicks with the rear leg (S4 · Slice 6)", () 
   it("drives the REAR foot to the opponent's near edge, leaving the front foot planted (M8.1/8.2)", () => {
     const pose = poseRound();
 
-    // The kick lands on footL — the rear leg — at the near edge (66), where mae-geri lands its footR.
-    expect(pose.footL).toEqual(scaled({ x: 66, y: -46 }));
+    // The kick lands on footL — the rear leg — at the near edge, where mae-geri lands its footR.
+    expect(pose.footL).toEqual(
+      scaled({ x: landingLocal(240_000, 300_000), y: -46 }),
+    );
     // The front foot is the SUPPORT leg now: it holds its stance. The fighter neither slides nor floats.
     expect(pose.footR).toEqual(scaled(NEUTRAL_FOOT_R));
   });
@@ -2851,13 +2982,13 @@ describe("scene — the roundhouse kicks with the rear leg (S4 · Slice 6)", () 
 
   it("tracks the real opponent distance — the rear-leg solve is retained (M8.5)", () => {
     // Two gaps, two phase-2 endpoints: the roundhouse foot tracks true distance through the SAME
-    // reachTargetX a fist uses, not a fixed authored extension. 150k ⇒ edge 37.5, 240k ⇒ 66, both
-    // inside the 95 cap.
+    // reachTargetX a fist uses, not a fixed authored extension. A nearer gap lands nearer, both inside
+    // mawashi-geri's subToLocal(300k) cap.
     expect(poseRound({ gap: 150_000 }).footL).toEqual(
-      scaled({ x: 37.5, y: -46 }),
+      scaled({ x: landingLocal(150_000, 300_000), y: -46 }),
     );
     expect(poseRound({ gap: 240_000 }).footL).toEqual(
-      scaled({ x: 66, y: -46 }),
+      scaled({ x: landingLocal(240_000, 300_000), y: -46 }),
     );
   });
 
@@ -2919,7 +3050,9 @@ describe("scene — the roundhouse kicks with the rear leg (S4 · Slice 6)", () 
     // adding the rear-leg branch left the proven front-kick path untouched.
     const front = poseFront();
 
-    expect(front.footR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(front.footR).toEqual(
+      scaled({ x: landingLocal(240_000, 270_000), y: -46 }),
+    );
     expect(front.footL).toEqual(scaled(NEUTRAL_FOOT_L));
   });
 });
@@ -2935,13 +3068,14 @@ describe("scene — empi leads with the elbow (S5 · Slice 1)", () => {
   // inversion assertions (elbow AT the target, fist BEHIND it) fail for exactly that reason until the
   // elbowR route exists.
   //
-  // Local-px anchors, recomputed independent of production (one sub-unit = 76/240000 local px):
-  //  · CLOSE anchor — empi's REAL reach (95k) at a 120k gap: centres 38 local px apart, near edge one
-  //    BODY_HALF_WIDTH (10) nearer ⇒ 28; empi's cap is 95000·(76/240000) = 30.08, so 28 lands in range.
-  //    This is the in-character close-range picture the elbow strike actually draws (and where M13g's
-  //    figure overlap lives — confirmed by eye in /dojo, not asserted here).
-  //  · FAR anchor — a controlled 240k reach at a 240k gap ⇒ edge 66, the standard anchor the strike and
-  //    throw blocks share. A HAND at this reach LEANS 16 (rootTravel over 2·ARM_BONE); a mid-joint must
+  // Local-px anchors, recomputed independent of production (one sub-unit = subToLocal, from the knob):
+  //  · CLOSE anchor — empi's REAL reach (95k) at a 120k gap: the near edge one BODY_HALF_WIDTH (10)
+  //    inside the centre gap, inside empi's subToLocal(95k) cap — landingLocal(120k, 95k). This is the
+  //    in-character close-range picture the elbow strike actually draws (and where M13g's figure overlap
+  //    lives — confirmed by eye in /dojo, not asserted here).
+  //  · FAR anchor — a controlled 240k reach at a 240k gap ⇒ landingLocal(240k, 240k), the standard
+  //    anchor the strike and throw blocks share. A HAND at this reach LEANS 16 (rootTravel over
+  //    2·ARM_BONE); a mid-joint must
   //    NOT (M13f: hold the root). Using the far anchor is what makes the lean gate load-bearing and the
   //    root-held test a real RED driver rather than a vacuum — the same reason the strike block probes
   //    reach with controlled values.
@@ -2993,7 +3127,9 @@ describe("scene — empi leads with the elbow (S5 · Slice 1)", () => {
     // BEHIND the elbow tip (elbowR.x > handR.x), the reverse of a punch where the hand leads.
     const pose = poseEmpi();
 
-    expect(pose.elbowR).toEqual(scaled({ x: 28, y: -46 }));
+    expect(pose.elbowR).toEqual(
+      scaled({ x: landingLocal(120_000, 95_000), y: -46 }),
+    );
     expect(pose.elbowR.x).toBeGreaterThan(pose.handR.x);
   });
 
@@ -3023,7 +3159,9 @@ describe("scene — empi leads with the elbow (S5 · Slice 1)", () => {
     // absolute ±7 shoulders, because the equidistant-from-midpoint check is invariant under rotation.
     const pose = poseEmpi({ gap: 240_000, reach: 240_000 });
 
-    expect(pose.elbowR).toEqual(scaled({ x: 66, y: -46 })); // it DID reach far — not a no-op
+    expect(pose.elbowR).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
+    ); // it DID reach far — not a no-op
     expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
     expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
     expect(pose.shoulderL).toEqual(scaled({ x: -SHOULDER_HALF_WIDTH, y: -64 }));
@@ -3033,12 +3171,12 @@ describe("scene — empi leads with the elbow (S5 · Slice 1)", () => {
 
   it("tracks the real opponent distance — the elbow solve is retained (guard 5)", () => {
     // The elbow tracks true distance through the SAME reachTargetX a fist uses, not a fixed authored
-    // extension: two gaps, two phase-2 elbow endpoints (28 and 66), both inside a 240k reach cap (76).
+    // extension: two gaps, two phase-2 elbow endpoints (nearer and farther), both inside a 240k reach cap.
     expect(poseEmpi({ gap: 120_000, reach: 240_000 }).elbowR).toEqual(
-      scaled({ x: 28, y: -46 }),
+      scaled({ x: landingLocal(120_000, 240_000), y: -46 }),
     );
     expect(poseEmpi({ gap: 240_000, reach: 240_000 }).elbowR).toEqual(
-      scaled({ x: 66, y: -46 }),
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
     );
   });
 
@@ -3093,13 +3231,13 @@ describe("scene — hiza-geri leads with the knee (S5 · Slice 2)", () => {
   // hip→footR bisector, the foot left at its stance. The inversion assertions (knee AT the target, foot
   // FOLDED behind/below it) fail for that reason until the kneeR route exists.
   //
-  // Local-px anchors, recomputed independent of production (one sub-unit = 76/240000 local px) — the
-  // reach solve is limb-agnostic, so these are the SAME edges the empi and strike blocks use:
-  //  · CLOSE anchor — hiza-geri's REAL reach (110k) at a 120k gap: centres 38 local px apart, near edge
-  //    one BODY_HALF_WIDTH (10) nearer ⇒ 28; the knee's cap is 110000·(76/240000) = 34.83, so 28 lands
-  //    in range. This is the in-character close-range picture (where M13g's overlap lives — by eye in
+  // Local-px anchors, recomputed independent of production (one sub-unit = subToLocal, from the knob) —
+  // the reach solve is limb-agnostic, so these are the SAME edges the empi and strike blocks use:
+  //  · CLOSE anchor — hiza-geri's REAL reach (110k) at a 120k gap: the near edge one BODY_HALF_WIDTH
+  //    (10) inside the centre gap, inside the knee's subToLocal(110k) cap — landingLocal(120k, 110k).
+  //    This is the in-character close-range picture (where M13g's overlap lives — by eye in
   //    /dojo, not asserted here).
-  //  · FAR anchor — a controlled 240k reach at a 240k gap ⇒ edge 66. A HAND at this reach LEANS 16
+  //  · FAR anchor — a controlled 240k reach at a 240k gap ⇒ landingLocal(240k, 240k). A HAND at this reach LEANS 16
   //    (rootTravel over 2·ARM_BONE); a mid-joint must NOT (M13f: hold the root). Using the far anchor is
   //    what makes the no-lean gate load-bearing and the root-held test a real RED driver, not a vacuum.
   const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand — untouched by a LEG strike
@@ -3153,7 +3291,9 @@ describe("scene — hiza-geri leads with the knee (S5 · Slice 2)", () => {
     // folded ABOVE the knee would read as a flick-up, not a knee).
     const pose = poseHiza();
 
-    expect(pose.kneeR).toEqual(scaled({ x: 28, y: -46 }));
+    expect(pose.kneeR).toEqual(
+      scaled({ x: landingLocal(120_000, 110_000), y: -46 }),
+    );
     expect(pose.kneeR.x).toBeGreaterThan(pose.footR.x);
     expect(pose.footR.y).toBeGreaterThan(pose.kneeR.y);
   });
@@ -3184,7 +3324,9 @@ describe("scene — hiza-geri leads with the knee (S5 · Slice 2)", () => {
     // edge (66) while the head, shoulder, hip (no step) and the SUPPORT foot all hold their stance.
     const pose = poseHiza({ gap: 240_000, reach: 240_000 });
 
-    expect(pose.kneeR).toEqual(scaled({ x: 66, y: -46 })); // it DID reach far — not a no-op
+    expect(pose.kneeR).toEqual(
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
+    ); // it DID reach far — not a no-op
     expect(pose.head).toEqual(scaled({ x: 0, y: -76 })); // no lean
     expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
     expect(pose.hip).toEqual(scaled({ x: 0, y: -34 })); // no step
@@ -3193,12 +3335,12 @@ describe("scene — hiza-geri leads with the knee (S5 · Slice 2)", () => {
 
   it("tracks the real opponent distance — the knee solve is retained (guard 5)", () => {
     // The knee tracks true distance through the SAME reachTargetX a fist uses, not a fixed authored
-    // extension: two gaps, two knee endpoints (28 and 66), both inside a 240k reach cap (76).
+    // extension: two gaps, two knee endpoints (nearer and farther), both inside a 240k reach cap.
     expect(poseHiza({ gap: 120_000, reach: 240_000 }).kneeR).toEqual(
-      scaled({ x: 28, y: -46 }),
+      scaled({ x: landingLocal(120_000, 240_000), y: -46 }),
     );
     expect(poseHiza({ gap: 240_000, reach: 240_000 }).kneeR).toEqual(
-      scaled({ x: 66, y: -46 }),
+      scaled({ x: landingLocal(240_000, 240_000), y: -46 }),
     );
   });
 
@@ -3259,10 +3401,10 @@ describe("scene — sweep reaps low with the front foot (S6 · Slice 1)", () => 
   // foot-at-near-ground and hand-at-stance assertions fail for exactly that reason until the sweep
   // descriptor (footR + targetY) exists.
   //
-  // Local-px anchors (recomputed independent of production, one sub-unit = 76/240000 local px):
-  //  · in-range anchor — a 150k gap: centres 47.5 local px apart, near edge one BODY_HALF_WIDTH (10)
-  //    nearer ⇒ 37.5; sweep's cap is 180000·(76/240000) = 57, so 37.5 lands in range (not capped).
-  //  · nearer anchor — a 120k gap ⇒ edge 28, also inside the cap, so the two land at different points.
+  // Local-px anchors (recomputed independent of production, one sub-unit = subToLocal, from the knob):
+  //  · in-range anchor — a 150k gap: near edge one BODY_HALF_WIDTH (10) inside the centre gap, inside
+  //    sweep's subToLocal(180k) cap — landingLocal(150k, 180k) (not capped).
+  //  · nearer anchor — a 120k gap lands nearer, also inside the cap, so the two land at different points.
   //  · SWEEP_Y (−8) is the authored near-ground knob: below the low band (−24), just off the floor
   //    (STAND foot at 0) — the height a reap hooks an ankle at. A re-tune in /dojo re-flows these.
   const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // STAND front foot — the no-descriptor fallback
@@ -3315,7 +3457,9 @@ describe("scene — sweep reaps low with the front foot (S6 · Slice 1)", () => 
     // fallback that draws a hand at the mid band.
     const pose = poseSweep();
 
-    expect(pose.footR).toEqual(scaled({ x: 37.5, y: SWEEP_Y }));
+    expect(pose.footR).toEqual(
+      scaled({ x: landingLocal(150_000, 180_000), y: SWEEP_Y }),
+    );
     expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
   });
 
@@ -3325,7 +3469,7 @@ describe("scene — sweep reaps low with the front foot (S6 · Slice 1)", () => 
     // for band 0 / an unmapped code), the sweep still draws there: its height never came from the band.
     [0, 1, 2, 3, 9].forEach((band) => {
       expect(poseSweep({ band }).footR).toEqual(
-        scaled({ x: 37.5, y: SWEEP_Y }),
+        scaled({ x: landingLocal(150_000, 180_000), y: SWEEP_Y }),
       );
     });
   });
@@ -3335,21 +3479,21 @@ describe("scene — sweep reaps low with the front foot (S6 · Slice 1)", () => 
   });
 
   it("tracks the real opponent distance — a nearer opponent is reaped at a nearer point (M8.5)", () => {
-    // The reach solve is retained for the foot, not replaced by a constant forward stub: a 120k gap
-    // reaps the edge at 28, a 150k gap at 37.5 — both inside sweep's 57 cap, so they land apart.
+    // The reach solve is retained for the foot, not replaced by a constant forward stub: a nearer (120k)
+    // gap reaps a nearer edge than the 150k gap — both inside sweep's subToLocal(180k) cap, so apart.
     expect(poseSweep({ gap: 120_000 }).footR).toEqual(
-      scaled({ x: 28, y: SWEEP_Y }),
+      scaled({ x: landingLocal(120_000, 180_000), y: SWEEP_Y }),
     );
     expect(poseSweep({ gap: 150_000 }).footR).toEqual(
-      scaled({ x: 37.5, y: SWEEP_Y }),
+      scaled({ x: landingLocal(150_000, 180_000), y: SWEEP_Y }),
     );
   });
 
   it("stops the sweeping foot at the move's reach cap when the opponent is beyond it", () => {
-    // A 400k gap is 126.7 px between centres — past sweep's 57 cap, so the foot stops at the cap rather
-    // than stretching to the edge. Pins that the foot obeys the SAME clamp as a fist, at the near-ground y.
+    // A 400k gap sits past sweep's subToLocal(180k) cap, so the foot stops at the cap rather than
+    // stretching to the edge. Pins that the foot obeys the SAME clamp as a fist, at the near-ground y.
     expect(poseSweep({ gap: 400_000 }).footR).toEqual(
-      scaled({ x: 57, y: SWEEP_Y }),
+      scaled({ x: landingLocal(400_000, 180_000), y: SWEEP_Y }),
     );
   });
 
@@ -3410,9 +3554,9 @@ describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
   // driven, a kick's hip WOULD step at this distance (S2 · Slice 3); the hip-held / grounded-contrast
   // assertions then fail until the AIR gate is added — the second RED within the slice.
   //
-  // Local-px anchors (recomputed independent of production, one sub-unit = 76/240000 local px):
-  //  · in-range — a 240k gap: centres 76 apart, near edge one BODY_HALF_WIDTH (10) nearer ⇒ 66;
-  //    tobi-geri's 250k reach caps at 250000·(76/240000) ≈ 79.2, so 66 lands in range (not capped).
+  // Local-px anchors (recomputed independent of production, one sub-unit = subToLocal, from the knob):
+  //  · in-range — a 240k gap: near edge one BODY_HALF_WIDTH (10) inside the centre gap —
+  //    landingLocal(240k, 250k); tobi-geri's 250k reach caps at subToLocal(250k), so it lands in range.
   //  · the band ladder (low −24 / mid −46 / high −68) supplies the y — tobi-geri authors no fixed
   //    `targetY` (unlike sweep), so an unmapped band draws nothing, exactly like a grounded kick.
   const NEUTRAL_AIR_FOOT_R = { x: 10, y: -18 }; // AIR front foot — tucked (no-strike fallback + wind-up)
@@ -3423,7 +3567,7 @@ describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
   const AIR_SHOULDER = { x: 0, y: -64 }; // AIR shoulder — upright too
 
   const REACH = 250_000; // tobi-geri's engine reach (reach-presets)
-  const CAP_LOCAL = REACH * (76 / 240_000); // ≈79.2 — the reach cap in local px, recomputed here
+  const CAP_LOCAL = subToLocal(REACH); // the reach cap in local px, re-flows from the imported knob
 
   const STARTUP = 1;
   const CONTACT = 2;
@@ -3468,7 +3612,9 @@ describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
     // rear foot holds its AIR tuck as the (airborne) support leg.
     const pose = poseTobi();
 
-    expect(pose.footR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(pose.footR).toEqual(
+      scaled({ x: landingLocal(240_000, 250_000), y: -46 }),
+    );
     expect(pose.footL).toEqual(scaled(NEUTRAL_AIR_FOOT_L));
     expect(pose.handR).toEqual(scaled(NEUTRAL_AIR_HAND_R));
   });
@@ -3496,16 +3642,18 @@ describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
   });
 
   it("tracks the real opponent distance — a nearer opponent is kicked at a nearer point (M8.5)", () => {
-    // The reach solve is retained for the airborne foot: a 150k gap kicks the edge at 37.5, a 240k gap
-    // at 66 — both inside tobi-geri's ~79 cap, so they land apart (not a constant forward stub).
+    // The reach solve is retained for the airborne foot: a nearer (150k) gap kicks a nearer edge than
+    // the 240k gap — both inside tobi-geri's subToLocal(250k) cap, so they land apart (not a stub).
     expect(poseTobi({ gap: 150_000 }).footR).toEqual(
-      scaled({ x: 37.5, y: -46 }),
+      scaled({ x: landingLocal(150_000, 250_000), y: -46 }),
     );
-    expect(poseTobi({ gap: 240_000 }).footR).toEqual(scaled({ x: 66, y: -46 }));
+    expect(poseTobi({ gap: 240_000 }).footR).toEqual(
+      scaled({ x: landingLocal(240_000, 250_000), y: -46 }),
+    );
   });
 
   it("stops the airborne foot at the move's reach cap when the opponent is beyond it (a whiff)", () => {
-    // A 400k gap is 126.7 px between centres — past tobi-geri's ~79 cap, so the foot stops at the cap
+    // A 400k gap sits past tobi-geri's subToLocal(250k) cap, so the foot stops at the cap
     // rather than stretching to the edge. Pins that the airborne foot obeys the SAME clamp as a fist.
     expect(poseTobi({ gap: 400_000 }).footR).toEqual(
       scaled({ x: CAP_LOCAL, y: -46 }),
@@ -3515,8 +3663,12 @@ describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
   it("carries the air kick to whichever band it targets, and draws none for an unmapped band", () => {
     // tobi-geri is BANDED (no fixed targetY, unlike sweep): the y is the band ladder, and band 0 / an
     // out-of-range code means no strike to draw ⇒ the foot keeps its AIR tuck (M7).
-    expect(poseTobi({ band: 1 }).footR).toEqual(scaled({ x: 66, y: -24 }));
-    expect(poseTobi({ band: 3 }).footR).toEqual(scaled({ x: 66, y: -68 }));
+    expect(poseTobi({ band: 1 }).footR).toEqual(
+      scaled({ x: landingLocal(240_000, 250_000), y: -24 }),
+    );
+    expect(poseTobi({ band: 3 }).footR).toEqual(
+      scaled({ x: landingLocal(240_000, 250_000), y: -68 }),
+    );
     expect(poseTobi({ band: 0 }).footR).toEqual(scaled(NEUTRAL_AIR_FOOT_R));
     expect(poseTobi({ band: 9 }).footR).toEqual(scaled(NEUTRAL_AIR_FOOT_R));
   });
@@ -3529,7 +3681,9 @@ describe("scene — tobi-geri is a flying front kick (S6 · Slice 2)", () => {
     const contact = poseTobi({ extra: { attackPhase: CONTACT } }).footR;
 
     expect(startup).toEqual(scaled(NEUTRAL_AIR_FOOT_R)); // AIR-tucked, not extended
-    expect(contact).toEqual(scaled({ x: 66, y: -46 })); // driven to the band
+    expect(contact).toEqual(
+      scaled({ x: landingLocal(240_000, 250_000), y: -46 }),
+    ); // driven to the band
     expect(startup).not.toEqual(contact);
   });
 
