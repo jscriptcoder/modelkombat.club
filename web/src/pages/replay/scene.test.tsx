@@ -4271,6 +4271,111 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
   });
 });
 
+describe("scene — a technique swings its driven endpoint through an arc (per-move character S3)", () => {
+  // S8 eases the driven point along STRAIGHT legs: stance → chamber (startup) and extension → stance
+  // (recovery), with the kime a hard snap to the held extension at the first active tick. S3 adds an
+  // optional per-move ARC via-waypoint: mawashi-geri's rear foot bows OFF the straight stance → chamber
+  // line as it winds up, so the roundhouse loads up-and-around instead of lifting straight — while
+  // ushiro-geri (the other rear-leg kick, no arc) still travels straight, and the kime is untouched.
+  //
+  // The arc rides the WIND-UP leg, never the chamber→contact kime (an arc there would dull the strike,
+  // S8): a quadratic Bézier through the authored via-point that PINS both endpoints, so the chamber is
+  // still reached at the last startup tick and contact is byte-identical. These assertions pin RELATIONS
+  // (decision 9): the mid-windup foot is OFF its own stance→chamber line, on the authored side — never an
+  // eye-tuned literal.
+  const STARTUP = 1;
+  const CONTACT = 2;
+
+  // A run of `phases` ticks, every one a committed `move` at a valid forward distance (opponent one full
+  // reach ahead, so the reach solve accepts the strike and the kick draws), the per-tick attackPhase from
+  // the array. Mirrors the S8 gyakuRun for a foot-driven kick.
+  const kickRun = (
+    move: string,
+    reach: number,
+    phases: readonly number[],
+  ): ReplayTape =>
+    phases.map((attackPhase, i) =>
+      tickOf(
+        i,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: reach,
+          attackMove: move,
+          x: 150_000,
+          facing: 1,
+          attackPhase,
+        },
+        { x: 150_000 + reach },
+      ),
+    );
+
+  const footAt = (tape: ReplayTape, playhead: number) =>
+    scene(tape, playhead, VIEWPORT).a.pose.footL;
+
+  // The signed area of the triangle (stance, chamber, mid): zero when the three are collinear (a straight
+  // ease), non-zero when the mid bows off the stance→chamber chord. Its SIGN is the side the path bows
+  // to — negative = bowed OUT / back (−x), the authored roundhouse load. Affine-invariant, so it reads
+  // straight off the projected foot with no literal.
+  const bowOf = (
+    stance: { x: number; y: number },
+    chamber: { x: number; y: number },
+    mid: { x: number; y: number },
+  ): number =>
+    (chamber.x - stance.x) * (mid.y - stance.y) -
+    (chamber.y - stance.y) * (mid.x - stance.x);
+
+  // A 5-tick startup run: index 0 sits at the stance foot (u=0), index 4 at the chamber (u=1), index 2 at
+  // the mid of the wind-up (u=smoothstep(0.5)=0.5, the peak of the bow).
+  const windUp = (move: string, reach: number) => {
+    const tape = kickRun(move, reach, [
+      STARTUP,
+      STARTUP,
+      STARTUP,
+      STARTUP,
+      STARTUP,
+    ]);
+
+    return {
+      stance: footAt(tape, 0),
+      mid: footAt(tape, 2),
+      chamber: footAt(tape, 4),
+    };
+  };
+
+  it("bows mawashi-geri's rear foot off the straight stance→chamber line as it winds up (the arc)", () => {
+    const { stance, mid, chamber } = windUp("mawashi-geri", 300_000);
+
+    // The endpoints are shared with a straight ease (the Bézier pins them); the arc lives in the interior.
+    // The MID tick bows clearly off the chord, to the authored (out / back, −x) side. RED today: no arc ⇒
+    // the mid is collinear ⇒ bow ≈ 0 (rounding noise only), never past the threshold.
+    expect(bowOf(stance, chamber, mid)).toBeLessThan(-800);
+  });
+
+  it("keeps a rear-leg kick with NO authored arc travelling straight (ushiro-geri — backward-compat)", () => {
+    // ushiro-geri drives the same rear leg (footL) but authors no arc — a straight back-thrust (D8), so
+    // its wind-up stays the straight ease exactly as today. This is the mawashi ≠ ushiro contrast AND the
+    // opt-in guard: the arc field must not leak to a move that does not author it.
+    const { stance, mid, chamber } = windUp("ushiro-geri", 330_000);
+
+    expect(Math.abs(bowOf(stance, chamber, mid))).toBeLessThan(200);
+  });
+
+  it("does not move contact — the kime tick still lands fully forward on the solved extension", () => {
+    // The arc rides the wind-up only; the active phase returns the solved extension and HOLDS it (S1 kime
+    // hold). So contact is fully forward (far past even the chamber), and the two active ticks are
+    // byte-equal — a mutant that applied the Bézier at the active phase would pull contact back toward the
+    // via and break both.
+    const wind = windUp("mawashi-geri", 300_000);
+    const contact = kickRun("mawashi-geri", 300_000, [CONTACT, CONTACT]);
+
+    // Fully extended forward (facing +1 ⇒ +x), far past the chamber — not bowed back toward the via.
+    expect(footAt(contact, 0).x).toBeGreaterThan(wind.chamber.x + 50);
+    // Held: the second active tick equals the first (kime hold intact).
+    expect(footAt(contact, 1)).toEqual(footAt(contact, 0));
+  });
+});
+
 describe("scene — a scored strike flashes an impact mark where it lands (Slice 2)", () => {
   // The window a score's flash lives for (mirrors SCORE_POP_TICKS in scene.ts): a fighter's mark
   // shows for the tick window ending at the playhead, then clears. Recomputed here from the documented

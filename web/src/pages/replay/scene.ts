@@ -1,5 +1,6 @@
 import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
 import {
+  arcFor,
   chamberFor,
   isGrab,
   leanFor,
@@ -319,6 +320,19 @@ const lerpJoint = (from: Joint, to: Joint, t: number): Joint => ({
   y: from.y + (to.y - from.y) * t,
 });
 
+// A quadratic Bézier through a control point (the arc VIA-waypoint, S3): (1−t)² p0 + 2(1−t)t p1 + t² p2.
+// At t=0 it is p0 and at t=1 it is p2, so it PINS both endpoints while bowing the interior toward the
+// via — the wind-up path curves through the waypoint yet still starts at the stance and reaches the
+// chamber exactly, leaving the kime snap that follows byte-unchanged (M14c).
+const bezier2 = (p0: Joint, p1: Joint, p2: Joint, t: number): Joint => {
+  const mt = 1 - t;
+
+  return {
+    x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
+    y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y,
+  };
+};
+
 // The driven point's position `index` ticks into a `length`-tick run of its phase, eased between the
 // phase's keyframes (M14c). Startup travels stance → chamber; the active phase HOLDS the solved
 // extension across its WHOLE window (S1 · replay-kime-hold) — the strike is drawn extended into the
@@ -337,6 +351,7 @@ const easeDriven = (
   stance: Joint,
   chamber: Joint,
   extension: Joint,
+  arc: Joint | null,
 ): Joint => {
   // Contact is the reach-to-target solve, unshifted, HELD for the whole active window. Length is
   // irrelevant here: a single-tick tape and the contact-sheet's active-phase still (S7) read the same
@@ -347,9 +362,16 @@ const easeDriven = (
 
   const u = smoothstep(index / (length - 1));
 
+  // Recovery retracts straight, extension → stance. The wind-up travels stance → chamber: STRAIGHT for a
+  // move that authors no arc (byte-identical to the pre-S3 lerp), or BOWED through the authored
+  // via-waypoint (S3) — a quadratic Bézier that still starts at the stance and reaches the chamber, so
+  // the kime snap into contact is unchanged. Only mawashi-geri authors one today (its rear foot swings
+  // up-and-around); the arc lives on the wind-up leg, never the kime.
   return phase === 3
     ? lerpJoint(extension, stance, u)
-    : lerpJoint(stance, chamber, u);
+    : arc === null
+      ? lerpJoint(stance, chamber, u)
+      : bezier2(stance, arc, chamber, u);
 };
 
 // The stance skeleton with the action layers applied: a knockdown lays the whole body PRONE and wins
@@ -429,6 +451,7 @@ const poseFor = (
             stanceDriven,
             chamberFor(frame.attackMove) ?? stanceDriven,
             strikeHand,
+            arcFor(frame.attackMove),
           );
 
   // A drawn HAND strike leans the upper body forward into the reach (M2) — gated to the ACTIVE phase
