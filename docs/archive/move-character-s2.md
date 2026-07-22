@@ -1,7 +1,8 @@
 # Plan: S2 — a move can LEAN as part of its technique (yoko-geri)
 
 **Branch**: feat/move-character-s2-lean
-**Status**: Active
+**Status**: ✅ Shipped — PR #388 (`main`@`3b24d0c`, 2026-07-22). Closeout in flight
+(archive → `docs/archive/move-character-s2.md`).
 
 Slice S2 of the **per-move character differentiation** arc (`plans/move-character-stories.md`,
 `plans/move-character-decisions.md`). S1 (front-hand chambers) shipped #386 + closed out #387. This is
@@ -18,17 +19,17 @@ descriptor field, while every move that authors no lean renders byte-identically
 ## Context — the seam (already mapped)
 
 - `web/src/pages/replay/scene.ts` ~L459: `const lean = driven === null || winding || isKick ||
-  isMidJoint ? 0 : rootTravel(drivingShoulder, driven, ARM_BONE)`. This is a **derived, hand-only**
+isMidJoint ? 0 : rootTravel(drivingShoulder, driven, ARM_BONE)`. This is a **derived, hand-only**
   reach-shortfall. The `isKick ? 0` branch **is where M9 is stated** — a kick's reach is answered by the
   hip `step` (L476) instead, and the torso stays upright. The derived `lean` shifts `head`/`shoulder` by
   `lean/2` (L515–516) and rotates the `girdle` (L502–505).
 - `web/src/pages/replay/move-descriptors.ts`: `MoveDescriptor` = `{ limb?, chamber?, offHand?, tuck?,
-  targetY?, grab? }` with a TOTAL `xFor(move)` lookup per field. `yoko-geri` already authors
+targetY?, grab? }` with a TOTAL `xFor(move)` lookup per field. `yoko-geri` already authors
   `{ limb: "footR", chamber: { x: 8, y: -28 } }` (drives the front foot, higher/across chamber vs
   `mae-geri`'s `{ x: 4, y: -22 }`).
 - M9 is pinned by tests in `scene.test.tsx` that all use **`mae-geri`** (`poseKicking` default) or
   **`mawashi-geri`** (`poseRound`) — neither authors a lean — so the new field does **not** break their
-  assertions; only their stated *premise* needs the conscious amendment. Key sites: L1611 "keeps the
+  assertions; only their stated _premise_ needs the conscious amendment. Key sites: L1611 "keeps the
   upper body upright in a kick… (M9)"; L1924 "keeps a kick upright at every phase… (M9)"; L3094 roundhouse
   upright; L2913 girdle-not-rotated-for-a-kick.
 

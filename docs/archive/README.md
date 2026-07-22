@@ -1682,7 +1682,7 @@ Every new derivation stayed a **pure scan of the tape at the playhead** (the `sc
 so it is identical on replay and after any scrub, and the whole arc held `BENCHMARK_VERSION` at `v19` with `src/`
 untouched — the same web-only discipline as the move-showcase arc it builds on.
 
-## Per-move character differentiation — colliding moves read apart by execution (arc in progress, S1 of 5)
+## Per-move character differentiation — colliding moves read apart by execution (arc in progress, S2 of 5)
 
 A post-arc follow-up to the move-showcase arc. That arc got every move to read as its own **limb** and closed
 accepting **M3**'s expressiveness limit — _only the driven endpoint moves_, so two moves that drive the same limb
@@ -1715,6 +1715,26 @@ a `/dojo` visual sign-off (Playwright — `agent-browser` hangs on the Pixi canv
 [move-character-s1.md](move-character-s1.md) — the S1 plan, with the recorded outcome and the full per-site
 fixture-rework categorization.
 
-**Design trail (live for S2–S5):** the decisions + stories stay in `plans/` until the whole arc closes —
+- **S2 — a move can lean back as part of its technique** (PR #388, `feat/move-character-s2-lean`) — the first of
+  the two **mechanism-risk skeletons**: a new optional per-move **`lean`** descriptor field (a horizontal upper-body
+  shift, `+` forward / `−` back) + a total `leanFor` lookup, wired in `scene.ts` as an `authoredLean` term added to
+  `head.x` / `shoulder.x` **only** (not the girdle — a torso pitch is not an arm rotation — and not the hip, whose
+  step still answers a kick's reach), gated to the **active phase**. `yoko-geri` authors `lean: -8` and becomes the
+  **first kick to lean at all**, pitching back off its bladed side kick so it reads apart from `mae-geri`'s upright
+  front snap. The lever is **purely additive** — any move that authors no lean gets `authoredLean = 0` and renders
+  byte-identically, so `src/` / TCB / `INPUT_HASH` / `v19` stay untouched. **M9 amended (conscious — the story's
+  requirement):** the derived reach-lean is hand-only and zeroes for kicks (`isKick ? 0`) — that zero **was** M9;
+  M9 becomes _"a kick is upright **by default**; an authored lean is the conscious exception."_ The
+  `mae-geri`/`mawashi-geri` M9 tests keep their assertions (both author no lean → still upright) and got reworded
+  premises pointing at the new `yoko-geri` test. **Bonus:** because the lean shifts the contact silhouette, `yoko`'s
+  `/sheet` cell now differs from `mae`'s too (execution twins otherwise stay alike on `/sheet` until the parked
+  motion-trail). Manual mutator scan: sign-flip, phase-gate-drop, and shoulder-lean-drop mutants killed; the exact
+  `-8` px (eye-tuned, decision 9) and a redundant `driven === null` guard (dead under the endpoints spread, kept for
+  parallelism) survive by design.
+
+[move-character-s2.md](move-character-s2.md) — the S2 plan, with the recorded verification (RED → GREEN → manual
+scan → `/dojo`).
+
+**Design trail (live for S3–S5):** the decisions + stories stay in `plans/` until the whole arc closes —
 `plans/move-character-decisions.md` (D1–D8 + constraints + carried risks) and `plans/move-character-stories.md`
 (the S1–S5 split + dependency graph). The design PR was #385.
