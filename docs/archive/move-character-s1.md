@@ -1,9 +1,10 @@
 # Plan: S1 — the front-hand trio winds up from its own chamber
 
 **Branch**: `feat/move-character-s1-hand-chambers`
-**Status**: Active
-**Story**: S1 in `plans/move-character-stories.md`; design in `plans/move-character-decisions.md`
-(D1–D8). Recommended first slice.
+**Status**: ✅ Complete — shipped #386 (`2212318`); archived 2026-07-22. First slice of the per-move
+character differentiation arc; the design trail (`plans/move-character-{decisions,stories}.md`, D1–D8,
+S1–S5) stays live in `plans/` for S2–S5.
+**Story**: S1 in `plans/move-character-stories.md`; design in `plans/move-character-decisions.md` (D1–D8).
 
 ## Goal
 
@@ -30,8 +31,8 @@ one sentence and reviewable as one coherent unit: _the hand trio winds up from t
   - `kizami-zuki` (jab) — fast, minimal: lead fist up near guard, e.g. `{ x: 12, y: -50 }`.
   - `uraken` (backfist) — fist cocked **across** the body, high: e.g. `{ x: -8, y: -56 }`.
   - `shuto` (knife-hand) — chambered **high by the ear**: e.g. `{ x: -2, y: -62 }`.
-  The three are mutually distinct in position (forward-low vs across-back vs high), so the wind-ups read
-  apart. Arc paths for `uraken`/`shuto` are **deferred to S5**; here they differ by chamber only.
+    The three are mutually distinct in position (forward-low vs across-back vs high), so the wind-ups read
+    apart. Arc paths for `uraken`/`shuto` are **deferred to S5**; here they differ by chamber only.
 - **No `offHand`, no `tuck`, no `targetY`, no arc.** Only `limb` + `chamber`. Keeps the diff minimal and
   leaves the `handL` (rear hand) at stance, matching the existing gyaku-zuki off-hand test's premise.
 
@@ -39,13 +40,13 @@ one sentence and reviewable as one coherent unit: _the hand trio winds up from t
 
 - [ ] Given each of `uraken` / `kizami-zuki` / `shuto` committed and rendered at its **chamber (startup)
       phase**, its driven `handR` sits at that move's **own** authored point — the three are mutually
-      distinct, and each differs from the stance hand (assert the *relation*: pairwise `≠`, not literals).
+      distinct, and each differs from the stance hand (assert the _relation_: pairwise `≠`, not literals).
 - [ ] Given each of the three at its **contact (active) phase**, its `handR` is **identical** to what an
       undescribed (unknown-id) move renders at the same frame params — i.e. authoring changed the wind-up
       only, never the contact landing (M3 / backward-compat).
 - [ ] Given an **unknown / absent / "" move id**, the generic front-hand fallback with **no chamber**
       still draws (M7 totality) — this invariant is preserved, re-expressed against an unknown id now that
-      no *real* move is undescribed.
+      no _real_ move is undescribed.
 - [ ] The full suite is green with `kizami-zuki` (and `uraken`/`shuto`) no longer standing in for
       "a real move with no descriptor."
 - [ ] `BENCHMARK_VERSION` is still `v19` and **no `src/` file is touched**; `web/` only.
@@ -69,6 +70,7 @@ outside Stryker) — substitute a scripted **manual mutator scan** over the diff
 **Acceptance criteria**: as above. **Present to the human and get confirmation before writing code.**
 
 **RED**: In `scene.test.tsx`, a new describe block "the front-hand trio winds up from its own chamber":
+
 - pose each of the three at the **chamber phase** (single-tick tape ⇒ `easeDriven` returns the chamber
   discretely) and assert the three `handR` points are pairwise distinct and each ≠ the stance hand;
 - pose each at the **contact phase** and assert its `handR` equals an unknown-id move's `handR` at the
@@ -81,12 +83,13 @@ is still true (M7/no-chamber) by switching its stand-in to the unknown id `"no-s
 the now-stale "undescribed" comments. The `mutation-testing` note: web is outside Stryker.
 
 **MUTATE**: **N/A** — manual scan. Mutants that matter and how the tests kill them:
+
 - a chamber row deleted / limb flipped to a foot ⇒ the chamber-distinctness assertion fails (the move
   reverts to stance or drives a foot);
 - two chambers made equal (copy-paste) ⇒ the pairwise-distinct assertion fails;
 - a chamber that changed the **contact** point ⇒ the contact-unchanged assertion fails.
-Exact chamber pixels are left loose by design (decision 9 — eye-tuned; the relation, not the literal).
-Record the scan in the PR body as the mutation `N/A` alternate evidence.
+  Exact chamber pixels are left loose by design (decision 9 — eye-tuned; the relation, not the literal).
+  Record the scan in the PR body as the mutation `N/A` alternate evidence.
 
 **REFACTOR**: Assess whether the three near-identical fixture re-points want a shared `UNDESCRIBED_ID`
 constant in the test file. Only if it adds clarity.
@@ -111,11 +114,11 @@ merely need a comment fix:
 - **`contact-sheet.test.tsx` (uraken/shuto) — value-safe but premise-stale, and NOT re-pointable.** Both
   cells are posed at the **active** phase, where authoring a `chamber` changes nothing, so both
   assertions (`uraken.handR.x > mae-geri.handR.x`; `shuto.handR.x > uraken.handR.x`) stay green. But
-  their comments claim these moves are *undescribed* / "both fall back to the generic front hand," which
+  their comments claim these moves are _undescribed_ / "both fall back to the generic front hand," which
   goes false. The sheet renders **arsenal moves only** (`cellFor("no-such-move")` throws and the key-set
   test forbids extras), and after S1 no arsenal hand move is undescribed — so there is **no re-point
   target**. Action: keep both assertions, rewrite the two comments to frame them as reach isolation over
-  two *now-described* front-hand moves (contact is reach-only; the chamber moves the wind-up, not this
+  two _now-described_ front-hand moves (contact is reach-only; the chamber moves the wind-up, not this
   frame). They stay valid reach guards.
 
 ### Per-site categorization (`scene.test.tsx` — `kizami-zuki`)
@@ -125,32 +128,32 @@ asserts now ease to a non-stance chamber); the rest stay green — the work ther
 hygiene, not a failing test. Re-pointing to `"no-such-move"` (reach still passed explicitly) is
 intent-preserving for **every** scene site.
 
-| line(s) | it (abbrev) | class | action |
-| --- | --- | --- | --- |
-| 1643 | falls back to generic hand for a move with no descriptor (M7) | BREAKS-GENERIC | array already lists `no-such-move`; drop the `kizami-zuki` entry (identical) |
-| 1781 | winds a move with NO authored chamber up through its stance (M7) | **BREAKS-CHAMBER** | re-point id → `no-such-move`; CHAMBER/RECOVER `== stance` then hold |
-| 2119 | still drives the FRONT hand for a punch with no descriptor | BREAKS-GENERIC | re-point → `no-such-move`; restores the "no descriptor" premise |
-| 2275 | leaves the other hand at stance for a move with no off hand (M7) | BREAKS-GENERIC | re-point → `no-such-move` (no offHand); `handL` stays stance |
-| 2381 | does not lean when the arm can already reach | SAFE-CONTACT | keep `kizami`; comment says "jab" — nothing stale |
-| 2484 | leaves the resting hand at stance — the ride is retired | SAFE-CONTACT | keep `kizami` |
-| 2505/2508 | keeps the resting arm's bones at stance length | SAFE-CONTACT | keep `kizami` |
-| 2534 | leaves a raised guard where the guard layer put it | SAFE-CONTACT | keep `kizami` |
-| 2634 | a reverse punch and a jab draw different arm lines | SAFE-CONTACT | keep `kizami` |
-| 2652 | separates the two punches by a VISIBLE amount | SAFE-CONTACT | keep `kizami` |
-| 2805/2813 | leans a reverse more than a jab at mid range | SAFE-CONTACT | keep `kizami` |
-| 2872 | retires the hand-ride — a jab's rear hand stays at stance | SAFE-CONTACT | keep `kizami` |
-| 3908 | holds an UNDESCRIBED move at full extension across the active window (S8) | **BREAKS-CHAMBER** | re-point → `no-such-move`; startup `== stance` then holds |
-| 2032 | describe-header comment (prose, no assertion) | OTHER | update the stale "identical picture" wording |
+| line(s)   | it (abbrev)                                                               | class              | action                                                                       |
+| --------- | ------------------------------------------------------------------------- | ------------------ | ---------------------------------------------------------------------------- |
+| 1643      | falls back to generic hand for a move with no descriptor (M7)             | BREAKS-GENERIC     | array already lists `no-such-move`; drop the `kizami-zuki` entry (identical) |
+| 1781      | winds a move with NO authored chamber up through its stance (M7)          | **BREAKS-CHAMBER** | re-point id → `no-such-move`; CHAMBER/RECOVER `== stance` then hold          |
+| 2119      | still drives the FRONT hand for a punch with no descriptor                | BREAKS-GENERIC     | re-point → `no-such-move`; restores the "no descriptor" premise              |
+| 2275      | leaves the other hand at stance for a move with no off hand (M7)          | BREAKS-GENERIC     | re-point → `no-such-move` (no offHand); `handL` stays stance                 |
+| 2381      | does not lean when the arm can already reach                              | SAFE-CONTACT       | keep `kizami`; comment says "jab" — nothing stale                            |
+| 2484      | leaves the resting hand at stance — the ride is retired                   | SAFE-CONTACT       | keep `kizami`                                                                |
+| 2505/2508 | keeps the resting arm's bones at stance length                            | SAFE-CONTACT       | keep `kizami`                                                                |
+| 2534      | leaves a raised guard where the guard layer put it                        | SAFE-CONTACT       | keep `kizami`                                                                |
+| 2634      | a reverse punch and a jab draw different arm lines                        | SAFE-CONTACT       | keep `kizami`                                                                |
+| 2652      | separates the two punches by a VISIBLE amount                             | SAFE-CONTACT       | keep `kizami`                                                                |
+| 2805/2813 | leans a reverse more than a jab at mid range                              | SAFE-CONTACT       | keep `kizami`                                                                |
+| 2872      | retires the hand-ride — a jab's rear hand stays at stance                 | SAFE-CONTACT       | keep `kizami`                                                                |
+| 3908      | holds an UNDESCRIBED move at full extension across the active window (S8) | **BREAKS-CHAMBER** | re-point → `no-such-move`; startup `== stance` then holds                    |
+| 2032      | describe-header comment (prose, no assertion)                             | OTHER              | update the stale "identical picture" wording                                 |
 
 **Counts:** BREAKS-CHAMBER **2** (1781, 3908 — the only reds) · BREAKS-GENERIC **3** (1643, 2119, 2275 —
 green, premise dies) · SAFE-CONTACT **8** (green, front-hand jab, unchanged) · OTHER **1** (comment).
 
 ### Per-site categorization (`contact-sheet.test.tsx` — `uraken` / `shuto`)
 
-| line(s) | it (abbrev) | class | action |
-| --- | --- | --- | --- |
-| 59/62 | renders an UNDESCRIBED move with the generic strike (`uraken` vs `mae-geri`) | BREAKS-GENERIC (value-safe) | keep assertion; rewrite comment — `uraken` now described, still drives `handR` forward past the kick |
-| 87/90 | poses each move at ITS OWN reach (`shuto` vs `uraken`) | BREAKS-GENERIC (value-safe) | keep assertion; rewrite comment — two now-described hand moves, reach-only at the active frame |
+| line(s) | it (abbrev)                                                                  | class                       | action                                                                                               |
+| ------- | ---------------------------------------------------------------------------- | --------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 59/62   | renders an UNDESCRIBED move with the generic strike (`uraken` vs `mae-geri`) | BREAKS-GENERIC (value-safe) | keep assertion; rewrite comment — `uraken` now described, still drives `handR` forward past the kick |
+| 87/90   | poses each move at ITS OWN reach (`shuto` vs `uraken`)                       | BREAKS-GENERIC (value-safe) | keep assertion; rewrite comment — two now-described hand moves, reach-only at the active frame       |
 
 **Counts:** BREAKS-GENERIC **2** — both **value-safe** (active-phase reach is unchanged), comment-stale,
 and **not re-pointable** (arsenal-only sheet, key-set test forbids `no-such-move`).
@@ -172,7 +175,7 @@ and **not re-pointable** (arsenal-only sheet, key-set test forbids `no-such-move
 ## Warnings
 
 - **Contact is unchanged, so `/sheet` and `/watch` contact frames look identical to today** — the value
-  is only visible in the *wind-up* during playback. Say so in the PR so "the sheet looks the same" is not
+  is only visible in the _wind-up_ during playback. Say so in the PR so "the sheet looks the same" is not
   read as failure (the `/sheet` motion-trail is the parked S-follow-up that would surface it statically).
 - **Don't add an `offHand`/arc here** — those are S5 (arc) and out of scope; keep the diff to `limb` +
   `chamber`.
@@ -180,4 +183,6 @@ and **not re-pointable** (arsenal-only sheet, key-set test forbids `no-such-move
   unknown ids; deleting them would drop coverage. Say which premise moved (real→unknown id) and why.
 
 ---
-*Delete this file when the plan is complete (archive under `docs/archive/` per `archive-plans-not-delete`).*
+
+_Archived 2026-07-22 in the S1 closeout (shipped #386). The arc's decisions + stories stay live in
+`plans/` until the whole arc closes, per `archive-plans-not-delete`._

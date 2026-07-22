@@ -1220,6 +1220,19 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     - `/dojo` single-tick previews stay byte-identical. Archived:
       [`docs/archive/replay-strike-contact.md`](archive/replay-strike-contact.md).
 
+11. **Per-move character differentiation — arc in progress (S1 of 5, PR #386).** A follow-up to the move-showcase
+    arc: the **7 colliding moves** that share a driven limb (`mae`/`yoko` on footR, `mawashi`/`ushiro` on footL,
+    `uraken`/`kizami-zuki`/`shuto` on handR) rendered the identical contact picture under M3, so they read apart
+    only by reach. This arc separates them by **execution** — a distinct wind-up / motion / posture — across five
+    slices (levers: `chamber` → per-move lean → arc via-waypoint; facing excluded). **S1 (#386)** — the front-hand
+    trio each authors its own `chamber` (the existing field, no new mechanism), so their **wind-ups** are three
+    distinct motions on `/dojo` + `/watch` while **contact stays byte-unchanged** (`easeDriven` returns the solved
+    extension at the active phase regardless of the chamber). `web/`-only (no `src/` / TCB / `v19` / `INPUT_HASH`
+    touch), TDD RED-GREEN + a manual mutator scan + a `/dojo` visual sign-off. The design PR (#385) landed the
+    decisions + stories, which stay live in `plans/move-character-{decisions,stories}.md` for S2–S5; the S1 plan is
+    archived at [`docs/archive/move-character-s1.md`](archive/move-character-s1.md) (closeout narrative in
+    [`docs/archive/README.md`](archive/README.md)). **Next: S2 (per-move lean) or S3 (arc lever) — independent.**
+
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
