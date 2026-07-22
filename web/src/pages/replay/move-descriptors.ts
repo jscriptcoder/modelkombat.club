@@ -84,6 +84,14 @@ export type StrikeLimb =
 // vertical pitch is not needed for the lean-back / lean-forward pair (D8) and can widen the field
 // later. It shifts head + shoulder but not the girdle (a torso pitch is not an arm rotation) nor the
 // hip (a kick's reach is still answered by its own hip step). Eye-tuned in /dojo, relation pinned.
+// A per-move ARC via-waypoint (per-move character S3): a wind-up waypoint (local px, same frame as
+// `chamber`) that the driven point's stance→chamber leg BOWS through, so the technique loads on a curve
+// rather than a straight line. `mawashi-geri`'s rear foot swings up-and-around off it — the roundhouse's
+// circular load, the one execution cue a 2-D side view can show that a lateral hip turn cannot. It rides
+// the WIND-UP leg only, never the chamber→contact kime (S1 · S8): an arc there would soften the strike's
+// snap. Applied as a quadratic Bézier that PINS both endpoints (stance and chamber), so the chamber is
+// still reached at the last startup tick and CONTACT is byte-unchanged. Optional: a move that authors
+// none keeps the straight ease exactly as today. Eye-tuned in /dojo, the bow's SIDE pinned, not the pixel.
 export type MoveDescriptor = {
   // Absent for a grab — a throw drives two hands, not one endpoint. `limbFor` falls back to the generic
   // hand for it, which is never consulted because a grab suppresses its own strike layer (scene.ts).
@@ -94,6 +102,7 @@ export type MoveDescriptor = {
   targetY?: number;
   grab?: boolean;
   lean?: number;
+  arc?: Joint;
 };
 
 const DESCRIPTORS = new Map<string, MoveDescriptor>([
@@ -148,8 +157,17 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // DIFFERENT limbs, M12i), so the roundhouse drives the REAR leg (`footL`): the rear foot swings
   // across to the near edge while the front foot holds as the support leg, a picture the front kick
   // never draws. Chamber: the rear knee cocked up and back, so the wind-up reads as a leg loading to
-  // whip around rather than the front leg's straight knee-up. Eye-tuned in /dojo, relations pinned.
-  ["mawashi-geri", { limb: "footL", chamber: { x: -8, y: -30 } }],
+  // whip around rather than the front leg's straight knee-up.
+  //
+  // What separates it from the OTHER rear-leg kick (`ushiro-geri`, a straight back-thrust) is EXECUTION
+  // (per-move character S3): the foot ARCS up-and-around as it winds up, bowing out (−x) off the straight
+  // stance→chamber line before folding into the cocked chamber — the roundhouse's circular load. The arc
+  // rides the wind-up only; the kime snap into contact is untouched (S8), so contact is byte-unchanged.
+  // Eye-tuned in /dojo, the bow's SIDE pinned, not the pixel.
+  [
+    "mawashi-geri",
+    { limb: "footL", chamber: { x: -8, y: -30 }, arc: { x: -26, y: -16 } },
+  ],
   // yoko-geri (side kick): the FRONT leg thrusts edge-on to the mid band, so the FOOT drives (footR),
   // exactly like mae-geri — NOT the hand it fell back to before authoring. Being the arsenal's
   // second-longest reach (315k), that fallback telescoped an ARM the whole way across the gap and read
@@ -273,3 +291,10 @@ export const isGrab = (move: string | undefined): boolean =>
 // exactly as `chamberFor` returns `null` for "no chamber".
 export const leanFor = (move: string | undefined): number | null =>
   DESCRIPTORS.get(move ?? "")?.lean ?? null;
+
+// This move's authored wind-up ARC via-waypoint (per-move character S3), or `null` when it authors none —
+// in which case the wind-up stays the straight stance→chamber ease (every move but `mawashi-geri` today,
+// plus the usual unknown-id / "" / absent-field fallbacks). TOTAL, same `Map`-lookup shape as the lookups
+// above; `null` (not a zero point) keeps "authors no arc" distinct at the boundary, like chamberFor/leanFor.
+export const arcFor = (move: string | undefined): Joint | null =>
+  DESCRIPTORS.get(move ?? "")?.arc ?? null;
