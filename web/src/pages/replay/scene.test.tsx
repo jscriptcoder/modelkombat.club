@@ -4469,6 +4469,132 @@ describe("scene — a technique swings its driven endpoint through an arc (per-m
   });
 });
 
+describe("scene — the front-hand pair loads on its own arc (per-move character S5)", () => {
+  // S1 gave the front-hand trio (uraken / kizami-zuki / shuto) three distinct CHAMBERS, so their wind-up
+  // POSITIONS differ. S5 gives the two the jab can't express their own wind-up PATH: the S3 arc lever
+  // (already built, limb-agnostic) bows each hand's straight stance → chamber leg through an authored
+  // via, so uraken and shuto LOAD on a curve while kizami-zuki (the jab) stays straight — and the two
+  // curve to distinguishable sides, so they read apart from each other, not just from the jab. The arc
+  // rides the WIND-UP only; the whip / chop into contact is the untouchable kime (carried-risk 1, S3).
+  //
+  // These pin RELATIONS (decision 9): each arced hand is OFF its own stance→chamber line, on its authored
+  // side; the two bow to opposite sides; the jab stays collinear — never an eye-tuned via literal.
+  const STARTUP = 1;
+  const CONTACT = 2;
+
+  // A run of `phases` ticks, every one a committed `move` at a valid forward distance (opponent one full
+  // reach ahead, so the reach solve accepts the strike and the hand draws). Same shape as the S3 kickRun,
+  // but the move drives handR, so we read the front hand.
+  const handRun = (
+    move: string,
+    reach: number,
+    phases: readonly number[],
+  ): ReplayTape =>
+    phases.map((attackPhase, i) =>
+      tickOf(
+        i,
+        {
+          attacking: true,
+          attackBand: 2,
+          attackReach: reach,
+          attackMove: move,
+          x: 150_000,
+          facing: 1,
+          attackPhase,
+        },
+        { x: 150_000 + reach },
+      ),
+    );
+
+  const handAt = (tape: ReplayTape, playhead: number) =>
+    scene(tape, playhead, VIEWPORT).a.pose.handR;
+
+  // The signed area of the triangle (stance, chamber, mid): zero when the three are collinear (a straight
+  // ease), non-zero when the mid bows off the stance→chamber chord. Its SIGN is the side the path bows to.
+  // Affine-invariant, so it reads straight off the projected hand with no literal. (Same helper as S3.)
+  const bowOf = (
+    stance: { x: number; y: number },
+    chamber: { x: number; y: number },
+    mid: { x: number; y: number },
+  ): number =>
+    (chamber.x - stance.x) * (mid.y - stance.y) -
+    (chamber.y - stance.y) * (mid.x - stance.x);
+
+  // A 5-tick startup run: index 0 sits at the stance hand (u=0), index 4 at the chamber (u=1), index 2 at
+  // the mid of the wind-up (u=smoothstep(0.5)=0.5, the peak of the bow).
+  const windUp = (move: string, reach: number) => {
+    const tape = handRun(move, reach, [
+      STARTUP,
+      STARTUP,
+      STARTUP,
+      STARTUP,
+      STARTUP,
+    ]);
+
+    return {
+      stance: handAt(tape, 0),
+      mid: handAt(tape, 2),
+      chamber: handAt(tape, 4),
+    };
+  };
+
+  // The perpendicular displacement the arc introduces at the mid tick: the mid minus the straight-chord
+  // midpoint (where a no-arc ease would sit). Zero for a straight ease; its DIRECTION is which way the arc
+  // curves — the machine-checkable proxy for "the two hands curve differently".
+  const bowOffset = (w: ReturnType<typeof windUp>) => ({
+    x: w.mid.x - (w.stance.x + w.chamber.x) / 2,
+    y: w.mid.y - (w.stance.y + w.chamber.y) / 2,
+  });
+
+  it("bows uraken's fist off the straight stance→chamber line as it winds up (the arc)", () => {
+    const { stance, mid, chamber } = windUp("uraken", 200_000);
+
+    // The endpoints are shared with a straight ease (the Bézier pins them); the arc lives in the interior.
+    // The MID tick bows clearly off the chord, to uraken's authored (up-and-forward, +) side. RED today:
+    // no arc ⇒ the mid is collinear ⇒ bow ≈ 0, never past the threshold.
+    expect(bowOf(stance, chamber, mid)).toBeGreaterThan(400);
+  });
+
+  it("bows shuto's hand off its own stance→chamber line, to the OPPOSITE side", () => {
+    const { stance, mid, chamber } = windUp("shuto", 260_000);
+
+    // shuto's high-cock load bows the other way (down-and-back, −). RED today (no arc ⇒ collinear).
+    expect(bowOf(stance, chamber, mid)).toBeLessThan(-400);
+  });
+
+  it("keeps the jab (kizami-zuki, NO authored arc) travelling straight — backward-compat / the control", () => {
+    // kizami-zuki authors no arc — the fast straight jab (D8), so its wind-up stays the straight ease
+    // exactly as today. This is the opt-in guard (the arc field must not leak to a move that authors none)
+    // AND the arced ≠ jab contrast.
+    const { stance, mid, chamber } = windUp("kizami-zuki", 210_000);
+
+    expect(Math.abs(bowOf(stance, chamber, mid))).toBeLessThan(200);
+  });
+
+  it("curves uraken and shuto to DIFFERENT sides — they read apart from each other, not just from the jab", () => {
+    // Each arc's perpendicular displacement points a materially different way: a negative dot means the two
+    // offsets are more than 90° apart. Kills a mutant that gave both hands the same via (their offsets would
+    // then point the same way ⇒ dot > 0). RED today: both are ≈ 0 (straight) ⇒ dot ≈ 0, not < 0.
+    const u = bowOffset(windUp("uraken", 200_000));
+    const s = bowOffset(windUp("shuto", 260_000));
+
+    expect(u.x * s.x + u.y * s.y).toBeLessThan(0);
+  });
+
+  it("does not move contact — the kime tick still lands fully forward on the solved extension", () => {
+    // The arc rides the wind-up only; the active phase returns the solved extension and HOLDS it (S1 kime
+    // hold). So contact is fully forward (far past the wind-up path) and the two active ticks are byte-equal
+    // — a mutant applying the Bézier at the active phase would pull contact back toward the via and break it.
+    const wind = windUp("uraken", 200_000);
+    const contact = handRun("uraken", 200_000, [CONTACT, CONTACT]);
+
+    // Fully extended forward (facing +1 ⇒ +x), far past the chamber — not bowed back toward the via.
+    expect(handAt(contact, 0).x).toBeGreaterThan(wind.chamber.x + 50);
+    // Held: the second active tick equals the first (kime hold intact).
+    expect(handAt(contact, 1)).toEqual(handAt(contact, 0));
+  });
+});
+
 describe("scene — a scored strike flashes an impact mark where it lands (Slice 2)", () => {
   // The window a score's flash lives for (mirrors SCORE_POP_TICKS in scene.ts): a fighter's mark
   // shows for the tick window ending at the playhead, then clears. Recomputed here from the documented
