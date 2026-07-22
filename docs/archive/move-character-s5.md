@@ -1,7 +1,7 @@
 # Plan: S5 — the front-hand pair loads on its own arc (uraken · shuto)
 
 **Branch**: feat/move-character-s5-hand-arcs
-**Status**: Active — plan drafted, awaiting acceptance-criteria confirmation before any code.
+**Status**: ✅ Shipped — PR #394 (`main`@`946e698`, 2026-07-22). The last slice; archived with the whole-arc close.
 
 Slice **S5 of 5** — the **LAST slice** of the **per-move character differentiation** arc
 (`plans/move-character-stories.md`, `plans/move-character-decisions.md`). S1 (front-hand chambers)

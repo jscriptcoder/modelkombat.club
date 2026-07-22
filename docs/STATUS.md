@@ -1220,7 +1220,7 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     - `/dojo` single-tick previews stay byte-identical. Archived:
       [`docs/archive/replay-strike-contact.md`](archive/replay-strike-contact.md).
 
-11. **Per-move character differentiation — arc in progress (S4 of 5, PRs #386, #388, #390, #392).** A follow-up to the
+11. **Per-move character differentiation — ✅ COMPLETE, all 5 slices (PRs #386, #388, #390, #392, #394).** A follow-up to the
     move-showcase arc: the **7 colliding moves** that share a driven limb (`mae`/`yoko` on footR, `mawashi`/`ushiro`
     on footL, `uraken`/`kizami-zuki`/`shuto` on handR) rendered the identical contact picture under M3, so they read
     apart only by reach. This arc separates them by **execution** — a distinct wind-up / motion / posture — across
@@ -1251,16 +1251,23 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     stay untouched). The straight foot path (no arc) and the solved contact point stay **byte-identical** — S3's
     `ushiro`-collinear test and the `ushiro` foot/hip tests stay green (the lean shifts only the upper body). The plan's
     "forward pitch over a rising leg" risk never bit: the active-phase gate keeps the wind-up upright, so the pitch
-    shows only at the extended _kime_ (confirmed in the `/dojo` wind-up capture). `web/`-only throughout (no `src/` /
-    TCB / `v19` / `INPUT_HASH` touch), TDD
+    shows only at the extended _kime_ (confirmed in the `/dojo` wind-up capture). **S5 (#394)** — the **last slice**
+    and the second group-completion slice: `uraken` and `shuto` reuse S3's `arc` field (`arc {8,-60}` / `{2,-46}`) so
+    each front hand **loads on a curve**, bowing to **opposite sides**, while `kizami-zuki` (the jab) stays the straight
+    ease — so the trio reads apart by wind-up **path**, not just chamber. Like S4, **no new mechanism, no `scene.ts`
+    change**: `easeDriven` already bows **whichever endpoint `limb` names** (it drove the foot for `mawashi`), and a
+    hand's wind-up has `step`/`lean`/`girdle` all 0, so the bowed `handR` flows to the pose cleanly. Like every arc it
+    rides the **wind-up** only — D8's whip/chop is the untouchable _kime_ (carried-risk 1), so the arc shows the
+    **loading** curve, as `mawashi`'s did. **With S5 all 7 colliding moves read apart by execution — the arc is done.**
+    `web/`-only throughout (no `src/` / TCB / `v19` / `INPUT_HASH` touch), TDD
     RED-GREEN + a manual mutator scan + a `/dojo` visual sign-off. The design PR (#385) landed the decisions +
-    stories, which stay live in `plans/move-character-{decisions,stories}.md` for S5; the S1–S4 plans are archived
-    at [`docs/archive/move-character-s1.md`](archive/move-character-s1.md) +
-    [`docs/archive/move-character-s2.md`](archive/move-character-s2.md) +
-    [`docs/archive/move-character-s3.md`](archive/move-character-s3.md) +
-    [`docs/archive/move-character-s4.md`](archive/move-character-s4.md) (closeout narratives in
-    [`docs/archive/README.md`](archive/README.md)). **Next: S5 (`uraken`/`shuto` arcs — reuses S3's `arc`, the last
-    slice); both mechanism levers are built.**
+    stories, which stayed live in `plans/` across all five slices and are **now archived with the arc's close** — the
+    complete design trail (S1–S5 plans + the decisions + stories) lives at
+    [`docs/archive/move-character-s1.md`](archive/move-character-s1.md) +
+    [`s2`](archive/move-character-s2.md) + [`s3`](archive/move-character-s3.md) +
+    [`s4`](archive/move-character-s4.md) + [`s5`](archive/move-character-s5.md) +
+    [`decisions`](archive/move-character-decisions.md) + [`stories`](archive/move-character-stories.md) (closeout
+    narratives in [`docs/archive/README.md`](archive/README.md)). No move-character files remain in `plans/`.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped

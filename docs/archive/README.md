@@ -1682,7 +1682,7 @@ Every new derivation stayed a **pure scan of the tape at the playhead** (the `sc
 so it is identical on replay and after any scrub, and the whole arc held `BENCHMARK_VERSION` at `v19` with `src/`
 untouched — the same web-only discipline as the move-showcase arc it builds on.
 
-## Per-move character differentiation — colliding moves read apart by execution (arc in progress, S4 of 5)
+## Per-move character differentiation — colliding moves read apart by execution (✅ complete, 5 of 5)
 
 A post-arc follow-up to the move-showcase arc. That arc got every move to read as its own **limb** and closed
 accepting **M3**'s expressiveness limit — _only the driven endpoint moves_, so two moves that drive the same limb
@@ -1780,6 +1780,30 @@ verification (RED → GREEN → manual scan → `/dojo`).
 [move-character-s4.md](move-character-s4.md) — the S4 plan, with the "no new mechanism / no `scene.ts` change"
 rationale and the recorded verification (RED → GREEN → manual scan → `/dojo`).
 
-**Design trail (live for S5):** the decisions + stories stay in `plans/` until the whole arc closes —
-`plans/move-character-decisions.md` (D1–D8 + constraints + carried risks) and `plans/move-character-stories.md`
-(the S1–S5 split + dependency graph). The design PR was #385.
+- **S5 — the front-hand pair loads on its own arc** (PR #394, `feat/move-character-s5-hand-arcs`) — the **last
+  slice**, and the second group-completion slice: like S4 it reuses a built lever with **no new mechanism** and
+  **no `scene.ts` change**. `uraken` and `shuto` author S3's optional `arc` field (`uraken { arc {8,-60} }`,
+  `shuto { arc {2,-46} }`) on top of their S1 chambers, so each front hand **loads on a curve** — `uraken`
+  bowing up-and-across, `shuto` bowing the **other way** up to its high by-the-ear cock — while `kizami-zuki`
+  (the jab) stays the straight ease, the group's no-arc control (the way `ushiro-geri` was for the rear-foot
+  pair). The two curve to **opposite sides**, so the trio reads apart by wind-up **path**, not just chamber. The
+  lever transferred from foot to hand for free: `easeDriven`'s startup Bézier bows **whichever endpoint `limb`
+  names**, and a hand's wind-up has `step` / `lean` / `girdle` all `0`, so the bowed `handR` flows to the pose
+  as cleanly as the foot did — the same literal-free seam. As with every arc it rides the **wind-up** only:
+  D8's whip / chop is the untouchable _kime_ (carried-risk 1, resolved in S3), so the arc shows the **loading**
+  curve, exactly as `mawashi`'s did. The one thing S5 had to prove that S3 did not — that the two arced moves
+  read apart **from each other** — is pinned by an offset-direction test (`offset(uraken)·offset(shuto) < 0`),
+  the sole killer of a "gave both the same via" regression. RED was the no-arc bow at **exactly `0`** (cleaner
+  than S3's `-83`). Manual mutator scan: drop each arc, sign-flip a via, and the same-via-for-both mutant all
+  killed; the exact via px survive by design (decision 9). `/dojo` sign-off: three distinct loads (up-and-across
+  · high by the ear · straight jab), bent elbows throughout (no stretched arms), contact unchanged.
+
+[move-character-s5.md](move-character-s5.md) — the S5 plan, with the "arc-lever-reused, no `scene.ts`"
+rationale and the recorded verification (RED → GREEN → manual scan → `/dojo`).
+
+**Arc complete — the design trail is archived.** The decisions + stories stayed live in `plans/` across all
+five slices and are archived here with the arc's close:
+[move-character-decisions.md](move-character-decisions.md) (D1–D8 + constraints + carried risks) and
+[move-character-stories.md](move-character-stories.md) (the S1–S5 split + dependency graph). The design PR
+was #385. All **7 colliding moves** now read apart by execution — a distinct wind-up / motion / posture — and
+no move-character files remain in `plans/`.
