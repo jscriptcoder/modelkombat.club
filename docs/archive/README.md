@@ -1682,7 +1682,7 @@ Every new derivation stayed a **pure scan of the tape at the playhead** (the `sc
 so it is identical on replay and after any scrub, and the whole arc held `BENCHMARK_VERSION` at `v19` with `src/`
 untouched — the same web-only discipline as the move-showcase arc it builds on.
 
-## Per-move character differentiation — colliding moves read apart by execution (arc in progress, S3 of 5)
+## Per-move character differentiation — colliding moves read apart by execution (arc in progress, S4 of 5)
 
 A post-arc follow-up to the move-showcase arc. That arc got every move to read as its own **limb** and closed
 accepting **M3**'s expressiveness limit — _only the driven endpoint moves_, so two moves that drive the same limb
@@ -1755,6 +1755,31 @@ scan → `/dojo`).
 [move-character-s3.md](move-character-s3.md) — the S3 plan, with the resolved open question and the recorded
 verification (RED → GREEN → manual scan → `/dojo`).
 
-**Design trail (live for S4–S5):** the decisions + stories stay in `plans/` until the whole arc closes —
+- **S4 — a back kick reads as a straight thrust pitched forward** (PR #392, `feat/move-character-s4-ushiro`) — the
+  **first group-completion slice**, and the first to introduce **no new mechanism**: it reuses S2's optional `lean`
+  field, authored **forward** this time. `ushiro-geri` gains `lean: 8` (the mirror of `yoko-geri`'s `-8` — symmetric
+  ±8), so at contact its torso **pitches forward** into the linear back-thrust — a committed drive that is the opposite
+  of the side kick's bladed lean-back and a posture the roundhouse (`mawashi-geri`, upright + arcing foot, S3) never
+  strikes. This **finishes the rear-foot pair:** `mawashi` arcs its foot and stays upright; `ushiro` drives its foot
+  straight and leans forward. **No `scene.ts` change** — the S2 `authoredLean` term already adds to `head.x` /
+  `shoulder.x` for **any** driven limb, gated on `winding` (not `isKick`), so a `footL` kick opts in exactly as
+  `yoko`'s did; the whole slice is one descriptor value + comment. **No M9 re-amendment** — `ushiro` is the **second
+  instance** of the exception S2 opened, so the `mae`/`mawashi` upright tests stay untouched. The straight foot path
+  (no arc) and the solved contact point stay **byte-identical** — S3's `ushiro`-collinear test and the `ushiro`
+  foot/hip tests stayed green (the lean shifts only the upper body). **The "falling into a rising leg" risk** carried
+  in the plan never materialized: the active-phase gate keeps the wind-up upright (leg rising, torso vertical), and the
+  forward pitch appears only at the extended kime — confirmed in the `/dojo` wind-up capture. **Honest caveat:**
+  `ushiro`'s _absolute_ forward pitch on `/dojo` is modest because it is the longest reach (330k), so the big hip-step
+  dominates any lean — the headline read is the clear opposite-sign contrast against `yoko`, which the tests pin
+  quantitatively at a matched setup (forward > `mae`; `yoko` < `mae` < `ushiro`; `mawashi` upright but `ushiro` >
+  `mawashi`; the lean contained to the upper body, foot unchanged). The reach bound mirrors `yoko`'s: a forward lean
+  stretches the **rear** arm, span `√((N+11)²+400)` must stay under `2·ARM_BONE ≈ 31.3`, so `+8`→27.6 is comfortably
+  safe (headroom to N≈13). Manual mutator scan: sign-flip, drop, and zero all killed; the exact `8` px survives by
+  design (decision 9).
+
+[move-character-s4.md](move-character-s4.md) — the S4 plan, with the "no new mechanism / no `scene.ts` change"
+rationale and the recorded verification (RED → GREEN → manual scan → `/dojo`).
+
+**Design trail (live for S5):** the decisions + stories stay in `plans/` until the whole arc closes —
 `plans/move-character-decisions.md` (D1–D8 + constraints + carried risks) and `plans/move-character-stories.md`
 (the S1–S5 split + dependency graph). The design PR was #385.

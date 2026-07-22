@@ -1220,7 +1220,7 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     - `/dojo` single-tick previews stay byte-identical. Archived:
       [`docs/archive/replay-strike-contact.md`](archive/replay-strike-contact.md).
 
-11. **Per-move character differentiation — arc in progress (S3 of 5, PRs #386, #388, #390).** A follow-up to the
+11. **Per-move character differentiation — arc in progress (S4 of 5, PRs #386, #388, #390, #392).** A follow-up to the
     move-showcase arc: the **7 colliding moves** that share a driven limb (`mae`/`yoko` on footR, `mawashi`/`ushiro`
     on footL, `uraken`/`kizami-zuki`/`shuto` on handR) rendered the identical contact picture under M3, so they read
     apart only by reach. This arc separates them by **execution** — a distinct wind-up / motion / posture — across
@@ -1240,14 +1240,27 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     chamber is still reached at the last startup tick and the _kime_ snap (the held solved extension at the active
     phase, S1) is **byte-identical** — this **resolved the arc's open question**: the swing rides the wind-up leg, not
     the untouchable chamber→contact whip (carried-risk 1). Purely additive (unauthored moves byte-identical); the
-    recovery-leg arc is a stated deferral. `web/`-only throughout (no `src/` / TCB / `v19` / `INPUT_HASH` touch), TDD
+    recovery-leg arc is a stated deferral. **S4 (#392)** — the **first group-completion slice**, and the first to
+    introduce **no new mechanism**: `ushiro-geri` authors S2's existing `lean` field **forward** (`lean: 8`, the mirror
+    of `yoko`'s `-8` — symmetric ±8), so at contact its torso **pitches forward** into the straight back-thrust, the
+    opposite of the side kick's bladed lean-back and a posture the roundhouse (upright + arcing foot) never strikes —
+    finishing the **rear-foot pair** (`mawashi` arcs its foot + stays upright; `ushiro` drives straight + forward).
+    **No `scene.ts` change** (the S2 `authoredLean` term is gated on `winding`, not `isKick`, so any driven limb —
+    here a `footL` kick — opts in exactly as `yoko` did; the slice is one descriptor value + comment) and **no M9
+    re-amendment** (`ushiro` is the **second instance** of the exception S2 opened, so the `mae`/`mawashi` upright tests
+    stay untouched). The straight foot path (no arc) and the solved contact point stay **byte-identical** — S3's
+    `ushiro`-collinear test and the `ushiro` foot/hip tests stay green (the lean shifts only the upper body). The plan's
+    "forward pitch over a rising leg" risk never bit: the active-phase gate keeps the wind-up upright, so the pitch
+    shows only at the extended _kime_ (confirmed in the `/dojo` wind-up capture). `web/`-only throughout (no `src/` /
+    TCB / `v19` / `INPUT_HASH` touch), TDD
     RED-GREEN + a manual mutator scan + a `/dojo` visual sign-off. The design PR (#385) landed the decisions +
-    stories, which stay live in `plans/move-character-{decisions,stories}.md` for S4–S5; the S1–S3 plans are archived
+    stories, which stay live in `plans/move-character-{decisions,stories}.md` for S5; the S1–S4 plans are archived
     at [`docs/archive/move-character-s1.md`](archive/move-character-s1.md) +
     [`docs/archive/move-character-s2.md`](archive/move-character-s2.md) +
-    [`docs/archive/move-character-s3.md`](archive/move-character-s3.md) (closeout narratives in
-    [`docs/archive/README.md`](archive/README.md)). **Next: S4 (`ushiro-geri` straight thrust — reuses S2's `lean`,
-    pitched forward) or S5 (`uraken`/`shuto` arcs — reuses S3's `arc`); both mechanism levers are now built.**
+    [`docs/archive/move-character-s3.md`](archive/move-character-s3.md) +
+    [`docs/archive/move-character-s4.md`](archive/move-character-s4.md) (closeout narratives in
+    [`docs/archive/README.md`](archive/README.md)). **Next: S5 (`uraken`/`shuto` arcs — reuses S3's `arc`, the last
+    slice); both mechanism levers are built.**
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
