@@ -134,22 +134,37 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // The FRONT-hand trio (uraken / kizami-zuki / shuto): three techniques that all drive the front hand
   // (handR) to the same solved target, so under M3 they land the identical contact picture and used to
   // read apart only by reach — the hand analogue of the two same-limb kick pairs. What separates them is
-  // HOW they WIND UP: each authors its OWN chamber, so the startup shape is three different motions on
-  // /dojo + /watch even though contact is byte-unchanged (the reach solve at the active phase ignores the
-  // chamber). No new mechanism — the same `chamber` field the kicks and gyaku-zuki already use. The arc
-  // SWING that would separate their contact motion paths is deferred; here they differ by chamber only.
-  // Each chamber sits well inside an ARM'S reach of the front shoulder (7, −64) so deriveBend never
-  // straightens the limb into a stretched line. Eye-tunable in /dojo; relations pinned, not literals.
+  // HOW they WIND UP: each authors its OWN chamber (S1), so the startup POSITIONS are three different
+  // shapes on /dojo + /watch even though contact is byte-unchanged (the reach solve at the active phase
+  // ignores the chamber). Per-move character S5 then gives the two the jab cannot express their own wind-up
+  // PATH: uraken and shuto author an `arc` via (the S3 lever, reused) so each hand LOADS on a curve, while
+  // kizami-zuki (the jab) stays the straight ease — and the two curve to OPPOSITE sides, so they read apart
+  // from each other, not just from the jab. Like every arc it rides the WIND-UP only; the whip / chop into
+  // contact is the untouchable kime (S1 · S8), so contact is byte-unchanged. No new mechanism — the same
+  // `chamber` + `arc` fields the kicks already use. Each chamber AND each via sits well inside an ARM'S
+  // reach of the front shoulder (7, −64) so deriveBend never straightens the limb into a stretched line.
+  // Eye-tunable in /dojo; the bow's SIDE + the pair's contrast are pinned, not the pixels.
   //
   // kizami-zuki (jab): fast and minimal — the lead fist waits high and slightly forward, near the guard,
-  // barely cocked. The shortest wind-up of the three, which is what a jab IS.
+  // barely cocked. The shortest wind-up of the three, which is what a jab IS. No arc — the straight jab is
+  // the group's no-arc control, the way ushiro-geri is for the rear-foot pair.
   ["kizami-zuki", { limb: "handR", chamber: { x: 12, y: -50 } }],
   // uraken (backfist): the fist cocks ACROSS the centreline and high, loaded to whip back out — the
-  // across-the-body start a straight jab never draws.
-  ["uraken", { limb: "handR", chamber: { x: -8, y: -56 } }],
+  // across-the-body start a straight jab never draws. Its wind-up ARCS (S5): the fist rises up-and-forward
+  // off the straight stance→chamber line before swinging back across into the cocked chamber — a curved
+  // backfist load, bowing to the opposite side from shuto's.
+  [
+    "uraken",
+    { limb: "handR", chamber: { x: -8, y: -56 }, arc: { x: 8, y: -60 } },
+  ],
   // shuto (knife-hand): chambered HIGH, up by the ear, to chop down-and-in — the highest cock of the
-  // three, distinct from the jab's forward-low guard and the backfist's across-the-body load.
-  ["shuto", { limb: "handR", chamber: { x: -2, y: -62 } }],
+  // three, distinct from the jab's forward-low guard and the backfist's across-the-body load. Its wind-up
+  // ARCS (S5) the OTHER way from uraken: the hand dips back before rising to the high by-the-ear cock, so
+  // the knife-hand loads on a distinct curved path.
+  [
+    "shuto",
+    { limb: "handR", chamber: { x: -2, y: -62 }, arc: { x: 2, y: -46 } },
+  ],
   // mawashi-geri (roundhouse): the second move with real screen time (~13%), and the one that forces
   // M3's expressiveness limit. A front kick and a roundhouse both drive a FOOT to the same solved
   // target, so driving the same foot renders them on the identical pixel — the wall the girdle was
