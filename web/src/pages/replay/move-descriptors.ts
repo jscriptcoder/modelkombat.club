@@ -26,7 +26,10 @@ import type { Joint } from "./scene";
 // `footL` — the REAR leg — is what separates a roundhouse from a front kick (S4 · Slice 6). Both kicks
 // drive a foot to the same solved target, so under M3 (only the driven endpoint moves) driving the
 // same foot would render them identically; the roundhouse takes the M12i escape hatch and drives the
-// OTHER leg, which is the one distinction a 2-D side view can show that a lateral hip turn cannot.
+// OTHER leg, which is the one distinction a 2-D side view can show that a lateral hip turn cannot. The
+// back kick (`ushiro-geri`) joins it on the rear leg for the same reason, so the front-leg kicks
+// (`mae-geri`, `yoko-geri`) and the rear-leg kicks (`mawashi-geri`, `ushiro-geri`) split into two
+// pictures — the most a side view can separate four kicks that all solve to one target.
 //
 // `elbowR` / `kneeR` (+ their L mirrors) — the close-range INVERSION (S5). Every endpoint above drives
 // a hand / foot and lets the bend rule DERIVE the mid-joint; an empi (elbow) or hiza-geri (knee) leads
@@ -117,6 +120,23 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // never draws. Chamber: the rear knee cocked up and back, so the wind-up reads as a leg loading to
   // whip around rather than the front leg's straight knee-up. Eye-tuned in /dojo, relations pinned.
   ["mawashi-geri", { limb: "footL", chamber: { x: -8, y: -30 } }],
+  // yoko-geri (side kick): the FRONT leg thrusts edge-on to the mid band, so the FOOT drives (footR),
+  // exactly like mae-geri — NOT the hand it fell back to before authoring. Being the arsenal's
+  // second-longest reach (315k), that fallback telescoped an ARM the whole way across the gap and read
+  // as a stretched limb rather than a kick (spotted on /dojo + the /sheet contact sheet). It shares
+  // mae-geri's front-leg picture at full extension — both footR to the same solved target, the M3 limit
+  // a 2-D side view cannot escape — but reads apart from the rear-leg roundhouse / back kick. Chamber:
+  // the knee cocked high and slightly across the centreline (a side kick loads by lifting the knee tight
+  // before the leg drives out), distinct from the front kick's straight knee-up. Eye-tunable in /dojo.
+  ["yoko-geri", { limb: "footR", chamber: { x: 8, y: -28 } }],
+  // ushiro-geri (back kick): thrusts to the mid / high band with the REAR leg (footL) — the roundhouse's
+  // escape hatch (M12i) reused, so the back kick reads apart from the front-leg side kick the same way
+  // the roundhouse reads apart from the front kick (both footL kicks share the rear-leg extension). It
+  // is the arsenal's LONGEST reach (330k); before authoring it fell back to the hand and stretched the
+  // arm the furthest of any move — the exact "arm stretches enormously" the S3 dojo snap first surfaced
+  // (docs/archive/move-poses-s3.md). Chamber: the rear knee lifted and cocked back before the heel drives
+  // through. Eye-tunable in /dojo.
+  ["ushiro-geri", { limb: "footL", chamber: { x: -4, y: -24 } }],
   // empi (elbow strike): the first CLOSE-RANGE technique, and the first that leads with a MID-JOINT.
   // The ELBOW is the driven point — it drives to the opponent's near edge at the band while the fist
   // folds back behind it (`tuck`, relative to the elbow so it rides across every phase, M13c). Every
