@@ -1682,7 +1682,7 @@ Every new derivation stayed a **pure scan of the tape at the playhead** (the `sc
 so it is identical on replay and after any scrub, and the whole arc held `BENCHMARK_VERSION` at `v19` with `src/`
 untouched — the same web-only discipline as the move-showcase arc it builds on.
 
-## Per-move character differentiation — colliding moves read apart by execution (arc in progress, S2 of 5)
+## Per-move character differentiation — colliding moves read apart by execution (arc in progress, S3 of 5)
 
 A post-arc follow-up to the move-showcase arc. That arc got every move to read as its own **limb** and closed
 accepting **M3**'s expressiveness limit — _only the driven endpoint moves_, so two moves that drive the same limb
@@ -1735,6 +1735,26 @@ fixture-rework categorization.
 [move-character-s2.md](move-character-s2.md) — the S2 plan, with the recorded verification (RED → GREEN → manual
 scan → `/dojo`).
 
-**Design trail (live for S3–S5):** the decisions + stories stay in `plans/` until the whole arc closes —
+- **S3 — a technique swings its driven endpoint through an arc** (PR #390, `feat/move-character-s3-arc`) — the
+  **second and last mechanism-risk skeleton**: a new optional per-move **`arc`** descriptor (an authored via-waypoint,
+  same local frame as `chamber`) + a total `arcFor` lookup + a pure `bezier2` quadratic Bézier. `easeDriven`'s
+  **startup branch only** becomes `arc === null ? lerpJoint(stance, chamber, u) : bezier2(stance, arc, chamber, u)`, so
+  `mawashi-geri` (which authors `arc: {-26, -16}`) **swings its rear foot up-and-around** as it winds up — a circular
+  load that reads apart from `ushiro-geri`'s straight rear-leg thrust (same leg, no arc, the side-by-side control).
+  **The Bézier pins both endpoints** (`t=0`→stance, `t=1`→chamber), so the chamber is reached exactly at the last
+  startup tick and the _kime_ commit (the held solved extension at the active phase, S1) is **byte-identical** — this
+  **resolved the arc's open question:** carried-risk 1 warned an arc on the chamber→contact (kime) leg would soften the
+  strike, so the swing rides the **wind-up** leg instead, where the roundhouse's circular load lives. The recovery-leg
+  arc (`extension → stance`, same `bezier2` at a second call site) is a **stated deferral** — the walking skeleton
+  proves the mechanism on one leg. Purely additive (unauthored moves byte-identical). RED was the signed cross-product
+  `expected -83 to be less than -800` (no arc ⇒ the mid wind-up foot is collinear ⇒ the bow is rounding noise); the
+  test pins the bow's **side + magnitude** via an affine-invariant cross-product, **not** the eye-tuned via literal
+  (decision 9). Manual mutator scan: drop-the-Bézier, via sign-flip, `arcFor` fallback leak, and phase-2-short-circuit
+  break all killed; the exact via px survives by design.
+
+[move-character-s3.md](move-character-s3.md) — the S3 plan, with the resolved open question and the recorded
+verification (RED → GREEN → manual scan → `/dojo`).
+
+**Design trail (live for S4–S5):** the decisions + stories stay in `plans/` until the whole arc closes —
 `plans/move-character-decisions.md` (D1–D8 + constraints + carried risks) and `plans/move-character-stories.md`
 (the S1–S5 split + dependency graph). The design PR was #385.
