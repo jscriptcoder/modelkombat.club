@@ -1636,11 +1636,11 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
     expect(pose.hip.y).toBe(scaled({ x: 0, y: -34 }).y);
   });
 
-  it("falls back to today's generic hand pose for a move with no descriptor yet (M7)", () => {
-    // The other 12 moves, an id the table has never heard of, an empty id, and an ABSENT field
+  it("falls back to today's generic hand pose for an unknown move id (M7)", () => {
+    // After S1 every real arsenal move is described, so the generic hand is now the fallback for
+    // NON-arsenal ids only: an id the table has never heard of, an empty id, and an ABSENT field
     // (the loader casts the wire wholesale, so the key may simply not be there) all draw the hand.
     const generic = [
-      { attackMove: "kizami-zuki" }, // a real move, no descriptor yet
       { attackMove: "no-such-move" }, // unknown id
       { attackMove: "" }, // the engine's "nothing committed" sentinel
       { attackMove: undefined }, // field absent from the wire
@@ -1699,6 +1699,82 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
     scene(tape, 1, VIEWPORT);
 
     expect(scene(tape, 0, VIEWPORT).a.pose.footR).toEqual(first);
+  });
+});
+
+describe("scene — the front-hand trio winds up from its own chamber (S1)", () => {
+  // uraken (backfist), kizami-zuki (jab) and shuto (knife-hand) all drive the FRONT hand (handR) to
+  // the same solved target at contact — under M3 that is one identical picture apart from reach. What
+  // separates them as techniques is HOW they wind up: each authors its own chamber, so the startup
+  // shape reads apart even though contact does not. This pins the RELATION (decision 9): the three
+  // chambers are mutually distinct and none is the stance hand, while contact is byte-unchanged from
+  // the generic fallback — the eye-tuned pixel itself is free to move.
+  const STARTUP = 1;
+  const CONTACT = 2;
+  const STANCE_HAND_R = { x: 18, y: -44 }; // STAND front hand — the undescribed wind-up
+
+  // One hand move posed at one phase on a SINGLE-tick tape, so easeDriven returns the phase's keyframe
+  // discretely: the authored chamber at startup, the solved reach-to-target extension at contact.
+  const handAtPhase = (
+    move: string,
+    attackPhase: number,
+    reach = 210_000,
+  ): Joint =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: reach,
+            attackMove: move,
+            x: 150_000,
+            facing: 1,
+            attackPhase,
+          },
+          { x: 390_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose.handR;
+
+  it("winds each of the three hand moves up from a DISTINCT chamber, none of them the stance hand", () => {
+    const kizami = handAtPhase("kizami-zuki", STARTUP);
+    const uraken = handAtPhase("uraken", STARTUP);
+    const shuto = handAtPhase("shuto", STARTUP);
+
+    // Pairwise distinct: three different motions, not one shared picture. A copy-pasted chamber (two
+    // rows sharing a value) collapses one of these pairs.
+    expect(kizami).not.toEqual(uraken);
+    expect(uraken).not.toEqual(shuto);
+    expect(shuto).not.toEqual(kizami);
+
+    // ...and each is a REAL wind-up, away from the stance hand an undescribed move holds — so a deleted
+    // chamber row, or a limb flipped to a foot (both revert handR to the stance), is caught here.
+    const stance = scaled(STANCE_HAND_R);
+
+    expect(kizami).not.toEqual(stance);
+    expect(uraken).not.toEqual(stance);
+    expect(shuto).not.toEqual(stance);
+    // The undescribed baseline IS the stance hand at startup — the thing the three now differ from.
+    expect(handAtPhase("no-such-move", STARTUP)).toEqual(stance);
+  });
+
+  it("still lands each hand move on the same contact point as the generic fallback (M3 unchanged)", () => {
+    // Authoring a chamber changes the WIND-UP only: at the active phase every move drives handR to the
+    // reach-to-target solve, identical whether or not a chamber is authored. So each of the three lands
+    // exactly where an undescribed move of the same reach lands — contact is byte-unchanged (M3). A
+    // chamber that leaked into the contact keyframe would break this.
+    const baseline = handAtPhase("no-such-move", CONTACT);
+
+    expect(handAtPhase("kizami-zuki", CONTACT)).toEqual(baseline);
+    expect(handAtPhase("uraken", CONTACT)).toEqual(baseline);
+    expect(handAtPhase("shuto", CONTACT)).toEqual(baseline);
+    // ...and that contact point is a real forward strike, not the stance hand — so "unchanged" means
+    // "still drives to the target", not "never moved".
+    expect(baseline.x).toBeGreaterThan(scaled(STANCE_HAND_R).x);
   });
 });
 
@@ -1769,16 +1845,16 @@ describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
   });
 
   it("winds a move with NO authored chamber up through its stance instead (M7, reading A)", () => {
-    // The other 12 moves are unauthored, so their driven endpoint simply returns to the stance while
-    // winding up and recovering — an arm dropping back to guard between strikes. Not a degraded
-    // state: it is still a wind-up, just not a bespoke one, and it is what makes THIS slice fix all
-    // 13 moves rather than only mae-geri.
+    // A move the table does not describe returns its driven endpoint to the stance while winding up and
+    // recovering — an arm dropping back to guard between strikes. Not a degraded state: it is still a
+    // wind-up, just not a bespoke one, and it is what makes phasing TOTAL (every move winds up, authored
+    // or not). After S1 every real arsenal move is described, so this reads off an UNKNOWN id.
     const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
-    // kizami-zuki (the jab) is the stand-in for "real move, still unauthored" — gyaku-zuki held this
-    // role until S4 · Slice 1 gave it a descriptor. Its 210k reach caps at subToLocal(210k), and
+    // `no-such-move` is the stand-in for "a move with no chamber" — kizami-zuki held this role until S1
+    // gave the front-hand trio their chambers. A synthetic 210k reach caps at subToLocal(210k), and
     // landingLocal(gap, reach) lands on whichever of the near edge or that cap binds, so the contact
     // expectation below tracks the knob.
-    const unauthored = { attackMove: "kizami-zuki", attackReach: 210_000 };
+    const unauthored = { attackMove: "no-such-move", attackReach: 210_000 };
 
     expect(poseAtPhase({ ...unauthored, attackPhase: CHAMBER }).handR).toEqual(
       scaled(NEUTRAL_HAND_R),
@@ -2112,11 +2188,11 @@ describe("scene — the reverse punch is thrown with the rear arm (S4 · Slice 1
   });
 
   it("still drives the FRONT hand for a punch with no descriptor, leaving the rear arm at stance", () => {
-    // M7 totality: the generic path is the status quo, not a degraded state. `kizami-zuki` (the jab)
-    // has no descriptor, so it must draw exactly as every hand technique drew before this slice.
-    // Its 210k reach caps at subToLocal(210k); landingLocal(gap, reach) lands on whichever of the
-    // near edge or that cap binds.
-    const pose = posePunching({ move: "kizami-zuki", reach: 210_000 });
+    // M7 totality: the generic path is the status quo, not a degraded state. An UNKNOWN move id has no
+    // descriptor, so it must draw exactly as every hand technique drew before this slice — the front
+    // hand driven, the rear arm at stance. A synthetic 210k reach caps at subToLocal(210k);
+    // landingLocal(gap, reach) lands on whichever of the near edge or that cap binds.
+    const pose = posePunching({ move: "no-such-move", reach: 210_000 });
 
     expect(pose.handR).toEqual(
       scaled({ x: landingLocal(240_000, 210_000), y: -68 }),
@@ -2265,8 +2341,9 @@ describe("scene — the reverse punch chambers and pulls (S4 · Slice 2)", () =>
 
   it("leaves the other hand at its stance shape for a move with no off hand authored (M7)", () => {
     // Totality: `offHand` is descriptor data, so every move that does not author one keeps the status
-    // quo. kizami-zuki is a hand technique with no descriptor at all, so its rear hand must not be
-    // dragged along by gyaku-zuki's authoring — it must sit where an unauthored hand sits.
+    // quo. kizami-zuki authors a CHAMBER (S1) but NO off hand, so its rear hand must not be dragged
+    // along by gyaku-zuki's authoring — it must sit where an unauthored hand sits, which also proves the
+    // S1 chamber did not smuggle in an off-hand pull.
     //
     // "Where an unauthored hand sits" is its ABSOLUTE stance point again (S4 · Slice 5): a resting hand
     // hangs off the rear shoulder, which a rotating girdle leaves put, so it neither rides nor pulls.
@@ -3891,11 +3968,12 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
   });
 
   it("holds an UNDESCRIBED move at full extension across the active window (M7 totality, S1)", () => {
-    // kizami-zuki has no descriptor, so its chamber IS its stance: it does not wind up (startup holds
+    // An unknown id has no descriptor, so its chamber IS its stance: it does not wind up (startup holds
     // the stance). During the active window it punches forward to the solved extension and now HOLDS
     // it — every active tick draws the same forward point, not a re-chamber back to the stance. So the
-    // hold is total: it covers the unauthored moves too, not just the authored ones.
-    const STANCE_HAND_R = { x: 18, y: -44 }; // STAND front hand — kizami-zuki's undescribed limb
+    // hold is total: it covers the unauthored moves too, not just the authored ones. (kizami-zuki held
+    // this role until S1 gave the front-hand trio chambers; an undescribed id carries it now.)
+    const STANCE_HAND_R = { x: 18, y: -44 }; // STAND front hand — an undescribed move's limb
 
     const unauthored = (phases: readonly number[]): ReplayTape =>
       phases.map((attackPhase, i) =>
@@ -3905,7 +3983,7 @@ describe("scene — a technique eases between its phase keyframes (S8)", () => {
             attacking: true,
             attackBand: 2,
             attackReach: 210_000,
-            attackMove: "kizami-zuki",
+            attackMove: "no-such-move",
             x: 150_000,
             facing: 1,
             attackPhase,

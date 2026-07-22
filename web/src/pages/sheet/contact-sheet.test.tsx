@@ -52,10 +52,11 @@ describe("contactSheetCells — one attacker figure per arsenal move", () => {
     );
   });
 
-  it("renders an UNDESCRIBED move with the generic strike, not a blank figure", () => {
-    // uraken has no descriptor, so it falls back to the generic front hand (M7). Its hand must still
-    // reach forward at the active phase — a real strike — well past a move that does NOT drive the
-    // hand (mae-geri, a kick, leaves handR at stance). No blank cell.
+  it("drives the front hand forward for a hand technique, not a blank figure", () => {
+    // uraken drives the front hand (handR) — since S1 via its own descriptor, before that via the
+    // generic fallback; either way its hand reaches forward at the active phase (its S1 chamber changes
+    // the WIND-UP, not this contact frame). A real strike, well past a move that does NOT drive the hand
+    // (mae-geri, a kick, leaves handR at stance). No blank cell.
     const uraken = cellFor("uraken");
     const maeGeri = cellFor("mae-geri");
 
@@ -80,10 +81,12 @@ describe("contactSheetCells — one attacker figure per arsenal move", () => {
   it("poses each move at ITS OWN true reach — a longer-reaching move extends further", () => {
     // Each cell spaces its idle opponent one move-reach away, so the reach-to-target solve extends the
     // driven endpoint to that move's real contact distance — not a shared gap. uraken (200k reach) and
-    // shuto (260k) both fall back to the generic front hand, so comparing their hands isolates reach:
-    // the longer move's hand lands further forward. Pins per-move true reach (kills a fixed-gap mutant).
+    // shuto (260k) both drive the front hand, so comparing their hands isolates reach: the longer move's
+    // hand lands further forward. Pins per-move true reach (kills a fixed-gap mutant). Both are S1
+    // front-hand moves now, but their chambers change only the WIND-UP — at this active contact frame
+    // each still drives handR to its own solved reach, so the hand-vs-hand comparison is unaffected.
     // (This pair used to be uraken vs ushiro-geri; ushiro-geri now drives a FOOT — see the kick test
-    // below — so a still-undescribed hand move stands in to keep the reach comparison a hand-vs-hand.)
+    // below — so a hand move stands in to keep the reach comparison a hand-vs-hand.)
     const uraken = cellFor("uraken");
     const shuto = cellFor("shuto");
 
