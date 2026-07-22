@@ -26,11 +26,11 @@ Seven moves in three groups. The other six are already distinct and are **out of
 (`gyaku-zuki` rear-hand + hikite; `empi`/`hiza-geri` mid-joint; `sweep` floor height; `tobi-geri`
 airborne; `throw` grab).
 
-| Group      | Moves                                | Shared driven limb |
-| ---------- | ------------------------------------ | ------------------ |
-| Front foot | `mae-geri`, `yoko-geri`              | `footR`            |
-| Rear foot  | `mawashi-geri`, `ushiro-geri`        | `footL`            |
-| Front hand | `uraken`, `kizami-zuki`, `shuto`     | `handR`            |
+| Group      | Moves                            | Shared driven limb |
+| ---------- | -------------------------------- | ------------------ |
+| Front foot | `mae-geri`, `yoko-geri`          | `footR`            |
+| Rear foot  | `mawashi-geri`, `ushiro-geri`    | `footL`            |
+| Front hand | `uraken`, `kizami-zuki`, `shuto` | `handR`            |
 
 ## Decisions (D1–D8)
 
