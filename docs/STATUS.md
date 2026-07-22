@@ -1220,18 +1220,25 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     - `/dojo` single-tick previews stay byte-identical. Archived:
       [`docs/archive/replay-strike-contact.md`](archive/replay-strike-contact.md).
 
-11. **Per-move character differentiation — arc in progress (S1 of 5, PR #386).** A follow-up to the move-showcase
-    arc: the **7 colliding moves** that share a driven limb (`mae`/`yoko` on footR, `mawashi`/`ushiro` on footL,
-    `uraken`/`kizami-zuki`/`shuto` on handR) rendered the identical contact picture under M3, so they read apart
-    only by reach. This arc separates them by **execution** — a distinct wind-up / motion / posture — across five
-    slices (levers: `chamber` → per-move lean → arc via-waypoint; facing excluded). **S1 (#386)** — the front-hand
-    trio each authors its own `chamber` (the existing field, no new mechanism), so their **wind-ups** are three
-    distinct motions on `/dojo` + `/watch` while **contact stays byte-unchanged** (`easeDriven` returns the solved
-    extension at the active phase regardless of the chamber). `web/`-only (no `src/` / TCB / `v19` / `INPUT_HASH`
-    touch), TDD RED-GREEN + a manual mutator scan + a `/dojo` visual sign-off. The design PR (#385) landed the
-    decisions + stories, which stay live in `plans/move-character-{decisions,stories}.md` for S2–S5; the S1 plan is
-    archived at [`docs/archive/move-character-s1.md`](archive/move-character-s1.md) (closeout narrative in
-    [`docs/archive/README.md`](archive/README.md)). **Next: S2 (per-move lean) or S3 (arc lever) — independent.**
+11. **Per-move character differentiation — arc in progress (S2 of 5, PRs #386, #388).** A follow-up to the
+    move-showcase arc: the **7 colliding moves** that share a driven limb (`mae`/`yoko` on footR, `mawashi`/`ushiro`
+    on footL, `uraken`/`kizami-zuki`/`shuto` on handR) rendered the identical contact picture under M3, so they read
+    apart only by reach. This arc separates them by **execution** — a distinct wind-up / motion / posture — across
+    five slices (levers: `chamber` → per-move lean → arc via-waypoint; facing excluded). **S1 (#386)** — the
+    front-hand trio each authors its own `chamber` (the existing field, no new mechanism), so their **wind-ups** are
+    three distinct motions on `/dojo` + `/watch` while **contact stays byte-unchanged** (`easeDriven` returns the
+    solved extension at the active phase regardless of the chamber). **S2 (#388)** — a new optional per-move **`lean`**
+    descriptor (a horizontal upper-body shift, active-phase-gated, added to `head`/`shoulder` only — not the girdle or
+    the hip step) makes `yoko-geri` the **first kick to lean at all**: it pitches back off its bladed side kick,
+    reading apart from `mae-geri`'s upright front snap. Purely additive (unauthored moves byte-identical), and it
+    **consciously amends M9** — "a kick is upright _by default_; an authored lean is the exception" (the
+    `mae`/`mawashi` M9 tests keep their asserts, reworded premises). `web/`-only throughout (no `src/` / TCB / `v19` /
+    `INPUT_HASH` touch), TDD RED-GREEN + a manual mutator scan + a `/dojo` visual sign-off. The design PR (#385)
+    landed the decisions + stories, which stay live in `plans/move-character-{decisions,stories}.md` for S3–S5; the
+    S1 + S2 plans are archived at [`docs/archive/move-character-s1.md`](archive/move-character-s1.md) +
+    [`docs/archive/move-character-s2.md`](archive/move-character-s2.md) (closeout narratives in
+    [`docs/archive/README.md`](archive/README.md)). **Next: S3 (arc via-waypoint lever) — the last mechanism-risk
+    skeleton, on `mawashi-geri`.**
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
