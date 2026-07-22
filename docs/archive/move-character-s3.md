@@ -1,7 +1,7 @@
 # Plan: S3 — a technique can SWING its driven endpoint through an arc (mawashi-geri)
 
 **Branch**: feat/move-character-s3-arc
-**Status**: ✅ Implemented — awaiting commit approval (verification below).
+**Status**: ✅ Shipped — PR #390 (`main`@`db4afed`, 2026-07-22). Closeout pending (archive this file).
 
 Slice S3 of the **per-move character differentiation** arc (`plans/move-character-stories.md`,
 `plans/move-character-decisions.md`). S1 (front-hand chambers) shipped #386/#387; S2 (the per-move lean
@@ -45,7 +45,7 @@ below) — the walking skeleton proves the arc on one leg.
   **equals the eased driven point** with no step/lean/girdle interference. This is what makes a clean,
   literal-free **collinearity** assertion possible (below).
 - `web/src/pages/replay/move-descriptors.ts`: `MoveDescriptor = { limb?, chamber?, offHand?, tuck?,
-  targetY?, grab?, lean? }`, each with a TOTAL `Map`-lookup (`chamberFor`/`leanFor`/…) returning the
+targetY?, grab?, lean? }`, each with a TOTAL `Map`-lookup (`chamberFor`/`leanFor`/…) returning the
   authored value or `null`. `mawashi-geri` already authors `{ limb: "footL", chamber: { x: -8, y: -30 } }`
   (drives the REAR leg, M12i — the one separation a 2-D side view gives it vs the front kick).
 - The sibling control is `ushiro-geri` `{ limb: "footL", chamber: { x: -4, y: -24 } }` — the other
@@ -108,9 +108,9 @@ below) — the walking skeleton proves the arc on one leg.
   (no arc ⇒ the mid wind-up foot is collinear ⇒ the signed bow is rounding noise only). The `ushiro`
   (collinear) and contact guards passed from the start.
 - **GREEN**: `move-descriptors.ts` (`arc?: Joint` field + `arcFor` lookup + `mawashi-geri: arc {-26,-16}`)
-  + `scene.ts` (pure `bezier2`, an `arc` parameter on `easeDriven`, the **startup branch only** bowing
-  through the via). Full `scene.test.tsx` 218/218; full `web` project 626/626 (incl. the previously-flaky
-  transport test); typecheck + lint + `prettier --check` on the touched files clean.
+  - `scene.ts` (pure `bezier2`, an `arc` parameter on `easeDriven`, the **startup branch only** bowing
+    through the via). Full `scene.test.tsx` 218/218; full `web` project 626/626 (incl. the previously-flaky
+    transport test); typecheck + lint + `prettier --check` on the touched files clean.
 - **Manual mutator scan** (web ∉ Stryker): 4 mutants applied via `sed` and restored from a green
   snapshot — drop the Bézier (startup back to straight, Test A fails); via sign-flip `{-26,-16}→{26,16}`
   (Test A's signed bow fails); `arcFor` fallback leaks `?? null → ?? {…}` (Test B, ushiro, fails); break
