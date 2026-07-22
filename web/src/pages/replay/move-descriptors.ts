@@ -111,6 +111,25 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
     "gyaku-zuki",
     { limb: "handL", chamber: { x: -26, y: -50 }, offHand: { x: -20, y: -50 } },
   ],
+  // The FRONT-hand trio (uraken / kizami-zuki / shuto): three techniques that all drive the front hand
+  // (handR) to the same solved target, so under M3 they land the identical contact picture and used to
+  // read apart only by reach — the hand analogue of the two same-limb kick pairs. What separates them is
+  // HOW they WIND UP: each authors its OWN chamber, so the startup shape is three different motions on
+  // /dojo + /watch even though contact is byte-unchanged (the reach solve at the active phase ignores the
+  // chamber). No new mechanism — the same `chamber` field the kicks and gyaku-zuki already use. The arc
+  // SWING that would separate their contact motion paths is deferred; here they differ by chamber only.
+  // Each chamber sits well inside an ARM'S reach of the front shoulder (7, −64) so deriveBend never
+  // straightens the limb into a stretched line. Eye-tunable in /dojo; relations pinned, not literals.
+  //
+  // kizami-zuki (jab): fast and minimal — the lead fist waits high and slightly forward, near the guard,
+  // barely cocked. The shortest wind-up of the three, which is what a jab IS.
+  ["kizami-zuki", { limb: "handR", chamber: { x: 12, y: -50 } }],
+  // uraken (backfist): the fist cocks ACROSS the centreline and high, loaded to whip back out — the
+  // across-the-body start a straight jab never draws.
+  ["uraken", { limb: "handR", chamber: { x: -8, y: -56 } }],
+  // shuto (knife-hand): chambered HIGH, up by the ear, to chop down-and-in — the highest cock of the
+  // three, distinct from the jab's forward-low guard and the backfist's across-the-body load.
+  ["shuto", { limb: "handR", chamber: { x: -2, y: -62 } }],
   // mawashi-geri (roundhouse): the second move with real screen time (~13%), and the one that forces
   // M3's expressiveness limit. A front kick and a roundhouse both drive a FOOT to the same solved
   // target, so driving the same foot renders them on the identical pixel — the wall the girdle was
