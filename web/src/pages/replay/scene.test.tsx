@@ -4309,3 +4309,94 @@ describe("scene — a scored strike flashes an impact mark where it lands (Slice
     expect(at.contact.a).toEqual(markAt(at.a, "footR", 0));
   });
 });
+
+describe("scene — the reach-apex kicks drive a foot, not a stretched arm", () => {
+  // yoko-geri (side kick, 315k) and ushiro-geri (back kick, 330k) are the two LONGEST reaches in the
+  // arsenal, and they carried no pose descriptor — so they fell back to the generic front HAND and
+  // telescoped an arm the whole way across that reach, reading as an over-long arm rather than a kick
+  // (visible on /dojo + the /sheet contact sheet). A descriptor names each one's driven FOOT, exactly
+  // as mae-geri and mawashi-geri do: the side kick thrusts the FRONT leg (footR), and the back kick the
+  // REAR leg (footL) — the roundhouse's M12i escape hatch — so the two read apart from each other while
+  // each hand returns to its stance.
+  const CONTACT = 2;
+  const NEUTRAL_FOOT_R = { x: 14, y: 0 }; // STAND front foot
+  const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot
+  const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
+
+  const poseKick = (move: string, reach: number, phase = CONTACT, gap = 240_000) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: reach,
+            attackMove: move,
+            attackPhase: phase,
+            x: 150_000,
+            facing: 1,
+          },
+          { x: 150_000 + gap },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("drives the FRONT foot for a yoko-geri (side kick), leaving the hand at stance", () => {
+    const pose = poseKick("yoko-geri", 315_000);
+
+    // The front FOOT reaches the near edge — a kick, not a hand-poke stretched across 315k.
+    expect(pose.footR).toEqual(
+      scaled({ x: landingLocal(240_000, 315_000), y: -46 }),
+    );
+    // The bug: the hand used to be the driven endpoint. It now stays home.
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
+  });
+
+  it("drives the REAR foot for an ushiro-geri (back kick), resting the hand and the support foot", () => {
+    const pose = poseKick("ushiro-geri", 330_000);
+
+    // The REAR foot (footL) drives forward — the roundhouse's escape hatch, so the back kick reads
+    // apart from the front-leg side kick even though both solve to the same target (M3).
+    expect(pose.footL).toEqual(
+      scaled({ x: landingLocal(240_000, 330_000), y: -46 }),
+    );
+    // Neither the hand nor the support (front) foot is the driven endpoint.
+    expect(pose.handR).toEqual(scaled(NEUTRAL_HAND_R));
+    expect(pose.footR).toEqual(scaled(NEUTRAL_FOOT_R));
+  });
+
+  it("lands the two apex kicks on the SWAPPED legs, each resting the other's driven leg", () => {
+    // yoko drives the front leg and rests the rear; ushiro drives the rear leg and rests the front —
+    // the same distinction the roundhouse draws against the front kick, so the side kick and the back
+    // kick are two pictures, not one, at the same gap.
+    const yoko = poseKick("yoko-geri", 315_000);
+    const ushiro = poseKick("ushiro-geri", 330_000);
+
+    expect(yoko.footL).toEqual(scaled(NEUTRAL_FOOT_L)); // side kick rests the rear leg
+    expect(ushiro.footR).toEqual(scaled(NEUTRAL_FOOT_R)); // back kick rests the front leg
+    expect(yoko.footR).not.toEqual(ushiro.footR);
+    expect(yoko.footL).not.toEqual(ushiro.footL);
+  });
+
+  it("chambers each apex kick as a lifted, cocked leg that whips forward to contact (M8.3/8.4)", () => {
+    const CHAMBER = 1;
+
+    // Each move's OWN driven foot: yoko the front (footR), ushiro the rear (footL). A wind-up is a
+    // different SHAPE, not a shorter reach (M3), so pin the chamber's RELATIONS (lifted, forward-of),
+    // never its eye-tuned literal — re-tuning the chamber in /dojo must not break this.
+    const yokoChamber = poseKick("yoko-geri", 315_000, CHAMBER).footR;
+    const yokoContact = poseKick("yoko-geri", 315_000).footR;
+    const ushiroChamber = poseKick("ushiro-geri", 330_000, CHAMBER).footL;
+    const ushiroContact = poseKick("ushiro-geri", 330_000).footL;
+
+    // A chambered leg is cocked knee-up — lifted off the ground line, not resting in stance.
+    expect(yokoChamber.y).toBeLessThan(0);
+    expect(ushiroChamber.y).toBeLessThan(0);
+    // ...and the kick EXTENDS forward from its chamber into contact, never retracts into it (M8.4).
+    expect(yokoChamber.x).toBeLessThan(yokoContact.x);
+    expect(ushiroChamber.x).toBeLessThan(ushiroContact.x);
+  });
+});

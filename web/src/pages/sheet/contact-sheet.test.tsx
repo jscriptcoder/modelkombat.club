@@ -80,14 +80,38 @@ describe("contactSheetCells — one attacker figure per arsenal move", () => {
   it("poses each move at ITS OWN true reach — a longer-reaching move extends further", () => {
     // Each cell spaces its idle opponent one move-reach away, so the reach-to-target solve extends the
     // driven endpoint to that move's real contact distance — not a shared gap. uraken (200k reach) and
-    // ushiro-geri (330k) both fall back to the generic front hand, so comparing their hands isolates
-    // reach: the longer move's hand lands further forward. Pins per-move true reach (kills a fixed-gap
-    // mutant); both are currently undescribed, so authoring a descriptor for either would revisit this.
+    // shuto (260k) both fall back to the generic front hand, so comparing their hands isolates reach:
+    // the longer move's hand lands further forward. Pins per-move true reach (kills a fixed-gap mutant).
+    // (This pair used to be uraken vs ushiro-geri; ushiro-geri now drives a FOOT — see the kick test
+    // below — so a still-undescribed hand move stands in to keep the reach comparison a hand-vs-hand.)
     const uraken = cellFor("uraken");
-    const ushiroGeri = cellFor("ushiro-geri");
+    const shuto = cellFor("shuto");
 
-    expect(ushiroGeri.placement.pose.handR.x).toBeGreaterThan(
+    expect(shuto.placement.pose.handR.x).toBeGreaterThan(
       uraken.placement.pose.handR.x,
     );
+  });
+
+  it("poses the reach-apex kicks with a driven FOOT, not a stretched hand", () => {
+    // yoko-geri (side kick, 315k) and ushiro-geri (back kick, 330k) are the two longest reaches and
+    // used to fall back to the generic front HAND — telescoping an arm across the gap on the very sheet
+    // a developer compares moves on. Each now drives a FOOT past the hip (yoko the front footR, ushiro
+    // the rear footL), and parks the front hand at stance where a kick leaves it, exactly as mae-geri
+    // does — not stretched forward like an undescribed hand move.
+    const yoko = cellFor("yoko-geri");
+    const ushiro = cellFor("ushiro-geri");
+    const maeGeri = cellFor("mae-geri"); // a known kick: hand parked at stance
+
+    // The side kick drives the front foot forward of the hip...
+    expect(yoko.placement.pose.footR.x).toBeGreaterThan(
+      yoko.placement.pose.hip.x,
+    );
+    // ...and the back kick drives the rear foot forward of the hip (the M12i escape hatch).
+    expect(ushiro.placement.pose.footL.x).toBeGreaterThan(
+      ushiro.placement.pose.hip.x,
+    );
+    // Neither stretches the hand: both leave handR where a kick does, matching mae-geri's parked hand.
+    expect(yoko.placement.pose.handR.x).toBe(maeGeri.placement.pose.handR.x);
+    expect(ushiro.placement.pose.handR.x).toBe(maeGeri.placement.pose.handR.x);
   });
 });
