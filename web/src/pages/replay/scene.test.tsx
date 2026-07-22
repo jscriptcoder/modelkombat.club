@@ -1795,7 +1795,100 @@ describe("scene — a move can lean back as part of its technique (per-move char
   });
 });
 
+describe("scene — a back kick pitches forward into a straight thrust (per-move character S4)", () => {
+  // Under M3 the two rear-leg kicks (mawashi-geri, ushiro-geri) both drive footL to the same solved
+  // target. S3 split their FOOT PATH (mawashi arcs off its stance→chamber line, ushiro travels straight);
+  // S4 splits their POSTURE: a back kick commits FORWARD on a linear thrust, where the roundhouse holds
+  // upright and the side kick (yoko-geri) pitches BACK. ushiro-geri authors a per-move `lean` — POSITIVE
+  // this time (forward into the target, the counterpart to yoko's negative) — which scene.ts adds to the
+  // upper body at the ACTIVE phase (the S2 lever, no new mechanism).
+  //
+  // This rides the M9 amendment S2 already made (a kick is upright BY DEFAULT; an authored lean is the
+  // exception): ushiro is the SECOND instance, so mae/mawashi keep their upright asserts unchanged.
+  // Relation, not literal (decision 9): the exact lean px is eye-tuned in /dojo, so these pin its SIGN,
+  // its ordering against yoko/mae, its containment, and that the foot thrust stays straight — never the pixel.
+  const CONTACT = 2;
+
+  // yoko-geri's single-tick kickPose (easeDriven returns the phase keyframe discretely, so the active-phase
+  // pose carries the full authoredLean). A 240k gap puts the target beyond the leg's reach so the hip steps
+  // — the lean must land on the UPPER body and leave that step and the driven foot alone.
+  const kickPose = (move: string, attackPhase: number = CONTACT) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: 330_000,
+            attackMove: move,
+            attackPhase,
+            x: 150_000,
+            facing: 1,
+          },
+          { x: 390_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("pitches the upper body FORWARD for a back kick as it extends, where a front kick stays upright", () => {
+    const ushiro = kickPose("ushiro-geri");
+    const mae = kickPose("mae-geri");
+
+    // Forward = local +x (into the target): head AND shoulder sit AHEAD of the upright stance. A SIGN, not
+    // merely "differs" — a +/- flip (leaning back like yoko) fails this.
+    expect(ushiro.head.x).toBeGreaterThan(mae.head.x);
+    expect(ushiro.shoulder.x).toBeGreaterThan(mae.shoulder.x);
+    // ...and it is a lean, not a drop: the pitch is horizontal, the heights are unchanged.
+    expect(ushiro.head.y).toBe(mae.head.y);
+    expect(ushiro.shoulder.y).toBe(mae.shoulder.y);
+  });
+
+  it("leans OPPOSITE to the side kick — yoko back, mae upright, ushiro forward", () => {
+    const yoko = kickPose("yoko-geri");
+    const mae = kickPose("mae-geri");
+    const ushiro = kickPose("ushiro-geri");
+
+    // The three sit in order about the upright midpoint: the side kick pitches back, the front kick holds
+    // upright, the back kick pitches forward. Kills a mutant that authored ushiro's lean negative.
+    expect(yoko.head.x).toBeLessThan(mae.head.x);
+    expect(mae.head.x).toBeLessThan(ushiro.head.x);
+  });
+
+  it("keeps the OTHER rear-leg kick (mawashi-geri) upright — the lean is opt-in", () => {
+    const mawashi = kickPose("mawashi-geri");
+    const mae = kickPose("mae-geri");
+    const ushiro = kickPose("ushiro-geri");
+
+    // mawashi authors no lean ⇒ upright, byte-identical to the front kick's posture; so the rear-foot pair
+    // differs on POSTURE (ushiro forward, mawashi upright) as well as foot path (S3's arc).
+    expect(mawashi.head).toEqual(mae.head);
+    expect(mawashi.shoulder).toEqual(mae.shoulder);
+    expect(ushiro.head.x).toBeGreaterThan(mawashi.head.x);
+  });
+
+  it("contains the lean to the upper body — the girdle stays square and the foot still thrusts straight ahead", () => {
+    const ushiro = kickPose("ushiro-geri");
+
+    // The girdle stays SQUARE (a torso pitch is not an arm rotation): the two shoulders sit symmetrically
+    // about the leaned head, within a rounding pixel. A mutant feeding the lean into the girdle splays them.
+    const leftGap = ushiro.head.x - ushiro.shoulderL.x;
+    const rightGap = ushiro.shoulderR.x - ushiro.head.x;
+
+    expect(Math.abs(leftGap - rightGap)).toBeLessThanOrEqual(1);
+
+    // The straight-thrust foot is untouched by the torso lean: footL lands on the same solved extension the
+    // no-lean ushiro contact test pins — the lean moves the torso, not where contact happens.
+    expect(ushiro.footL).toEqual(
+      scaled({ x: landingLocal(240_000, 330_000), y: -46 }),
+    );
+  });
+});
+
 describe("scene — the front-hand trio winds up from its own chamber (S1)", () => {
+  // uraken (backfist), kizami-zuki (jab) and shuto (knife-hand) all drive the FRONT hand (handR) to
   // uraken (backfist), kizami-zuki (jab) and shuto (knife-hand) all drive the FRONT hand (handR) to
   // the same solved target at contact — under M3 that is one identical picture apart from reach. What
   // separates them as techniques is HOW they wind up: each authors its own chamber, so the startup
