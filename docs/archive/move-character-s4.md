@@ -1,7 +1,7 @@
 # Plan: S4 — a back kick reads as a straight thrust pitched forward (ushiro-geri)
 
 **Branch**: feat/move-character-s4-ushiro
-**Status**: Active — plan drafted, awaiting acceptance-criteria confirmation before any code.
+**Status**: ✅ Shipped — PR #392 (`main`@`3253127`, 2026-07-22). Closeout pending (archive this file).
 
 Slice S4 of the **per-move character differentiation** arc (`plans/move-character-stories.md`,
 `plans/move-character-decisions.md`). S1 (front-hand chambers) shipped #386/#387; S2 (the per-move `lean`
@@ -82,7 +82,7 @@ mirrors S1 (descriptor-only, existing field) — and is even lighter, because th
 
 `scene.ts` L469–472 records **why kicks default upright**: a derived forward lean "over a rising leg makes
 the figure look like it is FALLING INTO the kick. A real front kick counterbalances." D8 nonetheless
-chooses a **forward** pitch for `ushiro-geri` on purpose — a back-thrust *commits forward* through a
+chooses a **forward** pitch for `ushiro-geri` on purpose — a back-thrust _commits forward_ through a
 linear drive, where a snapping front kick recovers. **`/dojo` is the arbiter:** if a forward pitch reads
 as "falling in" rather than "thrusting through," reduce the magnitude first; if it still fails by eye, the
 parking-lot fallbacks are chamber-only character (drop the lean) or — the escalation, not pulled in
@@ -106,8 +106,9 @@ everything else is mechanical.
       sit **forward** of (greater than) the upright reference (`mae-geri`, which authors no lean) — a
       **positive** lean, and the pitch is **horizontal** (head/shoulder `y` unchanged).
 - [ ] Given the three kicks at contact, `yoko-geri` (back), `mae-geri` (upright), and `ushiro-geri`
-      (forward) lean **opposite ways about the upright midpoint**: `yoko.head.x < mae.head.x <
-      ushiro.head.x` — the "opposite sign to `yoko`" contrast (kills a wrong-sign / no-lean mutant).
+      (forward) lean **opposite ways about the upright midpoint**:
+      `yoko.head.x < mae.head.x < ushiro.head.x` — the "opposite sign to `yoko`" contrast (kills a
+      wrong-sign / no-lean mutant).
 - [ ] Given `mawashi-geri` (the other rear-leg kick, authors no lean) at contact, its `head`/`shoulder`
       stay **upright** (equal to `mae-geri`'s) — so the rear-foot pair differs on posture too
       (`ushiro-geri` forward, `mawashi-geri` upright), and every unauthored move is byte-identical.
@@ -158,12 +159,12 @@ carries the full `authoredLean`.
   `yoko`) fails here. `yoko`'s half is green from S2; `ushiro`'s half is the new RED.
 - **Test C (`mawashi` stays upright — lean is opt-in, the posture half of ushiro ≠ mawashi).**
   `mawashi = kickPose("mawashi-geri")`. Assert `mawashi.head.x === mae.head.x` and `mawashi.shoulder.x ===
-  mae.shoulder.x` (mawashi authors no lean ⇒ upright, byte-identical) while `ushiro.head.x >
-  mawashi.head.x`. Green before and after — pins that the lean is opt-in and that the rear-foot pair now
+mae.shoulder.x` (mawashi authors no lean ⇒ upright, byte-identical) while `ushiro.head.x >
+mawashi.head.x`. Green before and after — pins that the lean is opt-in and that the rear-foot pair now
   differs on posture, not only foot path.
 - **Test D (containment — square girdle, horizontal, foot untouched).** Mirror S2's containment test
   (L1767–1784): for `ushiro`, the girdle stays **square** (`|(head.x − shoulderL.x) − (shoulderR.x −
-  head.x)| ≤ 1`), and — the "straight thrust unmoved" guard — its `footL` at contact equals the same
+head.x)| ≤ 1`), and — the "straight thrust unmoved" guard — its `footL` at contact equals the same
   solved extension the existing ushiro contact test pins (L4649–4651), unchanged by the lean. (S3's
   `ushiro-geri` collinear wind-up test + the L4644–4687 foot/hip tests are the standing byte-identical
   regression evidence; this test adds the active-phase foot check alongside the new torso asserts.)
