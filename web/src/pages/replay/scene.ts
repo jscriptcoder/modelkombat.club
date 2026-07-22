@@ -2,6 +2,7 @@ import type { ReplayFrame, ReplayTape, ReplayTick } from "./replay-contract";
 import {
   chamberFor,
   isGrab,
+  leanFor,
   limbFor,
   offHandFor,
   targetYFor,
@@ -461,6 +462,18 @@ const poseFor = (
       ? 0
       : rootTravel(drivingShoulder, driven, ARM_BONE);
 
+  // A per-move AUTHORED torso lean (per-move character S2) — the counterpart to the derived reach-lean
+  // above, but a fixed posture the descriptor authors rather than a shortfall the geometry solves. The
+  // derived lean is hand-only and a kick is held upright by it (M9, the `isKick` branch); an authored
+  // lean lets a move opt back in — `yoko-geri`'s bladed side kick pitches BACK (negative), the first
+  // kick to lean at all. Gated to the ACTIVE phase for the same reason the derived lean is (M9): a
+  // fighter leans as the technique extends, not while winding up or recovering. Added to head +
+  // shoulder below, NOT the girdle (a torso pitch is not an arm rotation) and NOT the hip (a kick's
+  // reach is still answered by its own step). Zero when the move authors none, so every move but the
+  // one that opts in is byte-unchanged.
+  const authoredLean =
+    driven === null || winding ? 0 : (leanFor(frame.attackMove) ?? 0);
+
   // A kick whose target is beyond the leg's reach steps the HIP forward (the leg's root) — the
   // lower-body counterpart of the lean, which already does this for the arm by shifting the shoulder.
   // Horizontal only: the fighter steps in, it does not rise. Zero for a punch (the lean covers it),
@@ -511,9 +524,17 @@ const poseFor = (
       : {
           // The upper body advances HALF the driving shoulder's lean (M12f): a torso that rotated AND
           // lunged the full amount is two motions where a body does one. The girdle ends (above) carry
-          // the other half, so the driving shoulder still reaches the full lean.
-          head: { x: stance.head.x + lean / 2, y: stance.head.y },
-          shoulder: { x: stance.shoulder.x + lean / 2, y: stance.shoulder.y },
+          // the other half, so the driving shoulder still reaches the full lean. A per-move `authoredLean`
+          // (S2) shifts the whole upper body on top — the full amount here (it has no girdle half), so a
+          // move can pitch its torso back or forward as part of its character.
+          head: {
+            x: stance.head.x + lean / 2 + authoredLean,
+            y: stance.head.y,
+          },
+          shoulder: {
+            x: stance.shoulder.x + lean / 2 + authoredLean,
+            y: stance.shoulder.y,
+          },
           hip: { x: stance.hip.x + step, y: stance.hip.y },
           // The resting hands stay at stance and are NOT rewritten here: only the driving shoulder
           // swings now, so a resting hand's own shoulder never moves out from under it and S4 · Slice

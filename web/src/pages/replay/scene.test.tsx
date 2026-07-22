@@ -1608,12 +1608,16 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
     );
   });
 
-  it("keeps the upper body upright in a kick, while a punch still leans into its reach (M9)", () => {
+  it("keeps a kick with no authored lean upright, while a punch still leans into its reach (M9 default)", () => {
     // The M2 lean was authored for PUNCHES, where pitching the torso into the reach is right. S2 ·
     // Slice 2's eye check found it inherited wrongly by kicks: on a mae-geri the torso pitches
     // forward over a rising leg, so the figure reads as FALLING INTO the kick rather than kicking.
-    // Real front kicks counterbalance — so the lean is now a property of the driving limb, not of
-    // "a strike happened". A kick stays upright; a hand technique is untouched.
+    // Real front kicks counterbalance — so the DERIVED lean is now a property of the driving limb, not
+    // of "a strike happened". A kick stays upright; a hand technique is untouched.
+    //
+    // AMENDED (per-move character S2): M9 is now a DEFAULT, not an absolute — a move MAY author its own
+    // lean (`yoko-geri`'s bladed side kick leans back), and that conscious exception is pinned in the
+    // "a move can lean back" block. `mae-geri` authors none, so it holds the upright default here.
     const kick = poseKicking();
     const punch = poseKicking({ move: "gyaku-zuki" });
 
@@ -1699,6 +1703,95 @@ describe("scene — per-move pose descriptors: a kick drives the foot (S1)", () 
     scene(tape, 1, VIEWPORT);
 
     expect(scene(tape, 0, VIEWPORT).a.pose.footR).toEqual(first);
+  });
+});
+
+describe("scene — a move can lean back as part of its technique (per-move character S2)", () => {
+  // Under M3 a side kick (yoko-geri) and a front kick (mae-geri) both drive the front foot (footR) to
+  // the SAME solved target, so they render one identical picture apart from reach. What separates them
+  // as techniques is EXECUTION: a side kick is bladed — the upper body pitches BACK off the kick as a
+  // counterbalance — where the front kick snaps straight and upright. yoko-geri authors a per-move
+  // `lean` (negative = away from the target); scene.ts adds it to the upper body at the ACTIVE phase.
+  //
+  // This consciously amends M9 (the upright-kick rule): a kick is upright BY DEFAULT — an AUTHORED lean
+  // is the exception. mae-geri authors none and stays upright (pinned in the kick blocks above);
+  // yoko-geri is the exception pinned here. Relation, not literal (decision 9): the exact lean px is
+  // eye-tuned in /dojo, so these pin its SIGN, its containment, and its phase — never the pixel.
+  const CHAMBER = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+  const UPRIGHT_HEAD = { x: 0, y: -76 }; // STAND head — upright, where a front kick holds
+  const REACH = 315_000; // yoko-geri's engine reach; shared with mae so only the execution differs
+
+  // Same geometry for both kicks (band, reach, gap) so the ONLY thing a test reads apart is the
+  // execution. A 240k gap puts the target beyond the leg's reach, so the hip steps — the lean must land
+  // on the UPPER body and leave that step (and the driven foot) alone.
+  const kickPose = (move: string, attackPhase: number = CONTACT) =>
+    scene(
+      [
+        tickOf(
+          0,
+          {
+            attacking: true,
+            attackBand: 2,
+            attackReach: REACH,
+            attackMove: move,
+            attackPhase,
+            x: 150_000,
+            facing: 1,
+          },
+          { x: 390_000 },
+        ),
+      ],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+  it("pitches the upper body BACK for a side kick as it extends, where a front kick stays upright", () => {
+    const yoko = kickPose("yoko-geri");
+    const mae = kickPose("mae-geri");
+
+    // The front kick is upright (M9's default): head + shoulder hold the stance x.
+    expect(mae.head).toEqual(scaled(UPRIGHT_HEAD));
+    expect(mae.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+
+    // The side kick leans BACK: head AND shoulder sit behind the stance (negative x, away from the
+    // target). A SIGN, not merely "differs" — a +/- flip (leaning INTO the kick) fails this.
+    expect(yoko.head.x).toBeLessThan(mae.head.x);
+    expect(yoko.shoulder.x).toBeLessThan(mae.shoulder.x);
+    // ...and it is a lean, not a drop: the pitch is horizontal, the heights are unchanged.
+    expect(yoko.head.y).toBe(mae.head.y);
+    expect(yoko.shoulder.y).toBe(mae.shoulder.y);
+  });
+
+  it("contains the lean to the upper body — the hip still steps, the foot still solves, the girdle stays square", () => {
+    const yoko = kickPose("yoko-geri");
+    const mae = kickPose("mae-geri");
+
+    // The hip step is the lower body's own mechanism (M9) and is untouched by the torso lean: yoko and
+    // the no-lean front kick, at the same reach, step the hip to the same x.
+    expect(yoko.hip).toEqual(mae.hip);
+    // Both drive footR to the same solved target — the M3 endpoint the two kicks share. The lean does
+    // not move where contact happens.
+    expect(yoko.footR).toEqual(mae.footR);
+    // The girdle stays SQUARE (a torso pitch is not an arm rotation): the two shoulders sit
+    // symmetrically about the leaned head, within a rounding pixel. A mutant feeding the lean into the
+    // girdle would splay them.
+    const leftGap = yoko.head.x - yoko.shoulderL.x;
+    const rightGap = yoko.shoulderR.x - yoko.head.x;
+
+    expect(Math.abs(leftGap - rightGap)).toBeLessThanOrEqual(1);
+  });
+
+  it("leans only at the active phase — upright through the wind-up and the recovery (M9's phase gate)", () => {
+    // A fighter leans INTO a technique as it extends; leaning back while still chambered (or after
+    // recovering) is backwards. The authored lean is gated to the active phase exactly as the hand
+    // lean is.
+    expect(kickPose("yoko-geri", CHAMBER).head).toEqual(scaled(UPRIGHT_HEAD));
+    expect(kickPose("yoko-geri", RECOVER).head).toEqual(scaled(UPRIGHT_HEAD));
+    expect(kickPose("yoko-geri", CONTACT).head.x).toBeLessThan(
+      scaled(UPRIGHT_HEAD).x,
+    );
   });
 });
 
@@ -1921,9 +2014,14 @@ describe("scene — a technique winds up and recovers (S2 · Slice 1)", () => {
     expect(punchAt(CONTACT)).toEqual(scaled({ x: 8, y: -76 }));
   });
 
-  it("keeps a kick upright at every phase — the lean belongs to hand techniques (M9)", () => {
-    // The complement of the gate above, so "a kick never leans" is pinned as its own rule rather
-    // than being a side effect of whichever phase a test happened to pick.
+  it("keeps a kick with no authored lean upright at every phase — the DERIVED lean belongs to hand techniques (M9 default)", () => {
+    // The complement of the gate above, so "an unauthored kick never leans" is pinned as its own rule
+    // rather than being a side effect of whichever phase a test happened to pick. `poseAtPhase` uses
+    // mae-geri, which authors no lean, so it holds the M9 default at every phase.
+    //
+    // AMENDED (per-move character S2): this pins the DERIVED, reach-driven lean — still hand-only. A
+    // move may now author its OWN lean on top (`yoko-geri`), which IS gated to the active phase; that
+    // exception's phase gate is pinned in the "a move can lean back" block.
     [CHAMBER, CONTACT, RECOVER].forEach((attackPhase) =>
       expect(poseAtPhase({ attackPhase }).head).toEqual(
         scaled({ x: 0, y: -76 }),
@@ -4401,7 +4499,12 @@ describe("scene — the reach-apex kicks drive a foot, not a stretched arm", () 
   const NEUTRAL_FOOT_L = { x: -14, y: 0 }; // STAND rear foot
   const NEUTRAL_HAND_R = { x: 18, y: -44 }; // STAND front hand
 
-  const poseKick = (move: string, reach: number, phase = CONTACT, gap = 240_000) =>
+  const poseKick = (
+    move: string,
+    reach: number,
+    phase = CONTACT,
+    gap = 240_000,
+  ) =>
     scene(
       [
         tickOf(

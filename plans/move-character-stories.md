@@ -5,6 +5,10 @@ Feeds `planning` → TDD, **PR per slice**. Every implementation slice loads `td
 `mutation-testing` (N/A for web — substitute the manual scan) and `refactoring`, and completes
 RED-GREEN-MUTATE/SCAN-REFACTOR before the next slice starts.
 
+**Status (2026-07-22):** **S1 ✅ shipped** (#386, `main`@`2212318`) + closed out (#387, `main`@`56d0b28`;
+per-slice plan archived → `docs/archive/move-character-s1.md`). **S2–S5 remain** — next up is **S2** (the
+per-move lean lever). This split + the decisions stay live in `plans/` until the whole arc closes.
+
 ## Parent
 
 **A developer browsing the arsenal in `/dojo` can tell each colliding move apart as a distinct
@@ -37,7 +41,7 @@ new lever. Needs neither the arc nor the lean mechanism.
 
 | Slice | Value | Includes | Defers | Acceptance examples | Release constraint |
 | ----- | ----- | -------- | ------ | ------------------- | ------------------ |
-| **S1 — front-hand trio winds up (chambers only)** | The hand group's wind-ups become three distinct motions; proves execution-differentiation reads as distinct; retires the `kizami-zuki` fixture debt | Distinct `chamber` for `uraken` (fist cocked across the body), `kizami-zuki` (minimal / near-guard, fast), `shuto` (high by the ear); rework the ~15 `kizami-zuki`-as-undescribed test sites; `contact-sheet` reach test already re-pointed to `uraken` vs `shuto` (done in #384) | The arc SWING for `uraken`/`shuto` (S5); any lean; the other two groups | Given each of the three committed, when a mid-startup tick renders, its driven `handR` sits at a DIFFERENT point from the other two (distinct chambers) · Given each at contact, `handR` still lands at the same solved target (contact unchanged, M3) · Given an unauthored move, the generic hand still draws (M7) · The suite is green with `kizami-zuki` no longer standing in for "undescribed" | Shippable, `/dojo` |
+| **S1 ✅ SHIPPED (#386)** — front-hand trio winds up (chambers only) | The hand group's wind-ups become three distinct motions; proves execution-differentiation reads as distinct; retires the `kizami-zuki` fixture debt | Distinct `chamber` for `uraken` (fist cocked across the body), `kizami-zuki` (minimal / near-guard, fast), `shuto` (high by the ear); rework the ~15 `kizami-zuki`-as-undescribed test sites; `contact-sheet` reach test already re-pointed to `uraken` vs `shuto` (done in #384) | The arc SWING for `uraken`/`shuto` (S5); any lean; the other two groups | Given each of the three committed, when a mid-startup tick renders, its driven `handR` sits at a DIFFERENT point from the other two (distinct chambers) · Given each at contact, `handR` still lands at the same solved target (contact unchanged, M3) · Given an unauthored move, the generic hand still draws (M7) · The suite is green with `kizami-zuki` no longer standing in for "undescribed" | Shippable, `/dojo` |
 | **S2 — a move can LEAN as part of its technique (walking skeleton on `yoko-geri`)** | Introduces the per-move lean/posture lever end-to-end and burns the "reopen M9 upright-kick" risk on one move; differentiates the front-foot pair | New optional per-move lean/posture descriptor field + pose wiring (generalise the hand-only, reach-derived lean to an authored value); `yoko-geri` = higher/tighter knee chamber + torso lean-BACK; consciously amend the M9 upright-kick test with rationale | Lean on any other move; the arc lever | Given `yoko-geri` committed, when it renders, the torso lean and/or knee-chamber differ from `mae-geri` at a representative tick (yoko ≠ mae) · Given a move that authors no lean (e.g. `mae-geri`), the torso is upright exactly as today (M9 preserved for it) · `BENCHMARK_VERSION` `v19`, no `src/` | Shippable, `/dojo` |
 | **S3 — a technique can SWING its driven endpoint through an arc (walking skeleton on `mawashi-geri`)** | Introduces the arc via-waypoint lever end-to-end and burns the "arc vs the kime snap" placement risk on one move; makes the roundhouse read as a swing | New optional arc/via-waypoint descriptor field + eased 3-point path (decide where the via sits — the wind-up and/or recovery legs, NOT dulling the kime commit); `mawashi-geri` foot swings across into contact | The arc for `uraken`/`shuto` (S5); `ushiro` (S4) | Given `mawashi-geri` committed, when the wind-up→contact renders, the driven `footL` passes through the authored intermediate point — its mid-path position is off the straight chamber→contact line (a swing) · Given a move with no arc waypoint, the path is the straight ease exactly as today (backward-compat) · the kime contact tick still lands on the solved extension (arc must not shift where contact happens) | Shippable, `/dojo` |
 | **S4 — `ushiro-geri` reads as a straight back-thrust, apart from the roundhouse** | Completes the rear-foot pair: the back kick contrasts with the roundhouse's swing | `ushiro-geri` = torso pitched FORWARD (opposite sign to `yoko`'s back-lean, reusing S2's lean lever) + a straight thrust path (no arc), so it contrasts with `mawashi`'s arc | — (last of the rear-foot group) | Given `ushiro-geri`, when it renders, the torso pitches forward (opposite sign to `yoko`) and the driven `footL` path is straight (no via point) — so `ushiro` ≠ `mawashi` at a representative tick (one arcs, one thrusts) | Shippable, `/dojo`. **Depends on S2** (lean lever); reads best after **S3** (the contrast) |
@@ -89,9 +93,10 @@ early (so their risk is burned before the group-completion slices), then finish 
 
 ## Next step
 
-Load `planning` for **S1** (the recommended first slice) to turn it into PR-sized implementation slices
-with TDD detail. Alternatively, run `find-gaps` on this split to harden the acceptance examples first,
-or pull **S2/S3** first if burning mechanism risk before S1's fixture rework is preferred.
+S1 is shipped and closed out. **Next up is S2** (the per-move lean lever — the first mechanism-risk
+skeleton, on `yoko-geri`, consciously reopening M9). Load `planning` for **S2** to turn it into PR-sized
+implementation slices with TDD detail. (S3 — the arc lever — is the other independent skeleton and could
+go first instead; S4/S5 are the group-completion slices that depend on S2/S3.)
 
 ---
 
