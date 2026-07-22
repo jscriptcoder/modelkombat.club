@@ -188,8 +188,17 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // is the arsenal's LONGEST reach (330k); before authoring it fell back to the hand and stretched the
   // arm the furthest of any move — the exact "arm stretches enormously" the S3 dojo snap first surfaced
   // (docs/archive/move-poses-s3.md). Chamber: the rear knee lifted and cocked back before the heel drives
-  // through. Eye-tunable in /dojo.
-  ["ushiro-geri", { limb: "footL", chamber: { x: -4, y: -24 } }],
+  // through.
+  //
+  // What separates it from the OTHER rear-leg kick (`mawashi-geri`, upright + an arcing foot) is EXECUTION
+  // on TWO axes: S3 gave mawashi its foot arc while ushiro stays a straight thrust; per-move character S4
+  // adds POSTURE — the torso pitches FORWARD into the linear back-thrust (`lean` POSITIVE, the counterpart
+  // to yoko-geri's negative lean-back), a committed forward drive where the roundhouse holds upright. This
+  // is the SECOND kick to author a lean, riding the M9 amendment S2 already made (a kick is upright BY
+  // DEFAULT; an authored lean is the exception) — mae/mawashi keep their upright default. Eye-tuned in
+  // /dojo within the arm's reach (a forward lean stretches the REAR arm, mirroring yoko's front-arm case);
+  // the lean's SIGN and its ordering against yoko/mae are pinned, not the pixel.
+  ["ushiro-geri", { limb: "footL", chamber: { x: -4, y: -24 }, lean: 8 }],
   // empi (elbow strike): the first CLOSE-RANGE technique, and the first that leads with a MID-JOINT.
   // The ELBOW is the driven point — it drives to the opponent's near edge at the band while the fist
   // folds back behind it (`tuck`, relative to the elbow so it rides across every phase, M13c). Every
