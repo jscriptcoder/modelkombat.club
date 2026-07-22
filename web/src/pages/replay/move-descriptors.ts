@@ -74,6 +74,16 @@ export type StrikeLimb =
 // non-descriptor render path left. A grab authors no `limb` (it drives two hands, not one) and no band
 // (the grip is at a fixed chest height, solved in scene.ts); the flag is all the table carries — the
 // grab GEOMETRY lives with the reach solve, exactly as band heights do for a strike.
+// A per-move torso LEAN (per-move character S2): a horizontal shift (local px) of the upper body
+// (head + shoulder) at the ACTIVE phase, an authored counterpart to the reach-derived hand lean in
+// scene.ts. Sign matches that lean — `+` pitches FORWARD into the target, `−` leans BACK away from it
+// (a counterbalance). Until now the lean was a DERIVED, hand-only value and a kick was held upright
+// (M9); authoring one lets a move opt into a posture — `yoko-geri`'s bladed side kick leans back, the
+// first kick to lean at all. Optional: a move that authors none stays upright exactly as today, so
+// M9 becomes "a kick is upright BY DEFAULT, an authored lean is the exception". Horizontal only — a
+// vertical pitch is not needed for the lean-back / lean-forward pair (D8) and can widen the field
+// later. It shifts head + shoulder but not the girdle (a torso pitch is not an arm rotation) nor the
+// hip (a kick's reach is still answered by its own hip step). Eye-tuned in /dojo, relation pinned.
 export type MoveDescriptor = {
   // Absent for a grab — a throw drives two hands, not one endpoint. `limbFor` falls back to the generic
   // hand for it, which is never consulted because a grab suppresses its own strike layer (scene.ts).
@@ -83,6 +93,7 @@ export type MoveDescriptor = {
   tuck?: Joint;
   targetY?: number;
   grab?: boolean;
+  lean?: number;
 };
 
 const DESCRIPTORS = new Map<string, MoveDescriptor>([
@@ -144,10 +155,15 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // second-longest reach (315k), that fallback telescoped an ARM the whole way across the gap and read
   // as a stretched limb rather than a kick (spotted on /dojo + the /sheet contact sheet). It shares
   // mae-geri's front-leg picture at full extension — both footR to the same solved target, the M3 limit
-  // a 2-D side view cannot escape — but reads apart from the rear-leg roundhouse / back kick. Chamber:
-  // the knee cocked high and slightly across the centreline (a side kick loads by lifting the knee tight
-  // before the leg drives out), distinct from the front kick's straight knee-up. Eye-tunable in /dojo.
-  ["yoko-geri", { limb: "footR", chamber: { x: 8, y: -28 } }],
+  // a 2-D side view cannot escape.
+  //
+  // What now reads it APART from the front kick is EXECUTION (per-move character S2): a bladed side kick
+  // pitches the upper body BACK off the extending leg (a counterbalance — `lean` negative), where a
+  // front kick snaps straight and upright, and it loads off a knee cocked high and across the centreline
+  // (chamber), distinct from mae-geri's straight knee-up. This is the first kick to lean at all — the
+  // conscious M9 exception. Both eye-tunable in /dojo; the lean's SIGN and the chamber's relation are
+  // pinned, not the pixel.
+  ["yoko-geri", { limb: "footR", chamber: { x: 8, y: -28 }, lean: -8 }],
   // ushiro-geri (back kick): thrusts to the mid / high band with the REAR leg (footL) — the roundhouse's
   // escape hatch (M12i) reused, so the back kick reads apart from the front-leg side kick the same way
   // the roundhouse reads apart from the front kick (both footL kicks share the rear-leg extension). It
@@ -249,3 +265,11 @@ export const targetYFor = (move: string | undefined): number | null =>
 // answer false, so a strike is never mistaken for a grab. Same `Map`-lookup safety as the lookups above.
 export const isGrab = (move: string | undefined): boolean =>
   DESCRIPTORS.get(move ?? "")?.grab ?? false;
+
+// This move's authored torso lean (per-move character S2), or `null` when it authors none — in which
+// case the caller applies no lean and the upper body stays upright (M9's default; every move but
+// `yoko-geri` today, plus the usual unknown-id / "" / absent-field fallbacks). TOTAL, same `Map`-lookup
+// shape as the lookups above. `null` rather than 0 keeps "authors no lean" distinct at the boundary,
+// exactly as `chamberFor` returns `null` for "no chamber".
+export const leanFor = (move: string | undefined): number | null =>
+  DESCRIPTORS.get(move ?? "")?.lean ?? null;
