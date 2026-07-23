@@ -1,7 +1,8 @@
 # Plan: Pure KotH S2 — Drop the gauntlet
 
-**Branch**: `feat/pure-koth-s2-spec-drops-gauntlet` (Slice 2; Slice 1 shipped, Slice 3 on its own branch)
-**Status**: Active — **Slice 1 shipped** (PR #402, `main`@`bd53a71`); Slices 2–3 remain.
+**Branch**: `feat/pure-koth-s3-mirror-model-agnostic` (Slice 3; Slices 1–2 shipped)
+**Status**: Active — **Slice 1 shipped** (PR #402, `main`@`bd53a71`); **Slice 2 shipped** (PR #403,
+`main`@`b99617c`); **Slice 3 remains** (the model-agnostic mirror, D17).
 
 Child story S2 of the `pure-koth-stories.md` split. Decisions: `pure-koth-decisions.md`
 (D1–D17; S2 leans on D6/D8/D9/D10/D15/**D16**/**D17**). Engine + TCB untouched — all work in
@@ -63,11 +64,11 @@ to a pure King-of-the-Hill product with no "clear the gauntlet" anywhere.
 - [x] `/spec` + `llms.txt` describe fighting the sitting champions directly — no "clear all six /
       earn a title shot" gate language; `docs/spec.md` is regenerated; `INPUT_HASH` +
       `BENCHMARK_VERSION` are unchanged (D16). — **Slice 2 (this PR)**
-- [ ] A raw resubmit of a seeded House champion (differs only by the inert `model`) is rejected
+- [x] A raw resubmit of a seeded House champion (differs only by the inert `model`) is rejected
       `409 arena-mirror` naming its slot — it never competes or takes a slot; a byte-exact resubmit
-      of a real member is still caught (D17).
-- [ ] The engine and its TCB are untouched; determinism / bots-are-data / on-demand-replay
-      invariants hold.
+      of a real member is still caught (D17). — **Slice 3 (this PR)**
+- [x] The engine and its TCB are untouched; determinism / bots-are-data / on-demand-replay
+      invariants hold. — **Slice 3**
 
 ## Slices
 
@@ -196,6 +197,15 @@ the schema test.
 typecheck + lint green, commit approved.
 
 ### Slice 3: A raw resubmit of a House champion is rejected as a mirror (D17)
+
+**Built as** (this PR): `handle-fight.ts` — a named `sameFighter(a, b)` http helper normalizes `model`
+to a shared `MIRROR_MODEL` sentinel on both sides, then reuses the engine's byte-exact `sameDoc`
+(a strict superset of the old byte-exact check); `mirrorSlot` swaps `sameDoc` → `sameFighter`, and the
+mirror detail reworded (model label ≠ a change). Engine / `sameDoc` untouched. RED = a resubmit
+differing only by `model` expected `409` (was `200` — byte-exact `sameDoc` slipped it); a superset
+guard (differing content + differing model still competes). MUTATE: Stryker `handle-fight.ts:157-184`
+→ 12/13 killed, the lone survivor the `MIRROR_MODEL` string value (equivalent — applied identically
+to both sides, so its value can't change the compare). Full Node suite 1611 green; typecheck + lint clean.
 
 **Value**: Bot author / board integrity — resubmitting a seeded House champion unchanged (differing
 only by the inert `model`) gets a clear `409 arena-mirror` instead of running a redundant fight and
