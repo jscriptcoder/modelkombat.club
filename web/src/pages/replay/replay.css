@@ -154,6 +154,60 @@
   text-decoration: underline;
 }
 
+/* The matchup switcher: the submission's sibling bouts (King · #2 · #3) as a row of permalink tabs,
+   so a spectator can watch each fight of the climb. Each tab is the defender's identity (model mark ·
+   name); it appears only when there is more than one bout to switch between. */
+.replay-matchup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.replay-matchup-link {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  color: var(--fg);
+  text-decoration: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.replay-matchup-link .brand-mark {
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: none;
+}
+
+.replay-matchup-name {
+  color: var(--accent);
+  font-size: 0.85rem;
+}
+
+.replay-matchup-link:hover,
+.replay-matchup-link:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* The bout currently on screen — layered over aria-current with NON-colour-only cues (a solid 2px
+   accent border + heavier weight + an underlined name), so the active tab reads without relying on
+   hue alone (the .ring-defender-crown precedent: never colour alone). */
+.replay-matchup-link[aria-current="page"] {
+  border-width: 2px;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.replay-matchup-link[aria-current="page"] .replay-matchup-name {
+  text-decoration: underline;
+}
+
 /* The /watch index: the King's fights as a newest-first list of link cards. Each card pits the two
    fighters' identities against each other ("A vs B") and navigates to that fight's permalink. */
 .replay-list {

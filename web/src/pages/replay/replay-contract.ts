@@ -45,5 +45,17 @@ export type ReplayTape = ReplayTick[];
 // `GET /replay` list item — an identities-only summary + the content-hash permalink id.
 export type ReplaySummary = { id: string; fighters: [Fighter, Fighter] };
 
-// `GET /replay/{id}` item — the reconstructed tape + both fighters' identities.
-export type ReplayItem = { tape: ReplayTape; fighters: [Fighter, Fighter] };
+// One switchable sibling bout of the same submission — the challenger vs one sitting champion,
+// addressed by its own content-hash permalink id (Slice 1's per-bout `boutReplayId`). `fighters` is
+// [challenger, defender], same order as `ReplayItem`.
+export type Matchup = { id: string; fighters: [Fighter, Fighter] };
+
+// `GET /replay/{id}` item — the reconstructed tape + both fighters' identities, plus the parent
+// submission's sibling `matchups` (board order, King first) so the viewer can switch between the
+// bouts of the climb. Optional + read defensively (the loader casts the wire wholesale): an
+// absent / single-entry list ⇒ no switcher.
+export type ReplayItem = {
+  tape: ReplayTape;
+  fighters: [Fighter, Fighter];
+  matchups?: Matchup[];
+};
