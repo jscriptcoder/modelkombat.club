@@ -1269,6 +1269,27 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     [`decisions`](archive/move-character-decisions.md) + [`stories`](archive/move-character-stories.md) (closeout
     narratives in [`docs/archive/README.md`](archive/README.md)). No move-character files remain in `plans/`.
 
+12. **Pure King-of-the-Hill — S1 fresh seeded v20 season ✅ COMPLETE (story 1 of 3, PRs #396–#399).** The first
+    story of the **pure KotH** rework: a new season is born already seeded with three House champions, so `/king`
+    and `/fight` are never an empty throne, and the season opens with a one-constant version bump. **S1.1 (#397)** —
+    a pure `buildSeedArena` builds `SEED_ARENA` from a pinned `SEED_ORDER` (the three strongest gauntlet bots
+    grappler/sweeper/rekka by a build-time round-robin, `handle: "Gauntlet"` · `model: "House"`, seniority 1/2/3),
+    and a shared `readArenaOrSeed` resolver makes an empty store resolve to the seed — wired into `/king` +
+    `api/king.ts`, **dark-launched** (inert while the live v19 store is non-empty). **S1.2 (#398)** —
+    `readArenaOrSeed` returns `{ arena, expected }` (CAS `expected = null` on a physically-empty store — the
+    find-gaps fix, else a first commit 409s forever); `/fight` resolves the seed up front and a first
+    gauntlet-clearer **round-robins the three House bots** instead of taking a solo crown — the old
+    `arena === undefined` bootstrap branch is deleted. **S1.3 (#399)** — the activation: `BENCHMARK_VERSION`
+    `"v19" → "v20"` wipes the version-scoped throne keys so the seed surfaces live; a **season wipe, not a scoring
+    change**, so `INPUT_HASH` is unchanged (`docs/spec.md` + `docs/variety.md` regenerated with only their version
+    headers moving — the two committed-doc byte-drift guards prove the bodies are byte-identical). Platform-layer
+    (`src/http` + `api/` wrappers + the one version flip) only — **TCB untouched, no DSL op, no engine change**;
+    Slices 1–2 at **100% mutation** on the changed `src/http` files, Slice 3 a constant flip (mutation N/A — version
+    pin + two byte-drift guards + a preview smoke). The design trail (`plans/pure-koth-{decisions,stories}.md`,
+    D1–D15, S1–S3) stays **live in `plans/`** for **S2 (drop the gauntlet)** + **S3 (watch every competing fight)**;
+    the S1 plan is archived at [`docs/archive/pure-koth-s1.md`](archive/pure-koth-s1.md) (closeout narrative in
+    [`docs/archive/README.md`](archive/README.md)). **The live season is now `v20`.**
+
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the

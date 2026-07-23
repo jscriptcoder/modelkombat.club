@@ -1807,3 +1807,46 @@ five slices and are archived here with the arc's close:
 [move-character-stories.md](move-character-stories.md) (the S1–S5 split + dependency graph). The design PR
 was #385. All **7 colliding moves** now read apart by execution — a distinct wind-up / motion / posture — and
 no move-character files remain in `plans/`.
+
+## Pure King-of-the-Hill — S1 fresh seeded v20 season ✅ COMPLETE (story 1 of 3)
+
+The first story of the **pure King-of-the-Hill** rework: a fresh season is born already seeded with three House
+champions, so `/king` and `/fight` are never an empty throne. `GET /king` on an empty (new-season) arena surfaces
+the **three strongest gauntlet bots** (grappler · sweeper · rekka, ranked King/#2/#3 by a deterministic build-time
+round-robin, credited `handle: "Gauntlet"` · `model: "House"`); a gauntlet-clearer that competes **contests that
+House board** rather than taking a free solo crown; and the season is opened by a one-constant `BENCHMARK_VERSION`
+bump. Platform-layer (`src/http` + the `api/` wrappers + the single version flip) only — **TCB untouched**, no DSL
+op, no engine change; the version bump is a **season wipe, not a scoring change**, so `INPUT_HASH` is unchanged.
+Design trail (still live for S2–S3): `plans/pure-koth-{decisions,stories}.md` (D1–D15). Slices 1–2 were TDD'd at
+**100% mutation** on the changed `src/http` files; Slice 3 is a constant flip (mutation N/A — the version pin + two
+committed-doc byte-drift guards + a preview smoke are the evidence).
+
+- **Slice 1 — `/king` seeds an empty arena** (PR #397, `feat/pure-koth-s1-seeded-season`) — a pure
+  `buildSeedArena(gauntlet)` builds `SEED_ARENA` from a **pinned** `SEED_ORDER` (grappler/sweeper/rekka, seniority
+  1/2/3, gen 1, nextSeniority 4), each member stamped `handle: "Gauntlet"` + `model: "House"`; a test re-derives
+  the strongest-three + their arena order from the real `benchmark` and fails the build if the pin ever diverges
+  (D5 — no runtime fights, the seed is a pinned constant). The shared `readArenaOrSeed` resolver makes an empty
+  store resolve to the seed; `handle-king` + `api/king.ts` read through it, **dark-launched** (inert while the live
+  v19 store is non-empty). `modelToBrand("House") → generic`, so the web renders the seed as ordinary champion rows
+  with **zero web change**.
+- **Slice 2 — `/fight` contests the House seed, retiring the bootstrap crown** (PR #398,
+  `feat/pure-koth-s1-compete-house`) — `readArenaOrSeed` now returns `{ arena, expected }` (overloaded so a required
+  seed narrows `arena` to defined): on a physically-empty store the effective arena is the seed but the CAS
+  `expected` is **`null`** (the find-gaps fix — committing against the seed's nominal generation 1 would 409
+  forever). `handle-fight` resolves the arena + CAS token up front, mirror-checks unconditionally, and both commit
+  sites use `expected`; the whole `arena === undefined` **bootstrap-crown branch is deleted** — a first clearer now
+  round-robins the three House bots instead of taking a solo crown. `FightDeps.seed` is required, so `api/fight.ts`
+  fails to compile without injecting the seed (a wiring guarantee).
+- **Slice 3 — open the v20 season (bump `BENCHMARK_VERSION`)** (PR #399, `feat/pure-koth-s1-bump-v20`) — the
+  activation: `BENCHMARK_VERSION` `"v19" → "v20"` wipes the version-scoped throne keys (`arena:v20` / `archive:v20`
+  are empty), so the seed machinery shipped (dark-launched) in Slices 1–2 surfaces everywhere. **No scoring
+  change** — `INPUT_HASH` is unchanged (the version is not a scoring input), so `CANONICAL_RULES`, the gauntlet, and
+  every run parameter stay byte-identical; `docs/spec.md` + `docs/variety.md` were regenerated with only their
+  version-string headers moving (bodies byte-identical — the two committed-doc byte-drift guards prove it). The
+  manifest's Policy comment gained the "a season wipe is a legitimate bump on its own, `INPUT_HASH` unchanged" note.
+  Preview smoke (real `api/king.ts` + `api/fight.ts` on an empty v20 store): `/king` → the grappler/sweeper/rekka
+  House board; compete → `version: v20`. Reverting the constant restores v19 (its keys are orphaned, not deleted).
+
+[pure-koth-s1.md](pure-koth-s1.md) — the S1 plan, with the recorded outcome + the as-built module list per slice.
+The pure-KotH design trail — `pure-koth-decisions.md` (D1–D15) + `pure-koth-stories.md` (the S1–S3 split) — stays
+**live in `plans/`** for **S2 (drop the gauntlet)** and **S3 (watch every competing fight)**.

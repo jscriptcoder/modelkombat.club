@@ -1,8 +1,10 @@
 # Plan: Pure KotH S1 — Fresh seeded v20 season
 
 **Branch**: feat/pure-koth-s1-bump-v20 (Slice 3; Slices 1–2 shipped on their own branches)
-**Status**: Active — Slice 1 ✅ shipped (PR #397, `main`@`1425ab7`); Slice 2 ✅ shipped (PR #398,
-`main`@`d93b056`); Slice 3 ✅ complete (pending commit — the v20 activation)
+**Status**: ✅ Complete — all three slices shipped (S1.1 PR #397 `1425ab7` · S1.2 PR #398 `d93b056` ·
+S1.3 PR #399 `0df7c1a`); archived 2026-07-23. First story of the **pure King-of-the-Hill** arc; the
+design trail (`plans/pure-koth-{decisions,stories}.md`, D1–D15, S1–S3) stays live in `plans/` for
+**S2 (drop the gauntlet)** + **S3 (watch every competing fight)**.
 
 Child story S1 of the `pure-koth-stories.md` split. Decisions: `pure-koth-decisions.md`
 (D1–D15). Engine + TCB untouched — all work in `src/http/`, `src/engine/benchmark-config.ts`
