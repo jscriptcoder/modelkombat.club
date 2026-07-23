@@ -13,10 +13,13 @@
 // Policy: also bump on any change to the engine outcome path (sim.ts / the dsl.ts
 // interpreter), which the existing determinism/replay tests catch. Adding or
 // renaming a bot's `model` is NOT a scoring change — it moves neither the hash nor
-// the version.
+// the version. The version ALSO scopes the KotH season (the throne store keys are
+// `arena:<version>` / `archive:<version>`), so a deliberate season wipe — starting a
+// fresh, House-seeded ladder — is a legitimate bump on its OWN, with the scoring
+// inputs (and INPUT_HASH) unchanged. v20 is exactly that: a season reset, no rules change.
 // ============================================================================
 
-export const BENCHMARK_VERSION = "v19"; // Aerial exercise: rekka's reachable-but-dormant `tobi-geri` jump-in is weaponized (its gate `opponent.distance > 300000`, which the ~286k opening gap never cleared, is lowered to > 250000) so the gauntlet actually EXERCISES aerial combat — rekka jumps off the opening gap and connects for a jodan ippon, all 6 members stay ∈ [25,75]. Only the rekka bot text changes (one INPUT_HASH flip); CANONICAL_RULES + the spec's move table are unchanged
+export const BENCHMARK_VERSION = "v20"; // Fresh pure-KotH season (S1): the bump wipes the version-scoped throne keys (arena:v20 / archive:v20 are empty), so the House-seeded arena — the three strongest gauntlet bots — surfaces on /king and is contested on /fight. NO scoring change: CANONICAL_RULES, the gauntlet, and every run parameter are byte-identical to v19, so INPUT_HASH is unchanged (a season wipe, not a rules change). Reverting to "v19" restores the prior ladder — its keys are orphaned, not deleted
 
 // The seeded perception jitter draws differ per seed; ten seeds average it out.
 export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];

@@ -1,11 +1,11 @@
-# Variety board — v19
+# Variety board — v20
 
-_Frozen 6-bot gauntlet · 10 seeds · v19_
+_Frozen 6-bot gauntlet · 10 seeds · v20_
 
 _§P7 soft targets: usage ≤ 35%, opener win ≤ 60%. Scan for ⚠ below._
 
 ```
-ModelKombat variety telemetry v19
+ModelKombat variety telemetry v20
 population: jabber, rekka, zoner, grappler, sweeper, vulture
 6 bots · 10 seeds · round-robin = 300 fights · 7356 honoured commitments
 note: small hand-authored reference population — shares reflect authored style, not discovered LLM behavior.
