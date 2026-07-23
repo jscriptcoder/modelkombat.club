@@ -1286,9 +1286,27 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     (`src/http` + `api/` wrappers + the one version flip) only — **TCB untouched, no DSL op, no engine change**;
     Slices 1–2 at **100% mutation** on the changed `src/http` files, Slice 3 a constant flip (mutation N/A — version
     pin + two byte-drift guards + a preview smoke). The design trail (`plans/pure-koth-{decisions,stories}.md`,
-    D1–D15, S1–S3) stays **live in `plans/`** for **S2 (drop the gauntlet)** + **S3 (watch every competing fight)**;
-    the S1 plan is archived at [`docs/archive/pure-koth-s1.md`](archive/pure-koth-s1.md) (closeout narrative in
+    S1–S3) stayed **live in `plans/`** for S2 + S3 (**S2 has since shipped — item 13**); the S1 plan is archived at
+    [`docs/archive/pure-koth-s1.md`](archive/pure-koth-s1.md) (closeout narrative in
     [`docs/archive/README.md`](archive/README.md)). **The live season is now `v20`.**
+
+13. **Pure King-of-the-Hill — S2 drop the gauntlet ✅ COMPLETE (story 2 of 3, PRs #401–#404).** The 6-bot gauntlet
+    pre-gate is **gone**: a submitted bot no longer clears a frozen gauntlet to earn a title shot — it fights the
+    sitting arena champions directly and is placed **crowned / entered / unplaced** by the round-robin alone.
+    **S2.1 (#402)** — the gauntlet `benchmark()` pass + `buildFightReport` + the `if (!cleared) return` gate are
+    deleted; `settle` returns `{ version, title|projection }`, the dead `FightDeps.gauntlet`/`gauntletNames` +
+    `fight-report.ts` exports retire (per-defender board telemetry stays), and `/ring` + the home page + How-It-Works
+    drop all gauntlet language (the "The Gauntlet" section is removed); net −876 lines. **S2.2 (#403)** — the
+    author-facing spec (`gen-spec.ts` → `/spec`, `/spec-guide`, `docs/spec.md`) + `llms.txt` stop instructing "clear
+    all six / earn a title shot" and describe the **climb** (out-rank the weakest to enter, top the King to be
+    crowned); the fixed six-bot roster listing is removed — **no fighters are named** (D16). **S2.3 (#404)** — the
+    arena-mirror guard goes **model-agnostic**: a new `sameFighter` http helper normalizes the inert `model` label
+    to a shared sentinel before the byte-exact `sameDoc` compare, so a raw House-champion resubmit (differing only by
+    `model`) is mirror-rejected — a strict superset of the byte-exact check (D17). Platform-layer only (`src/http` +
+    `api/` wrappers + `web/` + `src/cli/gen-spec.ts` + the generated `docs/spec.md`) — **TCB untouched, no DSL op, no
+    engine change**; **`INPUT_HASH` + `BENCHMARK_VERSION` (`v20`) unchanged** (a dropped pre-gate + reworded docs move
+    no scoring input). The S2 plan is archived at [`docs/archive/pure-koth-s2.md`](archive/pure-koth-s2.md); the design
+    trail stays **live in `plans/`** for **S3 (watch every competing fight)**.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped

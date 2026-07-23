@@ -1848,5 +1848,41 @@ committed-doc byte-drift guards + a preview smoke are the evidence).
   House board; compete → `version: v20`. Reverting the constant restores v19 (its keys are orphaned, not deleted).
 
 [pure-koth-s1.md](pure-koth-s1.md) — the S1 plan, with the recorded outcome + the as-built module list per slice.
-The pure-KotH design trail — `pure-koth-decisions.md` (D1–D15) + `pure-koth-stories.md` (the S1–S3 split) — stays
-**live in `plans/`** for **S2 (drop the gauntlet)** and **S3 (watch every competing fight)**.
+The pure-KotH design trail — `pure-koth-decisions.md` + `pure-koth-stories.md` (the S1–S3 split) — stays
+**live in `plans/`** for the rest of the arc (now just **S3 — watch every competing fight**).
+
+## Pure King-of-the-Hill — S2 drop the gauntlet ✅ COMPLETE (story 2 of 3)
+
+The second story of the **pure King-of-the-Hill** rework: the 6-bot gauntlet pre-gate is **gone**. A submitted
+bot no longer has to clear a frozen gauntlet to earn a title shot — it fights the sitting arena champions
+directly and is placed **crowned / entered / unplaced** by the round-robin alone. The reshape ran end-to-end —
+the `/fight` contract, the `/ring` UI, the home page, the author-facing spec + `llms.txt`, and the mirror guard.
+Platform-layer only (`src/http` + `api/` wrappers + `web/` + `src/cli/gen-spec.ts` + the generated `docs/spec.md`)
+— **TCB untouched**, no DSL op, no engine change; **`INPUT_HASH` and `BENCHMARK_VERSION` (`v20`) are unchanged**
+(dropping a pre-gate and rewording docs move no scoring input). Slices 1 & 3 at **100% / equivalent-only mutation**
+on the changed `src/http` files; Slice 2 is string assembly (mutation N/A — the `docs/spec.md` byte-drift guard +
+the spec-content assertions + the `/spec` envelope pin are the evidence).
+
+- **Slice 1 — drop the gate; `/fight` + `/ring` show the arena result** (PR #402, `feat/pure-koth-s2-spec-drops-gauntlet`
+  base) — the gauntlet `benchmark()` pass + `buildFightReport` + the `if (!cleared) return` gate are **deleted**;
+  `settle` returns `{ version, title|projection }` and every valid bot flows straight to crowned/entered/unplaced.
+  `fight-report.ts` shrinks to `toTitleFightReport` (the per-defender board rows still carry full telemetry — D8);
+  the dead `FightDeps.gauntlet` / `gauntletNames` + `api/fight.ts` wiring retire (D9). `/ring` renders arena-only
+  headlines + the per-defender board (scorecard + dead empty-board "first King" branches removed), and the home
+  page's **"The Gauntlet" section is deleted** with the How-It-Works copy reworded to pure KotH. Net −876 lines.
+- **Slice 2 — the author-facing spec + `llms.txt` describe fighting the champions** (PR #403,
+  `feat/pure-koth-s2-spec-drops-gauntlet`) — `gen-spec.ts`'s overview + benchmark section + submit bullets stop
+  instructing "clear all six gauntlet opponents / earn a title shot" and describe the **climb** (fight the sitting
+  champions; out-rank the weakest to **enter**, top the King to be **crowned**, else **unplaced**). The fixed
+  six-bot roster listing is **removed** — the spec names no fighters (not even the three transient House seeds,
+  D16). `docs/spec.md` regenerated (`INPUT_HASH` + `v20` byte-unchanged — the drift guard proves it); `api/spec.ts`
+  - `web/public/llms.txt` reframed to the arena.
+- **Slice 3 — a raw House-champion resubmit is mirror-rejected regardless of model** (PR #404,
+  `feat/pure-koth-s3-mirror-model-agnostic`) — the House seed stamps its champions `model: "House"`, so a raw
+  resubmit differed only by the inert `model` label and slipped the byte-exact `sameDoc` mirror. A new `sameFighter`
+  http helper normalizes `model` to a shared sentinel on both sides, then reuses `sameDoc` — a **strict superset**
+  of the byte-exact check (an existing member's byte-exact resubmit is still caught). `model` is inert
+  (`INPUT_HASH` excludes it), so the engine / `sameDoc` stay untouched (D17). Stryker `handle-fight.ts:157-184` →
+  12/13 killed, the survivor the sentinel's value (equivalent — applied identically to both sides).
+
+[pure-koth-s2.md](pure-koth-s2.md) — the S2 plan, with the recorded outcome + the as-built module list per slice.

@@ -1,8 +1,10 @@
 # Plan: Pure KotH S2 — Drop the gauntlet
 
-**Branch**: `feat/pure-koth-s3-mirror-model-agnostic` (Slice 3; Slices 1–2 shipped)
-**Status**: Active — **Slice 1 shipped** (PR #402, `main`@`bd53a71`); **Slice 2 shipped** (PR #403,
-`main`@`b99617c`); **Slice 3 remains** (the model-agnostic mirror, D17).
+**Status**: ✅ **SHIPPED & ARCHIVED** — all 3 slices merged: Slice 1 (PR #402, `main`@`bd53a71`),
+Slice 2 (PR #403, `main`@`b99617c`), Slice 3 (PR #404, `main`@`547d7b3`). The gauntlet is gone —
+a bot fights the sitting champions directly, the author-facing docs describe the climb, and a raw
+House-champion resubmit is mirror-rejected regardless of its model label. The design trail
+(`plans/pure-koth-{decisions,stories}.md`) stays live for S3 (watch every competing fight).
 
 Child story S2 of the `pure-koth-stories.md` split. Decisions: `pure-koth-decisions.md`
 (D1–D17; S2 leans on D6/D8/D9/D10/D15/**D16**/**D17**). Engine + TCB untouched — all work in
@@ -39,7 +41,7 @@ to a pure King-of-the-Hill product with no "clear the gauntlet" anywhere.
   preserves N, so a compete's `board` is never empty: the `/ring` "empty throne / first King"
   branches (`boardHasRows === false`) are now dead and simplify away.
 - **Author-facing docs must stop lying (D16).** `/spec` (from `gen-spec.ts`, feeding `/spec-guide`
-  + built `docs/spec.md`) and `llms.txt` tell authors to "clear all six gauntlet opponents"; a
+  and built `docs/spec.md`) and `llms.txt` tell authors to "clear all six gauntlet opponents"; a
   `gen-spec.ts` prose change forces `npm run gen:spec` (the `docs/spec.md` drift guard goes RED
   until regenerated) but moves neither `BENCHMARK_VERSION` nor `INPUT_HASH`.
 - **Mirror hardening (D17).** Seeds carry an overridden display `model: "House"`, so a raw resubmit
@@ -108,7 +110,7 @@ code as a natural consequence).
 - A compete request runs no `benchmark({ gauntlet: deps.gauntlet })` pass; the response is
   `{ version, title|projection: { outcome, rank?, board, displaced? } }` with no `cleared` /
   `gauntlet` / `diagnostics` keys, and each `board` row carries `winRate/net/wins/losses/draws/
-  bouts/endReasons/degrade`.
+bouts/endReasons/degrade`.
 - Every valid bot is placed (crowned / entered / unplaced) — there is no early "didn't clear"
   return; an unplaced compete still commits its archive record and leaves the arena byte-identical.
 - Practice (`X-Compete` ≠ true) returns the same placement as a `projection` (never a `title`),
@@ -134,16 +136,17 @@ is gate-free.
 return; `settle` returns `{ version: deps.version, title|projection: placement }`; retire the dead
 `fight-report.ts` exports + `FightDeps` fields + `api/fight.ts` wiring; reshape `RingPage.tsx`
 (headlines, drop scorecard + `cleared` guard + dead empty-board branches); remove `home/Gauntlet.tsx`
-+ its render; refresh How-It-Works copy.
-**MUTATE**: Stryker on the changed `src/http` files (`handle-fight.ts`, `fight-report.ts`) — kill
-mutants on the compete/practice branch, the `settle` title-vs-projection selection, and the
-unplaced-still-commits path. Web: manual mutator scan over the reshaped headline/board logic
-(exact-assertion tests).
-**KILL MUTANTS**: Strengthen tests for survivors (ask if a survivor's value is ambiguous).
-**REFACTOR**: Assess whether `settle` simplifies now that it no longer spreads a report, and whether
-`fight-report.ts` should shrink to just the title-fight helper.
-**Done when**: ACs met, mutation report clean/justified + web scan recorded, typecheck + lint green
-(format only touched files), commit approved.
+
+- its render; refresh How-It-Works copy.
+  **MUTATE**: Stryker on the changed `src/http` files (`handle-fight.ts`, `fight-report.ts`) — kill
+  mutants on the compete/practice branch, the `settle` title-vs-projection selection, and the
+  unplaced-still-commits path. Web: manual mutator scan over the reshaped headline/board logic
+  (exact-assertion tests).
+  **KILL MUTANTS**: Strengthen tests for survivors (ask if a survivor's value is ambiguous).
+  **REFACTOR**: Assess whether `settle` simplifies now that it no longer spreads a report, and whether
+  `fight-report.ts` should shrink to just the title-fight helper.
+  **Done when**: ACs met, mutation report clean/justified + web scan recorded, typecheck + lint green
+  (format only touched files), commit approved.
 
 ### Slice 2: The author-facing spec + `llms.txt` describe fighting the champions directly (D16)
 
@@ -242,6 +245,7 @@ future member-equality check.
 ## Pre-PR Quality Gate
 
 Before each PR:
+
 1. Mutation (Slices 1 & 3) on the changed `src/http` files; Slice 2 records the `N/A` + alternate
    evidence (drift guard + spec tests). Web (Slice 1): manual mutator scan recorded.
 2. Refactoring assessment (`settle` / `fight-report` shrink in Slice 1; mirror helper in Slice 3) —

@@ -106,12 +106,12 @@ The API is a set of Vercel serverless functions that import the engine directly 
 `src/` — the same `validate` / `runFight` and contract types run in the CLI, the tests,
 and production, so there is no cross-language drift.
 
-| Endpoint         | What it does                                                                            |
-| ---------------- | --------------------------------------------------------------------------------------- |
-| `GET /spec`      | The self-describing bot-authoring spec (Markdown) an LLM reads to write a fighter.      |
-| `POST /validate` | Pre-check a bot document without spending a fight.                                      |
-| `POST /fight`    | Run a bot through the frozen gauntlet gate, then challenge the king-of-the-hill throne. |
-| `GET /king`      | The reigning King and the recent line of succession (identity only).                    |
+| Endpoint         | What it does                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------- |
+| `GET /spec`      | The self-describing bot-authoring spec (Markdown) an LLM reads to write a fighter.                |
+| `POST /validate` | Pre-check a bot document without spending a fight.                                                |
+| `POST /fight`    | Fight a bot against the sitting arena champions — see where it lands: crowned, entered, unplaced. |
+| `GET /king`      | The reigning King and the recent line of succession (identity only).                              |
 
 Details in [`api/README.md`](api/README.md) and [`src/http/README.md`](src/http/README.md).
 
