@@ -70,7 +70,12 @@ export type ThroneStore = {
 // Tunable config: raise it to retain more replay history, lower it to spend less storage. The
 // composition root uses this default; tests inject a small K. Both the fake and the Upstash adapter
 // read the same knob, so the archive bounds identically everywhere.
-export const DEFAULT_ARCHIVE_LIMIT = 50;
+//
+// Set to 100 (from 50) after measuring the full-archive `LRANGE 0 -1` reply: at cap 100 the reply
+// is ~1.4 MiB worst-case (every record embeds the 3 champion docs; ~12 KB/record) and ~0.36 MiB for
+// realistic bots — within a ~1.5 MiB ceiling for the `/replay`-only, 30s-cached read. 200 was
+// rejected (2.8 MiB worst-case). See `plans/pure-koth-s3.md` Slice 4.
+export const DEFAULT_ARCHIVE_LIMIT = 100;
 
 // The archive retained after an append: the newest `limit` records, PLUS any older record still
 // PINNED to a current arena member (its `memberSeniority` is among the committed arena's seniorities).
