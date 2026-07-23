@@ -8,6 +8,7 @@ import { memberIdentity } from "./champion-identity.js";
 import { problem, readValidatedBot } from "./envelope.js";
 import { buildFightReport, toTitleFightReport } from "./fight-report.js";
 import { rankArena, type Standing } from "./rank-arena.js";
+import { readArenaOrSeed } from "./seed-arena.js";
 import type {
   ArenaMember,
   ArenaRecord,
@@ -39,6 +40,12 @@ export type FightDeps = {
   // The frozen per-version arena cap (D4, default 3). The arena keeps the top `n` contestants;
   // #1 is King. It changes only with a version bump (which starts a fresh empty ladder).
   n: number;
+  // The House seed contested when the version's store is PHYSICALLY empty (D5/D15) — so the first
+  // clearer of a fresh season round-robins the three House champions instead of a solo bootstrap
+  // crown. `api/fight.ts` injects `buildSeedArena(loadGauntlet())`; tests inject a small controllable
+  // seed. Required: with the seed always present, the effective arena is never empty, so there is no
+  // empty-arena special case.
+  seed: ArenaRecord;
 };
 
 // The placement block a clearer reads back — committed as a `title` (compete) or returned as a
@@ -257,16 +264,22 @@ export const handleFight = async (
     memberSeniority,
   });
 
-  // Read the arena up front — before the costly gauntlet benchmark — so a byte-identical resubmit
-  // of a current member is rejected as a no-op (C4): a clone can never displace its original. The
-  // same read feeds the placement below (one snapshot; the commit is still gen-guarded).
-  const arena = await deps.store.readArena(deps.version);
+  // Resolve the effective arena up front — before the costly gauntlet benchmark. On a physically-empty
+  // store this is the House seed (D5); `expected` is the CAS token to commit against — `null` when the
+  // store is empty (so the seed materializes), else the stored generation (which guards a real
+  // placement). With the seed always present the arena is never empty, so there is no bootstrap case.
+  // The mirror guard rejects a byte-identical resubmit of a current member as a no-op (C4) — a clone
+  // can never displace its original. The same snapshot feeds the placement below (the commit is still
+  // gen-guarded via `expected`).
+  const { arena, expected } = await readArenaOrSeed(
+    deps.store,
+    deps.version,
+    deps.seed,
+  );
 
-  if (arena !== undefined) {
-    const mirror = mirrorSlot(arena.members, parsed.doc);
+  const mirror = mirrorSlot(arena.members, parsed.doc);
 
-    if (mirror !== undefined) return mirror;
-  }
+  if (mirror !== undefined) return mirror;
 
   const result = benchmark({
     bot: parsed.doc,
@@ -309,28 +322,11 @@ export const handleFight = async (
     return moved ?? json({ ...report, title: placement });
   };
 
-  // Empty arena: bootstrap-crown the clearer as this version's first champion (arena #1 at generation
-  // 1, seniority 1), archiving its record with an empty defender list. Practice projects the same crown.
-  if (arena === undefined) {
-    const challenger: ArenaMember = {
-      champion: parsed.doc,
-      handle,
-      seniority: 1,
-    };
-
-    return settle(
-      { outcome: "crowned", rank: 1, board: [] },
-      null,
-      { members: [challenger], generation: 1, nextSeniority: 2 },
-      reproRecord([], 1),
-    );
-  }
-
-  // A non-empty arena — whether it has room or is full: rank the challenger against the current
-  // defenders via a round-robin, keep the top N, #1 is King. While filling nobody is relegated (C2
-  // join-if-room); a full arena relegates its weakest (the (N+1)-th by the total order) unless the
-  // challenger is itself the weakest, in which case it is `unplaced` and the arena is untouched. The
-  // entrant is stamped with the next per-version seniority.
+  // Rank the challenger against the current arena — whether it has room or is full: round-robin the
+  // defenders, keep the top N, #1 is King. While filling nobody is relegated (C2 join-if-room); a
+  // full arena relegates its weakest (the (N+1)-th by the total order) unless the challenger is itself
+  // the weakest, in which case it is `unplaced` and the arena is untouched. The entrant is stamped
+  // with the next per-version seniority.
   const challenger: ArenaMember = {
     champion: parsed.doc,
     handle,
@@ -363,7 +359,7 @@ export const handleFight = async (
   if (placement.outcome === "unplaced") {
     return settle(
       { outcome: "unplaced", board },
-      arena.generation,
+      expected,
       arena,
       reproRecord(arena.members, null),
     );
@@ -384,7 +380,7 @@ export const handleFight = async (
         ? { displaced: memberIdentity(placement.displaced) }
         : {}),
     },
-    arena.generation,
+    expected,
     {
       members: placement.members,
       generation: arena.generation + 1,

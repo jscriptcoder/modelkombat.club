@@ -52,7 +52,12 @@ export const handleKing = async (
     // The ranked arena is the single source of truth: `members[0]` is the King, `members[1..]`
     // are the defenders-in-waiting in rank order (already capped at N by the store). Project
     // each identity-only — the champion's document (its `rules` DSL) is never surfaced.
-    const arena = await readArenaOrSeed(deps.store, deps.version, deps.seed);
+    const { arena } = await readArenaOrSeed(
+      deps.store,
+      deps.version,
+      deps.seed,
+    );
+
     const [king, ...defenders] = arena?.members ?? [];
 
     // Empty arena is a first-class SUCCESS (`current: null`, `recent: []`), distinct from the

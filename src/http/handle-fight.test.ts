@@ -57,9 +57,28 @@ const mover = (): BotDoc => ({
   default: { type: "idle" },
 });
 
+// A House-seed record (D15): champions credited handle "Gauntlet". `handleFight` contests the seed
+// when the store is PHYSICALLY empty (D5) — a small, controllable stand-in for the real 3-bot board
+// (that board's determinism is pinned in seed-arena.test.ts). Round-robin outcomes here reuse the
+// known head-to-heads (aggressor beats the idle dummy; loses to berserker/pacer 0.00).
+const seedOf = (...champions: BotDoc[]): ArenaRecord => ({
+  members: champions.map((champion, i) => ({
+    champion,
+    handle: "Gauntlet",
+    seniority: i + 1,
+  })),
+  generation: 1,
+  nextSeniority: champions.length + 1,
+});
+
+// A uniquely-named idle House bot — the default seed the `arena()` deps carry. Non-empty-store tests
+// ignore it (the stored arena wins); empty-store tests that assert a seed contest override `seed`.
+const houseIdle = (): BotDoc => ({ ...dummy(), name: "house-idle" });
+
 // The injected "arena": a 1-member idle gauntlet + a test version key + the real engine
-// config + the frozen arena cap N=3. Arena fights reuse `seeds` (D-A: a deterministic
-// tournament graph, no fresh entropy) — 5 seeds × both sides ⇒ 10 bouts per pairing.
+// config + the frozen arena cap N=3 + the House seed (D5, contested when the store is empty). Arena
+// fights reuse `seeds` (D-A: a deterministic tournament graph, no fresh entropy) — 5 seeds × both
+// sides ⇒ 10 bouts per pairing.
 const arena = (version: string, store: FightDeps["store"]): FightDeps => ({
   gauntlet: [dummy()],
   gauntletNames: ["dummy"],
@@ -70,6 +89,7 @@ const arena = (version: string, store: FightDeps["store"]): FightDeps => ({
   version,
   store,
   n: 3,
+  seed: seedOf(houseIdle()),
 });
 
 // Pre-seat a lone champion in the fake store's arena (bypassing the clearing gate — this King
@@ -178,50 +198,68 @@ type IncumbentBody = {
   };
 };
 
-describe("handleFight — S2.1: empty-arena bootstrap crowning (N=3)", () => {
-  it("crowns the first gauntlet-clearer on an empty version arena", async () => {
+describe("handleFight — S2.1: contesting the House seed on an empty store (N=3)", () => {
+  it("materializes the arena from the seed on the physically-empty store (CAS expected=null, not the seed's gen)", async () => {
     const store = inMemoryThroneStore();
-    const clearer = loadBot("aggressor");
+    const clearer = loadBot("aggressor"); // beats the idle House member
 
-    const res = await handleFight(
-      fightRequest(JSON.stringify(clearer)),
-      arena("vTEST", store),
-    );
+    const res = await handleFight(fightRequest(JSON.stringify(clearer)), {
+      ...arena("vTEST", store),
+      seed: seedOf(houseIdle()),
+    });
 
+    // 200, NOT 409 — proves the commit used expected=null against the physically-empty store; had it
+    // passed the seed's nominal generation 1, the CAS would 409 forever (the find-gaps fix).
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as {
       cleared: boolean;
-      title?: { outcome: string; rank: number };
+      title?: {
+        outcome: string;
+        rank: number;
+        board?: { defender: { name: string; handle: string | null } }[];
+      };
     };
 
     expect(body.cleared).toBe(true);
     expect(body.title?.outcome).toBe("crowned");
     expect(body.title?.rank).toBe(1);
+    // it fought the seed (a non-empty board) — the old empty-arena bootstrap crown is retired
+    expect(body.title?.board).toHaveLength(1);
+    expect(body.title?.board?.[0].defender).toMatchObject({
+      name: "house-idle",
+      handle: "Gauntlet",
+    });
 
-    // the champion is persisted as the sole arena member at generation 1
+    // the arena is materialized from the seed's generation (1) → committed at generation 2
     const after = await store.readArena("vTEST");
 
-    expect(after?.generation).toBe(1);
-    expect(after?.members[0].champion).toEqual(clearer);
-    expect(after?.members).toHaveLength(1);
+    expect(after?.members[0].champion).toEqual(clearer); // the challenger crowned #1
+    expect(after?.members.map((m) => m.champion.name)).toContain("house-idle"); // seed member kept
+    expect(after?.generation).toBe(2);
   });
 
-  it("omits the incumbent from an empty-arena crown (you fought no one)", async () => {
+  it("mirror-rejects a byte-identical clone of a House seed member on the empty store (no materialization)", async () => {
     const store = inMemoryThroneStore();
+    const houseBot = loadBot("berserker");
 
-    const res = await handleFight(
-      fightRequest(JSON.stringify(loadBot("aggressor"))),
-      arena("vTEST", store),
-    );
+    // The store is physically empty, so the effective arena is the seed. A submission byte-identical to
+    // a seed member is a no-op clone → 409 arena-mirror, and nothing is materialized.
+    const res = await handleFight(fightRequest(JSON.stringify(houseBot)), {
+      ...arena("vTEST", store),
+      seed: seedOf(houseBot),
+    });
 
-    const body = (await res.json()) as { title?: Record<string, unknown> };
+    expect(res.status).toBe(409);
 
-    expect(body.title?.outcome).toBe("crowned");
-    expect(body.title).not.toHaveProperty("incumbent");
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/arena-mirror");
+    expect(body.title).toContain("#1");
+    expect(await store.readArena("vTEST")).toBeUndefined(); // nothing materialized
   });
 
-  it("does not place or emit a title when the bot fails the gate", async () => {
+  it("does not place or emit a title when the bot fails the gate (nothing materializes)", async () => {
     const store = inMemoryThroneStore();
 
     const res = await handleFight(
@@ -235,10 +273,11 @@ describe("handleFight — S2.1: empty-arena bootstrap crowning (N=3)", () => {
 
     expect(body.cleared).toBe(false);
     expect(body).not.toHaveProperty("title");
+    // a gate-failer never touches the store — the seed is not materialized
     expect(await store.readArena("vTEST")).toBeUndefined();
   });
 
-  it("treats the current version arena as empty even when another version is occupied", async () => {
+  it("contests only the current version's seed — an arena under another version is untouched", async () => {
     const store = inMemoryThroneStore();
     const other = loadBot("berserker");
 
@@ -246,17 +285,72 @@ describe("handleFight — S2.1: empty-arena bootstrap crowning (N=3)", () => {
 
     const res = await handleFight(
       fightRequest(JSON.stringify(loadBot("aggressor"))),
-      arena("vTEST", store),
+      { ...arena("vTEST", store), seed: seedOf(houseIdle()) },
     );
 
-    const body = (await res.json()) as { title?: { outcome: string } };
+    const body = (await res.json()) as {
+      title?: { outcome: string; board?: unknown[] };
+    };
 
+    // vTEST was empty → contested its seed (not vOTHER's occupant, not a solo empty crown)
     expect(body.title?.outcome).toBe("crowned");
+    expect(body.title?.board).toHaveLength(1);
 
+    // vOTHER is byte-untouched
     const otherArena = await store.readArena("vOTHER");
 
     expect(otherArena?.members[0].champion).toEqual(other);
     expect(otherArena?.members).toHaveLength(1);
+  });
+
+  it("leaves a clearer ranked below a FULL seed UNPLACED, but still commits — materializing the arena AS the seed", async () => {
+    const inner = inMemoryThroneStore();
+    const berserker2: BotDoc = { ...loadBot("berserker"), name: "berserker-2" };
+
+    // A full (N=3) House seed of bots that each beat aggressor 1.00 → the clearer is uniquely last.
+    const seed = seedOf(loadBot("berserker"), loadBot("pacer"), berserker2);
+
+    let commits = 0;
+
+    const store: FightDeps["store"] = {
+      readArena: inner.readArena,
+      readArchive: inner.readArchive,
+      commitArena: (v, e, n, r) => {
+        commits += 1;
+
+        return inner.commitArena(v, e, n, r);
+      },
+    };
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor"))),
+      { ...arena("vTEST", store), seed },
+    );
+
+    const body = (await res.json()) as {
+      title?: { outcome: string; board?: unknown[] };
+    };
+
+    expect(body.title?.outcome).toBe("unplaced");
+    expect(body.title?.board).toHaveLength(3); // fought all three House defenders
+
+    // the unplaced clearer commits ONCE (to archive), materializing the arena AS the seed (gen 1)
+    expect(commits).toBe(1);
+
+    const after = await inner.readArena("vTEST");
+
+    expect(after?.members.map((m) => m.champion.name)).toEqual([
+      "berserker",
+      "pacer",
+      "berserker-2",
+    ]);
+    expect(after?.generation).toBe(1); // materialized as the seed itself (expected=null, next=seed)
+    expect(after?.members.every((m) => m.handle === "Gauntlet")).toBe(true);
+
+    const archive = await inner.readArchive("vTEST");
+
+    expect(archive).toHaveLength(1);
+    expect(archive[0].memberSeniority).toBeNull(); // a non-placer is never a member
   });
 });
 
@@ -595,7 +689,7 @@ describe("handleFight — S2.1: concurrent placements serialize (409 throne-move
     expect(await inner.readArchive("vTEST")).toEqual([]);
   });
 
-  it("409s a bootstrap crown when the empty arena was claimed since the read", async () => {
+  it("409s a seed-materializing commit when the empty arena was claimed since the read", async () => {
     const inner = inMemoryThroneStore();
     const usurper = loadBot("berserker");
 
@@ -605,12 +699,12 @@ describe("handleFight — S2.1: concurrent placements serialize (409 throne-move
       nextSeniority: 2,
     });
 
-    // our request read the arena as EMPTY, before that claim landed
+    // our request read the arena as EMPTY (it would materialize the seed at expected=null), before the claim
     const store = staleArenaStore(inner, undefined);
 
     const res = await handleFight(
       fightRequest(JSON.stringify(loadBot("aggressor"))),
-      arena("vTEST", store),
+      { ...arena("vTEST", store), seed: seedOf(houseIdle()) },
     );
 
     expect(res.status).toBe(409);
@@ -620,7 +714,7 @@ describe("handleFight — S2.1: concurrent placements serialize (409 throne-move
     expect((await inner.readArena("vTEST"))?.members[0].champion).toEqual(
       usurper,
     );
-    // S5.1: the bootstrap loser archived nothing on the lost race
+    // S5.1: the loser archived nothing on the lost race
     expect(await inner.readArchive("vTEST")).toEqual([]);
   });
 });
@@ -1051,11 +1145,14 @@ describe("handleFight — S2.3: mirror-reject (C4) + re-entry (D3)", () => {
 
     const after = await store.readArena("vTEST");
 
-    expect(after?.members.map((m) => m.champion.name)).toEqual([
-      "berserker",
+    // both distinct koga bots hold slots — the shared handle never triggers a mirror reject (it keys
+    // on the document, not the handle). The seeded House member (handle "Gauntlet") fills the last slot.
+    const koga = (after?.members ?? []).filter((m) => m.handle === "koga");
+
+    expect(koga.map((m) => m.champion.name).sort()).toEqual([
       "aggressor",
+      "berserker",
     ]);
-    expect(after?.members.every((m) => m.handle === "koga")).toBe(true);
   });
 
   it("does NOT mirror-reject a RELEGATED veteran on re-submission — it re-competes (D3)", async () => {
@@ -1226,18 +1323,23 @@ describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
     expect(JSON.stringify(board)).not.toContain('"default"');
   });
 
-  it("gives the empty-arena bootstrap crown an EMPTY board (it fought no defenders)", async () => {
+  it("gives a seed-materializing crown a board over the House defenders (never an empty board)", async () => {
     const store = inMemoryThroneStore();
 
     const res = await handleFight(
       fightRequest(JSON.stringify(loadBot("aggressor"))),
-      arena("vTEST", store),
+      {
+        ...arena("vTEST", store),
+        seed: seedOf(dummy()),
+      },
     );
 
     const t = ((await res.json()) as BoardBody).title;
 
     expect(t?.outcome).toBe("crowned");
-    expect(t?.board).toEqual([]);
+    // the empty-arena bootstrap (empty board) is retired — the crown fought the seed member
+    expect(t?.board).toHaveLength(1);
+    expect(t?.board?.[0].defender.name).toBe("dummy");
   });
 
   it("retires the flat King scout — the King fight is read only from board[0] (S4.3)", async () => {
@@ -1285,12 +1387,15 @@ describe("handleFight — S4.1: the per-defender placement board (C7)", () => {
 // arena commit. A placer/King pins by its seniority; a non-placer archives too (memberSeniority null,
 // covered by the S2.2 unplaced test above). Nothing is archived when the gauntlet gate fails.
 describe("handleFight — S5.1: reproduction archive", () => {
-  it("archives the bootstrap champion's record — empty defenders, pinned by seniority 1", async () => {
+  it("archives a seed-materializing champion's record — the House defenders it fought, pinned by its seniority", async () => {
     const store = inMemoryThroneStore();
 
     const res = await handleFight(
       fightRequest(JSON.stringify(loadBot("aggressor"))),
-      arena("vTEST", store),
+      {
+        ...arena("vTEST", store),
+        seed: seedOf(dummy()),
+      },
     );
 
     expect(
@@ -1300,10 +1405,10 @@ describe("handleFight — S5.1: reproduction archive", () => {
     const archive = await store.readArchive("vTEST");
     expect(archive).toHaveLength(1);
     expect(archive[0].challenger.name).toBe("aggressor");
-    expect(archive[0].defenders).toEqual([]); // an empty arena → no defenders fought
+    expect(archive[0].defenders.map((d) => d.name)).toEqual(["dummy"]); // the seed member it fought
     expect(archive[0].seeds).toEqual([1, 2, 3, 4, 5]);
     expect(archive[0].version).toBe("vTEST");
-    expect(archive[0].memberSeniority).toBe(1); // the King's pin key
+    expect(archive[0].memberSeniority).toBe(2); // its assigned seniority = seed.nextSeniority
   });
 
   it("archives a placing challenger's record — the defenders it fought, pinned by its seniority", async () => {
@@ -1472,23 +1577,27 @@ describe("handleFight — practice/compete via the X-Compete header", () => {
     expect(await inner.readArena("vTEST")).toEqual(before);
   });
 
-  it("PROJECTS the empty-arena bootstrap crown as rank 1 with an empty board, writing nothing", async () => {
+  it("PROJECTS contesting the seed on an empty store (board over the House defenders), writing nothing", async () => {
     const inner = inMemoryThroneStore();
     const { store, commits } = countingStore(inner);
 
     const res = await handleFight(
       practiceRequest(JSON.stringify(loadBot("aggressor"))),
-      arena("vTEST", store),
+      {
+        ...arena("vTEST", store),
+        seed: seedOf(dummy()),
+      },
     );
 
     const body = (await res.json()) as ProjectionBody;
 
     expect(body.projection?.outcome).toBe("crowned");
     expect(body.projection?.rank).toBe(1);
-    expect(body.projection?.board).toEqual([]);
+    expect(body.projection?.board).toHaveLength(1); // fought the seed, not "no one"
+    expect(body.projection?.board?.[0].defender.name).toBe("dummy");
     expect(body).not.toHaveProperty("title");
     expect(commits()).toBe(0);
-    expect(await inner.readArena("vTEST")).toBeUndefined(); // arena still empty
+    expect(await inner.readArena("vTEST")).toBeUndefined(); // arena stays physically empty
   });
 
   it("returns the plain gauntlet report — neither projection nor title — when a practice bot fails the gate", async () => {

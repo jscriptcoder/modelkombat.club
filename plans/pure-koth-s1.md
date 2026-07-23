@@ -1,7 +1,7 @@
 # Plan: Pure KotH S1 — Fresh seeded v20 season
 
-**Branch**: feat/pure-koth-s1-seeded-season
-**Status**: Active
+**Branch**: feat/pure-koth-s1-compete-house (Slice 2; Slice 1 shipped on feat/pure-koth-s1-seeded-season)
+**Status**: Active — Slice 1 ✅ shipped (PR #397, `main`@`1425ab7`); Slice 2 next; Slice 3 pending
 
 Child story S1 of the `pure-koth-stories.md` split. Decisions: `pure-koth-decisions.md`
 (D1–D15). Engine + TCB untouched — all work in `src/http/`, `src/engine/benchmark-config.ts`
@@ -29,12 +29,12 @@ visible on `/king` and contestable through `/fight` — with the gauntlet gate s
 
 ## Acceptance Criteria
 
-- [ ] On an empty arena, `GET /king` returns the three strongest House bots ranked King/#2/#3 by
+- [x] On an empty arena, `GET /king` returns the three strongest House bots ranked King/#2/#3 by
       a deterministic build-time round-robin, each showing `handle: "Gauntlet"` + `model: "House"`
       (the unknown/generic brand glyph — no web change; `modelToBrand` already falls back to
       `generic`). The `api/king.ts` wrapper + `vercel.json` `includeFiles` are wired in this slice,
-      dark-launched (inert while v19 is non-empty).
-- [ ] `SEED_ARENA` (members, order, seniorities 1/2/3, `generation: 1`, `nextSeniority: 4`) is a
+      dark-launched (inert while v19 is non-empty). — **Slice 1, PR #397**
+- [x] `SEED_ARENA` (members, order, seniorities 1/2/3, `generation: 1`, `nextSeniority: 4`) is a
       pinned constant, asserted by a test to equal the round-robin computation over the three
       strongest bots — selected as the top 3 by `winRateVsRoster` on the frozen roster/seeds,
       ties broken by `GAUNTLET_NAMES` order. The handler never recomputes it at runtime.
@@ -42,9 +42,10 @@ visible on `/king` and contestable through `/fight` — with the gauntlet gate s
       (next is zoner 40% — unambiguous). Their 3-way round-robin is a strict order → **King:
       grappler** (wins 2, net +334) · **#2: sweeper** (wins 1) · **#3: rekka** (wins 0); seniority
       1/2/3 = grappler/sweeper/rekka (never needed as a tiebreak — grappler beats both 100%).
-- [ ] On an empty arena, a gauntlet-clearer that competes round-robins the three House bots
+- [x] On an empty arena, a gauntlet-clearer that competes round-robins the three House bots
       (not a solo bootstrap crown) and is placed crowned/entered/unplaced; the arena materializes
       via a CAS commit with `expected = null`. The old empty-arena bootstrap branch is gone.
+      — **Slice 2, this branch**
 - [ ] After the bump to v20, the live `/king` shows the House board and the first clearer contests
       it; v19 data is orphaned and restorable by reverting the bump. `INPUT_HASH` is unchanged
       (the version string is not a scoring input).
@@ -56,7 +57,12 @@ Classified per the planning contract. All three are **behavior changes** (RED-GR
 Read the project CLAUDE.md + `mutation-testing` notes before each: `src/http/` is in Stryker
 scope (node), so mutants are meaningful here.
 
-### Slice 1: `GET /king` on an empty arena returns the three House champions
+### Slice 1: `GET /king` on an empty arena returns the three House champions — ✅ SHIPPED (PR #397)
+
+**Shipped as**: `src/http/seed-arena.ts` (`SEED_ORDER` pinned constant + pure `buildSeedArena` +
+`readArenaOrSeed`); `handle-king.ts` reads through `readArenaOrSeed(store, version, seed)` with an
+optional `seed` on `KingDeps`; `api/king.ts` injects `buildSeedArena(loadGauntlet())`; `vercel.json`
+adds `api/king.ts` → `includeFiles: "bots/*.json"`. 100% mutation score (47/47) on the seed module.
 
 **Value**: Site visitor / API client — an empty season shows a live board of three ranked House
 champions instead of "no King yet." Establishes `SEED_ARENA` + the shared seed resolver.
@@ -98,7 +104,14 @@ resolver extraction warrants it.
   **REFACTOR**: Assess only if the resolver/hydrator seams add clarity.
   **Done when**: ACs met, mutation report clean/justified, typecheck+lint green, commit approved.
 
-### Slice 2: A challenger competing on an empty arena fights the three House champions
+### Slice 2: A challenger competing on an empty arena fights the three House champions — ✅ complete (pending commit)
+
+**Shipped as**: `readArenaOrSeed` now returns `{ arena, expected }` (overloaded — a required seed yields
+a defined arena, so the compete path needs no empty-arena special case); `handle-fight.ts` resolves the
+effective arena + CAS `expected` up front, mirror-checks unconditionally, and both commit sites use
+`expected` (null when physically empty) — the `arena === undefined` bootstrap branch is deleted;
+`FightDeps.seed` is required and `api/fight.ts` injects `buildSeedArena(loadGauntlet())`. 100% mutation
+score (181/181) across the four changed files.
 
 **Value**: Bot author — the first compete of a season contests the seeded board (must beat House
 bots to place), instead of a free solo bootstrap crown. Wires the seed default into the compete

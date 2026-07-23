@@ -44,12 +44,39 @@ export const buildSeedArena = (gauntlet: readonly BotDoc[]): ArenaRecord => {
   return { members, generation: 1, nextSeniority: SEED_ORDER.length + 1 };
 };
 
-// The effective arena for a version: the stored arena, or the seed when the store is empty. The
-// shared seed default for the read path (`handle-king`). `seed` is optional so a caller that
-// supplies none keeps the pre-seed "empty → no arena" behaviour. (Slice 2 extends this to also
-// surface the CAS `expected` — `null` when physically empty — for the compete path.)
-export const readArenaOrSeed = async (
+// The effective arena for a version PLUS the CAS token to commit against — the shared seed default
+// for both the read path (`handle-king`) and the compete path (`handle-fight`). When the store is
+// physically empty the `arena` is the seed but the CAS `expected` is `null` ("expect an empty
+// arena"), NOT the seed's nominal generation: passing the latter would 409 forever against the empty
+// store (the find-gaps fix). A stored arena passes straight through with its own generation as the
+// expected token.
+export type ResolvedArena = {
+  arena: ArenaRecord | undefined;
+  expected: number | null;
+};
+
+// `seed` is optional so the read path keeps its "empty → no King" behaviour; a caller that supplies a
+// DEFINED seed (the compete path) gets a DEFINED `arena` back — the overload narrows it, so the compete
+// path needs no empty-arena special case (the bootstrap branch is gone).
+export async function readArenaOrSeed(
+  store: ThroneStore,
+  version: string,
+  seed: ArenaRecord,
+): Promise<{ arena: ArenaRecord; expected: number | null }>;
+export async function readArenaOrSeed(
   store: ThroneStore,
   version: string,
   seed?: ArenaRecord,
-): Promise<ArenaRecord | undefined> => (await store.readArena(version)) ?? seed;
+): Promise<ResolvedArena>;
+
+export async function readArenaOrSeed(
+  store: ThroneStore,
+  version: string,
+  seed?: ArenaRecord,
+): Promise<ResolvedArena> {
+  const stored = await store.readArena(version);
+
+  return stored !== undefined
+    ? { arena: stored, expected: stored.generation }
+    : { arena: seed, expected: null };
+}
