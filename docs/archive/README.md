@@ -1886,3 +1886,46 @@ the spec-content assertions + the `/spec` envelope pin are the evidence).
   12/13 killed, the survivor the sentinel's value (equivalent — applied identically to both sides).
 
 [pure-koth-s2.md](pure-koth-s2.md) — the S2 plan, with the recorded outcome + the as-built module list per slice.
+
+## Pure King-of-the-Hill — S3 watch every competing fight ✅ COMPLETE (story 3 of 3) — CLOSES THE ARC
+
+The **third and final** story of the **pure King-of-the-Hill** rework: a spectator can watch how a fighter beat (or
+lost to) **each** of the sitting champions — not just the King bout — reaching every matchup by its own permalink,
+including straight from the `/ring` board row that reports it. The `ReproRecord` already stored every defender + seed
+(S5.1), so watchability was **free**; S3 made each bout **addressable** and **navigable**, then widened the retention
+window. Platform-layer (`src/http` + `web/`) only — **TCB untouched**, no DSL op, no engine change, **no `INPUT_HASH` /
+`BENCHMARK_VERSION` (`v20`) bump**. Node slices TDD'd at **100% mutation** on the changed `src/http` files; web slices
+compensate the Node-only Stryker scope with exhaustive exact-assertion browser tests + a manual mutator scan.
+
+- **S3.1 — reconstruct any of the three bouts by its own content-hash id** (PR #407,
+  `feat/pure-koth-s3-per-bout-ids`) — the record-level `replayId` is **replaced** by a **per-bout** `boutReplayId`
+  (sha256 of the canonicalized `{challenger, defender, seed, version}`, singular), so every challenger-vs-defender
+  matchup is addressable (byte-identical bouts dedupe). `GET /replay?id=<bout id>` reconstructs **that** bout via
+  `renderTape`; the item response also carries the parent submission's sibling `matchups` (a content hash can't derive
+  its siblings, D19). The browse list stays one entry per submission, now headlined by the **King-bout** id (D14).
+- **S3.2 — the replay page switches between the three matchups** (PR #408,
+  `feat/pure-koth-s3-matchup-switcher`) — on `/watch/{boutId}`, `ReplayFight`'s `found` branch renders a matchup
+  switcher: a `<nav aria-label="Matchups">` of the submission's sibling bouts (board order, King first) as per-bout
+  permalink tabs, each the defender's identity (`ModelLogo` mark + name). The bout on screen is marked
+  `aria-current="page"` plus non-colour-only cues (weight / underline / border); the others are plain `/watch/{id}`
+  links. A single-matchup (or absent) list renders no switcher; loading / not-found / error states are preserved.
+  `matchups` was threaded through the web contract mirror (`Matchup` + optional `matchups?`), read defensively.
+- **S3.3 — `/fight` embeds per-bout ids; `/ring` board rows deep-link to their bout** (PR #409,
+  `feat/pure-koth-s3-ring-deeplinks`) — a COMPETE `title.board[i]` now carries a `replayId`, computed via the shared
+  `boutReplayIds` **exported from `handle-replay`** (the hashing rule + seed pairing live once, so a row's id is
+  byte-for-byte the one `/replay` resolves), attached **only when competing** (a practice `projection` omits it —
+  unwatchable, D12/D18); `board[0].replayId` is the headline watch target. On `/ring`, each board row after a compete
+  renders a keyboard-reachable, `aria-label`-identity-labelled **"Watch"** deep-link to `/watch/<its id>`.
+- **S3.4 — raise the reproduction-archive retention cap to 100, measured** (PR #410,
+  `feat/pure-koth-s4-retention-cap`) — `DEFAULT_ARCHIVE_LIMIT` **50 → 100** (both the in-memory fake and the Upstash
+  adapter read the one knob, so no Lua change), gated on the **D13/D20 measurement**: the full-archive `LRANGE 0 -1`
+  reply is dominated by each record embedding the 3 champion docs, so at cap 100 it is ~1.4 MiB worst-case / ~0.36 MiB
+  realistic — within a ~1.5 MiB ceiling for the `/replay`-only, 30s-cached read (200 rejected at 2.8 MiB). A behavior
+  test pins the shipped default (a default-configured store retains exactly the newest 100); `throne-store.ts` at 100%.
+
+[pure-koth-s3.md](pure-koth-s3.md) — the S3 plan, with the recorded measurement + the per-slice outcomes.
+
+**Arc complete (S1–S3, the whole pure-KotH rework).** With the last story shipped, the pure-KotH design trail —
+[pure-koth-decisions.md](pure-koth-decisions.md) (D1–D20) + [pure-koth-stories.md](pure-koth-stories.md) (the S1–S3
+split) — was kept live in `plans/` across all three stories and is now archived here alongside the slice plans. No
+pure-koth files remain in `plans/`.

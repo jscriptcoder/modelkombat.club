@@ -123,8 +123,9 @@ counter / cancel windows, the throw triangle, sweeps + okizeme, air actions, a s
 economy), WKF match structure, and a canonical, behaviorally-proven frame table.
 
 The **platform layer is live**: the HTTP API (`/spec` · `/validate` · `/fight` · `/king`),
-the king-of-the-hill ladder on a durable throne store, and the public website. Still on
-the roadmap: `/replay` and the Pixi replay viewer.
+the pure king-of-the-hill ladder on a durable throne store, the public website, and the
+Pixi **`/watch`** replay viewer — every competing bout of a fighter's climb plays back as
+animated stickmen, each reachable by its own permalink (and linked from its `/ring` result).
 
 The authoritative, capability-by-capability build log and the "next in the pipeline"
 roadmap live in **[`docs/STATUS.md`](docs/STATUS.md)**.
