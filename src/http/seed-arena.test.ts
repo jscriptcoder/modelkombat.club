@@ -141,18 +141,21 @@ describe("SEED_ARENA — the pinned House seed (deterministic, no runtime fights
   });
 });
 
-describe("readArenaOrSeed — an empty store resolves to the seed", () => {
+describe("readArenaOrSeed — resolves the effective arena + its CAS expected token", () => {
   const seed = (): ArenaRecord => buildSeedArena(roster);
 
-  it("returns the seed when the version has no stored arena", async () => {
+  it("returns the seed with expected=null when the version has no stored arena", async () => {
     const store = inMemoryThroneStore();
 
-    const arena = await readArenaOrSeed(store, "v-empty", seed());
+    const { arena, expected } = await readArenaOrSeed(store, "v-empty", seed());
 
     expect(arena?.members.map((m) => m.champion.name)).toEqual([...SEED_ORDER]);
+    // physically empty → the CAS token is null ("expect an empty arena"), NOT the seed's nominal
+    // generation 1; passing gen 1 would 409 forever against the empty store (the find-gaps fix).
+    expect(expected).toBeNull();
   });
 
-  it("returns the STORED arena, not the seed, when one exists", async () => {
+  it("returns the STORED arena and its generation as the expected token when one exists", async () => {
     const store = inMemoryThroneStore();
 
     const real: ArenaRecord = {
@@ -165,15 +168,20 @@ describe("readArenaOrSeed — an empty store resolves to the seed", () => {
 
     await store.commitArena("v1", null, real);
 
-    const arena = await readArenaOrSeed(store, "v1", seed());
+    const { arena, expected } = await readArenaOrSeed(store, "v1", seed());
 
     expect(arena?.members.map((m) => m.champion.name)).toEqual(["zoner"]);
     expect(arena?.generation).toBe(5);
+    // a stored arena's CAS token is its own generation (guards a real placement against a race)
+    expect(expected).toBe(5);
   });
 
-  it("returns undefined when the store is empty and no seed is supplied", async () => {
+  it("returns arena undefined + expected null when the store is empty and no seed is supplied", async () => {
     const store = inMemoryThroneStore();
 
-    expect(await readArenaOrSeed(store, "v-empty")).toBeUndefined();
+    const { arena, expected } = await readArenaOrSeed(store, "v-empty");
+
+    expect(arena).toBeUndefined();
+    expect(expected).toBeNull();
   });
 });

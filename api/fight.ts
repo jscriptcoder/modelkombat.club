@@ -18,6 +18,7 @@
 import { handleFight } from "../src/http/handle-fight.js";
 import { selectThroneStore } from "../src/http/throne-store-select.js";
 import { loadGauntlet } from "../src/http/gauntlet.js";
+import { buildSeedArena } from "../src/http/seed-arena.js";
 import { CANONICAL_RULES } from "../src/engine/rules.js";
 import {
   BENCHMARK_VERSION,
@@ -29,6 +30,11 @@ import {
 
 const gauntlet = loadGauntlet();
 const store = selectThroneStore(process.env);
+
+// The House seed (D5/D15): the three strongest gauntlet bots, contested when the version's store is
+// physically empty (a fresh season). Built once per cold start from the same frozen docs the gauntlet
+// gate uses — a pure pick-and-order, no runtime fights (determinism invariant).
+const seed = buildSeedArena(gauntlet);
 
 // The frozen top-N arena cap (D4): the ladder keeps the top 3 champions; #1 is King. Frozen per
 // version — changing it requires a version bump (which starts a fresh empty ladder), so it never
@@ -48,6 +54,7 @@ export default {
       version: BENCHMARK_VERSION,
       store,
       n: ARENA_N,
+      seed,
     });
   },
 };
