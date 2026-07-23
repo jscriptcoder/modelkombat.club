@@ -77,8 +77,8 @@ describe("benchmark config — the frozen, versioned manifest", () => {
     });
   });
 
-  it("carries BENCHMARK_VERSION v19 (aerial exercise: rekka's weaponized tobi-geri jump-in connects on the board)", () => {
-    expect(BENCHMARK_VERSION).toBe("v19");
+  it("carries BENCHMARK_VERSION v20 (fresh pure-KotH season — the House-seeded arena opens; no scoring change, INPUT_HASH unchanged)", () => {
+    expect(BENCHMARK_VERSION).toBe("v20");
   });
 
   it("every gauntlet bot loads + validates through the real gate (roster integrity)", () => {

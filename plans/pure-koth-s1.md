@@ -1,7 +1,8 @@
 # Plan: Pure KotH S1 — Fresh seeded v20 season
 
-**Branch**: feat/pure-koth-s1-compete-house (Slice 2; Slice 1 shipped on feat/pure-koth-s1-seeded-season)
-**Status**: Active — Slice 1 ✅ shipped (PR #397, `main`@`1425ab7`); Slice 2 next; Slice 3 pending
+**Branch**: feat/pure-koth-s1-bump-v20 (Slice 3; Slices 1–2 shipped on their own branches)
+**Status**: Active — Slice 1 ✅ shipped (PR #397, `main`@`1425ab7`); Slice 2 ✅ shipped (PR #398,
+`main`@`d93b056`); Slice 3 ✅ complete (pending commit — the v20 activation)
 
 Child story S1 of the `pure-koth-stories.md` split. Decisions: `pure-koth-decisions.md`
 (D1–D15). Engine + TCB untouched — all work in `src/http/`, `src/engine/benchmark-config.ts`
@@ -46,10 +47,10 @@ visible on `/king` and contestable through `/fight` — with the gauntlet gate s
       (not a solo bootstrap crown) and is placed crowned/entered/unplaced; the arena materializes
       via a CAS commit with `expected = null`. The old empty-arena bootstrap branch is gone.
       — **Slice 2, this branch**
-- [ ] After the bump to v20, the live `/king` shows the House board and the first clearer contests
+- [x] After the bump to v20, the live `/king` shows the House board and the first clearer contests
       it; v19 data is orphaned and restorable by reverting the bump. `INPUT_HASH` is unchanged
-      (the version string is not a scoring input).
-- [ ] The gauntlet gate is unchanged; the engine and its TCB are untouched.
+      (the version string is not a scoring input). — **Slice 3, this branch**
+- [x] The gauntlet gate is unchanged; the engine and its TCB are untouched. — **Slice 3**
 
 ## Slices
 
@@ -143,7 +144,16 @@ null, next, record)` → materialized arena. Verified via injected empty store.
   **REFACTOR**: Assess resolver reuse between `handle-king` and `handle-fight`.
   **Done when**: ACs met, mutation report clean/justified, typecheck+lint green, commit approved.
 
-### Slice 3: Open the v20 season — bump the benchmark version, activating the seeded board
+### Slice 3: Open the v20 season — bump the benchmark version, activating the seeded board — ✅ complete (pending commit)
+
+**Shipped as**: `BENCHMARK_VERSION` `"v19"` → `"v20"` (one constant in `src/engine/benchmark-config.ts`,
+its trailing + header Policy comments reworded to the season-wipe rationale); the version pin test
+(`benchmark-config.test.ts`) asserts `"v20"`; `docs/spec.md` + `docs/variety.md` regenerated (both
+committed-artifact drift guards green — the only diff in each is the version-string header, bodies
+byte-identical). `INPUT_HASH` unchanged (version is not a scoring input → no accidental ladder reset).
+Preview smoke (real `api/king.ts` + `api/fight.ts` on an empty v20 store): `/king` → grappler/sweeper/
+rekka House board; compete → `version: v20`. MUTATE N/A (string-literal flip) — killed by the version
+pin + the two drift guards; alternate evidence recorded.
 
 **Value**: Everyone — production flips to a fresh, House-seeded v20 arena (the wipe). The prod-
 visible outcome of S1; a one-line, revertible activation of the already-tested seed default.
