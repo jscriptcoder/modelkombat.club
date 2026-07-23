@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { handleReplay, replayId, type ReplayDeps } from "./handle-replay.js";
+import {
+  boutReplayId,
+  handleReplay,
+  type Bout,
+  type ReplayDeps,
+} from "./handle-replay.js";
 import type { ReproRecord, ThroneStore } from "./throne-store.js";
 import { renderTape } from "../engine/sim.js";
 import type { BotDoc } from "../engine/dsl.js";
@@ -50,6 +55,15 @@ const record = (o: Partial<ReproRecord> = {}): ReproRecord => ({
   ...o,
 });
 
+// The King bout of a record — the challenger vs the champion at slot 0. For the single-defender
+// records these fixtures build, it is the record's only bout, and its id is the headline id.
+const kingBout = (rec: ReproRecord): Bout => ({
+  challenger: rec.challenger,
+  defender: rec.defenders[0],
+  seed: rec.seeds[0],
+  version: rec.version,
+});
+
 // A read-only throne store serving a fixed archive (append order). No arena, no commits — the
 // replay endpoint reads the archive only.
 const fakeStore = (archive: ReproRecord[]): ThroneStore => ({
@@ -85,7 +99,11 @@ const itemReq = (id: string): Request =>
 describe("GET /replay/{id} — the reconstructed headline bout", () => {
   it("reconstructs a real record's tape + both fighters' identities, never the documents", async () => {
     const rec = record();
-    const res = await handleReplay(itemReq(replayId(rec)), getDeps([rec]));
+
+    const res = await handleReplay(
+      itemReq(boutReplayId(kingBout(rec))),
+      getDeps([rec]),
+    );
 
     expect(res.status).toBe(200);
 
@@ -114,7 +132,7 @@ describe("GET /replay/{id} — the reconstructed headline bout", () => {
     const match = { winGap: 1 } as const;
 
     const res = await handleReplay(
-      itemReq(replayId(rec)),
+      itemReq(boutReplayId(kingBout(rec))),
       getDeps([rec], { rules, maxTicks: 10, match }),
     );
 
@@ -134,7 +152,11 @@ describe("GET /replay/{id} — the reconstructed headline bout", () => {
 
   it("marks a reconstructed replay immutable (content-addressed → safe to cache forever)", async () => {
     const rec = record();
-    const res = await handleReplay(itemReq(replayId(rec)), getDeps([rec]));
+
+    const res = await handleReplay(
+      itemReq(boutReplayId(kingBout(rec))),
+      getDeps([rec]),
+    );
 
     expect(res.headers.get("cache-control")).toContain("immutable");
   });
@@ -152,15 +174,106 @@ describe("GET /replay/{id} — the reconstructed headline bout", () => {
     expect(body.type).toBe("/problems/replay-not-found");
   });
 
-  it("returns 404 for a bootstrap record's id — a bootstrap crown is not a watchable fight", async () => {
+  it("resolves no item id from a bootstrap crown — a crown that fought nobody has no bout", async () => {
     const bootstrap = record({ defenders: [] });
 
+    // A bootstrap has no bouts, so nothing addresses it; the zero-bout record is skipped and any
+    // well-formed sha256 misses (404), never a crash on its absent defenders[0].
     const res = await handleReplay(
-      itemReq(replayId(bootstrap)),
+      itemReq("a".repeat(64)),
       getDeps([bootstrap, record()]),
     );
 
     expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /replay/{id} — per-bout matchups (S3.1)", () => {
+  // A submission whose challenger fought all three sitting champions — three distinct bouts, one
+  // seed each. The King bout is defenders[0]/seeds[0]. The #2 champion attacks back, so its bout's
+  // motion genuinely differs from the King bout (a robust distinctness check, not seed-luck).
+  const threeBoutRecord = (): ReproRecord =>
+    record({
+      challenger: bot("alpha", "gpt", ATTACK_MID),
+      defenders: [
+        bot("king", "claude", IDLE),
+        bot("second", "m2", ATTACK_MID),
+        bot("third", "m3", IDLE),
+      ],
+      seeds: [3, 4, 5],
+    });
+
+  it("exposes every bout of the submission as a switchable matchup, headlined by the King bout", async () => {
+    const rec = threeBoutRecord();
+    const deps = getDeps([rec]);
+
+    const list = (await (await handleReplay(listReq(), deps)).json()) as {
+      id: string;
+    }[];
+
+    const headlineId = list[0].id;
+
+    const item = (await (
+      await handleReplay(itemReq(headlineId), deps)
+    ).json()) as {
+      matchups: { id: string; fighters: { name: string; model: string }[] }[];
+    };
+
+    // One matchup per defender, in board order (King first), challenger always fighters[0].
+    expect(item.matchups.map((m) => m.fighters[1])).toEqual([
+      { name: "king", model: "claude" },
+      { name: "second", model: "m2" },
+      { name: "third", model: "m3" },
+    ]);
+    expect(item.matchups.every((m) => m.fighters[0].name === "alpha")).toBe(
+      true,
+    );
+
+    // Three distinct bout ids; the headline entry IS the King bout (matchups[0]).
+    expect(new Set(item.matchups.map((m) => m.id)).size).toBe(3);
+    expect(item.matchups[0].id).toBe(headlineId);
+
+    // Doc-privacy holds across the new field — no champion documents in the matchups.
+    const text = JSON.stringify(item);
+
+    expect(text).not.toContain('"rules"');
+    expect(text).not.toContain('"default"');
+  });
+
+  it("resolves each matchup id to that specific bout's byte-faithful tape", async () => {
+    const rec = threeBoutRecord();
+    const rules = getMockRules();
+    const deps = getDeps([rec], { rules, maxTicks: 10 });
+
+    const list = (await (await handleReplay(listReq(), deps)).json()) as {
+      id: string;
+    }[];
+
+    const kingItem = (await (
+      await handleReplay(itemReq(list[0].id), deps)
+    ).json()) as {
+      tape: unknown;
+      matchups: { id: string }[];
+    };
+
+    // The #2 (second champion) matchup resolves to the challenger-vs-second reconstruction — byte
+    // identical to a direct renderTape on defenders[1]/seeds[1], and distinct from the King bout.
+    const secondId = kingItem.matchups[1].id;
+
+    const secondItem = (await (
+      await handleReplay(itemReq(secondId), deps)
+    ).json()) as { tape: unknown };
+
+    const expectedSecond = renderTape({
+      rules,
+      botA: rec.challenger,
+      botB: rec.defenders[1],
+      maxTicks: 10,
+      seed: rec.seeds[1],
+    });
+
+    expect(secondItem.tape).toEqual(expectedSecond);
+    expect(secondItem.tape).not.toEqual(kingItem.tape);
   });
 });
 
@@ -189,7 +302,7 @@ describe("GET /replay — the browsable list", () => {
     }[];
 
     expect(list.map((e) => e.fighters[0].name)).toEqual(["new", "old"]);
-    expect(list[0].id).toBe(replayId(newRec));
+    expect(list[0].id).toBe(boutReplayId(kingBout(newRec)));
     expect(list[0].fighters).toEqual([
       { name: "new", model: "m2" },
       { name: "king", model: "claude" },
@@ -238,8 +351,8 @@ describe("GET /replay — the browsable list", () => {
       version: 1,
     };
 
-    expect(replayId(record({ challenger: shuffled }))).toBe(
-      replayId(record({ challenger: straight })),
+    expect(boutReplayId(kingBout(record({ challenger: shuffled })))).toBe(
+      boutReplayId(kingBout(record({ challenger: straight }))),
     );
   });
 

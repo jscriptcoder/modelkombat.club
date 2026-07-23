@@ -42,15 +42,33 @@ const fighterIdentity = (doc: BotDoc): FighterIdentity => ({
   model: sanitize(doc.model),
 });
 
-// A replay's two fighters, always in the same order: the challenger, then the King it fought
-// (`defenders[0]` — the arena is rank-ordered, so slot 0 is the reigning champion). The headline
-// bout (decision 2) is exactly this pairing.
-const fightersOf = (
-  record: ReproRecord,
-): [FighterIdentity, FighterIdentity] => [
-  fighterIdentity(record.challenger),
-  fighterIdentity(record.defenders[0]),
+// One bout's replay IDENTITY: the challenger, the single defender it faced, that bout's frozen
+// seed, and the version. Per-bout (not per-record) so every challenger-vs-defender matchup is
+// addressable on its own (D19). `defenders` and `seeds` are parallel — bout `i` is `defenders[i]`
+// fought at `seeds[i]`.
+export type Bout = {
+  challenger: BotDoc;
+  defender: BotDoc;
+  seed: number;
+  version: string;
+};
+
+// A bout's two fighters, always challenger-first, identities only (never the documents).
+const boutFighters = (bout: Bout): [FighterIdentity, FighterIdentity] => [
+  fighterIdentity(bout.challenger),
+  fighterIdentity(bout.defender),
 ];
+
+// The bouts a record captured, in board order (slot 0 = the King it fought): the challenger vs
+// each defender, paired with that defender's frozen seed. A bootstrap crown (`defenders: []`)
+// captured no bouts, so this is empty — it contributes no addressable replay.
+const boutsOf = (record: ReproRecord): Bout[] =>
+  record.defenders.map((defender, index) => ({
+    challenger: record.challenger,
+    defender,
+    seed: record.seeds[index],
+    version: record.version,
+  }));
 
 // Recursively sort object keys so a record serializes identically regardless of the key ORDER it
 // was built or deserialized with (the in-proc fake vs an Upstash JSON round-trip can differ) — the
@@ -71,23 +89,37 @@ const canonicalize = (value: unknown): unknown => {
   );
 };
 
-// The content-addressed replay id: sha256 of the record's canonical JSON over the fight IDENTITY
-// (`challenger + defenders + seeds + version`) — NOT `memberSeniority`, which is a mutable archive
-// pin key, not part of what the fight IS. Eviction-proof + permalinkable: the same fight always
-// hashes to the same id, so a link survives the record aging in/out of the bounded archive.
-export const replayId = (record: ReproRecord): string =>
+// The content-addressed id of ONE bout: sha256 of its canonical JSON (challenger + the single
+// defender + that bout's seed + version). Per-bout so every matchup has its own permalink and
+// byte-identical bouts dedupe. Eviction-proof + permalinkable: the same bout always hashes to the
+// same id, so a link survives the record aging in/out of the bounded archive.
+export const boutReplayId = (bout: Bout): string =>
   createHash("sha256")
-    .update(
-      JSON.stringify(
-        canonicalize({
-          challenger: record.challenger,
-          defenders: record.defenders,
-          seeds: record.seeds,
-          version: record.version,
-        }),
-      ),
-    )
+    .update(JSON.stringify(canonicalize(bout)))
     .digest("hex");
+
+// The switchable matchups of a record — every bout with its own id + fighters, in board order —
+// so a replay item hands the viewer the sibling bouts to switch between (a content hash can't
+// derive its siblings, D19).
+const matchupsOf = (
+  record: ReproRecord,
+): { id: string; fighters: [FighterIdentity, FighterIdentity] }[] =>
+  boutsOf(record).map((bout) => ({
+    id: boutReplayId(bout),
+    fighters: boutFighters(bout),
+  }));
+
+// The bout addressed by an id: scan every record's bouts for a matching content hash, returning
+// the parent record (for its matchups) + the matched bout (for reconstruction), or undefined — a
+// miss (unknown, evicted, malformed) or a bootstrap crown (no bouts to match). `find` short-
+// circuits on the first match, so no fight is reconstructed for a miss.
+const findBout = (
+  archive: readonly ReproRecord[],
+  id: string,
+): { record: ReproRecord; bout: Bout } | undefined =>
+  archive
+    .flatMap((record) => boutsOf(record).map((bout) => ({ record, bout })))
+    .find(({ bout }) => boutReplayId(bout) === id);
 
 // A watchable replay has at least one defender. A BOOTSTRAP crown (the version's first champion,
 // which fought nobody) has `defenders: []` — there is no bout to watch, so it is filtered out of
@@ -147,19 +179,21 @@ export const handleReplay = async (
   // List: the current version's watchable fights, NEWEST-FIRST (the archive is append-ordered, so
   // reverse it), identities only. An empty or bootstrap-only archive is a first-class `200 []`.
   if (id === null) {
-    const list = [...watchable].reverse().map((record) => ({
-      id: replayId(record),
-      fighters: fightersOf(record),
-    }));
+    const list = [...watchable].reverse().map((record) => {
+      const king = boutsOf(record)[0];
+
+      return { id: boutReplayId(king), fighters: boutFighters(king) };
+    });
 
     return json(list, LIST_CACHE);
   }
 
-  // Item: resolve the content-hash id against the watchable archive. A miss — unknown, evicted,
-  // malformed, or a bootstrap id — 404s BEFORE any fight is reconstructed (the lookup short-circuits).
-  const record = watchable.find((candidate) => replayId(candidate) === id);
+  // Item: resolve the content-hash id against every bout in the watchable archive. A miss —
+  // unknown, evicted, malformed, or a bootstrap id — 404s BEFORE any fight is reconstructed
+  // (`findBout` short-circuits on the first match and never matches a bootstrap's zero bouts).
+  const found = findBout(watchable, id);
 
-  if (record === undefined) {
+  if (found === undefined) {
     return problem(
       404,
       "/problems/replay-not-found",
@@ -167,16 +201,22 @@ export const handleReplay = async (
     );
   }
 
-  // Reconstruct the headline bout on demand: the challenger vs the King it fought, on the arena's
-  // frozen rules/maxTicks/match and this record's frozen seed — byte-faithful to the title fight.
+  // Reconstruct THIS bout on demand: the challenger vs the one defender it addresses, on the arena's
+  // frozen rules/maxTicks/match and the bout's frozen seed — byte-faithful to the fight that
+  // happened. The response also carries the parent submission's sibling matchups for the switcher.
+  const { record, bout } = found;
+
   const tape = renderTape({
     rules: deps.rules,
-    botA: record.challenger,
-    botB: record.defenders[0],
+    botA: bout.challenger,
+    botB: bout.defender,
     maxTicks: deps.maxTicks,
-    seed: record.seeds[0],
+    seed: bout.seed,
     match: deps.match,
   });
 
-  return json({ tape, fighters: fightersOf(record) }, REPLAY_CACHE);
+  return json(
+    { tape, fighters: boutFighters(bout), matchups: matchupsOf(record) },
+    REPLAY_CACHE,
+  );
 };
