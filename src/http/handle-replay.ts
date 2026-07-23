@@ -98,6 +98,13 @@ export const boutReplayId = (bout: Bout): string =>
     .update(JSON.stringify(canonicalize(bout)))
     .digest("hex");
 
+// The per-bout replay ids of a record, in board order — the very ids the item read resolves. Exposed
+// so `/fight` can stamp each board row its bout's id from a SINGLE source (the hashing rule + seed
+// pairing live here once, never duplicated): a caller that holds the record — not the raw
+// per-defender seeds — gets the ids directly, guaranteed to match what `/replay` reconstructs.
+export const boutReplayIds = (record: ReproRecord): string[] =>
+  boutsOf(record).map(boutReplayId);
+
 // The switchable matchups of a record — every bout with its own id + fighters, in board order —
 // so a replay item hands the viewer the sibling bouts to switch between (a content hash can't
 // derive its siblings, D19).

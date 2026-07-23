@@ -6,6 +6,7 @@
 // S2: the 6-bot gauntlet pre-gate is gone — a bot fights the sitting champions directly.
 import { arenaStandings, pairIndices } from "./arena-standings.js";
 import { memberIdentity } from "./champion-identity.js";
+import { boutReplayIds } from "./handle-replay.js";
 import { problem, readValidatedBot } from "./envelope.js";
 import { rankArena, type Standing } from "./rank-arena.js";
 import { readArenaOrSeed } from "./seed-arena.js";
@@ -49,9 +50,12 @@ export type FightDeps = {
 // The placement block a competitor reads back — committed as a `title` (compete) or returned as a
 // `projection` (practice). Same shape either way: the challenger's outcome/rank, the per-defender
 // board, and the relegated defender (identity only) when a full arena shed one to seat it.
-type BoardRow = { defender: ReturnType<typeof memberIdentity> } & ReturnType<
-  typeof toTitleFightReport
->;
+type BoardRow = {
+  defender: ReturnType<typeof memberIdentity>;
+  // The bout's content-hash replay id — present ONLY on a COMPETE title (D18): a committed fight is
+  // watchable at /watch/<replayId>. A practice projection omits it (D12 — unwatchable).
+  replayId?: string;
+} & ReturnType<typeof toTitleFightReport>;
 type Placement = {
   outcome: "crowned" | "entered" | "unplaced";
   rank?: number | null;
@@ -341,13 +345,23 @@ export const handleFight = async (
     n: deps.n,
   });
 
+  // Each board bout's content-hash replay id, in board order — computed ONLY when COMPETING (D18): a
+  // practice projection is unwatchable (D12), so it carries none. Derived via the shared
+  // `boutReplayIds` over the very record the archive stores (seniority is irrelevant to a bout id), so
+  // a row's id is byte-for-byte the one `/replay` reconstructs — one hashing rule, no duplication.
+  const replayIds = compete
+    ? boutReplayIds(reproRecord(arena.members, null))
+    : [];
+
   // The per-defender board (C7): every defender the challenger fought, in arena rank order (board[0]
   // = the reigning King), each pairing that defender's IDENTITY (never its document — the standings
   // are public via /king + podium) with the challenger's telemetry vs IT, at full per-defender
-  // fidelity. Non-placers get the full board too — diagnose why, don't guess (D-C ethos).
+  // fidelity. Non-placers get the full board too — diagnose why, don't guess (D-C ethos). A compete
+  // row also carries its bout's watch id (board[0]'s is the headline "watch this fight" target).
   const board = arena.members.map((member, i) => ({
     defender: memberIdentity(member),
     ...toTitleFightReport(challengerFights[i]),
+    ...(compete ? { replayId: replayIds[i] } : {}),
   }));
 
   // Unplaced: the challenger ranked below every defender of a FULL arena. It joins no

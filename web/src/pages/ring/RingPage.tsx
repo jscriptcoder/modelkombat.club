@@ -10,7 +10,7 @@ import {
   type ValidationIssue,
 } from "./ring-fight-error";
 import { validateHandle } from "./ring-handle";
-import { FIGHT_PATH } from "../../shared/lib/paths";
+import { FIGHT_PATH, WATCH_PATH } from "../../shared/lib/paths";
 
 // The result of a POST /fight: the HTTP status plus the parsed JSON body. `body` is `unknown`
 // because a non-2xx carries a problem+json, not a report — the human still sees and copies it.
@@ -197,8 +197,15 @@ const beatLabel = (winRate: number): string =>
 type Incumbent = { name: string; model: string | null; handle: string | null };
 
 // One arena-board row: a defender's identity + the challenger's win rate vs it, plus whether it is
-// the reigning King (board[0]). The card reads these; the fuller telemetry rides in the raw block.
-type BoardRow = { defender: Incumbent; winRate: number; isKing: boolean };
+// the reigning King (board[0]) and this bout's watch permalink id (`replayId`, present only on a
+// COMPETE result — null on a practice projection, which is unwatchable). The card reads these; the
+// fuller telemetry rides in the raw block.
+type BoardRow = {
+  defender: Incumbent;
+  winRate: number;
+  isKing: boolean;
+  replayId: string | null;
+};
 
 // The placement-block view-model, for a committed title OR a practice projection. `linksToThrone`
 // is true only for a COMMITTED crown (the throne is now yours to view) — never on a preview. `board`
@@ -235,7 +242,17 @@ const readBoard = (value: unknown): BoardRow[] => {
 
     return defender === null
       ? []
-      : [{ defender, winRate: entry.winRate, isKing: index === 0 }];
+      : [
+          {
+            defender,
+            winRate: entry.winRate,
+            isKing: index === 0,
+            // The bout's watch id — a string only on a compete title; a projection omits it (null ⇒
+            // no watch link). Read defensively, like every other wire field.
+            replayId:
+              typeof entry.replayId === "string" ? entry.replayId : null,
+          },
+        ];
   });
 };
 
@@ -626,6 +643,17 @@ const RingPage: Component<RingPageProps> = (props) => {
                             >
                               {beatLabel(row.winRate)}
                             </span>
+                            <Show when={row.replayId}>
+                              {(id) => (
+                                <a
+                                  class="ring-defender-watch"
+                                  href={`${WATCH_PATH}/${id()}`}
+                                  aria-label={`Watch the fight against ${row.defender.name}`}
+                                >
+                                  Watch
+                                </a>
+                              )}
+                            </Show>
                           </li>
                         )}
                       </For>

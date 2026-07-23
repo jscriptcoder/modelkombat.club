@@ -1788,3 +1788,72 @@ describe("RingPage — select-all on focus", () => {
     expect(textarea.selectionEnd).toBe(doc.length);
   });
 });
+
+describe("RingPage — board rows deep-link to their bout replay (S3.3)", () => {
+  // The per-bout replay ids /fight now stamps on a COMPETE title.board (one per BOARD row).
+  const REPLAY_IDS = ["id-king", "id-second", "id-third"];
+
+  // A committed title whose three board rows each carry their bout's watch id.
+  const competeWithIds = (): Record<string, unknown> =>
+    titledBody({
+      outcome: "crowned",
+      board: BOARD.map((r, i) =>
+        boardEntry({
+          defender: { name: r.name, model: r.model, handle: r.handle },
+          winRate: r.winRate,
+          replayId: REPLAY_IDS[i],
+        }),
+      ),
+    });
+
+  it("links each board row to /watch/<its bout id>, identity-labelled", async () => {
+    const ui = render(() => (
+      <RingPage postFight={resolves({ status: 200, body: competeWithIds() })} />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+    const rows = within(list).getAllByRole("listitem");
+
+    const links = rows.map((row) =>
+      within(row).getByRole("link", { name: /watch/i }),
+    );
+
+    // Each row opens THAT bout's permalink, in board order (board[0] = the King bout).
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "/watch/id-king",
+      "/watch/id-second",
+      "/watch/id-third",
+    ]);
+    // Identity-labelled (a text link, never colour alone) — the accessible name names the defender.
+    expect(links.map((link) => link.getAttribute("aria-label"))).toEqual([
+      "Watch the fight against old-king",
+      "Watch the fight against runner-up",
+      "Watch the fight against third-seat",
+    ]);
+    // …and a visible "Watch" affordance for sighted users (not aria-label alone).
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Watch",
+      "Watch",
+      "Watch",
+    ]);
+  });
+
+  it("shows no watch link on a PRACTICE projection board (unwatchable — D12/D18)", async () => {
+    const ui = render(() => (
+      <RingPage
+        postFight={resolves({ status: 200, body: projectedBoard("crowned") })}
+      />
+    ));
+
+    submit(ui, { name: "b", model: null, rules: [] }, "h");
+
+    const list = await ui.findByRole("list", { name: /arena defenders/i });
+    const rows = within(list).getAllByRole("listitem");
+
+    rows.forEach((row) => {
+      expect(within(row).queryByRole("link", { name: /watch/i })).toBeNull();
+    });
+  });
+});

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { handleFight, type FightDeps } from "./handle-fight.js";
+import { boutReplayId } from "./handle-replay.js";
 import {
   inMemoryThroneStore,
   type ArenaMember,
@@ -1896,5 +1897,72 @@ describe("handleFight — practice/compete via the X-Compete header", () => {
     expect(body.type).toBe("/problems/malformed-request");
     expect(body.title).toContain("X-Author-Handle"); // the handle guard fired first
     expect(await store.readArena("vTEST")).toBeUndefined();
+  });
+});
+
+describe("handleFight — S3.3: a compete board carries each bout's replay id", () => {
+  // Three distinct idle defenders; all idle ⇒ their mutual fights draw and fall to seniority, so the
+  // board order is the seated order [alpha, bravo, charlie]. Distinct names ⇒ distinct bout ids.
+  const alpha = (): BotDoc => ({ ...dummy(), name: "alpha" });
+  const bravo = (): BotDoc => ({ ...dummy(), name: "bravo" });
+  const charlie = (): BotDoc => ({ ...dummy(), name: "charlie" });
+
+  const seatThree = (store: FightDeps["store"]): Promise<unknown> =>
+    seatArena(store, "vTEST", [
+      { champion: alpha(), handle: null, seniority: 1 },
+      { champion: bravo(), handle: null, seniority: 2 },
+      { champion: charlie(), handle: null, seniority: 3 },
+    ]);
+
+  it("stamps each board row with boutReplayId(challenger, that defender, seeds[i], version)", async () => {
+    const store = inMemoryThroneStore();
+    await seatThree(store);
+
+    const challenger = loadBot("aggressor"); // beats the idle trio ⇒ competes to a real placement
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(challenger)),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as {
+      title?: { board?: { replayId?: string }[] };
+    };
+
+    const board = body.title?.board ?? [];
+
+    // Board order = pre-fight arena [alpha, bravo, charlie]; bout i reconstructs at seeds[i] (1,2,3).
+    // The id is content-addressed exactly as /replay resolves it — same fields, same seed pairing.
+    const bout = (defender: BotDoc, seed: number): string =>
+      boutReplayId({ challenger, defender, seed, version: "vTEST" });
+
+    expect(board.map((row) => row.replayId)).toEqual([
+      bout(alpha(), 1),
+      bout(bravo(), 2),
+      bout(charlie(), 3),
+    ]);
+    // board[0].replayId is the King-bout id — the headline "watch this fight" target (no extra field).
+    expect(board[0]?.replayId).toBe(bout(alpha(), 1));
+  });
+
+  it("omits replay ids from a PRACTICE projection board (unwatchable — D12/D18)", async () => {
+    const store = inMemoryThroneStore();
+    await seatThree(store);
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(loadBot("aggressor")), {
+        "X-Compete": "false",
+      }),
+      arena("vTEST", store),
+    );
+
+    const body = (await res.json()) as {
+      projection?: { board?: Record<string, unknown>[] };
+    };
+
+    const board = body.projection?.board ?? [];
+
+    expect(board).toHaveLength(3);
+    expect(board.every((row) => !("replayId" in row))).toBe(true);
   });
 });
