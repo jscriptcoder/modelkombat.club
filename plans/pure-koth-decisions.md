@@ -26,14 +26,14 @@ change lives in `src/http/`, the `api/` wrappers, and `web/`.
   Only the gauntlet **pre-gate** is removed — podium, ranks, seniority, displacement all stay.
   (Rejected: collapse to 1v1-vs-King — throws away the podium for no ask.)
 - **D3 — Seed all three slots full.** A full ring at launch makes "out-rank the weakest
-  sitting bot" the entry floor **for free** (the existing relegation cut *is* the quality
+  sitting bot" the entry floor **for free** (the existing relegation cut _is_ the quality
   gate). No new gating code replaces the gauntlet. (Rejected: seed only the King — `rankArena`
   join-if-room would seat losing bots in the open slots, needing a brand-new floor rule.)
 - **D4 — Seed source: the three strongest existing gauntlet bots.** A build-time round-robin
   among them fixes the launch King/#2/#3 order deterministically, asserted by a test. Reuses
   proven-balanced, visually-distinct bots; zero new calibration. "Strongest" is a fact to pull
   from calibration/telemetry at build time. (Owner's rationale: seeds are placeholders that
-  churn out fast; variety is for *watchability*, and any three archetypes are distinct.)
+  churn out fast; variety is for _watchability_, and any three archetypes are distinct.)
 - **D5 — Self-healing seed default.** The seed arena is a build-time constant `SEED_ARENA`;
   the handler (and `/king`) treat an empty store as `SEED_ARENA`, and the first real compete
   materializes it through the normal CAS commit. This **replaces** the old "empty arena →
@@ -42,15 +42,21 @@ change lives in `src/http/`, the `api/` wrappers, and `web/`.
   round-robin. The six bots survive as internal tooling (`npm run benchmark`, telemetry) and
   as the seed roster. (Rejected: keep a non-gating public "practice diagnostic" — dual-system
   complexity the drop is meant to eliminate.)
-- **D7 — The wipe *is* a version bump.** Bump `BENCHMARK_VERSION` v19 → **v20**. Throne/arena/
+- **D7 — The wipe _is_ a version bump.** Bump `BENCHMARK_VERSION` v19 → **v20**. Throne/arena/
   archive are version-keyed, so a new version orphans v19 data automatically and the fresh v20
   arena self-seeds (D5) — no manual Redis wipe.
-- **D15 — Seeds are visibly "House".** Each seeded `ArenaMember` carries `handle: "House"` so
-  `/king` and the `/ring` board show a `[House]` credit — players can tell placeholder champions
-  from real submissions, framing the goal as "dethrone the house champions." `model` follows the
-  bot doc as-is (the archetypes have no LLM model ⇒ no logo); `name` stays the archetype name.
-  Consequence: a byte-identical resubmission of a seed bot hits the existing C4 mirror rule (409
-  `arena-mirror`) — acceptable (a clone can't out-rank its original anyway).
+- **D15 — Seeds are visibly House fighters.** Each seeded `ArenaMember` carries
+  `handle: "Gauntlet"` (the author credit) and an overridden `model: "House"` so `/king` and the
+  `/ring` board show a `[Gauntlet]` credit, a "House" model label, and the neutral/unknown brand
+  glyph — `modelToBrand` maps any unrecognized model → `generic`, so **no web change is needed**.
+  Players can tell placeholder champions from real LLM submissions, framing the goal as "dethrone
+  the house champions." `name` stays the archetype name. Overriding `model` is safe: the engine
+  never reads it and `INPUT_HASH` excludes it, so a fight is byte-identical whatever the label.
+  (Revised 2026-07-23 from the original `handle: "House"`, on the owner's call — the docs actually
+  carry `model: "gauntlet"`, so the identity is now handle `Gauntlet` + model `House` rather than a
+  bare `[House]` handle.) Consequence: the seed champion doc's `model` now differs from
+  `bots/<name>.json`, so whether a byte-identical raw resubmission trips the C4 mirror rule (409
+  `arena-mirror`) is revisited in Slice 2 — harmless either way (a clone can't out-rank its original).
 
 ### Response contract (forced by D6)
 
@@ -72,7 +78,7 @@ change lives in `src/http/`, the `api/` wrappers, and `web/`.
   defenders + the seed). Defender-vs-defender bouts stay internal (ranking plumbing).
 - **D12 — Coverage is already there.** All three commit paths (crown / enter / unplaced)
   archive, so every compete already produces watchable material. Practice (`X-Compete` ≠ true)
-  stays footprint-free and unwatchable — consistent with "every *competing* fight watchable."
+  stays footprint-free and unwatchable — consistent with "every _competing_ fight watchable."
 - **D13 — Retention bounded at 200** (up from `DEFAULT_ARCHIVE_LIMIT = 50`); the archive is a
   **Redis list** (`RPUSH`/`LRANGE`), not a single blob — the write evicts server-side in Lua
   (cheap network at any K), but `readArchive` pulls the whole list in one `LRANGE 0 -1` reply and
@@ -80,7 +86,7 @@ change lives in `src/http/`, the `api/` wrappers, and `web/`.
   (house-sized; a large challenger ~25–30 KB) K=200 ≈ **~2.5 MB+ per uncached read** (vs ~650 KB
   at K=50). **Prerequisite:** verify the Upstash plan tolerates ~3 MB `LRANGE` responses and the
   cold-read latency is acceptable before raising the cap; fall back to the largest safe cap if not.
-  "Every *recent* competing fight watchable"; permalinks last a long window. (Deferred: true-
+  "Every _recent_ competing fight watchable"; permalinks last a long window. (Deferred: true-
   permanent via a per-record-keyed storage restructure — its own follow-up, and the real fix if the
   read-size ceiling ever bites.)
 - **D14 — Per-bout content-hash permalinks.** Each bout is hashed over

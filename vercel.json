@@ -28,6 +28,9 @@
     },
     "api/fight.ts": {
       "includeFiles": "bots/*.json"
+    },
+    "api/king.ts": {
+      "includeFiles": "bots/*.json"
     }
   }
 }
