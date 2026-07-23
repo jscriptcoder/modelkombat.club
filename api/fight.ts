@@ -22,7 +22,6 @@ import { buildSeedArena } from "../src/http/seed-arena.js";
 import { CANONICAL_RULES } from "../src/engine/rules.js";
 import {
   BENCHMARK_VERSION,
-  GAUNTLET_NAMES,
   MATCH,
   MAX_TICKS,
   SEEDS,
@@ -45,8 +44,6 @@ const ARENA_N = 3;
 export default {
   fetch(req: Request): Promise<Response> {
     return handleFight(req, {
-      gauntlet,
-      gauntletNames: GAUNTLET_NAMES,
       seeds: SEEDS,
       maxTicks: MAX_TICKS,
       rules: CANONICAL_RULES,

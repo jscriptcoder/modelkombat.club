@@ -5,7 +5,6 @@ import Arsenal from "./Arsenal";
 import { createClientResource } from "../../shared/lib/client-resource";
 import Fights from "./Fights";
 import Footer from "../../shared/components/Footer";
-import Gauntlet from "./Gauntlet";
 import Hero from "./Hero";
 import HowItWorks from "./HowItWorks";
 import King, { type Champion } from "./King";
@@ -71,7 +70,6 @@ const App: Component<{ fetchKing?: () => Promise<KingResponse> }> = (props) => {
         <Hero />
         <HowItWorks />
         <Arsenal />
-        <Gauntlet />
         <King
           current={king()?.current ?? null}
           loading={king.loading}

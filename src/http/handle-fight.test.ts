@@ -75,13 +75,10 @@ const seedOf = (...champions: BotDoc[]): ArenaRecord => ({
 // ignore it (the stored arena wins); empty-store tests that assert a seed contest override `seed`.
 const houseIdle = (): BotDoc => ({ ...dummy(), name: "house-idle" });
 
-// The injected "arena": a 1-member idle gauntlet + a test version key + the real engine
-// config + the frozen arena cap N=3 + the House seed (D5, contested when the store is empty). Arena
-// fights reuse `seeds` (D-A: a deterministic tournament graph, no fresh entropy) — 5 seeds × both
-// sides ⇒ 10 bouts per pairing.
+// The injected "arena": a test version key + the real engine config + the frozen arena cap N=3 + the
+// House seed (D5, contested when the store is empty). Arena fights reuse `seeds` (D-A: a deterministic
+// tournament graph, no fresh entropy) — 5 seeds × both sides ⇒ 10 bouts per pairing.
 const arena = (version: string, store: FightDeps["store"]): FightDeps => ({
-  gauntlet: [dummy()],
-  gauntletNames: ["dummy"],
   seeds: [1, 2, 3, 4, 5],
   maxTicks: 600,
   rules: CANONICAL_RULES,
@@ -213,7 +210,6 @@ describe("handleFight — S2.1: contesting the House seed on an empty store (N=3
     expect(res.status).toBe(200);
 
     const body = (await res.json()) as {
-      cleared: boolean;
       title?: {
         outcome: string;
         rank: number;
@@ -221,7 +217,10 @@ describe("handleFight — S2.1: contesting the House seed on an empty store (N=3
       };
     };
 
-    expect(body.cleared).toBe(true);
+    // reshaped contract (S2 drop-the-gauntlet): the body is { version, title|projection } only —
+    // no `cleared` verdict, no `gauntlet` scorecard block.
+    expect(body).not.toHaveProperty("cleared");
+    expect(body).not.toHaveProperty("gauntlet");
     expect(body.title?.outcome).toBe("crowned");
     expect(body.title?.rank).toBe(1);
     // it fought the seed (a non-empty board) — the old empty-arena bootstrap crown is retired
@@ -259,9 +258,12 @@ describe("handleFight — S2.1: contesting the House seed on an empty store (N=3
     expect(await store.readArena("vTEST")).toBeUndefined(); // nothing materialized
   });
 
-  it("does not place or emit a title when the bot fails the gate (nothing materializes)", async () => {
+  it("competes a scoreless bot directly — no gauntlet gate, so it still ENTERS by arena rank", async () => {
     const store = inMemoryThroneStore();
 
+    // `mover` only walks — it would have FAILED the old 6-bot gauntlet gate. With the gate dropped it
+    // fights the seed directly: it draws the idle House member (0 wins) but the arena has room (1 of 3),
+    // so join-if-room seats it at #2 behind the senior House member, and it materializes the arena.
     const res = await handleFight(
       fightRequest(JSON.stringify(mover())),
       arena("vTEST", store),
@@ -269,12 +271,22 @@ describe("handleFight — S2.1: contesting the House seed on an empty store (N=3
 
     expect(res.status).toBe(200);
 
-    const body = (await res.json()) as Record<string, unknown>;
+    const body = (await res.json()) as {
+      title?: { outcome: string; rank: number };
+    };
 
-    expect(body.cleared).toBe(false);
-    expect(body).not.toHaveProperty("title");
-    // a gate-failer never touches the store — the seed is not materialized
-    expect(await store.readArena("vTEST")).toBeUndefined();
+    // reshaped contract: no `cleared` tier — every valid bot is placed by the round-robin alone
+    expect(body).not.toHaveProperty("cleared");
+    expect(body.title?.outcome).toBe("entered");
+    expect(body.title?.rank).toBe(2);
+
+    // it competed for real: the arena materialized with the House member #1 and the mover #2
+    const after = await store.readArena("vTEST");
+
+    expect(after?.members.map((m) => m.champion.name)).toEqual([
+      "house-idle",
+      "mover",
+    ]);
   });
 
   it("contests only the current version's seed — an arena under another version is untouched", async () => {
@@ -1431,17 +1443,24 @@ describe("handleFight — S5.1: reproduction archive", () => {
     expect(archive[0].memberSeniority).toBe(2); // its assigned seniority (the arena's nextSeniority)
   });
 
-  it("archives nothing when the submission fails the gauntlet gate", async () => {
+  it("archives a scoreless bot's record once it competes and enters (no gate to fail)", async () => {
     const store = inMemoryThroneStore();
-    await enthrone(store, "vTEST", loadBot("aggressor")); // a King reigns
+    await enthrone(store, "vTEST", loadBot("aggressor")); // a lone King, room for entrants
 
+    // `mover` loses every bout to the King but the arena has room → it ENTERS at #2 (no gauntlet gate
+    // gates it out), so — like any placer — its reproduction record is archived.
     const res = await handleFight(
-      fightRequest(JSON.stringify(mover())), // only walks → cannot clear the idle dummy → no title shot
+      fightRequest(JSON.stringify(mover())),
       arena("vTEST", store),
     );
 
-    expect(((await res.json()) as { title?: unknown }).title).toBeUndefined();
-    expect(await store.readArchive("vTEST")).toEqual([]); // no clear ⇒ no archive entry
+    expect(
+      ((await res.json()) as { title?: { outcome: string } }).title?.outcome,
+    ).toBe("entered");
+
+    const archive = await store.readArchive("vTEST");
+    expect(archive).toHaveLength(1);
+    expect(archive[0].challenger.name).toBe("mover");
   });
 });
 
@@ -1473,7 +1492,6 @@ describe("handleFight — practice/compete via the X-Compete header", () => {
   };
 
   type ProjectionBody = {
-    cleared: boolean;
     title?: unknown;
     projection?: {
       outcome: string;
@@ -1506,7 +1524,7 @@ describe("handleFight — practice/compete via the X-Compete header", () => {
 
     const body = (await res.json()) as ProjectionBody;
 
-    expect(body.cleared).toBe(true);
+    expect(body).not.toHaveProperty("cleared");
     expect(body.projection?.outcome).toBe("crowned");
     expect(body.projection?.rank).toBe(1);
     expect(body.projection?.board).toHaveLength(1);
@@ -1600,12 +1618,14 @@ describe("handleFight — practice/compete via the X-Compete header", () => {
     expect(await inner.readArena("vTEST")).toBeUndefined(); // arena stays physically empty
   });
 
-  it("returns the plain gauntlet report — neither projection nor title — when a practice bot fails the gate", async () => {
+  it("PROJECTS where a scoreless bot would land (entered) — no gauntlet gate — writing nothing", async () => {
     const inner = inMemoryThroneStore();
     const { store, commits } = countingStore(inner);
 
+    // `mover` scores nothing (would have failed the old gate). In practice it still projects where it
+    // WOULD land: it draws the idle House seed member, but the arena has room, so it would enter at #2.
     const res = await handleFight(
-      practiceRequest(JSON.stringify(mover())), // only walks → cannot clear the idle dummy
+      practiceRequest(JSON.stringify(mover())),
       arena("vTEST", store),
     );
 
@@ -1613,11 +1633,11 @@ describe("handleFight — practice/compete via the X-Compete header", () => {
 
     const body = (await res.json()) as ProjectionBody;
 
-    expect(body.cleared).toBe(false);
-    expect(body).not.toHaveProperty("projection");
+    expect(body).not.toHaveProperty("cleared");
+    expect(body.projection?.outcome).toBe("entered");
     expect(body).not.toHaveProperty("title");
     expect(commits()).toBe(0);
-    expect(await inner.readArena("vTEST")).toBeUndefined();
+    expect(await inner.readArena("vTEST")).toBeUndefined(); // practice writes nothing
   });
 
   it("still competes-and-commits when X-Compete is true (returns a title, not a projection)", async () => {

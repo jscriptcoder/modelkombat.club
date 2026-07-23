@@ -1,14 +1,15 @@
-// The `/fight` orchestration seam — the request→gate→arena flow, extracted from
+// The `/fight` orchestration seam — the request→arena flow, extracted from
 // `api/fight.ts` so the throne store and arena config are INJECTABLE (the S4
 // dependency seam). `api/fight.ts` becomes a thin wrapper supplying production
 // deps. Pure transport + orchestration over the deterministic engine (`benchmark`)
 // and the platform-layer throne store — no DSL op, TCB untouched (invariant #2).
+// S2: the 6-bot gauntlet pre-gate is gone — a bot fights the sitting champions directly.
 import { arenaStandings, pairIndices } from "./arena-standings.js";
 import { memberIdentity } from "./champion-identity.js";
 import { problem, readValidatedBot } from "./envelope.js";
-import { buildFightReport, toTitleFightReport } from "./fight-report.js";
 import { rankArena, type Standing } from "./rank-arena.js";
 import { readArenaOrSeed } from "./seed-arena.js";
+import { toTitleFightReport } from "./fight-report.js";
 import type {
   ArenaMember,
   ArenaRecord,
@@ -24,13 +25,10 @@ import {
 import type { BotDoc } from "../engine/dsl.js";
 import type { Rules } from "../engine/types.js";
 
-// Everything the handler needs, injected: the arena (gauntlet + run config + the
-// version key the throne is scoped to + the frozen top-N cap) and the throne store.
-// Tests inject a small idle gauntlet + a fresh in-memory store; `api/fight.ts` supplies
-// the frozen manifest + the production store.
+// Everything the handler needs, injected: the arena (run config + the version key the throne is
+// scoped to + the frozen top-N cap + the House seed) and the throne store. Tests inject a fresh
+// in-memory store + a small seed; `api/fight.ts` supplies the frozen manifest + the production store.
 export type FightDeps = {
-  gauntlet: BotDoc[];
-  gauntletNames: readonly string[];
   seeds: readonly number[];
   maxTicks: number;
   rules: Rules;
@@ -41,14 +39,14 @@ export type FightDeps = {
   // #1 is King. It changes only with a version bump (which starts a fresh empty ladder).
   n: number;
   // The House seed contested when the version's store is PHYSICALLY empty (D5/D15) — so the first
-  // clearer of a fresh season round-robins the three House champions instead of a solo bootstrap
+  // competitor of a fresh season round-robins the three House champions instead of a solo bootstrap
   // crown. `api/fight.ts` injects `buildSeedArena(loadGauntlet())`; tests inject a small controllable
   // seed. Required: with the seed always present, the effective arena is never empty, so there is no
   // empty-arena special case.
   seed: ArenaRecord;
 };
 
-// The placement block a clearer reads back — committed as a `title` (compete) or returned as a
+// The placement block a competitor reads back — committed as a `title` (compete) or returned as a
 // `projection` (practice). Same shape either way: the challenger's outcome/rank, the per-defender
 // board, and the relegated defender (identity only) when a full arena shed one to seat it.
 type BoardRow = { defender: ReturnType<typeof memberIdentity> } & ReturnType<
@@ -108,8 +106,8 @@ const hasControlChar = (s: string): boolean =>
 
 // Read the required `X-Author-Handle` header → the sanitized handle, or a `400` problem
 // when it is absent/empty, over-length, or carries control characters. Runs before the
-// gauntlet gate, so a missing or malformed handle is rejected cheaply and independently
-// of whether the bot would clear.
+// fight, so a missing or malformed handle is rejected cheaply and independently of where
+// the bot would place.
 const readHandle = (req: Request): Response | { handle: string } => {
   const raw = req.headers.get("x-author-handle");
 
@@ -232,15 +230,15 @@ export const handleFight = async (
 
   if (parsed instanceof Response) return parsed;
 
-  // Reject a malformed author handle up front — before the (costlier) benchmark and
-  // independently of whether the bot would clear the gate.
+  // Reject a malformed author handle up front — before the (costlier) round-robin and
+  // independently of where the bot would place.
   const handleResult = readHandle(req);
 
   if (handleResult instanceof Response) return handleResult;
 
   const { handle } = handleResult;
 
-  // Read the compete/practice intent up front — before the (costlier) benchmark, and after the handle
+  // Read the compete/practice intent up front — before the (costlier) round-robin, and after the handle
   // so a malformed handle wins over a malformed intent. Rejects a non-true/false `X-Compete` with 400.
   const competeResult = readCompete(req);
 
@@ -248,7 +246,7 @@ export const handleFight = async (
 
   const { compete } = competeResult;
 
-  // Build this clearer's reproduction record (S5.1): the challenger doc + the exact defender docs it
+  // Build this competitor's reproduction record (S5.1): the challenger doc + the exact defender docs it
   // fought + the frozen seeds + version, from which any fight regenerates via `runFight` (never a
   // tape — invariant #1). `memberSeniority` is the pin key: the seniority it was seated at when it
   // placed, or `null` for a non-placer (never an arena member). `seeds`/`version` are constant across
@@ -264,7 +262,7 @@ export const handleFight = async (
     memberSeniority,
   });
 
-  // Resolve the effective arena up front — before the costly gauntlet benchmark. On a physically-empty
+  // Resolve the effective arena up front — before the round-robin. On a physically-empty
   // store this is the House seed (D5); `expected` is the CAS token to commit against — `null` when the
   // store is empty (so the seed materializes), else the stored generation (which guards a real
   // placement). With the seed always present the arena is never empty, so there is no bootstrap case.
@@ -281,35 +279,21 @@ export const handleFight = async (
 
   if (mirror !== undefined) return mirror;
 
-  const result = benchmark({
-    bot: parsed.doc,
-    gauntlet: deps.gauntlet,
-    seeds: deps.seeds,
-    maxTicks: deps.maxTicks,
-    rules: deps.rules,
-    match: deps.match,
-  });
-
-  const report = buildFightReport(result, {
-    version: deps.version,
-    seeds: deps.seeds,
-    gauntletNames: deps.gauntletNames,
-  });
-
-  // Failed the gate: plain gauntlet report, no title/projection, arena untouched.
-  if (!report.cleared) return json(report);
-
-  // Settle a clearer's placement. COMPETE → attempt the (archiving) commit and, on success, return the
-  // placement as a `title`; a lost CAS race surfaces as the 409. PRACTICE → write NOTHING and return the
-  // SAME placement as a `projection` — never a title, so a consumer keying on `title` can't misread a
-  // footprint-free preview as a real crown. Shared by all three clearer outcomes below.
+  // Settle a competitor's placement. COMPETE → attempt the (archiving) commit and, on success, return
+  // the placement as a `title`; a lost CAS race surfaces as the 409. PRACTICE → write NOTHING and return
+  // the SAME placement as a `projection` — never a title, so a consumer keying on `title` can't misread a
+  // footprint-free preview as a real crown. The body is `{ version, title|projection }` — there is no
+  // gauntlet gate, so every valid bot lands crowned/entered/unplaced (S2 drop-the-gauntlet). Shared by
+  // all three placement outcomes below.
   const settle = async (
     placement: Placement,
     expected: number | null,
     next: ArenaRecord,
     record: ReproRecord,
   ): Promise<Response> => {
-    if (!compete) return json({ ...report, projection: placement });
+    if (!compete) {
+      return json({ version: deps.version, projection: placement });
+    }
 
     const moved = await commit(
       deps.store,
@@ -319,7 +303,7 @@ export const handleFight = async (
       record,
     );
 
-    return moved ?? json({ ...report, title: placement });
+    return moved ?? json({ version: deps.version, title: placement });
   };
 
   // Rank the challenger against the current arena — whether it has room or is full: round-robin the
@@ -344,14 +328,14 @@ export const handleFight = async (
 
   // The per-defender board (C7): every defender the challenger fought, in arena rank order (board[0]
   // = the reigning King), each pairing that defender's IDENTITY (never its document — the standings
-  // are public via /king + podium) with the challenger's telemetry vs IT, at the same fidelity a
-  // gauntlet row carries. Non-placers get the full board too — diagnose why, don't guess (D-C ethos).
+  // are public via /king + podium) with the challenger's telemetry vs IT, at full per-defender
+  // fidelity. Non-placers get the full board too — diagnose why, don't guess (D-C ethos).
   const board = arena.members.map((member, i) => ({
     defender: memberIdentity(member),
     ...toTitleFightReport(challengerFights[i]),
   }));
 
-  // Unplaced: the challenger cleared but ranked below every defender of a FULL arena. It joins no
+  // Unplaced: the challenger ranked below every defender of a FULL arena. It joins no
   // arena slot — but competing it STILL commits (S5.1), gen-guarded against the arena it fought, to
   // archive its reproduction record (memberSeniority null — it is no member); the commit leaves the
   // arena byte-identical (only the archive grows). A CAS race means the arena moved under it, so its
