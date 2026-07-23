@@ -34,18 +34,20 @@ version}` → **one id per submission**; the item read reconstructs **only** `de
 
 ## Acceptance Criteria
 
-- [ ] A placed compete's replay page switches between its (up to) three matchups (King / #2 / #3),
-      each a byte-faithful reconstruction of that specific challenger-vs-defender bout.
-- [ ] Each matchup has its own permalink, content-addressed over `{challenger, defender, seed, version}`; two identical bouts resolve to (dedupe on) the same id.
-- [ ] A `/ring` board row (after a compete) opens that row's specific bout replay.
+- [x] A placed compete's replay page switches between its (up to) three matchups (King / #2 / #3),
+      each a byte-faithful reconstruction of that specific challenger-vs-defender bout. _(Slice 2.)_
+- [x] Each matchup has its own permalink, content-addressed over `{challenger, defender, seed, version}`; two identical bouts resolve to (dedupe on) the same id. _(Slice 1 id/dedupe + Slice 2 permalink page.)_
+- [x] A `/ring` board row (after a compete) opens that row's specific bout replay. _(Slice 3.)_
 - [x] The `/watch` browse list stays **one entry per submission**, headlined by the challenger-vs-King
       bout (D14) — S3 does not triple the list. _(Slice 1: list headline is now the King-bout id.)_
-- [ ] With more than the retention cap of archived competes, the newest `cap` remain watchable and
-      older ones age out; permalinks to still-retained bouts keep resolving.
-- [ ] The Upstash full-archive `LRANGE` reply size + cold-read latency at the raised cap are measured
-      and shown to tolerate the raise (or the cap is set to the largest safe value) **before** 200 ships.
-- [ ] `BENCHMARK_VERSION` and `INPUT_HASH` are unchanged (`benchmark-config.test.ts` green); the engine
-      and TCB are untouched.
+- [x] With more than the retention cap of archived competes, the newest `cap` remain watchable and
+      older ones age out; permalinks to still-retained bouts keep resolving. _(Slice 4: default cap
+      raised 50 → 100; a default-configured store retains the newest 100.)_
+- [x] The Upstash full-archive `LRANGE` reply size at the raised cap is measured and shown to tolerate
+      the raise (or the cap is set to the largest safe value) **before** it ships. _(Slice 4: measured
+      — cap 100 ≈ 1.4 MiB worst-case / 0.36 MiB realistic; 200 rejected at 2.8 MiB. Cap set to 100.)_
+- [x] `BENCHMARK_VERSION` and `INPUT_HASH` are unchanged (`benchmark-config.test.ts` green); the engine
+      and TCB are untouched. _(Held across all four slices — every change lived in `src/http` + `web`.)_
 
 ## Slices
 
@@ -85,7 +87,7 @@ matches → `renderTape` reconstructs that bout → response carries the tape + 
 - **REFACTOR**: assess `fightersOf`/`fighterIdentity` reuse for the per-bout `matchups` shape.
 - **Done when**: ACs met, mutation report clean, suite green, commit approved.
 
-### Slice 2: The replay page switches between the three matchups
+### Slice 2: The replay page switches between the three matchups — ✅ SHIPPED (#408, `main`@`f6c9a6c`)
 
 **Value**: Spectator — on `/watch/<bout-id>`, tabs for King / #2 / #3 let them watch each fight of the
 climb; selecting a matchup lazily fetches its tape (content-addressed, `immutable`-cached — one
@@ -114,7 +116,7 @@ tests + a manual mutator scan (house convention for `web/`).
 - **REFACTOR**: assess switcher extraction only if it earns its keep.
 - **Done when**: ACs met, manual mutator scan recorded, suite green, commit approved.
 
-### Slice 3: `/fight` embeds per-bout ids; `/ring` board rows deep-link to their bout
+### Slice 3: `/fight` embeds per-bout ids; `/ring` board rows deep-link to their bout — ✅ SHIPPED (#409, `main`@`12806f4`)
 
 **Value**: Spectator/author — straight from the compete result, each board row opens that specific
 bout's replay (the D14 "each row → its bout" payoff, closing the loop from result to watch).
@@ -144,7 +146,14 @@ defenders[i], seeds[i], version)` — matching the id Slice 1 resolves. The head
 - **REFACTOR**: share the bout-id derivation with Slice 1 (single source — no duplicated hashing rule).
 - **Done when**: ACs met, mutation report + manual scan recorded, suite green, commit approved.
 
-### Slice 4: Raise the retention cap toward 200 after measuring the Upstash ceiling
+### Slice 4: Raise the retention cap after measuring the Upstash ceiling — ✅ DONE (cap 100)
+
+**Measurement (recorded before the raise).** The full-archive `LRANGE 0 -1` reply is dominated by
+each record embedding the 3 reigning champion docs (only the challenger varies). Projected reply
+size: cap 50 ≈ 0.70 MiB worst-case; **cap 100 ≈ 1.4 MiB worst / 0.36 MiB realistic**; cap 200 ≈
+2.8 MiB worst — over a ~1.5 MiB ceiling for the `/replay`-only, 30s-cached read. **Decision: cap
+100** (2× retention, worst-case within ceiling). Latency is transfer-bound behind the cache; no live
+probe taken (size is the binding constraint).
 
 **Value**: Spectator — a longer watchable window (more recent competes keep resolvable permalinks),
 without risking the storage read ceiling (D13/D20).
@@ -199,10 +208,10 @@ is near-empty post-wipe) — noted in the story Parking Lot ("old permalinks bre
 
 ## Next Step
 
-**Slice 1 shipped (#407).** Next is **Slice 2** (the web matchup switcher). Load `tdd` + `testing`
-(browser-mode) + `refactoring` (mutation `N/A` — `web/` is outside the Node Stryker scope; compensate
-with exhaustive exact-assertion browser tests + a manual mutator scan), then present **Slice 2**'s
-acceptance criteria for confirmation before writing the first failing browser test.
+**All four slices are done (#407 / #408 / #409 + Slice 4 in flight).** The measurement gated the
+raise to **100** (not 200). Only the **arc closeout** remains: archive this plan → `docs/archive/`,
+update `docs/STATUS.md` + `README.md`, and record the pure-KotH "watch every competing fight" arc as
+complete.
 
 ---
 
