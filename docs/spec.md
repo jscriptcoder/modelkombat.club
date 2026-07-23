@@ -5,7 +5,7 @@
 > the engine, so this document cannot lie about how a fight resolves.
 
 - **Benchmark version:** `v20` — a score is comparable only against another at the same version.
-- **Input hash:** `9eb2897d10a02acd78ef3b9ff0c1e0f23383f3cedf24b840513ed8ff6569b989` (pins the scoring inputs: rules + gauntlet + run params).
+- **Input hash:** `9eb2897d10a02acd78ef3b9ff0c1e0f23383f3cedf24b840513ed8ff6569b989` (pins the scoring inputs: rules + opponents + run params).
 
 A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is
 validated once against the allowlists below (the security boundary), then run
@@ -22,9 +22,10 @@ validated once against the allowlists here (the security boundary) and then
 interpreted, never executed as a program.
 
 Two bots then fight a **WKF karate match** — strikes, throws, and sweeps across
-height bands, decided on points. Your bot is scored against a **frozen gauntlet**
-of reference opponents; you author from this spec alone, with no feedback loop
-while you write. Encode a strategy as priority-ordered rules and submit.
+height bands, decided on points. Your bot enters a **King-of-the-Hill arena** and
+fights the sitting champions — the fighters other authors have already placed
+there; you author from this spec alone, with no feedback loop while you write.
+Encode a strategy as priority-ordered rules and submit.
 
 ## Limits
 
@@ -1401,8 +1402,9 @@ numbers — read those via `rule(...)` so a bot survives a frame-table retune.
 
 ## Benchmark rules
 
-A submitted bot fights **WKF matches** against a frozen, versioned gauntlet,
-scored deterministically — the spec is the only input; there is no feedback loop.
+A submitted bot fights **WKF matches** against the sitting champions — the King on
+the throne and the challengers ranked below it, up to three fighters in all — scored
+deterministically and versioned. The spec is the only input; there is no feedback loop.
 
 - `win condition` — a match ends the moment either fighter leads by `winGap` = 8 points; otherwise it runs the full `maxTicks` = 600 ticks and is decided on total points; if still level, one sudden-death `overtime` period of `ticks` = 300 ticks plays — first to a 1-point gap wins; if still level, the first fighter to have scored (`senshu`, first blood) wins — only a bout where neither drew first blood is a draw.
 - `yame` — after each SCORING exchange resolves, both fighters reset to the neutral start (position, posture, guard, open windows) — but points, stamina, and memory PERSIST. No okizeme farm carries across exchanges.
@@ -1411,13 +1413,13 @@ scored deterministically — the spec is the only input; there is no feedback lo
 - `metric` — win-rate (matches won) is primary; Σ net-points over every (opponent × seed × side) fight breaks ties.
 - `seeds` — 1..10 (10 seeds), each matchup played twice (bot as A and as B).
 - `maxTicks` — 600
-- gauntlet opponents (archetypes only — you author blind, no bot documents shown):
-  - `jabber` — Death by a thousand cuts — walks you down, reads your strike's height and blocks it, then answers with the jab. (signature: `kizami-zuki`)
-  - `rekka` — Flurry artist — chains cancel into cancel, then leaps in for a jump-kick ippon. (signature: `tobi-geri`)
-  - `zoner` — Fights at the fence — picks the exact-length kick for the gap and retreats the instant you close the distance. (signature: `ushiro-geri`)
-  - `grappler` — Owns the clinch — crowd him and he throws you to the mat, then punishes the knockdown with a reverse punch. (signature: `throw`)
-  - `sweeper` — Chops your base out with a foot sweep, then cashes the knockdown for a reverse-punch finish. (signature: `sweep → gyaku-zuki`)
-  - `vulture` — Patient predator — baits the whiff, punishes it with a snap backfist, and feeds on a gassed opponent. (signature: `uraken`)
+
+**The climb.** Your bot round-robins the whole arena, and the field — you plus the
+sitting champions — is ranked by that metric. Out-rank the weakest champion and you
+take its seat (**entered**), relegating it; finish above every champion and you seize
+the throne (**crowned**); fall short of them all and you are **unplaced** and the
+standings are untouched — one round-robin decides everything, with no separate
+clearance gate.
 
 ## Submitting
 
@@ -1429,13 +1431,13 @@ request to the same origin that served this spec:
   fighter is credited under on the ladder; keep it short and free of control
   characters. If you are an LLM driving this, **ask the human** running you for
   their handle — do not invent one.
-- **By default, a `/fight` is a practice run.** The response reports your gauntlet
-  result and, if you clear all six opponents, a `projection` of where you would land
-  on the ladder — but it changes nothing. Iterate as many times as you like; practice
-  runs never touch the standings.
+- **By default, a `/fight` is a practice run.** The response reports the fight's
+  outcome and a `projection` of where your bot would land in the arena — but it
+  changes nothing. Iterate as many times as you like; practice runs never touch the
+  standings.
 - **When your bot is good enough to compete, add the `X-Compete: true` header.** Only
-  then does clearing the gauntlet earn a real title shot at the reigning King, and only
-  a competing win crowns you on the ladder.
+  then does a placing result count for real — taking a seat in the arena, or crowning
+  you if you top the reigning King.
 
 ```sh
 # Practice (the default): iterate freely — nothing is recorded.

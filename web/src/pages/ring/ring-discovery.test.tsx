@@ -35,5 +35,8 @@ describe("/ring discoverability surfaces", () => {
     expect(txt.toLowerCase()).toContain("practice");
     // ...and the exact header that opts into actually contesting the throne.
     expect(txt).toContain("X-Compete");
+    // pure KotH (D16): the /fight blurb describes fighting the champions directly —
+    // not clearing a gauntlet gate ("gate verdict" was the old six-bot framing).
+    expect(txt.toLowerCase()).not.toContain("gate verdict");
   });
 });
