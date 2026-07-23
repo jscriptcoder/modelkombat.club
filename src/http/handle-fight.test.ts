@@ -1205,6 +1205,85 @@ describe("handleFight — S2.3: mirror-reject (C4) + re-entry (D3)", () => {
         ?.outcome,
     ).toBe("unplaced");
   });
+
+  // D17: `model` is an inert DISPLAY label the engine never reads (INPUT_HASH excludes it), and the
+  // House seed stamps its champions `model: "House"` (seed-arena.ts) while the bots/*.json they are
+  // built from carry their own model. So a raw resubmit of a House champion differs from the stored
+  // member ONLY by `model` — a no-op clone that today's byte-exact `sameDoc` mirror lets slip. The
+  // guard must compare SCORING content (the doc with `model` normalized away), rejecting the clone.
+  it("rejects a resubmit that differs from a current member ONLY by the inert `model` (D17)", async () => {
+    const inner = inMemoryThroneStore();
+
+    // A member stamped like a House seed (model:"House").
+    const seated: BotDoc = { ...loadBot("berserker"), model: "House" };
+
+    await seatArena(inner, "vTEST", [
+      { champion: seated, handle: "Gauntlet", seniority: 1 },
+    ]);
+
+    const before = await inner.readArena("vTEST");
+    const { store, commits } = countingCommits(inner);
+
+    // Byte-identical scoring content, a DIFFERENT model — the same fighter under a fresh label.
+    const resubmit: BotDoc = {
+      ...loadBot("berserker"),
+      model: "claude-opus-4-8",
+    };
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(resubmit)),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(409);
+    expect(res.headers.get("content-type")).toContain(
+      "application/problem+json",
+    );
+
+    const body = (await res.json()) as { type: string; title: string };
+
+    expect(body.type).toBe("/problems/arena-mirror");
+    expect(body.title).toContain("#1"); // names the matched member's slot
+
+    // no benchmark, no CAS — the clone never competed and the arena is byte-identical
+    expect(commits()).toBe(0);
+    expect(await inner.readArena("vTEST")).toEqual(before);
+  });
+
+  it("still competes a submission whose SCORING content differs, even when its model also differs (D17)", async () => {
+    const store = inMemoryThroneStore();
+
+    // A House-stamped King (model:"House").
+    await seatArena(store, "vTEST", [
+      {
+        champion: { ...loadBot("berserker"), model: "House" },
+        handle: "Gauntlet",
+        seniority: 1,
+      },
+    ]);
+
+    // A genuinely different fighter under a real model label — different name AND rules AND model.
+    // The model-normalizing compare must NOT over-match on the shared-nothing content: it competes.
+    const fresh: BotDoc = { ...loadBot("aggressor"), model: "claude-opus-4-8" };
+
+    const res = await handleFight(
+      fightRequest(JSON.stringify(fresh)),
+      arena("vTEST", store),
+    );
+
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as {
+      title?: { outcome: string; rank: number };
+    };
+
+    // aggressor loses to the berserker King (0.00) but the arena has room → it enters at #2
+    expect(body.title?.outcome).toBe("entered");
+    expect(body.title?.rank).toBe(2);
+    expect(
+      (await store.readArena("vTEST"))?.members.map((m) => m.champion.name),
+    ).toEqual(["berserker", "aggressor"]);
+  });
 });
 
 // S4.1 (C7): every gauntlet-clearer — crowned, entered, OR unplaced — reads back a per-defender BOARD,

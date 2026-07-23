@@ -151,20 +151,35 @@ const readCompete = (req: Request): Response | { compete: boolean } => {
   );
 };
 
-// The RFC 9457 detail for a byte-identical resubmit of a sitting arena member (C4). A clone can
-// never out-rank its original, so it is rejected as a no-op before any benchmark; the detail names
-// the 1-based slot it duplicates so the author knows which fighter already holds that ground.
+// The RFC 9457 detail for a resubmit of a sitting arena member (C4). A clone can never out-rank its
+// original, so it is rejected as a no-op before any benchmark; the detail names the 1-based slot it
+// duplicates so the author knows which fighter already holds that ground.
 const arenaMirrorDetail = (slot: number): string =>
-  `This exact bot already holds arena slot #${slot} — resubmitting an unchanged fighter has no effect.`;
+  `This fighter already holds arena slot #${slot} — resubmitting it (a model label is not a change) has no effect.`;
 
-// If the submitted document is byte-identical to a current arena member, the 409 that rejects it
-// (naming the member's 1-based slot); otherwise `undefined`, and the submission proceeds. `sameDoc`
-// is the same serialization deep-equal the benchmark's no-mirror rule uses (shared knowledge).
+// Two documents are the SAME FIGHTER when their SCORING content matches (D17). `model` is an inert
+// display label the interpreter never reads — `INPUT_HASH` excludes it, so a fight is byte-identical
+// whatever the label — and the House seed stamps its champions `model: "House"` while the docs they
+// are built from carry their own model. So a resubmit that differs ONLY by `model` (a raw House
+// champion) is the same fighter and must still mirror-reject. Normalize `model` to a shared sentinel
+// on both sides, then reuse the engine's byte-exact `sameDoc`: this is a strict superset of the
+// byte-exact check (same model + same content still matches). The engine / `sameDoc` stay untouched —
+// the normalization lives here in the http layer.
+const MIRROR_MODEL = "";
+
+const sameFighter = (a: BotDoc, b: BotDoc): boolean =>
+  sameDoc({ ...a, model: MIRROR_MODEL }, { ...b, model: MIRROR_MODEL });
+
+// If the submitted document is the same fighter (scoring content, `model` aside) as a current arena
+// member, the 409 that rejects it (naming the member's 1-based slot); otherwise `undefined`, and the
+// submission proceeds.
 const mirrorSlot = (
   members: readonly ArenaMember[],
   doc: BotDoc,
 ): Response | undefined => {
-  const index = members.findIndex((member) => sameDoc(member.champion, doc));
+  const index = members.findIndex((member) =>
+    sameFighter(member.champion, doc),
+  );
 
   return index === -1
     ? undefined
