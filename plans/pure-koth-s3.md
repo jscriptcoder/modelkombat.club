@@ -38,8 +38,8 @@ version}` → **one id per submission**; the item read reconstructs **only** `de
       each a byte-faithful reconstruction of that specific challenger-vs-defender bout.
 - [ ] Each matchup has its own permalink, content-addressed over `{challenger, defender, seed, version}`; two identical bouts resolve to (dedupe on) the same id.
 - [ ] A `/ring` board row (after a compete) opens that row's specific bout replay.
-- [ ] The `/watch` browse list stays **one entry per submission**, headlined by the challenger-vs-King
-      bout (D14) — S3 does not triple the list.
+- [x] The `/watch` browse list stays **one entry per submission**, headlined by the challenger-vs-King
+      bout (D14) — S3 does not triple the list. _(Slice 1: list headline is now the King-bout id.)_
 - [ ] With more than the retention cap of archived competes, the newest `cap` remain watchable and
       older ones age out; permalinks to still-retained bouts keep resolving.
 - [ ] The Upstash full-archive `LRANGE` reply size + cold-read latency at the raised cap are measured
@@ -55,7 +55,7 @@ via the now-King-bout id); Slices 2–3 deliver the spectator-visible payoff; Sl
 retention raise. Each behavior-changing slice runs the full `tdd` → `testing` → `mutation-testing` →
 `refactoring` cycle, and its acceptance criteria are **presented for confirmation before any code**.
 
-### Slice 1: Reconstruct any of the three bouts by its own content-hash id
+### Slice 1: Reconstruct any of the three bouts by its own content-hash id — ✅ SHIPPED (#407, `main`@`8adadd3`)
 
 **Value**: Spectator/API — every challenger-vs-defender bout (not just vs King) becomes an addressable,
 byte-faithful reconstruction; the switcher and the `/ring` deep-link (Slices 2–3) build on it.
@@ -199,8 +199,10 @@ is near-empty post-wipe) — noted in the story Parking Lot ("old permalinks bre
 
 ## Next Step
 
-Load `tdd` + `testing` + `mutation-testing` + `refactoring`, then present **Slice 1**'s acceptance
-criteria for confirmation before writing the first failing test.
+**Slice 1 shipped (#407).** Next is **Slice 2** (the web matchup switcher). Load `tdd` + `testing`
+(browser-mode) + `refactoring` (mutation `N/A` — `web/` is outside the Node Stryker scope; compensate
+with exhaustive exact-assertion browser tests + a manual mutator scan), then present **Slice 2**'s
+acceptance criteria for confirmation before writing the first failing browser test.
 
 ---
 
