@@ -346,3 +346,17 @@
 .ring-defender-result-beat {
   background: rgba(120, 226, 168, 0.22);
 }
+
+/* The per-bout watch link — opens this defender's fight replay at /watch/<id>. A text link (never
+   colour alone), present only on a COMPETE result; a practice projection omits it. */
+.ring-defender-watch {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ring-defender-watch:hover,
+.ring-defender-watch:focus-visible {
+  text-decoration: underline;
+}
