@@ -56,7 +56,8 @@ change lives in `src/http/`, the `api/` wrappers, and `web/`.
   carry `model: "gauntlet"`, so the identity is now handle `Gauntlet` + model `House` rather than a
   bare `[House]` handle.) Consequence: the seed champion doc's `model` now differs from
   `bots/<name>.json`, so whether a byte-identical raw resubmission trips the C4 mirror rule (409
-  `arena-mirror`) is revisited in Slice 2 — harmless either way (a clone can't out-rank its original).
+  `arena-mirror`) is **resolved in D17** (S2 makes the mirror guard model-agnostic, so a House clone
+  IS rejected rather than competing).
 
 ### Response contract (forced by D6)
 
@@ -70,6 +71,29 @@ change lives in `src/http/`, the `api/` wrappers, and `web/`.
   gauntlet" headlines removed; the arena board is the primary result; loading copy updated. The
   home "The Gauntlet" section is removed (King + Podium already show the live arena) and any
   "How It Works" copy referencing the gate is refreshed.
+- **D16 — The author-facing spec drops the gauntlet too (S2 scope, own sub-slice).** `/spec`
+  (generated from `src/cli/gen-spec.ts`, also feeding the prerendered `/spec-guide` and the built
+  `docs/spec.md`) and `web/public/llms.txt` currently instruct authors to "clear all six gauntlet
+  opponents" for a title shot — wrong the moment the gate drops (D6). S2 rewrites their "Benchmark
+  rules" + compete/practice framing to describe fighting the sitting champions directly (out-rank the
+  weakest of the up-to-three-member arena to enter, beat the King to be crowned); the WKF scoring
+  mechanics, seeds, move list, and frame table are unchanged. Sizable enough to be **its own S2
+  sub-slice**. Mechanics: a `gen-spec.ts` prose change forces `npm run gen:spec` (the `docs/spec.md`
+  byte-drift guard `gen-spec.test.ts` goes RED until regenerated) but moves neither `BENCHMARK_VERSION`
+  nor `INPUT_HASH`. The internal 6-bot gauntlet still exists (D6) — it just stops being described as
+  the public gate. (Surfaced by `find-gaps` 2026-07-23; D10 had named only `/ring` + the home section.)
+- **D17 — Mirror check becomes model-agnostic (resolves D15's Slice-2 question).** A seed's stored
+  `champion` carries the display override `model: "House"` (`seed-arena.ts`) while `bots/<name>.json`
+  carries `model: "gauntlet"`, so a raw resubmit of a House champion is NOT byte-identical and today
+  slips past `mirrorSlot`'s `sameDoc` check → it competes, and (inheriting its original's dominance
+  over the other two seeds) can occupy a board slot, relegating a distinct archetype and eroding the
+  seed's variety purpose. S2 makes the arena-mirror guard compare **scoring content** instead of raw
+  bytes: `mirrorSlot` strips the inert `model` field before the deep-equal — **http layer only**
+  (`src/http/`, NO engine / `sameDoc` / benchmark change, honouring the arc's engine-untouched
+  invariant). Effect: a House clone (and any same-doc copycat resubmitted under a different `model`)
+  is rejected 409 `arena-mirror` ("already holds slot #k"), matching the rule's intent that an
+  unchanged fighter has no effect. A byte-exact resubmit of a real member is still caught (a superset).
+  (Resolved via `find-gaps` 2026-07-23.)
 
 ### Watchability
 
