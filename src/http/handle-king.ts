@@ -6,14 +6,18 @@
 // touches the arena write path, so no CAS concern here.
 import { memberIdentity } from "./champion-identity.js";
 import { problem } from "./envelope.js";
-import type { ThroneStore } from "./throne-store.js";
+import { readArenaOrSeed } from "./seed-arena.js";
+import type { ArenaRecord, ThroneStore } from "./throne-store.js";
 
-// Injected: the throne store + the version the read is scoped to. `api/king.ts` supplies
-// the production store (`selectThroneStore`) + `BENCHMARK_VERSION`; tests inject a fresh
-// in-memory fake + a test version.
+// Injected: the throne store + the version the read is scoped to + the House seed. `api/king.ts`
+// supplies the production store (`selectThroneStore`) + `BENCHMARK_VERSION` + `buildSeedArena`;
+// tests inject a fresh in-memory fake + a test version.
 export type KingDeps = {
   store: ThroneStore;
   version: string;
+  // The House seed surfaced when the store is empty (D5/D15). Optional: a caller that supplies none
+  // keeps the pre-seed "empty → no King" behaviour; `api/king.ts` always injects `buildSeedArena`.
+  seed?: ArenaRecord;
 };
 
 // The arena changes rarely — only a placing submission moves it — so a brief public cache
@@ -48,7 +52,7 @@ export const handleKing = async (
     // The ranked arena is the single source of truth: `members[0]` is the King, `members[1..]`
     // are the defenders-in-waiting in rank order (already capped at N by the store). Project
     // each identity-only — the champion's document (its `rules` DSL) is never surfaced.
-    const arena = await deps.store.readArena(deps.version);
+    const arena = await readArenaOrSeed(deps.store, deps.version, deps.seed);
     const [king, ...defenders] = arena?.members ?? [];
 
     // Empty arena is a first-class SUCCESS (`current: null`, `recent: []`), distinct from the

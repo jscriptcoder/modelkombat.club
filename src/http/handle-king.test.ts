@@ -4,6 +4,7 @@ import { handleKing } from "./handle-king.js";
 import {
   inMemoryThroneStore,
   type ArenaMember,
+  type ArenaRecord,
   type ThroneStore,
 } from "./throne-store.js";
 import type { BotDoc } from "../engine/dsl.js";
@@ -65,6 +66,31 @@ const seatArena = (
     generation: 1,
     nextSeniority: members.length + 1,
   });
+
+// The House seed the production /king injects (D15): three placeholder champions credited
+// handle "Gauntlet" + model "House", in rank order (King first). handleKing surfaces these when
+// the store is empty, projected identity-only like any champion row.
+const houseSeed = (): ArenaRecord => ({
+  members: [
+    arenaMember("grappler", {
+      handle: "Gauntlet",
+      seniority: 1,
+      doc: { model: "House" },
+    }),
+    arenaMember("sweeper", {
+      handle: "Gauntlet",
+      seniority: 2,
+      doc: { model: "House" },
+    }),
+    arenaMember("rekka", {
+      handle: "Gauntlet",
+      seniority: 3,
+      doc: { model: "House" },
+    }),
+  ],
+  generation: 1,
+  nextSeniority: 4,
+});
 
 // A store whose arena read fails — models Upstash being unreachable (the real adapter THROWS
 // on an error reply, never silently reads empty). Drives the 503 path.
@@ -221,6 +247,67 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
 
     expect(body.current).toBeNull();
     expect(body.recent).toEqual([]);
+  });
+
+  it("returns the injected House seed when the arena is empty (current = King, recent = defenders)", async () => {
+    const store = inMemoryThroneStore(); // empty
+
+    const res = await handleKing(kingRequest(), {
+      store,
+      version: VERSION,
+      seed: houseSeed(),
+    });
+
+    const body = (await res.json()) as KingBody;
+
+    // current is the seed's King (arena #1), credited handle Gauntlet + model House.
+    expect(body.current).toEqual({
+      name: "grappler",
+      model: "House",
+      handle: "Gauntlet",
+    });
+    // recent is the two House defenders below the King, in rank order.
+    expect(body.recent.map((c) => c.name)).toEqual(["sweeper", "rekka"]);
+    body.recent.forEach((c) => {
+      expect(c.handle).toBe("Gauntlet");
+      expect(c.model).toBe("House");
+    });
+  });
+
+  it("projects the House seed identity-only — no rules/doc leak", async () => {
+    const store = inMemoryThroneStore();
+
+    const res = await handleKing(kingRequest(), {
+      store,
+      version: VERSION,
+      seed: houseSeed(),
+    });
+
+    const body = (await res.json()) as KingBody;
+
+    expect(Object.keys(body.current ?? {}).sort()).toEqual([...IDENTITY_KEYS]);
+
+    const raw = JSON.stringify(body);
+
+    expect(raw).not.toContain("rules");
+    expect(raw).not.toContain("canAct");
+  });
+
+  it("ignores the seed when a real arena exists (the stored King wins)", async () => {
+    const store = inMemoryThroneStore();
+
+    await seatArena(store, [arenaMember("real-king", { handle: "human" })]);
+
+    const res = await handleKing(kingRequest(), {
+      store,
+      version: VERSION,
+      seed: houseSeed(),
+    });
+
+    const body = (await res.json()) as KingBody;
+
+    expect(body.current?.name).toBe("real-king");
+    expect(body.current?.handle).toBe("human");
   });
 
   it("strips control characters from identity strings for current and every recent entry", async () => {
