@@ -1,7 +1,7 @@
 # Plan: Pure KotH S2 — Drop the gauntlet
 
-**Branch**: `feat/pure-koth-s2-drop-gauntlet` (Slice 1; Slices 2–3 on their own branches)
-**Status**: Active
+**Branch**: `feat/pure-koth-s2-spec-drops-gauntlet` (Slice 2; Slice 1 shipped, Slice 3 on its own branch)
+**Status**: Active — **Slice 1 shipped** (PR #402, `main`@`bd53a71`); Slices 2–3 remain.
 
 Child story S2 of the `pure-koth-stories.md` split. Decisions: `pure-koth-decisions.md`
 (D1–D17; S2 leans on D6/D8/D9/D10/D15/**D16**/**D17**). Engine + TCB untouched — all work in
@@ -47,22 +47,22 @@ to a pure King-of-the-Hill product with no "clear the gauntlet" anywhere.
 
 ## Acceptance Criteria
 
-- [ ] A valid bot competing runs **no gauntlet gate** — it is ranked by the arena round-robin alone
-      and placed crowned / entered / unplaced (there is no "failed the gate" tier).
-- [ ] `POST /fight` returns `{ version, title | projection }`, where the block is
+- [x] A valid bot competing runs **no gauntlet gate** — it is ranked by the arena round-robin alone
+      and placed crowned / entered / unplaced (there is no "failed the gate" tier). — **Slice 1, PR #402**
+- [x] `POST /fight` returns `{ version, title | projection }`, where the block is
       `{ outcome, rank?, board, displaced? }` and each `board` row keeps its per-defender telemetry;
-      the body carries **no** `cleared`, `gauntlet.perOpponent`, or `diagnostics`.
-- [ ] `buildFightReport` / `FightReport` / `FightReportOpponent` and the now-unused
+      the body carries **no** `cleared`, `gauntlet.perOpponent`, or `diagnostics`. — **Slice 1**
+- [x] `buildFightReport` / `FightReport` / `FightReportOpponent` and the now-unused
       `FightDeps.gauntlet` / `gauntletNames` are removed; `toTitleFightReport` remains. Typecheck +
-      lint stay green (no dead references).
-- [ ] `/ring` after a compete shows an arena headline + the per-defender board as the primary
+      lint stay green (no dead references). — **Slice 1**
+- [x] `/ring` after a compete shows an arena headline + the per-defender board as the primary
       result, with **zero** "gauntlet" language and no gauntlet scorecard; practice still previews a
-      `projection` with a claim button (the two-step practice→claim survives).
-- [ ] The home page has **no "The Gauntlet" section**; the How-It-Works copy describes pure KotH
-      (fight the sitting champions; out-rank the weakest to enter, beat the King to be crowned).
-- [ ] `/spec` + `llms.txt` describe fighting the sitting champions directly — no "clear all six /
+      `projection` with a claim button (the two-step practice→claim survives). — **Slice 1**
+- [x] The home page has **no "The Gauntlet" section**; the How-It-Works copy describes pure KotH
+      (fight the sitting champions; out-rank the weakest to enter, beat the King to be crowned). — **Slice 1**
+- [x] `/spec` + `llms.txt` describe fighting the sitting champions directly — no "clear all six /
       earn a title shot" gate language; `docs/spec.md` is regenerated; `INPUT_HASH` +
-      `BENCHMARK_VERSION` are unchanged (D16).
+      `BENCHMARK_VERSION` are unchanged (D16). — **Slice 2 (this PR)**
 - [ ] A raw resubmit of a seeded House champion (differs only by the inert `model`) is rejected
       `409 arena-mirror` naming its slot — it never competes or takes a slot; a byte-exact resubmit
       of a real member is still caught (D17).
@@ -82,7 +82,13 @@ Slices 2 and 3 are mutually independent and may swap; the mirror (Slice 3) is a 
 diff on the reshaped handler and could even precede Slice 1 — it is sequenced last to avoid rebase
 friction. Slice 2 is sequenced right after Slice 1 so the author-facing docs stop lying promptly.
 
-### Slice 1: Drop the gate — a bot fights the champions directly, and `/fight` + `/ring` show the arena result
+### Slice 1: Drop the gate — a bot fights the champions directly, and `/fight` + `/ring` show the arena result — ✅ SHIPPED (PR #402, `main`@`bd53a71`)
+
+**Shipped as**: `handle-fight.ts` (gate pass + `buildFightReport` + `!cleared` return deleted; `settle` →
+`{ version, title|projection }`); `fight-report.ts` shrunk to `toTitleFightReport`; `FightDeps.gauntlet`/
+`gauntletNames` + `api/fight.ts` wiring retired; `RingPage.tsx` arena-only headlines + scorecard removed +
+dead empty-board branches gone; home "Gauntlet" section/component deleted, Nav + How-It-Works + Podium +
+`/ring` meta de-gauntleted. Full suite 2259 green; MUTATE http 100% (130/130); net −876 lines.
 
 **Value**: Bot author — a submission no longer clears a 6-bot gate; it fights the sitting champions
 directly and the ring shows the arena outcome. The headline S2 ask, delivered end-to-end.
@@ -140,6 +146,15 @@ unplaced-still-commits path. Web: manual mutator scan over the reshaped headline
 
 ### Slice 2: The author-facing spec + `llms.txt` describe fighting the champions directly (D16)
 
+**Built as** (this PR): `gen-spec.ts` — overview + `## Benchmark rules` reframed to the sitting-champions
+arena (opening reworded; the 6-bot `GAUNTLET_ARCHETYPES` roster + `GAUNTLET_NAMES` use deleted; a new
+**The climb** paragraph teaches crowned/entered/unplaced), submit bullets de-gated, header hash gloss
+`gauntlet`→`opponents`; `docs/spec.md` regenerated (`INPUT_HASH` + `v20` byte-unchanged). `api/spec.ts`
+`/fight` envelope blurb + `web/public/llms.txt` (intro, `/fight`, home bullet) reframed to the arena.
+Stale `src/http/README.md` gate line (left by S2.1) corrected. RED = new spec-content assertions + the
+`docs/spec.md` byte-drift guard + the `/spec` envelope byte-pin + the `llms.txt` discovery lock; MUTATE
+N/A (string assembly). Suite 2258 green; typecheck + lint clean.
+
 **Value**: LLM bot author — the canonical prompt context (`/spec`) and `llms.txt` stop instructing
 "clear all six gauntlet opponents" and describe the real path (fight the sitting champions;
 out-rank the weakest to enter, beat the King to be crowned), so authored bots target the actual game.
@@ -157,9 +172,12 @@ assertions + `spec-schema.test.ts`).
   6-bot clearance gate or "earn a title shot"; they describe fighting the sitting champions and how
   a bot is crowned/entered/unplaced. The WKF match mechanics, seeds, `maxTicks`, move list, and
   frame table sections are unchanged.
-- The fixed "gauntlet opponents (archetypes only)" roster listing is reframed to the arena / House
-  champions the season opens against (exact microcopy chosen at implementation with the spec in
-  context; guardrail: no "clear the gauntlet / title shot" gate framing).
+- The fixed per-opponent roster listing (the six "gauntlet opponents (archetypes only)" bios) is
+  **removed** — the spec names no specific fighters (not even the three House seeds, which are
+  transient). In its place the spec describes the climb: a submission fights the sitting champions —
+  a live ladder of prior winners — entering by out-ranking the weakest of the top ranks and being
+  crowned by reaching #1 / beating the King. Guardrail: no "clear the gauntlet / title shot" gate
+  framing and no named fighters (D16).
 - `llms.txt` `/fight` + intro blurbs describe the direct-arena fight (no "clear, then projection"
   gate); the home-page "the Gauntlet (reference opponents)" bullet is dropped (the section is gone
   after Slice 1).
@@ -224,10 +242,12 @@ Before each PR:
 
 ## Notes / open facts for implementation
 
-- **Microcopy is deferred by choice** (arc norm): the crowned/entered/unplaced `/ring` headlines,
-  the How-It-Works copy, and the spec's champion-roster framing are written during implementation
-  with the UI/spec in context. Guardrail (an AC above): no "gauntlet" / "clear the gauntlet" / "title
-  shot" wording; the headline reflects the arena outcome + board.
+- **Spec roster resolved (2026-07-23):** the spec names no specific fighters — the per-opponent
+  roster is removed and replaced with the climb mechanics (see the Slice 2 AC + D16). The
+  crowned/entered/unplaced `/ring` headlines + How-It-Works copy already shipped in Slice 1. The
+  remaining Slice 2 microcopy (the exact climb wording) is written during implementation with the
+  spec in context; guardrail: no "gauntlet" / "clear the gauntlet" / "title shot" wording, no named
+  fighters.
 - **`/variety` is parked** (Parking Lot, `pure-koth-stories.md`): the board's "frozen gauntlet
   move-usage" framing stays for now — the 6 bots survive as internal tooling + the seed roster (D6),
   so the data is unchanged; a reframe is an optional follow-up, not part of S2.

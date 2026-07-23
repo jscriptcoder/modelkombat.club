@@ -34,7 +34,7 @@ arena size) are injected so tests can substitute fakes.
 
 | File                                 | Purpose                                                                                                                                                                                                            |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`handle-fight.ts`](handle-fight.ts) | `handleFight` — the `POST /fight` flow: validate → gauntlet gate → arena round-robin → CAS-guarded atomic commit. A bot must clear the frozen gauntlet before it earns a title shot at the king-of-the-hill arena. |
+| [`handle-fight.ts`](handle-fight.ts) | `handleFight` — the `POST /fight` flow: validate → arena round-robin → CAS-guarded atomic commit. A submitted bot fights the sitting champions directly; out-ranking the arena's weakest earns a seat, topping the King crowns it. |
 | [`handle-king.ts`](handle-king.ts)   | `handleKing` — the `GET /king` read: an identity-only projection of the version-scoped ranked arena (the King + the defenders in waiting). Stateless and cacheable; it never touches the write path.               |
 
 ### King-of-the-Hill ladder (pure, engine-free)

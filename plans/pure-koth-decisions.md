@@ -81,7 +81,12 @@ change lives in `src/http/`, the `api/` wrappers, and `web/`.
   sub-slice**. Mechanics: a `gen-spec.ts` prose change forces `npm run gen:spec` (the `docs/spec.md`
   byte-drift guard `gen-spec.test.ts` goes RED until regenerated) but moves neither `BENCHMARK_VERSION`
   nor `INPUT_HASH`. The internal 6-bot gauntlet still exists (D6) — it just stops being described as
-  the public gate. (Surfaced by `find-gaps` 2026-07-23; D10 had named only `/ring` + the home section.)
+  the public gate. **The per-opponent roster listing is removed outright, not reframed:** the spec
+  names no specific fighters — not even the three House seeds, which are transient (real submissions
+  displace them within a season, so naming them would date the spec). In its place it describes the
+  climb — fight the sitting champions (a live ladder of prior winners), enter by out-ranking the
+  weakest of the top ranks, be crowned by reaching #1 / beating the King. (Decision 2026-07-23.)
+  (Surfaced by `find-gaps` 2026-07-23; D10 had named only `/ring` + the home section.)
 - **D17 — Mirror check becomes model-agnostic (resolves D15's Slice-2 question).** A seed's stored
   `champion` carries the display override `model: "House"` (`seed-arena.ts`) while `bots/<name>.json`
   carries `model: "gauntlet"`, so a raw resubmit of a House champion is NOT byte-identical and today

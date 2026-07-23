@@ -69,7 +69,7 @@ describe("GET /spec — the serve-time API envelope (where to act)", () => {
       "",
       "- `GET https://a.example/spec` — this self-describing spec.",
       "- `POST https://a.example/validate` — pre-check a bot document; returns ok or the validator's structured issues.",
-      "- `POST https://a.example/fight` — fight a bot against the frozen gauntlet; returns the gate verdict and a per-opponent report.",
+      "- `POST https://a.example/fight` — fight a bot against the sitting champions and see where it lands in the arena — crowned, entered, or unplaced.",
       "- `GET https://a.example/king` — the reigning King of the Hill and the recent line of succession for the live version; identity only, never the DSL.",
     ].join("\n");
 

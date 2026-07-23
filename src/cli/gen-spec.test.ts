@@ -71,6 +71,23 @@ describe("generateSpec — the factual machine-truth spec", () => {
     });
   });
 
+  describe("no gauntlet framing — pure King-of-the-Hill (D16)", () => {
+    it("never mentions a gauntlet, a clearance gate, or a title shot in the prose", () => {
+      // Post-KotH the author fights the sitting champions directly; the six-bot
+      // clearance gate is gone, so none of its vocabulary may survive in the spec's
+      // author-facing prose. (The embedded example-bot documents legitimately carry a
+      // `"model": "gauntlet"` provenance string — fixture content, not framing — so
+      // fenced code blocks are stripped before the check.)
+      const prose = generateSpec()
+        .replace(/```[\s\S]*?```/g, "")
+        .toLowerCase();
+
+      expect(prose).not.toContain("gauntlet");
+      expect(prose).not.toContain("title shot");
+      expect(prose).not.toContain("clear all");
+    });
+  });
+
   describe("game overview (the version-neutral 'what this game is' intro)", () => {
     const HEADING = "## What ModelKombat is";
 
@@ -93,13 +110,16 @@ describe("generateSpec — the factual machine-truth spec", () => {
       );
     });
 
-    it("teaches only the authoring-relevant domain — LLM-authored data-not-code karate scored vs a gauntlet", () => {
+    it("teaches only the authoring-relevant domain — LLM-authored data-not-code karate fought in a KotH arena", () => {
       const overview = flat(sectionOf(generateSpec(), HEADING));
       expect(overview).toContain("LLM"); // fighters authored by LLMs
       expect(overview).toContain("data, not code"); // the security framing
       expect(overview).toContain("WKF karate match"); // the genre + points scoring
-      expect(overview).toContain("frozen gauntlet"); // how it's scored
+      expect(overview.toLowerCase()).toContain("arena"); // fought in the KotH arena...
+      expect(overview.toLowerCase()).toContain("champions"); // ...against the sitting champions
       expect(overview).toContain("no feedback loop"); // the one-shot authoring constraint
+      // the gauntlet-clearance framing is gone (D16) — no gate in the intro
+      expect(overview.toLowerCase()).not.toContain("gauntlet");
     });
 
     it("is version-neutral — a BENCHMARK_VERSION / INPUT_HASH bump never touches this prose", () => {
@@ -273,9 +293,35 @@ describe("generateSpec — the factual machine-truth spec", () => {
     const ruleLine = (spec: string, label: string): string =>
       spec.split("\n").find((l) => l.includes(code(label))) ?? "";
 
-    it("names every frozen gauntlet opponent", () => {
-      const spec = generateSpec();
-      for (const name of GAUNTLET_NAMES) expect(spec).toContain(name);
+    it("frames the fights as the arena (the sitting champions), not a gauntlet clearance gate", () => {
+      const bench = sectionOf(generateSpec(), "## Benchmark rules").toLowerCase();
+      // you fight the sitting champions in the KotH arena...
+      expect(bench).toContain("arena");
+      expect(bench).toContain("champions");
+      // ...and there is no gauntlet / clearance-gate framing
+      expect(bench).not.toContain("gauntlet");
+    });
+
+    it("describes the climb — how a bot ends up crowned, entered, or unplaced", () => {
+      const bench = sectionOf(generateSpec(), "## Benchmark rules").toLowerCase();
+      expect(bench).toContain("crowned"); // top every champion → the throne
+      expect(bench).toContain("entered"); // out-rank the weakest → a seat
+      expect(bench).toContain("unplaced"); // fall short → the standings are untouched
+    });
+
+    it("reveals no bot document in the arena section, and names no seed opponent", () => {
+      // No per-opponent roster survives: the section carries no fenced code block
+      // (no revealed bot DSL) and names none of the seed archetypes it once listed
+      // — sourced from the manifest so re-adding any roster line re-reddens this.
+      const bench = sectionOf(generateSpec(), "## Benchmark rules");
+      expect(bench).not.toContain("```");
+      const lower = bench.toLowerCase();
+
+      for (const name of GAUNTLET_NAMES) {
+        expect(lower, `${name} not named in the arena section`).not.toContain(
+          name.toLowerCase(),
+        );
+      }
     });
 
     it("states the seed range and tick budget", () => {
@@ -768,9 +814,12 @@ describe("generateSpec — the factual machine-truth spec", () => {
       // A bare /fight is a footprint-free practice run — an LLM must know iterating changes nothing,
       // or it will believe every submission already contests the throne.
       expect(submit.toLowerCase()).toContain("practice");
-      // ...and it must know the exact header + value that flips a run from practice to a real title
-      // shot, or a good bot never actually competes.
+      // ...and it must know the exact header + value that flips a run from practice to a real
+      // competing entry, or a good bot never actually competes.
       expect(submit).toContain("X-Compete: true");
+      // pure KotH (D16): practice previews the arena directly — no six-bot clearance gate framing.
+      expect(submit.toLowerCase()).not.toContain("gauntlet");
+      expect(submit.toLowerCase()).not.toContain("title shot");
     });
   });
 });
@@ -964,40 +1013,6 @@ describe("technique roles — glosses + intent (reused from the arsenal)", () =>
     expect(
       spec.split("\n").find((l) => l.startsWith(`- ${code("throw")} (`)),
     ).toBeUndefined();
-  });
-});
-
-describe("gauntlet archetypes — named with their strategy, no bot document (Tier 3)", () => {
-  // The gauntlet roster bullet for `name`: `  - `name` — …`.
-  const oppLine = (spec: string, name: string): string =>
-    spec.split("\n").find((l) => l.trim().startsWith(`- ${code(name)} —`)) ??
-    "";
-
-  it("gives every gauntlet opponent an archetype line (not a bare name)", () => {
-    const spec = generateSpec();
-
-    for (const name of GAUNTLET_NAMES) {
-      expect(oppLine(spec, name), `${name} archetype`).not.toBe("");
-    }
-  });
-
-  it("names each opponent's signature move", () => {
-    const spec = generateSpec();
-    expect(oppLine(spec, "grappler")).toContain(code("throw"));
-    expect(oppLine(spec, "zoner")).toContain(code("ushiro-geri"));
-  });
-
-  it("carries a faithful archetype descriptor (not just the name)", () => {
-    const spec = generateSpec();
-    expect(oppLine(spec, "sweeper").toLowerCase()).toContain("sweep");
-    expect(oppLine(spec, "grappler").toLowerCase()).toContain("clinch");
-  });
-
-  it("does NOT embed a bot document in the gauntlet listing (archetypes only)", () => {
-    // the gauntlet is listed in the benchmark-rules section; naming-only means
-    // that section carries no fenced code block (no revealed bot document)
-    const bench = sectionOf(generateSpec(), "## Benchmark rules");
-    expect(bench).not.toContain("```");
   });
 });
 

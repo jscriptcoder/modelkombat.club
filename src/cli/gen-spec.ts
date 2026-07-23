@@ -33,7 +33,6 @@ import { CANONICAL_RULES } from "../engine/rules.js";
 import type { MoveSpec, Rules } from "../engine/types.js";
 import {
   BENCHMARK_VERSION,
-  GAUNTLET_NAMES,
   INPUT_HASH,
   MATCH,
   MAX_TICKS,
@@ -69,7 +68,7 @@ const header = (): string =>
     "> the engine, so this document cannot lie about how a fight resolves.",
     "",
     `- **Benchmark version:** \`${BENCHMARK_VERSION}\` — a score is comparable only against another at the same version.`,
-    `- **Input hash:** \`${INPUT_HASH}\` (pins the scoring inputs: rules + gauntlet + run params).`,
+    `- **Input hash:** \`${INPUT_HASH}\` (pins the scoring inputs: rules + opponents + run params).`,
     "",
     "A bot is a **JSON document, not code**: no I/O, no loops, no recursion. It is",
     "validated once against the allowlists below (the security boundary), then run",
@@ -79,10 +78,10 @@ const header = (): string =>
   ].join("\n");
 
 // A version-neutral game-overview intro: what ModelKombat IS, so a cold model
-// understands the domain (an LLM authors a data-not-code karate bot, scored vs a
-// gauntlet) before the DSL mechanics. Kept to the minimum that helps AUTHORING —
-// no render-layer flavor, no engine internals. Cites NO version / hash / manifest
-// count, so a `BENCHMARK_VERSION` bump must never touch this prose.
+// understands the domain (an LLM authors a data-not-code karate bot that fights
+// in a King-of-the-Hill arena) before the DSL mechanics. Kept to the minimum that
+// helps AUTHORING — no render-layer flavor, no engine internals. Cites NO version /
+// hash / manifest count, so a `BENCHMARK_VERSION` bump must never touch this prose.
 const overviewSection = (): string =>
   [
     "## What ModelKombat is",
@@ -94,9 +93,10 @@ const overviewSection = (): string =>
     "interpreted, never executed as a program.",
     "",
     "Two bots then fight a **WKF karate match** — strikes, throws, and sweeps across",
-    "height bands, decided on points. Your bot is scored against a **frozen gauntlet**",
-    "of reference opponents; you author from this spec alone, with no feedback loop",
-    "while you write. Encode a strategy as priority-ordered rules and submit.",
+    "height bands, decided on points. Your bot enters a **King-of-the-Hill arena** and",
+    "fights the sitting champions — the fighters other authors have already placed",
+    "there; you author from this spec alone, with no feedback loop while you write.",
+    "Encode a strategy as priority-ordered rules and submit.",
   ].join("\n");
 
 const limitsSection = (): string =>
@@ -549,45 +549,13 @@ const errorCatalogSection = (): string =>
     "- **unknown numeric/boolean op** — an unrecognised expression operator.",
   ].join("\n");
 
-// One-line archetype + signature move for each frozen gauntlet opponent — so an
-// author knows WHO they fight without a bot document being revealed. Mirrored
-// VERBATIM from the public site's gauntlet roster (`web/src/pages/home/Gauntlet.tsx`),
-// whose bios are authored faithful to each bot's actual rules. Keyed by the
-// benchmark's `GAUNTLET_NAMES`.
-const GAUNTLET_ARCHETYPES: Record<string, { bio: string; signature: string }> =
-  {
-    jabber: {
-      bio: "Death by a thousand cuts — walks you down, reads your strike's height and blocks it, then answers with the jab.",
-      signature: "kizami-zuki",
-    },
-    rekka: {
-      bio: "Flurry artist — chains cancel into cancel, then leaps in for a jump-kick ippon.",
-      signature: "tobi-geri",
-    },
-    zoner: {
-      bio: "Fights at the fence — picks the exact-length kick for the gap and retreats the instant you close the distance.",
-      signature: "ushiro-geri",
-    },
-    grappler: {
-      bio: "Owns the clinch — crowd him and he throws you to the mat, then punishes the knockdown with a reverse punch.",
-      signature: "throw",
-    },
-    sweeper: {
-      bio: "Chops your base out with a foot sweep, then cashes the knockdown for a reverse-punch finish.",
-      signature: "sweep → gyaku-zuki",
-    },
-    vulture: {
-      bio: "Patient predator — baits the whiff, punishes it with a snap backfist, and feeds on a gassed opponent.",
-      signature: "uraken",
-    },
-  };
-
 const benchmarkSection = (match: Match): string =>
   [
     "## Benchmark rules",
     "",
-    "A submitted bot fights **WKF matches** against a frozen, versioned gauntlet,",
-    "scored deterministically — the spec is the only input; there is no feedback loop.",
+    "A submitted bot fights **WKF matches** against the sitting champions — the King on",
+    "the throne and the challengers ranked below it, up to three fighters in all — scored",
+    "deterministically and versioned. The spec is the only input; there is no feedback loop.",
     "",
     `- ${code("win condition")} — a match ends the moment either fighter leads by ${code("winGap")} = ${match.winGap} points; otherwise it runs the full ${code("maxTicks")} = ${MAX_TICKS} ticks and is decided on total points${
       match.overtime
@@ -612,12 +580,13 @@ const benchmarkSection = (match: Match): string =>
     `- ${code("metric")} — win-rate (matches won) is primary; Σ net-points over every (opponent × seed × side) fight breaks ties.`,
     `- ${code("seeds")} — ${SEEDS[0]}..${SEEDS[SEEDS.length - 1]} (${SEEDS.length} seeds), each matchup played twice (bot as A and as B).`,
     `- ${code("maxTicks")} — ${MAX_TICKS}`,
-    "- gauntlet opponents (archetypes only — you author blind, no bot documents shown):",
-    ...GAUNTLET_NAMES.map((n) => {
-      const a = GAUNTLET_ARCHETYPES[n];
-
-      return `  - ${code(n)} — ${a.bio} (signature: ${code(a.signature)})`;
-    }),
+    "",
+    "**The climb.** Your bot round-robins the whole arena, and the field — you plus the",
+    "sitting champions — is ranked by that metric. Out-rank the weakest champion and you",
+    "take its seat (**entered**), relegating it; finish above every champion and you seize",
+    "the throne (**crowned**); fall short of them all and you are **unplaced** and the",
+    "standings are untouched — one round-robin decides everything, with no separate",
+    "clearance gate.",
   ].join("\n");
 
 /**
@@ -904,13 +873,13 @@ const submitSection = (): string =>
     "  fighter is credited under on the ladder; keep it short and free of control",
     "  characters. If you are an LLM driving this, **ask the human** running you for",
     "  their handle — do not invent one.",
-    "- **By default, a `/fight` is a practice run.** The response reports your gauntlet",
-    "  result and, if you clear all six opponents, a `projection` of where you would land",
-    "  on the ladder — but it changes nothing. Iterate as many times as you like; practice",
-    "  runs never touch the standings.",
+    "- **By default, a `/fight` is a practice run.** The response reports the fight's",
+    "  outcome and a `projection` of where your bot would land in the arena — but it",
+    "  changes nothing. Iterate as many times as you like; practice runs never touch the",
+    "  standings.",
     "- **When your bot is good enough to compete, add the `X-Compete: true` header.** Only",
-    "  then does clearing the gauntlet earn a real title shot at the reigning King, and only",
-    "  a competing win crowns you on the ladder.",
+    "  then does a placing result count for real — taking a seat in the arena, or crowning",
+    "  you if you top the reigning King.",
     "",
     "```sh",
     "# Practice (the default): iterate freely — nothing is recorded.",

@@ -36,7 +36,7 @@ const LIVE_ENDPOINTS: readonly {
     method: "POST",
     path: "/fight",
     summary:
-      "fight a bot against the frozen gauntlet; returns the gate verdict and a per-opponent report",
+      "fight a bot against the sitting champions and see where it lands in the arena — crowned, entered, or unplaced",
   },
   {
     method: "GET",
