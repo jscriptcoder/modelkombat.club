@@ -1308,6 +1308,26 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     no scoring input). The S2 plan is archived at [`docs/archive/pure-koth-s2.md`](archive/pure-koth-s2.md); the design
     trail stays **live in `plans/`** for **S3 (watch every competing fight)**.
 
+14. **Pure King-of-the-Hill — S3 watch every competing fight ✅ COMPLETE (story 3 of 3, PRs #407–#410) — CLOSES THE
+    ARC.** A spectator can now watch how a fighter beat (or lost to) **each** sitting champion — not just the King
+    bout — reaching every matchup by its own permalink, including straight from the `/ring` board row that reports it.
+    **S3.1 (#407)** — the record-level `replayId` is replaced by a **per-bout** `boutReplayId` (sha256 of the
+    canonicalized `{challenger, defender, seed, version}`), so any of the (up to) three bouts reconstructs on demand;
+    the item response also carries the submission's sibling `matchups` (D19), and the browse list stays one entry per
+    submission headlined by the King bout (D14). **S3.2 (#408)** — `/watch/{boutId}` renders a **matchup switcher**
+    (`<nav>` of per-bout permalink tabs, board order, King first, current bout `aria-current="page"` with
+    non-colour-only cues); a single-matchup record renders none. **S3.3 (#409)** — a COMPETE `title.board[i]` carries a
+    `replayId` (computed only when competing — a practice projection is unwatchable, D12/D18 — via the shared
+    `boutReplayIds` exported from `handle-replay`, so a row's id is byte-for-byte the one `/replay` resolves), and each
+    `/ring` board row deep-links to `/watch/<its id>` with an identity-labelled "Watch" link. **S3.4 (#410)** — the
+    reproduction-archive retention cap `DEFAULT_ARCHIVE_LIMIT` **50 → 100**, gated on the measured full-archive
+    `LRANGE` reply (~1.4 MiB worst-case at 100, within the ~1.5 MiB ceiling for the `/replay`-only, 30s-cached read;
+    200 rejected at 2.8 MiB). Platform-layer only (`src/http` + `web/`) — **TCB untouched, no DSL op, no engine
+    change**; **`INPUT_HASH` + `BENCHMARK_VERSION` (`v20`) unchanged**. Node slices at **100% mutation**; web slices
+    exact-assertion browser tests + a manual mutator scan. **The pure-KotH arc is COMPLETE** — the S3 plan is archived
+    at [`docs/archive/pure-koth-s3.md`](archive/pure-koth-s3.md) and the whole design trail (`pure-koth-decisions.md` +
+    `pure-koth-stories.md`, D1–D20) is archived alongside it; no pure-koth files remain in `plans/`.
+
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
