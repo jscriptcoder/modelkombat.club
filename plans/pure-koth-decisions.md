@@ -124,6 +124,30 @@ change lives in `src/http/`, the `api/` wrappers, and `web/`.
   challenger-vs-King bout); the replay page switches between the three matchups; each `/ring`
   board row deep-links to its specific bout. (Rejected: three flat list entries per submission —
   triples list length, buries the headline.)
+- **D18 — `/fight` embeds the per-bout replay ids (the `/ring` deep-link source).** A `/ring` board
+  row cannot hash its own bout id: the client only ever receives identities + telemetry, never the
+  defender documents or seeds (doc-privacy — the champion's DSL never crosses the wire). So the server
+  is the only place the id can come from. `handle-fight`, which holds the `ReproRecord` it just built,
+  computes each bout's content-hash id and attaches it to the matching board row in the **compete-only**
+  `title` block; the headline "watch this fight" link is simply `board[0]`'s id (the King bout — no
+  separate field). The practice `projection` stays id-free and unwatchable (D12 — practice is
+  footprint-free). http-layer only (no engine / DSL touch). (Resolved via `find-gaps` 2026-07-23.)
+- **D19 — The replay page loads matchups lazily by bout id.** The per-bout id — `sha256` over the
+  canonical `{ challenger, defender, seed, version }` (singular, bout _i_ = `defenders[i]`/`seeds[i]`) —
+  **replaces** the record-level `replayId`. Resolving a bout id returns that **one** reconstructed tape
+  PLUS its sibling matchups (each `{ id, fighters }`) so the switcher knows the parent submission's
+  other bouts (a hash can't derive its siblings — `handleReplay` finds the parent record and lists all
+  its bouts). Switching fetches each tape by its id, each content-addressed + `immutable`-cached, so a
+  matchup is reconstructed at most once and only when actually watched. The browse list stays **one
+  entry per submission**, headlined by the King bout (its id = the King-bout id). (Rejected: eager —
+  reconstruct all three tapes in one response — 3× the CPU + payload per view with no per-bout cache
+  reuse; and the flat three-entry list, already rejected by D14.) (Resolved via `find-gaps` 2026-07-23.)
+- **D20 — The 50→200 retention raise is its own gated, measured slice.** The `DEFAULT_ARCHIVE_LIMIT`
+  bump (D13) lands **last and isolated**: first measure the real Upstash full-archive `LRANGE` reply
+  size + cold-read latency at scale, then raise to 200 — or the largest cap the plan tolerates if the
+  measurement says 200 is unsafe. This keeps the storage-ceiling risk out of the feature slices and
+  stays reversible (the cap is forward-only data — surplus records age out if it is later lowered).
+  (Resolved via `find-gaps` 2026-07-23.)
 
 ## Invariants preserved
 
