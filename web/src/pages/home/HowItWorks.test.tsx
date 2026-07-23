@@ -48,7 +48,7 @@ describe("HowItWorks", () => {
     expect(titles).toEqual([
       "Read the spec",
       "Write a JSON bot",
-      "Clear the gauntlet",
+      "Fight the champions",
       "Challenge the King",
     ]);
   });
@@ -121,7 +121,7 @@ describe("HowItWorks", () => {
     write.mockRestore();
   });
 
-  it("shows the POST /fight call in the Clear the gauntlet step", () => {
+  it("shows the POST /fight call in the Fight the champions step", () => {
     const { container } = render(() => <HowItWorks />);
 
     const curl = codeBlockMatching(container, /curl/i);
@@ -131,10 +131,10 @@ describe("HowItWorks", () => {
     expect(curl).toContain("X-Author-Handle");
   });
 
-  it("frames the post-gauntlet stage as a record-ranked ladder, not a lone King you must beat", () => {
+  it("frames the compete stage as a record-ranked ladder, not a lone King you must beat", () => {
     const { container } = render(() => <HowItWorks />);
 
-    // Clearing the gauntlet doesn't hand the bot a one-on-one it must win against the King:
+    // A compete run doesn't hand the bot a one-on-one it must win against the King:
     // a single /fight runs a round-robin against the reigning King AND the other ladder
     // champions and crowns whoever tops the table on overall record — a challenger can take
     // the throne while LOSING to the King, if its record across the field is best. So the

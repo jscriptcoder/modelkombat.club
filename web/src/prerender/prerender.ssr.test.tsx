@@ -71,12 +71,10 @@ describe("renderApp (prerender entry)", () => {
     const html = renderApp();
 
     expect(html).toContain("The Arsenal");
-    // A Gauntlet fighter name — the roster is the marketing centrepiece...
-    expect(html).toContain("jabber");
-    // ...and the four How-it-works step titles.
+    // The four How-it-works step titles.
     expect(html).toContain("Read the spec");
     expect(html).toContain("Write a JSON bot");
-    expect(html).toContain("Clear the gauntlet");
+    expect(html).toContain("Fight the champions");
     expect(html).toContain("Challenge the King");
   });
 

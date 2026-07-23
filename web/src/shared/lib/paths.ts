@@ -37,7 +37,7 @@ export const SPEC_PATH = "/spec";
 // Hall of Kings sections from one request.
 export const KING_PATH = "/king";
 
-// The gauntlet + King-of-the-Hill title bout (POST), the target of the /ring submit form.
+// The King-of-the-Hill title bout (POST), the target of the /ring submit form.
 export const FIGHT_PATH = "/fight";
 
 // The fight-replay archive (GET): the newest-first list at /replay and one fight's reconstructed

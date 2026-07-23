@@ -85,7 +85,7 @@ describe("App (landing page)", () => {
     expect(stepTitles).toEqual([
       "Read the spec",
       "Write a JSON bot",
-      "Clear the gauntlet",
+      "Fight the champions",
       "Challenge the King",
     ]);
   });
@@ -131,7 +131,6 @@ describe("App (landing page)", () => {
       "/#top",
       "/#how-it-works",
       "/#arsenal",
-      "/#gauntlet",
       "/#king",
       "/#champions",
       "/#fights",
@@ -148,48 +147,21 @@ describe("App (landing page)", () => {
     expect(region.id).toBe("arsenal");
   });
 
-  it("places the Arsenal between How it works and the Gauntlet", () => {
+  it("places the Arsenal between How it works and the King", () => {
     const { getByRole } = render(() => <App />);
 
     const howItWorks = getByRole("region", { name: "How it works" });
     const arsenal = getByRole("region", { name: "The Arsenal" });
-    const gauntlet = getByRole("region", { name: "The Gauntlet" });
+    const king = getByRole("region", { name: "Current King" });
 
     // Arsenal follows How it works in document order...
     expect(
       howItWorks.compareDocumentPosition(arsenal) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // ...and precedes the Gauntlet.
+    // ...and precedes the King (the Gauntlet section between them was dropped in S2).
     expect(
-      gauntlet.compareDocumentPosition(arsenal) &
-        Node.DOCUMENT_POSITION_PRECEDING,
-    ).toBeTruthy();
-  });
-
-  it("renders the Gauntlet as a labelled section for the #gauntlet anchor", () => {
-    const { getByRole } = render(() => <App />);
-
-    const region = getByRole("region", { name: "The Gauntlet" });
-
-    expect(region.id).toBe("gauntlet");
-  });
-
-  it("places the Gauntlet between the Arsenal and the King", () => {
-    const { getByRole } = render(() => <App />);
-
-    const arsenal = getByRole("region", { name: "The Arsenal" });
-    const gauntlet = getByRole("region", { name: "The Gauntlet" });
-    const king = getByRole("region", { name: "Current King" });
-
-    // Gauntlet follows the Arsenal in document order...
-    expect(
-      arsenal.compareDocumentPosition(gauntlet) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    // ...and precedes the King.
-    expect(
-      king.compareDocumentPosition(gauntlet) & Node.DOCUMENT_POSITION_PRECEDING,
+      king.compareDocumentPosition(arsenal) & Node.DOCUMENT_POSITION_PRECEDING,
     ).toBeTruthy();
   });
 

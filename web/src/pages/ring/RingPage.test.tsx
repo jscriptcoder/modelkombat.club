@@ -13,89 +13,23 @@ afterEach(cleanup);
 // from one test can't leak into another's initial render (idempotency — front-end-testing skill).
 afterEach(() => localStorage.clear());
 
-// A well-formed /fight report body, overridable per test. `title` is added only for cleared bots.
+// A well-formed /fight body, overridable per test. The real contract is { version, title|projection }
+// (S2 dropped the gauntlet gate), so there is no `cleared`/`gauntlet`/`diagnostics` block — every
+// valid bot lands a placement.
 const reportBody = (
   overrides?: Record<string, unknown>,
 ): Record<string, unknown> => ({
-  version: "v19",
-  cleared: false,
-  gauntlet: { seeds: [1, 2, 3], perOpponent: [] },
-  diagnostics: { degrade: {} },
+  version: "v20",
   ...overrides,
 });
 
-// The frozen gauntlet order — hardcoded here (NOT imported from the component or engine) so a
-// dropped, reordered, or renamed opponent row fails the test. This IS the mutation guard, since
-// Stryker can't reach web/src (see the plan's Testing note). Mirrors GAUNTLET_NAMES.
-const GAUNTLET_ORDER = [
-  "jabber",
-  "rekka",
-  "zoner",
-  "grappler",
-  "sweeper",
-  "vulture",
-] as const;
+// A body carrying a committed `title` block (a COMPETE result), for the celebration/board tests.
+const titledBody = (title: Record<string, unknown>): Record<string, unknown> =>
+  reportBody({ title });
 
-// One `gauntlet.perOpponent` row (the /fight report shape), overridable per test. The extra
-// fields (wins/losses/draws/net/endReasons) ride along verbatim in the raw block; the card reads
-// name/winRate/passed.
-const opp = (overrides?: Record<string, unknown>): Record<string, unknown> => ({
-  name: "jabber",
-  winRate: 0.4,
-  wins: 8,
-  losses: 12,
-  draws: 0,
-  net: -37,
-  passed: false,
-  endReasons: {},
-  ...overrides,
-});
-
-// A six-row scorecard with distinct, exactly-representable win rates and pass/fail flags. `zoner`
-// at 0.5 / passed:false pins BOTH the strict-`>` gate (an exact tie doesn't pass) and the
-// 50%-boundary win-rate formatting. Duplicated verbatim in each expectation below.
-const SCORECARD: ReadonlyArray<{
-  name: string;
-  winRate: number;
-  passed: boolean;
-  rate: string;
-  result: string;
-}> = [
-  { name: "jabber", winRate: 0.4, passed: false, rate: "40%", result: "lost" },
-  { name: "rekka", winRate: 0.55, passed: true, rate: "55%", result: "beat" },
-  { name: "zoner", winRate: 0.5, passed: false, rate: "50%", result: "lost" },
-  {
-    name: "grappler",
-    winRate: 0.65,
-    passed: true,
-    rate: "65%",
-    result: "beat",
-  },
-  { name: "sweeper", winRate: 0.3, passed: false, rate: "30%", result: "lost" },
-  { name: "vulture", winRate: 0.75, passed: true, rate: "75%", result: "beat" },
-];
-
-// A well-formed report carrying the six-row scorecard (uncleared by default).
-const scoredBody = (
-  overrides?: Record<string, unknown>,
-): Record<string, unknown> =>
-  reportBody({
-    gauntlet: {
-      seeds: [1, 2, 3],
-      perOpponent: SCORECARD.map((row) =>
-        opp({ name: row.name, winRate: row.winRate, passed: row.passed }),
-      ),
-    },
-    ...overrides,
-  });
-
-// Read a labelled cell's text out of a scorecard row (the per-slot idiom from Gauntlet.test).
+// Read a labelled cell's text out of a rendered row (the per-slot idiom shared by the board tests).
 const cell = (row: HTMLElement, selector: string): string | null =>
   row.querySelector(selector)?.textContent ?? null;
-
-// A cleared report carrying a `title` block, for the celebration/incumbent-scout tests.
-const titledBody = (title: Record<string, unknown>): Record<string, unknown> =>
-  scoredBody({ cleared: true, title });
 
 // A scouted incumbent (identity only — the /fight contract never carries the King's DSL).
 const INCUMBENT = {
@@ -184,7 +118,7 @@ const boardedBody = (
 // real crown (no throne link), with a deliberate claim button.
 const projectedBody = (
   projection: Record<string, unknown>,
-): Record<string, unknown> => scoredBody({ cleared: true, projection });
+): Record<string, unknown> => reportBody({ projection });
 
 // A projection carrying the three-row BOARD at the given outcome (mirrors boardedBody).
 const projectedBoard = (
@@ -297,36 +231,37 @@ describe("RingPage — the /ring submit surface", () => {
       headline: RegExp;
     }> = [
       {
-        body: reportBody({ cleared: false }),
-        headline: /didn't clear the gauntlet/i,
-      },
-      {
-        // crowned with an EMPTY board ⇒ the first King (D-B: distinguished by board emptiness)
+        // committed crowned ⇒ a dethrone (the House seed guarantees a non-empty board — no "first King")
         body: reportBody({
-          cleared: true,
-          title: { outcome: "crowned", rank: 1, board: [] },
-        }),
-        headline: /first King/i,
-      },
-      {
-        // crowned with a NON-EMPTY board ⇒ a dethrone (you fought the sitting King)
-        body: reportBody({
-          cleared: true,
           title: { outcome: "crowned", rank: 1, board: [boardEntry()] },
         }),
-        headline: /new champion/i,
+        headline: /new champion.*dethroned the reigning King/i,
       },
       {
         body: reportBody({
-          cleared: true,
           title: { outcome: "entered", rank: 2, board: [boardEntry()] },
         }),
         // pins the rank into the headline (not just "joined the arena") — the #-branch guard
         headline: /joined the arena at #2/i,
       },
       {
-        body: reportBody({ cleared: true, title: { outcome: "unplaced" } }),
+        body: reportBody({
+          title: { outcome: "unplaced", board: [boardEntry()] },
+        }),
         headline: /didn't crack the top ranks/i,
+      },
+      {
+        // a PRACTICE projection reads hypothetically ("would…"), never as a real result
+        body: reportBody({
+          projection: { outcome: "crowned", rank: 1, board: [boardEntry()] },
+        }),
+        headline: /would dethrone the reigning King/i,
+      },
+      {
+        body: reportBody({
+          projection: { outcome: "entered", rank: 3, board: [boardEntry()] },
+        }),
+        headline: /would enter the arena at #3/i,
       },
     ];
 
@@ -359,7 +294,7 @@ describe("RingPage — the /ring submit surface", () => {
 
     expect(raw.textContent).toBe(JSON.stringify(body, null, 2));
     // Once the result is in, the in-flight status is gone (no stuck "running…" spinner).
-    expect(ui.queryByText(/running the gauntlet/i)).toBeNull();
+    expect(ui.queryByText(/fighting the champions/i)).toBeNull();
   });
 
   it("copies the exact pretty-printed response for handing back to the LLM", async () => {
@@ -400,10 +335,10 @@ describe("RingPage — the /ring submit surface", () => {
 
     submit(ui, { name: "b", model: null, rules: [] }, "h");
 
-    // A live region sets expectations during the (multi-second) gauntlet run.
+    // A live region sets expectations during the (multi-second) fight run.
     const status = await ui.findByRole("status");
 
-    expect(status.textContent).toMatch(/running the gauntlet/i);
+    expect(status.textContent).toMatch(/fighting the champions/i);
   });
 
   it("surfaces a timeout with a retry when the fight aborts", async () => {
@@ -441,7 +376,9 @@ describe("RingPage — the /ring submit surface", () => {
         ? Promise.reject(new Error("offline"))
         : Promise.resolve({
             status: 200,
-            body: reportBody({ cleared: false }),
+            body: reportBody({
+              projection: { outcome: "unplaced", board: [boardEntry()] },
+            }),
           });
     };
 
@@ -455,7 +392,7 @@ describe("RingPage — the /ring submit surface", () => {
 
     // The second attempt succeeds and the outcome REPLACES the error — the stale failure
     // message must be cleared, not left sitting above the fresh result.
-    expect(await ui.findByText(/didn't clear the gauntlet/i)).toBeTruthy();
+    expect(await ui.findByText(/wouldn't crack the top ranks/i)).toBeTruthy();
     expect(ui.queryByText(/couldn't reach the ring/i)).toBeNull();
   });
 
@@ -484,13 +421,15 @@ describe("RingPage — the /ring submit surface", () => {
     // ...but no outcome headline is claimed for an error response.
     expect(
       ui.queryByText(
-        /didn't clear|new champion|first King|joined the arena|didn't crack/i,
+        /new champion|joined the arena|didn't crack|would dethrone|would enter/i,
       ),
     ).toBeNull();
   });
 
   it("posts the bot to /fight with the author-handle and a PRACTICE X-Compete by default", async () => {
-    const body = reportBody({ cleared: false });
+    const body = reportBody({
+      projection: { outcome: "unplaced", board: [boardEntry()] },
+    });
 
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify(body), {
@@ -506,7 +445,7 @@ describe("RingPage — the /ring submit surface", () => {
       submit(ui, doc, "grandmaster");
 
       // Waiting for the rendered outcome proves the default seam actually posted and parsed.
-      expect(await ui.findByText(/didn't clear the gauntlet/i)).toBeTruthy();
+      expect(await ui.findByText(/wouldn't crack the top ranks/i)).toBeTruthy();
 
       expect(fetchSpy).toHaveBeenCalledWith(
         "/fight",
@@ -528,80 +467,15 @@ describe("RingPage — the /ring submit surface", () => {
   });
 });
 
-// The fight card (Slice 2): the 200 report expands from a bare headline into a per-opponent
-// scorecard + a title/incumbent block, while the Slice 1 raw-JSON + Copy block persists below it
-// as the machine-readable source of truth. All behavior asserted on what the author sees; the
-// expected rows/copy are hardcoded (never imported from the component) as the mutation guard.
+// The fight card: the 200 result expands from a bare headline into the per-defender arena board +
+// a title/incumbent block, while the raw-JSON + Copy block persists below it as the machine-readable
+// source of truth. All behavior asserted on what the author sees; the expected rows/copy are
+// hardcoded (never imported from the component) as the mutation guard.
 describe("RingPage — the fight card", () => {
-  it("renders one scorecard row per opponent, in the report's order", async () => {
-    const ui = render(() => (
-      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
-    ));
-
-    submit(ui, { name: "b", model: null, rules: [] }, "h");
-
-    const scorecard = await ui.findByRole("region", {
-      name: /gauntlet scorecard/i,
-    });
-
-    const names = within(scorecard)
-      .getAllByRole("listitem")
-      .map((row) => cell(row, ".ring-score-name"));
-
-    // Pins BOTH the count (exactly six rows, one per perOpponent entry) and the frozen
-    // GAUNTLET_NAMES order — a dropped, extra, or reordered row fails here.
-    expect(names).toEqual([...GAUNTLET_ORDER]);
-  });
-
-  it("shows each opponent's win rate as a percentage", async () => {
-    const ui = render(() => (
-      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
-    ));
-
-    submit(ui, { name: "b", model: null, rules: [] }, "h");
-
-    const scorecard = await ui.findByRole("region", {
-      name: /gauntlet scorecard/i,
-    });
-
-    const rates = within(scorecard)
-      .getAllByRole("listitem")
-      .map((row) => cell(row, ".ring-score-rate"));
-
-    // Exact percentages, in order, including the 0.5 → "50%" boundary — pins the `* 100` scaling
-    // and rounding so a dropped multiply or an off-by-one rounding mutant fails.
-    expect(rates).toEqual(SCORECARD.map((row) => row.rate));
-  });
-
-  it("marks each opponent beaten or lost with a text result, never colour alone", async () => {
-    const ui = render(() => (
-      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
-    ));
-
-    submit(ui, { name: "b", model: null, rules: [] }, "h");
-
-    const scorecard = await ui.findByRole("region", {
-      name: /gauntlet scorecard/i,
-    });
-
-    const results = within(scorecard)
-      .getAllByRole("listitem")
-      .map((row) => cell(row, ".ring-score-result"));
-
-    // The pass/fail signal is carried by "beat"/"lost" TEXT (not colour) — an accessibility
-    // requirement AND the mutation guard for a flipped `passed` boolean. `zoner` at exactly 0.5
-    // reads "lost" (strict-`>` gate), pinning the boundary.
-    expect(results).toEqual(SCORECARD.map((row) => row.result));
-  });
-
-  it("celebrates the first crown with a throne link and no defender board (you fought no one)", async () => {
+  it("links to the throne and announces the dethrone on a committed crown", async () => {
     const ui = render(() => (
       <RingPage
-        postFight={resolves({
-          status: 200,
-          // a crown with an EMPTY board is the first King (D-B) — the throne is yours, no one fought
-          body: titledBody({ outcome: "crowned", rank: 1, board: [] }),
-        })}
+        postFight={resolves({ status: 200, body: boardedBody("crowned") })}
       />
     ));
 
@@ -609,16 +483,18 @@ describe("RingPage — the fight card", () => {
 
     const region = await ui.findByRole("region", { name: /title fight/i });
 
-    // The crown links to the (now-yours) throne.
+    // The crown links to the (now-yours) throne...
     expect(
       within(region)
         .getByRole("link", { name: /throne/i })
         .getAttribute("href"),
     ).toBe("/#king");
 
-    // First King: no defenders were fought — no board list, no rows.
-    expect(ui.queryByRole("list", { name: /arena defenders/i })).toBeNull();
-    expect(region.querySelector(".ring-defender-row")).toBeNull();
+    // ...and the headline names the dethrone (the House seed guarantees a non-empty board — there
+    // is no "first King / you fought no one" case).
+    expect(
+      ui.getByText(/new champion.*dethroned the reigning King/i),
+    ).toBeTruthy();
   });
 
   it("renders one board row per arena defender, in board order with the King first", async () => {
@@ -808,8 +684,8 @@ describe("RingPage — the fight card", () => {
 
     submit(ui, { name: "b", model: null, rules: [] }, "h");
 
-    // The scorecard proves the cleared result rendered...
-    await ui.findByRole("region", { name: /gauntlet scorecard/i });
+    // The raw block proves the result rendered...
+    await ui.findByLabelText(/raw fight result/i);
 
     // ...but with no board and no crown, the title section gracefully omits (no crash)...
     expect(ui.queryByRole("region", { name: /title fight/i })).toBeNull();
@@ -849,20 +725,6 @@ describe("RingPage — the fight card", () => {
     expect(region.textContent).not.toMatch(/SMUGGLED_SECRET_RULE/);
   });
 
-  it("shows no title block when the bot didn't clear the gauntlet", async () => {
-    const ui = render(() => (
-      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
-    ));
-
-    submit(ui, { name: "b", model: null, rules: [] }, "h");
-
-    // The scorecard proves the result rendered — but with no title celebration.
-    await ui.findByRole("region", { name: /gauntlet scorecard/i });
-
-    expect(ui.queryByRole("region", { name: /title fight/i })).toBeNull();
-    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
-  });
-
   it("keeps the complete raw payload below the card as the source of truth", async () => {
     const body = boardedBody("crowned");
 
@@ -872,9 +734,7 @@ describe("RingPage — the fight card", () => {
 
     submit(ui, { name: "b", model: null, rules: [] }, "h");
 
-    const scorecard = await ui.findByRole("region", {
-      name: /gauntlet scorecard/i,
-    });
+    const card = await ui.findByRole("region", { name: /title fight/i });
 
     const raw = await ui.findByLabelText(/raw fight result/i);
 
@@ -883,32 +743,10 @@ describe("RingPage — the fight card", () => {
     // is still there for the author to copy back to their LLM.
     expect(raw.textContent).toBe(JSON.stringify(body, null, 2));
 
-    // ...and it sits BELOW the card (AC-5): the scorecard precedes the raw block in document order.
+    // ...and it sits BELOW the card: the title card precedes the raw block in document order.
     expect(
-      scorecard.compareDocumentPosition(raw) & Node.DOCUMENT_POSITION_FOLLOWING,
+      card.compareDocumentPosition(raw) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-  });
-
-  it("renders no scorecard when the response carries no opponents", async () => {
-    const ui = render(() => (
-      <RingPage
-        postFight={resolves({
-          status: 400,
-          body: { type: "/problems/malformed-request", title: "Invalid" },
-        })}
-      />
-    ));
-
-    submit(ui, { name: "b", model: null, rules: [] }, "h");
-
-    // An error (or any body without `gauntlet.perOpponent`) still shows the raw block for the
-    // LLM, but there are zero rows — so the scorecard region must not render (an empty scorecard
-    // would be noise). Pins the `rows().length > 0` guard against a `>= 0` boundary mutant.
-    await ui.findByLabelText(/raw fight result/i);
-
-    expect(
-      ui.queryByRole("region", { name: /gauntlet scorecard/i }),
-    ).toBeNull();
   });
 });
 
@@ -934,27 +772,6 @@ describe("RingPage — the practice projection", () => {
     expect(ui.queryByText(/new champion/i)).toBeNull();
     // ...and offers no throne link — you don't hold the throne, you're only previewing.
     expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
-  });
-
-  it("frames a first-crown projection (empty board) as taking the empty throne", async () => {
-    const ui = render(() => (
-      <RingPage
-        postFight={resolves({
-          status: 200,
-          body: projectedBody({ outcome: "crowned", rank: 1, board: [] }),
-        })}
-      />
-    ));
-
-    submit(ui, VALID_DOC, "grandmaster");
-
-    expect(await ui.findByText(/take the empty throne/i)).toBeTruthy();
-    // Not the committed "first King" copy, and no throne link on a preview.
-    expect(ui.queryByText(/first king/i)).toBeNull();
-    expect(ui.queryByRole("link", { name: /throne/i })).toBeNull();
-    // An empty-board crown still fought no one, so there's no board — but the claim button must
-    // still render (nothing to render EXCEPT the claim), pinning the section's omit rule.
-    expect(ui.getByRole("button", { name: /take the throne/i })).toBeTruthy();
   });
 
   it("frames an entered projection with the rank it would take", async () => {
@@ -1048,21 +865,6 @@ describe("RingPage — the claim button", () => {
       await ui.findByRole("button", { name: /claim your place/i }),
     ).toBeTruthy();
     expect(ui.queryByRole("button", { name: /take the throne/i })).toBeNull();
-  });
-
-  it("offers no claim button when the bot didn't clear the gauntlet", async () => {
-    const ui = render(() => (
-      <RingPage postFight={resolves({ status: 200, body: scoredBody() })} />
-    ));
-
-    submit(ui, VALID_DOC, "grandmaster");
-
-    // The scorecard proves the (uncleared) result rendered — but there's nothing to claim.
-    await ui.findByRole("region", { name: /gauntlet scorecard/i });
-
-    expect(
-      ui.queryByRole("button", { name: /take the throne|claim your place/i }),
-    ).toBeNull();
   });
 
   it("offers no claim button on an already-committed title result", async () => {

@@ -220,100 +220,11 @@
   line-height: 1.5;
 }
 
-/* ---- The fight card: per-opponent scorecard + the title-fight block ---------------------- */
+/* ---- The fight card: the raw JSON block + the title-fight block ---------------------- */
 
-/* The scorecard and the raw JSON: stacked by default (narrow viewports). The `-split` modifier
-   is present only when there IS a scorecard (a 200 with a gauntlet) — an error response, whose
-   only child is the raw block, stays full width. */
-.ring-result-cols {
+/* The raw JSON result — shown for every response (a placement or an error), full width. */
+.ring-raw {
   margin-top: 1.5rem;
-}
-
-.ring-result-cols > .ring-scorecard,
-.ring-result-cols > .ring-raw {
-  margin-top: 0;
-}
-
-/* Wide enough for two columns: the bot list (left) and the raw JSON (right), side by side and
-   equal height. The list drives the row height; the JSON pane fills the rest of that height and
-   scrolls, so both columns end level instead of the JSON running the page long. */
-@media (min-width: 40rem) {
-  .ring-result-cols-split {
-    display: flex;
-    align-items: stretch;
-    gap: 1rem;
-  }
-
-  /* Equal columns; min-width:0 lets each shrink so the JSON's own scrollbar handles long lines
-     rather than widening the column. */
-  .ring-result-cols-split > .ring-scorecard,
-  .ring-result-cols-split > .ring-raw {
-    flex: 1 1 0;
-    min-width: 0;
-  }
-
-  /* The JSON pane fills the column's height (set by the taller bot list) and scrolls within it. */
-  .ring-result-cols-split .ring-raw-json {
-    flex: 1 1 0;
-    min-height: 0;
-    max-height: none;
-  }
-}
-
-/* The gauntlet scorecard — one row per house fighter. */
-.ring-scorecard {
-  margin-top: 1.5rem;
-}
-
-.ring-score-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.4rem;
-}
-
-/* Each row: fighter name | win rate | pass/fail pill. `auto` side columns keep the name column
-   fluid so long names (grappler) never wrap; the whole row fits at 360px. */
-.ring-score-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-/* Name chip: the shared .move-id / .fighter-name token treatment (accent on code-bg). */
-.ring-score-name {
-  justify-self: start;
-  padding: 0.1rem 0.4rem;
-  color: var(--accent);
-  background: var(--code-bg);
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.ring-score-rate {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
-}
-
-/* Pass/fail pill. Text ("beat"/"lost") always carries the signal; the tint is a secondary cue,
-   never the only one (AC-1). Default is the failed (red) tint; `.passed` flips it to green. */
-.ring-score-result {
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: var(--fg);
-  background: rgba(255, 128, 128, 0.22);
-}
-
-.ring-score-result-passed {
-  background: rgba(120, 226, 168, 0.22);
 }
 
 /* The title-fight block — a centred card in the King's visual language. */

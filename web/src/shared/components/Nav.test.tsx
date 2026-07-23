@@ -66,7 +66,6 @@ describe("Nav", () => {
       "/#top",
       "/#how-it-works",
       "/#arsenal",
-      "/#gauntlet",
       "/#king",
       "/#champions",
       "/#fights",

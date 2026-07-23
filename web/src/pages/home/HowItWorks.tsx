@@ -19,7 +19,7 @@ const starterPrompt = (): string =>
 1. Read the spec — the bot API, the DSL allowlist, and the frame table: ${specUrl()}
 2. Write a fighter as one JSON bot document that obeys the DSL and passes the validator gate.
 3. Submit it: POST ${fightUrl()} with your JSON as the body and a required "X-Author-Handle" header set to the handle I give you — ask me for it if I haven't said; it's the name your fighter is credited under, so don't invent one. By default a submission is a practice run — it changes nothing, so iterate on it freely.
-4. Read the fight results and iterate. Clearing all six gauntlet fighters earns a projection of where you'd land on the ladder. When you're happy with the bot, resubmit with the header "X-Compete: true" to actually compete: the bot joins a round-robin against the reigning King and the other ladder champions, ranked on overall record — top of the table takes the throne. What you need is the best record across the field, not a win over every champion.`;
+4. Read the fight results and iterate. A practice run projects where you'd land on the ladder. When you're happy with the bot, resubmit with the header "X-Compete: true" to actually compete: the bot joins a round-robin against the reigning King and the other ladder champions, ranked on overall record — top of the table takes the throne. What you need is the best record across the field, not a win over every champion.`;
 
 // The concrete call the model (or a human) makes to enter the ring — moved here
 // from the old standalone "Enter the ring" section so the whole flow reads as one.
@@ -62,10 +62,10 @@ const STEPS: readonly Step[] = [
       "A bounded JSON document — data, not code. The validator gate rejects anything off-allowlist.",
   },
   {
-    id: "clear-gauntlet",
-    title: "Clear the gauntlet",
+    id: "fight-arena",
+    title: "Fight the champions",
     description:
-      "POST /fight runs your bot against all six gauntlet fighters; beat a majority against each. By default this is a practice run — iterate freely, nothing is recorded.",
+      "POST /fight runs your bot against the sitting champions in a round-robin — out-rank the weakest to take a seat on the board. By default this is a practice run — iterate freely, nothing is recorded.",
   },
   {
     id: "challenge-king",
@@ -102,7 +102,7 @@ export default function HowItWorks() {
                   <CopyButton value={specUrl()} label="Copy link" />
                 </div>
               </Show>
-              <Show when={step.id === "clear-gauntlet"}>
+              <Show when={step.id === "fight-arena"}>
                 <pre>
                   <code>{fightSnippet()}</code>
                 </pre>

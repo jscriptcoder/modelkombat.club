@@ -2,11 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import handler from "./fight.js";
 import { LIMITS, validate, type BotDoc } from "../src/engine/dsl.js";
-import {
-  BENCHMARK_VERSION,
-  GAUNTLET_NAMES,
-  SEEDS,
-} from "../src/engine/benchmark-config.js";
+import { BENCHMARK_VERSION, SEEDS } from "../src/engine/benchmark-config.js";
 
 // A complete, well-formed bot (real `BotDoc` type — no redefined schema). It is
 // NOT a gauntlet member, so it fights all 6 (no mirror skip). Invalid cases spread
@@ -45,19 +41,18 @@ const validBotBodyOfLength = (length: number): string => {
   return base + " ".repeat(length - base.length);
 };
 
-type ReportOpponent = {
-  name: string;
+type BoardRow = {
+  defender: { name: string; model: string | null; handle: string | null };
   winRate: number;
   wins: number;
   losses: number;
   draws: number;
-  net: number;
-  passed: boolean;
+  bouts: number;
   endReasons: { gap: number; time: number; senshu: number; overtime: number };
 };
 
-describe("POST /fight — the stateless gauntlet gate", () => {
-  it("scores a valid bot against the frozen gauntlet and returns the report", async () => {
+describe("POST /fight — stateless arena placement", () => {
+  it("fights a valid bot against the seeded arena directly (no gauntlet gate) and projects its placement", async () => {
     const res = await handler.fetch(
       fightRequest("POST", JSON.stringify(validBot()), {
         "X-Author-Handle": "candidate-author",
@@ -71,60 +66,35 @@ describe("POST /fight — the stateless gauntlet gate", () => {
 
     const body = (await res.json()) as {
       version: string;
-      cleared: boolean;
-      gauntlet: { seeds: number[]; perOpponent: ReportOpponent[] };
-      diagnostics: {
-        degrade: Record<
-          "unaffordable" | "out-of-band" | "locked" | "inert" | "wrong-context",
-          number
-        >;
-      };
+      projection?: { outcome: string; rank?: number; board?: BoardRow[] };
     };
 
     expect(body.version).toBe(BENCHMARK_VERSION);
-    expect(body.gauntlet.seeds).toEqual([...SEEDS]); // fixed + disclosed
-    // one entry per frozen gauntlet member, in the frozen order
-    expect(body.gauntlet.perOpponent.map((o) => o.name)).toEqual([
-      ...GAUNTLET_NAMES,
-    ]);
-
-    const fightsPerMember = SEEDS.length * 2; // both sides
-
-    for (const o of body.gauntlet.perOpponent) {
-      expect(o.wins + o.losses + o.draws).toBe(fightsPerMember);
-      expect(o.winRate).toBeCloseTo(o.wins / fightsPerMember);
-      expect(o.passed).toBe(o.winRate > 0.5);
-
-      // every bout ended by exactly one reason ⇒ the reason counts sum to the fights
-      const { gap, time, senshu, overtime } = o.endReasons;
-
-      expect(gap + time + senshu + overtime).toBe(fightsPerMember);
-    }
-
-    // cleared = the strict >50%-vs-each gate over the derived per-member figures
-    const gate =
-      body.gauntlet.perOpponent.length === GAUNTLET_NAMES.length &&
-      body.gauntlet.perOpponent.every((o) => o.passed);
-
-    expect(body.cleared).toBe(gate);
-
-    // degrade diagnostics: all five reason buckets present and non-negative
-    const { degrade } = body.diagnostics;
-
-    expect(Object.keys(degrade).sort()).toEqual([
-      "inert",
-      "locked",
-      "out-of-band",
-      "unaffordable",
-      "wrong-context",
-    ]);
-
-    for (const count of Object.values(degrade)) {
-      expect(count).toBeGreaterThanOrEqual(0);
-    }
-
-    // no throne yet (S4), and no opponent playbook leaked (visibility principle)
+    // the gauntlet gate is gone: the body is { version, title|projection } — no `cleared` verdict,
+    // no `gauntlet` scorecard, no `diagnostics` block (S2 drop-the-gauntlet).
+    expect(body).not.toHaveProperty("cleared");
+    expect(body).not.toHaveProperty("gauntlet");
+    // a bare submit PRACTICES by default → a projection, never a committed title
     expect(body).not.toHaveProperty("title");
+
+    // the walk-only bot scores nothing, so against the FULL v20 House seed (three champions) it is
+    // unplaced — but it still fought all three, so the projection carries a per-defender board.
+    expect(body.projection?.outcome).toBe("unplaced");
+    expect(body.projection?.board).toHaveLength(3);
+
+    const boutsPerDefender = SEEDS.length * 2; // both sides
+
+    for (const row of body.projection?.board ?? []) {
+      expect(row.wins + row.losses + row.draws).toBe(boutsPerDefender);
+      expect(row.winRate).toBeCloseTo(row.wins / boutsPerDefender);
+
+      // every bout ended by exactly one reason ⇒ the reason counts sum to the bouts
+      const { gap, time, senshu, overtime } = row.endReasons;
+
+      expect(gap + time + senshu + overtime).toBe(boutsPerDefender);
+    }
+
+    // no opponent playbook leaked — the board carries defender IDENTITY only, never the doc
     expect(JSON.stringify(body)).not.toContain('"rules"');
   });
 

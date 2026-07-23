@@ -90,39 +90,32 @@ const readPlacement = (body: unknown): Placement | null => {
   return null;
 };
 
-// A dethrone fought the sitting King (a non-empty board); an empty board is the first crown (D-B).
-const boardHasRows = (block: Record<string, unknown>): boolean =>
-  Array.isArray(block.board) && block.board.length > 0;
-
-// The committed headline for a clearer that COMPETED and now holds its placement (C7): crowned
-// (first King vs dethrone, told apart by board emptiness), entered as a defender, or unplaced.
+// The committed headline for a competitor that COMPETED and now holds its placement (C7): crowned
+// (a dethrone — the House seed guarantees a non-empty board, so there is no "first King" case),
+// entered as a defender, or unplaced.
 const committedHeadline = (block: Record<string, unknown>): string => {
   if (block.outcome === "crowned") {
-    return boardHasRows(block)
-      ? "New champion — you dethroned the reigning King! 👑"
-      : "Cleared the gauntlet — you're the first King! 👑";
+    return "New champion — you dethroned the reigning King! 👑";
   }
 
   if (block.outcome === "entered") {
     return typeof block.rank === "number"
-      ? `Cleared the gauntlet — you joined the arena at #${block.rank}! ⚔️`
-      : "Cleared the gauntlet — you joined the arena! ⚔️";
+      ? `You joined the arena at #${block.rank}! ⚔️`
+      : "You joined the arena! ⚔️";
   }
 
   if (block.outcome === "unplaced") {
-    return "Cleared the gauntlet, but didn't crack the top ranks.";
+    return "You fought the champions, but didn't crack the top ranks.";
   }
 
-  return "Cleared the gauntlet.";
+  return "Fight complete.";
 };
 
 // The hypothetical headline for a PRACTICE projection — where the bot WOULD land if it claimed,
 // framed in the conditional so a preview never reads as a real result. Same outcome branches.
 const projectionHeadline = (block: Record<string, unknown>): string => {
   if (block.outcome === "crowned") {
-    return boardHasRows(block)
-      ? "This bot would dethrone the reigning King. 👑"
-      : "This bot clears the gauntlet — claim it to take the empty throne.";
+    return "This bot would dethrone the reigning King. 👑";
   }
 
   if (block.outcome === "entered") {
@@ -132,22 +125,18 @@ const projectionHeadline = (block: Record<string, unknown>): string => {
   }
 
   if (block.outcome === "unplaced") {
-    return "Cleared the gauntlet, but wouldn't crack the top ranks.";
+    return "This bot fought the champions, but wouldn't crack the top ranks.";
   }
 
-  return "This bot clears the gauntlet.";
+  return "This bot fought the champions.";
 };
 
-// Map a /fight report body to the author-facing headline. A bot that didn't clear stops at the
-// gauntlet; a clearer's line is committed (it competed) or hypothetical (a practice projection).
+// Map a /fight body to the author-facing headline. There is no gauntlet gate — every valid bot lands
+// a placement: committed (it competed) or hypothetical (a practice projection).
 const outcomeHeadline = (body: unknown): string => {
-  if (!isRecord(body) || body.cleared !== true) {
-    return "Didn't clear the gauntlet.";
-  }
-
   const placement = readPlacement(body);
 
-  if (placement === null) return "Cleared the gauntlet.";
+  if (placement === null) return "Fight complete.";
 
   return placement.committed
     ? committedHeadline(placement.block)
@@ -194,40 +183,12 @@ const rememberHandle = (handle: string): void => {
   }
 };
 
-// One per-opponent scorecard row, shaped from the /fight report's `gauntlet.perOpponent`. Local
-// types (not imported from `src/`) keep the web layer decoupled — the King.tsx precedent.
-type ScoreRow = { name: string; winRate: number; passed: boolean };
-
-// Extract the per-opponent rows from an unknown /fight body, preserving the report's order (the
-// frozen GAUNTLET_NAMES order). A body without a well-formed `gauntlet.perOpponent` — an error
-// response, or a shape we don't recognise — yields no rows, so the card simply doesn't render.
-const scoreRows = (body: unknown): ScoreRow[] => {
-  if (!isRecord(body)) return [];
-
-  const gauntlet = body.gauntlet;
-
-  if (!isRecord(gauntlet) || !Array.isArray(gauntlet.perOpponent)) return [];
-
-  return gauntlet.perOpponent.flatMap((row: unknown) =>
-    isRecord(row) &&
-    typeof row.name === "string" &&
-    typeof row.winRate === "number" &&
-    typeof row.passed === "boolean"
-      ? [{ name: row.name, winRate: row.winRate, passed: row.passed }]
-      : [],
-  );
-};
-
 // A 0–1 win rate → a whole-number percentage. Bouts run in multiples of 1/20, so the percentage
 // is an integer; rounding pins it and clears float noise (0.55 * 100 = 55.00000000000001).
 const formatRate = (winRate: number): string => `${Math.round(winRate * 100)}%`;
 
-// The pass/fail signal as TEXT — never colour alone (accessibility). The strict-`>`-half gate is
-// already resolved server-side in `passed`; the card only names it.
-const resultLabel = (passed: boolean): string => (passed ? "beat" : "lost");
-
 // The per-defender result as TEXT (never colour alone). You "beat" a defender by winning more than
-// half the head-to-head bouts — the strict-`>`-half convention the gauntlet gate uses.
+// half the head-to-head bouts — the strict-`>`-half convention arena ranking uses.
 const beatLabel = (winRate: number): string =>
   winRate > 0.5 ? "beat" : "lost";
 
@@ -364,17 +325,8 @@ const RingPage: Component<RingPageProps> = (props) => {
   const [loading, setLoading] = createSignal(false);
   const [result, setResult] = createSignal<FightResponse | null>(null);
 
-  // The per-opponent scorecard rows for the current result — empty until a report with a
-  // well-formed gauntlet arrives (so an error response renders no card). Derived so the guard
-  // and the list read from one source.
-  const rows = (): ScoreRow[] => {
-    const current = result();
-
-    return current ? scoreRows(current.body) : [];
-  };
-
-  // The title-fight view-model for the current result — null until a cleared report with a
-  // well-formed title arrives (so uncleared/error results render no title block).
+  // The title-fight view-model for the current result — null until a placed result with a
+  // well-formed title/projection arrives (so error results render no title block).
   const title = (): TitleView | null => {
     const current = result();
 
@@ -540,7 +492,7 @@ const RingPage: Component<RingPageProps> = (props) => {
 
       <Show when={loading()}>
         <p class="ring-status" role="status">
-          Running the gauntlet — this can take a few seconds.
+          Fighting the champions — this can take a few seconds.
         </p>
       </Show>
 
@@ -696,45 +648,15 @@ const RingPage: Component<RingPageProps> = (props) => {
               )}
             </Show>
 
-            <div
-              class="ring-result-cols"
-              classList={{ "ring-result-cols-split": rows().length > 0 }}
-            >
-              <Show when={rows().length > 0}>
-                <section class="ring-scorecard" aria-label="Gauntlet scorecard">
-                  <ul class="ring-score-list">
-                    <For each={rows()}>
-                      {(row) => (
-                        <li class="ring-score-row">
-                          <code class="ring-score-name">{row.name}</code>
-                          <span class="ring-score-rate">
-                            {formatRate(row.winRate)}
-                          </span>
-                          <span
-                            class="ring-score-result"
-                            classList={{
-                              "ring-score-result-passed": row.passed,
-                            }}
-                          >
-                            {resultLabel(row.passed)}
-                          </span>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                </section>
-              </Show>
-
-              <div class="ring-raw">
-                <pre class="ring-raw-json" aria-label="Raw fight result (JSON)">
-                  {JSON.stringify(response().body, null, 2)}
-                </pre>
-                <CopyButton
-                  value={JSON.stringify(response().body, null, 2)}
-                  label="Copy result for your LLM"
-                  copy={props.copy}
-                />
-              </div>
+            <div class="ring-raw">
+              <pre class="ring-raw-json" aria-label="Raw fight result (JSON)">
+                {JSON.stringify(response().body, null, 2)}
+              </pre>
+              <CopyButton
+                value={JSON.stringify(response().body, null, 2)}
+                label="Copy result for your LLM"
+                copy={props.copy}
+              />
             </div>
           </section>
         )}

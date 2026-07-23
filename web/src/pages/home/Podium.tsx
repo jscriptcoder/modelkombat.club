@@ -48,7 +48,7 @@ const Podium: Component<PodiumProps> = (props) => {
             fallback={
               <>
                 <p class="podium-empty">
-                  No champions have been crowned yet — clear the gauntlet to be
+                  No champions have been crowned yet — beat the champions to be
                   the first.
                 </p>
                 <p class="podium-empty-link">
