@@ -167,10 +167,12 @@ const FAMILIES: readonly Family[] = [
   },
 ];
 
-// Props are the injectable Pixi-stage loader (default = the real dynamic import, in MovePreview) so
-// tests drive the preview through a spy stage without a WebGL mount.
+// Props are injected in tests: the Pixi-stage loader (default = the real dynamic import, in
+// MovePreview) drives the preview through a spy stage without a WebGL mount; `reducedMotion` drives the
+// prefers-reduced-motion branch deterministically. Both default to production behavior when absent.
 type ArsenalProps = {
   loadStage?: () => Promise<Component<PreviewStageProps>>;
+  reducedMotion?: () => boolean;
 };
 
 const Arsenal: Component<ArsenalProps> = (props) => {
@@ -253,6 +255,7 @@ const Arsenal: Component<ArsenalProps> = (props) => {
         onClose={() => setOpenMove(null)}
         anchor={anchor()}
         loadStage={props.loadStage}
+        reducedMotion={props.reducedMotion}
       />
       <p class="arsenal-spec">
         <a href={`${SPEC_GUIDE_PATH}#frame-table`} target="_blank">
