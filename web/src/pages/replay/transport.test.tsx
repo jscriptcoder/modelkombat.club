@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   advance,
+  playbackDelta,
   seek,
   startTransport,
   step,
@@ -128,6 +129,23 @@ describe("transport — the pure playback clock", () => {
 
     // continues from 5 (not 0), and stays playing.
     expect(advance(resumed, 3, 100)).toEqual({ playhead: 8, playing: true });
+  });
+
+  // The per-frame tick advance the Pixi ticker feeds `advance`. The viewer plays SLOWER than one
+  // engine tick per animation frame (1× is 0.65 ticks/frame, not 1.0), so a fast exchange is legible;
+  // the picked rate (0.5 / 1 / 2) scales that base, and the frame delta scales it linearly. Concrete
+  // expected values (not `frameDelta * speed * BASE`) so a flipped operator or a base of 1 is caught.
+  it("advances 0.65 engine ticks per frame-unit at 1× — slower than real time so exchanges read", () => {
+    expect(playbackDelta(1, 1)).toBeCloseTo(0.65);
+  });
+
+  it("scales the base rate by the picked speed — half at 0.5×, double at 2×", () => {
+    expect(playbackDelta(1, 0.5)).toBeCloseTo(0.325);
+    expect(playbackDelta(1, 2)).toBeCloseTo(1.3);
+  });
+
+  it("scales linearly with the frame delta — a two-frame delta advances twice as far", () => {
+    expect(playbackDelta(2, 1)).toBeCloseTo(1.3);
   });
 
   it("feeds a HUD tick that freezes on pause and stays put across frames", () => {

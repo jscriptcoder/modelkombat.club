@@ -11,6 +11,7 @@ import { brandsFor, createStage } from "./figures";
 import { scene, type Viewport } from "./scene";
 import {
   advance,
+  playbackDelta,
   seek,
   startTransport,
   step,
@@ -102,7 +103,11 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
     // unchanged), then draw the frame the playhead lands on. Reading the signal each frame picks up
     // pause / restart from the controls; a restart resets the playhead and the next frame draws it.
     created.ticker.add((ticker) => {
-      const next = advance(transport(), ticker.deltaTime * speed(), lastTick);
+      const next = advance(
+        transport(),
+        playbackDelta(ticker.deltaTime, speed()),
+        lastTick,
+      );
 
       setTransport(next);
       stage.apply(scene(tape, Math.round(next.playhead), viewport));

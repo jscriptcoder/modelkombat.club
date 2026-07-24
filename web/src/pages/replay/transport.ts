@@ -12,6 +12,18 @@ export type Transport = {
 // to the start state (tick 0, resumed), so the controls reuse it rather than a separate operation.
 export const startTransport = (): Transport => ({ playhead: 0, playing: true });
 
+// How many engine ticks 1× playback advances per animation frame-unit. Below 1.0 deliberately: at
+// one tick per 60 fps frame a fast exchange (a strike resolves in a handful of ticks) blurs past, so
+// the viewer plays a touch slower than real time. The picked rate (RATES in ReplayPlayer) scales
+// this; eye-tunable, so no test pins the exact figure beyond the `playbackDelta` cases below.
+export const BASE_PLAYBACK_RATE = 0.65;
+
+// The per-frame tick advance the Pixi ticker feeds `advance`: the frame's delta (≈1 per 60 fps frame)
+// scaled by the picked speed multiplier and the base rate. Pure (no ticker, no Pixi) so the playback
+// pacing is exact-assertion testable here rather than buried in the mount's ticker callback.
+export const playbackDelta = (frameDelta: number, speed: number): number =>
+  frameDelta * speed * BASE_PLAYBACK_RATE;
+
 // Advance the playhead by `delta` ticks while playing, clamped so it never runs past the final tick.
 // Reaching the last tick auto-pauses the clock (the toggle returns to Play) rather than freezing on
 // Pause over the final frame. A paused clock is returned unchanged (same reference) — the tick
