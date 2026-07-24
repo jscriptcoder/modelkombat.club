@@ -68,12 +68,12 @@ export type StrikeLimb =
 // constant, not a band read. Mirrors how the throw grab pins to a fixed chest height rather than a
 // band. Only a move whose height is band-independent authors one; every banded strike leaves it
 // absent and takes `bandHeight(attackBand)` as before. Optional, so the reach solve still supplies x.
-// A GRAB (throw): this move drives BOTH hands into a two-handed grip on the opponent's near edge
-// rather than a single limb to a band (S6 · Slice 3). It is the last move to dispatch through the
-// descriptor table — before this the throw was drawn off a separate `frame.throwing` boolean, the one
-// non-descriptor render path left. A grab authors no `limb` (it drives two hands, not one) and no band
-// (the grip is at a fixed chest height, solved in scene.ts); the flag is all the table carries — the
-// grab GEOMETRY lives with the reach solve, exactly as band heights do for a strike.
+// A GRAB (throw): this move closes a SECOND hand onto the grip, a spread behind the driven one, so a
+// throw reads as a two-handed seize rather than one hand on the opponent (S6 · Slice 3). It carries a
+// second duty — the COMMITMENT tell: the engine gives a throw its own state and never flags it
+// `attacking` (sim.ts), so this is what tells scene.ts a throw is committed at all and lets it solve,
+// ease and lean down the same path as every strike. Everything else about a grab is ordinary
+// descriptor data: it drives `handR` to a fixed-height `targetY` and winds up through a `chamber`.
 // A per-move torso LEAN (per-move character S2): a horizontal shift (local px) of the upper body
 // (head + shoulder) at the ACTIVE phase, an authored counterpart to the reach-derived hand lean in
 // scene.ts. Sign matches that lean — `+` pitches FORWARD into the target, `−` leans BACK away from it
@@ -93,8 +93,6 @@ export type StrikeLimb =
 // still reached at the last startup tick and CONTACT is byte-unchanged. Optional: a move that authors
 // none keeps the straight ease exactly as today. Eye-tuned in /dojo, the bow's SIDE pinned, not the pixel.
 export type MoveDescriptor = {
-  // Absent for a grab — a throw drives two hands, not one endpoint. `limbFor` falls back to the generic
-  // hand for it, which is never consulted because a grab suppresses its own strike layer (scene.ts).
   limb?: StrikeLimb;
   chamber?: Joint;
   offHand?: Joint;
@@ -252,13 +250,27 @@ const DESCRIPTORS = new Map<string, MoveDescriptor>([
   // arc supplies the closing and the leg telescopes for the residual (see the `isAirborne` gate in
   // scene.ts), which is why this leads with `footR` yet reads apart from a lunging grounded kick.
   ["tobi-geri", { limb: "footR" }],
-  // throw: the last move to get a descriptor, and the only GRAB. It authors no limb and no band —
-  // the two-hand grip is solved at a fixed chest height in scene.ts (`throwGrabFor`). Adding it here
-  // retires the last non-descriptor render path: the grab now dispatches on `attackMove:"throw"` (which
-  // the engine emits on every throw frame) instead of the `frame.throwing` boolean, so a real /watch
-  // throw renders byte-identically while the /dojo picker — which stamps the move id but never the
-  // flag — finally draws the grab instead of a generic hand.
-  ["throw", { grab: true }],
+  // throw: the only GRAB, and the last technique to be drawn as a single HELD pose. The grip used to
+  // be solved once and stamped on all 23 ticks, because the grab authored no `limb` and suppressed its
+  // own strike layer — so the driven point was null and there was nothing for S8 to ease. It is now an
+  // ORDINARY move with a second hand riding along: the lead hand (`handR`) drives to the grip exactly
+  // as a punch drives to its band, and scene.ts places the rear hand a spread behind whatever the ease
+  // produced. The `grab` flag survives as that one rear-hand rule (and as the gate that lets a throw —
+  // which the engine never flags `attacking` — commit at all); everything else is the shared path.
+  //
+  // `targetY` is the grip's fixed CHEST height, the same band-independent override `sweep` uses for its
+  // floor reap: the engine emits `attackBand:0` on a throw, so there is no band to read. Chamber: both
+  // hands cocked back and low off the stance, the shape of a fighter about to seize — eye-tuned in
+  // /dojo, its RELATION to the stance (behind and below) pinned, not the pixel.
+  //
+  // `limb: "handR"` is EQUIVALENT to omitting it under today's data — GENERIC_LIMB is the front hand
+  // too, and the mutator scan confirms no test can tell the two apart. Written out anyway, for the
+  // reason the off-hand routing below is: "the lead hand grips" is the actual rule, and leaning on the
+  // fallback happening to coincide would be wrong the moment GENERIC_LIMB is re-pointed.
+  [
+    "throw",
+    { grab: true, limb: "handR", targetY: -44, chamber: { x: 10, y: -38 } },
+  ],
 ]);
 
 // What an undescribed move draws: today's generic front-hand strike (M7). Every move rendered this
