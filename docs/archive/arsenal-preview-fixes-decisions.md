@@ -33,7 +33,7 @@ Root cause chain: `strikeHandFor` returns `null` for a grab (`scene.ts:897`) ⇒
 AIR stance at `scene.ts:82`, lift at `scene.ts:1044`, shrinking ground shadow at `scene.ts:1159`,
 airborne hip-step suppression at `scene.ts:510` — the tape simply never supplies them.
 
-**Compounding effect:** the descriptor authors *no chamber* for tobi-geri
+**Compounding effect:** the descriptor authors _no chamber_ for tobi-geri
 (`move-descriptors.ts:247-254`) on the stated assumption that the AIR stance's tucked `footR` **is**
 the wind-up. At posture 0 that assumption is false, so `chamberFor` returns null, `easeDriven` lerps
 stance→stance, and startup/recovery **hold still** — motion exists only during the 3 active ticks.
@@ -41,28 +41,28 @@ Fixing posture restores the wind-up for free.
 
 ## Engine facts established (all verified, not assumed)
 
-| fact | source |
-| --- | --- |
-| A landed throw downs the defender | `src/engine/sim.ts:1020` |
-| `sweep` downs the defender, **score 0** | `src/engine/rules.ts:46` — *"the points live in the okizeme finish, not the sweep itself"* |
-| `hiza-geri` downs the defender, **score 0** | `src/engine/rules.ts:240` — *"a clean mid hit DOWNS the foe for no score"* |
-| `knockdownDuration` | 18 ticks (`rules.ts:315`) |
-| Jump arc | `y += vy; vy -= gravity`, `jumpImpulse 12000` / `gravity 4000` ⇒ `12000, 20000, 24000, 24000, 20000, 12000, 0` (`rules.ts:327-339`) |
-| Horizontal jump | `jumpXSpeed 10000`/tick ⇒ ~60000 closed over ~6 airborne ticks (`rules.ts:340-346`) |
-| tobi-geri is scoring, **not** knockdown-class | `rules.ts:252-253` |
-| Preview clock | `PREVIEW_SPEED 0.6` × 60fps = 36 tape-ticks/sec (`PreviewStage.tsx:35`) |
+| fact                                          | source                                                                                                                              |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| A landed throw downs the defender             | `src/engine/sim.ts:1020`                                                                                                            |
+| `sweep` downs the defender, **score 0**       | `src/engine/rules.ts:46` — _"the points live in the okizeme finish, not the sweep itself"_                                          |
+| `hiza-geri` downs the defender, **score 0**   | `src/engine/rules.ts:240` — _"a clean mid hit DOWNS the foe for no score"_                                                          |
+| `knockdownDuration`                           | 18 ticks (`rules.ts:315`)                                                                                                           |
+| Jump arc                                      | `y += vy; vy -= gravity`, `jumpImpulse 12000` / `gravity 4000` ⇒ `12000, 20000, 24000, 24000, 20000, 12000, 0` (`rules.ts:327-339`) |
+| Horizontal jump                               | `jumpXSpeed 10000`/tick ⇒ ~60000 closed over ~6 airborne ticks (`rules.ts:340-346`)                                                 |
+| tobi-geri is scoring, **not** knockdown-class | `rules.ts:252-253`                                                                                                                  |
+| Preview clock                                 | `PREVIEW_SPEED 0.6` × 60fps = 36 tape-ticks/sec (`PreviewStage.tsx:35`)                                                             |
 
 **Knockdown timing** — contact is the first active tick; every knockdown move stays down past its
 own tape end, so no wake-up needs modelling:
 
-| move | contact | tape ends | would wake |
-| --- | --- | --- | --- |
-| `throw` | 7 | 23 | 25 |
-| `sweep` | 7 | 22 | 25 |
-| `hiza-geri` | 9 | 27 | 27 |
+| move        | contact | tape ends | would wake |
+| ----------- | ------- | --------- | ---------- |
+| `throw`     | 7       | 23        | 25         |
+| `sweep`     | 7       | 22        | 25         |
+| `hiza-geri` | 9       | 27        | 27         |
 
 **Displacement scale** (`BODY_HEIGHT_SUB` = 210000): vertical apex 24000 ≈ **11%** of body height;
-horizontal closing 60000 ≈ **29%**. The leap is visually dominated by its *horizontal* travel.
+horizontal closing 60000 ≈ **29%**. The leap is visually dominated by its _horizontal_ travel.
 
 ## Decisions
 
@@ -80,7 +80,7 @@ bypasses easing and draws the raw solved point (the M7 totality guard). All 8 ex
 cases in `scene.test.tsx:887-1030` build **single-tick tapes with no `attackPhase`**, so they hit
 that branch and land on today's values. **They stay green untouched.**
 
-*Rejected:* preview-only (would freeze `/watch` forever and break the "what you tune is what ships"
+_Rejected:_ preview-only (would freeze `/watch` forever and break the "what you tune is what ships"
 rule the dojo/preview pipeline is built on); flag-gated (two grab paths, no removal date).
 
 ### D2 — the throw stays inside the existing keyframe vocabulary
@@ -89,10 +89,10 @@ Author only a chamber. The grip is the extension (held across active); recovery'
 retract `extension → stance` carries the pull. **Zero new mechanism** — the same four keyframes all
 twelve other moves use. The "dump" read is carried by the target dropping prone underneath.
 
-*Escalation, not now:* if `/dojo` sign-off judges it weak, extend the `arcFor` via-waypoint lever to
+_Escalation, not now:_ if `/dojo` sign-off judges it weak, extend the `arcFor` via-waypoint lever to
 the recovery leg (S8 already parked "per-segment curves"). Do that with evidence in hand.
 
-*Rejected:* a bespoke throw keyframe path — reintroduces exactly the special case S6·3 spent a slice
+_Rejected:_ a bespoke throw keyframe path — reintroduces exactly the special case S6·3 spent a slice
 deleting.
 
 ### D3 — all three knockdown moves get a reacting target
@@ -101,11 +101,11 @@ deleting.
 a mirrored `knockdown` column in the preset table — a table fact, not a per-move special case. Uses
 the existing full-body PRONE override; no new render mechanism.
 
-**This is not a throw fix.** For `sweep` and `hiza-geri` the knockdown is the *entire payload* (both
+**This is not a throw fix.** For `sweep` and `hiza-geri` the knockdown is the _entire payload_ (both
 score 0), so today those previews fail to show the only thing the move does. They were arguably worse
 served than `throw`.
 
-*Rejected:* throw-only (leaves two previews under-showing their move, and makes the reaction a
+_Rejected:_ throw-only (leaves two previews under-showing their move, and makes the reaction a
 special case someone must re-litigate); adding a flinch layer for the other 10 moves (no flinch
 mechanism exists — a separate arc, not a slice).
 
@@ -118,22 +118,22 @@ mechanism exists — a separate arc, not a slice).
   pure `jumpArc()` that integrates `y += vy; vy -= gravity`, pinned against the sequence `rules.ts`
   documents in prose.
 
-Matches the existing *distributed*-mirror precedent (`reach-presets.ts`'s own header cites
+Matches the existing _distributed_-mirror precedent (`reach-presets.ts`'s own header cites
 `scene.ts`'s `WORLD_WIDTH`).
 
-*Rejected:* hardcoding the 7-value arc — it mirrors a *derived* value, so a gravity or impulse change
+_Rejected:_ hardcoding the 7-value arc — it mirrors a _derived_ value, so a gravity or impulse change
 produces a wrong-but-green arc that the drift test can only compare to itself.
 
 ### D5 — tobi-geri's arc is faithful, over the full tape
 
 Launch at tick 0; contact lands on the **held apex** (tick 4); touchdown tick 7; full grounded
-recovery through tick 20. Matches the engine's own stated design — *"Active 3 opens the window on the
-descending approach"* and *"the LANDING recovery is punishable"* (`rules.ts:259-262`).
+recovery through tick 20. Matches the engine's own stated design — _"Active 3 opens the window on the
+descending approach"_ and _"the LANDING recovery is punishable"_ (`rules.ts:259-262`).
 
-| tick | 0 | 1–3 | 4 (first active) | 5–6 | 7 | 8–20 |
-| --- | --- | --- | --- | --- | --- | --- |
-| y | 0 | 12000 → 24000 | 24000 (apex) | 20000 → 12000 | 0 | 0 |
-| posture | 0 | 2 | 2 | 2 | 0 | 0 |
+| tick    | 0   | 1–3           | 4 (first active) | 5–6           | 7   | 8–20 |
+| ------- | --- | ------------- | ---------------- | ------------- | --- | ---- |
+| y       | 0   | 12000 → 24000 | 24000 (apex)     | 20000 → 12000 | 0   | 0    |
+| posture | 0   | 2             | 2                | 2             | 0   | 0    |
 
 **Posture is DERIVED, not authored** (refined during planning): `posture = y > 0 ? 2 : 0`. Total and
 testable, with no per-tick posture list to keep in step with the arc. It correctly leaves tick 0 a
@@ -141,9 +141,10 @@ grounded launch frame (the crouch before the leap) and tick 7 a grounded landing
 stance drawn at y 0 would render as a figure floating on the mat.
 
 Same full-technique tape rule as all twelve other previews — no per-move length logic. Arc (7 ticks)
-is *shorter* than the move (21), so **no tape-span change is needed**.
+is _shorter_ than the move (21), so **no tape-span change is needed**.
 
 **Accepted costs, eyes open:**
+
 - Airborne is ~0.17s of a ~0.58s loop (~29%); ~67% is grounded recovery. Mitigated by the recovery
   not being static (`easeDriven` retracts the foot across it) and re-settling after a landing being a
   real part of the technique.
@@ -153,10 +154,10 @@ is *shorter* than the move (21), so **no tape-span change is needed**.
 - `contactFrame` (the reduced-motion still) = tick 4 = the held apex, so the poster frame becomes
   airborne either way. A clear win.
 
-*Escalation, not now:* if sign-off says the grounded tail dominates, trim the tape a few ticks past
+_Escalation, not now:_ if sign-off says the grounded tail dominates, trim the tape a few ticks past
 touchdown.
 
-*Rejected:* stretching the arc (breaks the arc-to-phase relationship — the exact thing we're trying
+_Rejected:_ stretching the arc (breaks the arc-to-phase relationship — the exact thing we're trying
 to show honestly); holding extra apex ticks (invents ticks the engine never emits, breaking the 1:1
 tape-to-engine-timing property the whole pipeline rests on).
 
@@ -166,14 +167,14 @@ Two pure, separately-testable tape transforms (jump arc; knockdown target) compo
 `moveLoopTape`. `buildDojoTape` keeps its single job — centre two posed fighters.
 
 - **`/sheet` retires its `AIRBORNE_MOVES` duplicate** in favour of the mirrored `air` column. Its own
-  comment (`contact-sheet.ts:22-28`) justified keeping it local because posture is *"the engine's,
-  not a drawing choice"* and the sheet was *"the only place that needs it"* — the preview now needs it
+  comment (`contact-sheet.ts:22-28`) justified keeping it local because posture is _"the engine's,
+  not a drawing choice"_ and the sheet was _"the only place that needs it"_ — the preview now needs it
   too, and that same reasoning points at the mirror table, not the descriptor table.
 - **`/dojo` stays untouched.** M10 keeps its controls raw so engine-impossible combos remain
   reachable; auto-applying an arc would override the developer's own posture control and defeat the
   lab's purpose.
 
-*Rejected:* pushing into `buildDojoTape` (breaks M10 — you could no longer pose a grounded tobi-geri
+_Rejected:_ pushing into `buildDojoTape` (breaks M10 — you could no longer pose a grounded tobi-geri
 to inspect it).
 
 ### D7 — the jump-in x travel ships now, in the same helper
@@ -183,24 +184,24 @@ closes to 250000 at contact, where the reach-to-target solve puts the foot on th
 
 **This reverses an earlier "defer" recommendation.** At ~29% of body height the horizontal closing is
 nearly **triple** the vertical displacement, so without it the "jump" is mostly an 11% hop and the fix
-under-delivers. `rules.ts:254-256` is explicit: *"the aerial strike must be a genuine jump-IN, not a
-free full-range poke."* Marginal extra code inside a transform being written anyway.
+under-delivers. `rules.ts:254-256` is explicit: _"the aerial strike must be a genuine jump-IN, not a
+free full-range poke."_ Marginal extra code inside a transform being written anyway.
 
 Accepted wrinkle: a travelling attacker drifts off `buildDojoTape`'s symmetric `WORLD_MID` centring,
 so framing in the small popover needs an eye-tune — not a mechanism.
 
 ### D8 — three PRs, in order
 
-| # | slice | touches | surfaces |
-| --- | --- | --- | --- |
-| 1 | throw eases through `easeDriven` | `move-descriptors.ts`, `scene.ts` | **/watch**, /dojo, /sheet, preview |
-| 2 | knockdown target (throw, sweep, hiza-geri) | `reach-presets.ts` + pure transform + `moveLoopTape` | preview |
-| 3 | airborne tobi-geri (arc + x travel) | jump-physics module + pure transform + `moveLoopTape`; retire `/sheet` `AIRBORNE_MOVES` | preview, /sheet |
+| #   | slice                                      | touches                                                                                 | surfaces                           |
+| --- | ------------------------------------------ | --------------------------------------------------------------------------------------- | ---------------------------------- |
+| 1   | throw eases through `easeDriven`           | `move-descriptors.ts`, `scene.ts`                                                       | **/watch**, /dojo, /sheet, preview |
+| 2   | knockdown target (throw, sweep, hiza-geri) | `reach-presets.ts` + pure transform + `moveLoopTape`                                    | preview                            |
+| 3   | airborne tobi-geri (arc + x travel)        | jump-physics module + pure transform + `moveLoopTape`; retire `/sheet` `AIRBORNE_MOVES` | preview, /sheet                    |
 
-Front-loads the only shared-renderer risk. Slice 2 is honestly named — it is a *knockdown* slice
+Front-loads the only shared-renderer risk. Slice 2 is honestly named — it is a _knockdown_ slice
 covering three moves, not a throw slice.
 
-*Rejected:* two PRs grouped by complaint (mixes a shared renderer change with preview authoring, and
+_Rejected:_ two PRs grouped by complaint (mixes a shared renderer change with preview authoring, and
 files sweep/hiza-geri work under a "throw" label nobody will find); a groundwork-first PR (horizontal
 — pure data, no observable behaviour change).
 

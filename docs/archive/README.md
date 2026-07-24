@@ -1967,3 +1967,57 @@ presetFor(move)?.startup ?? 0`) instead of the loop. The decision lives above th
 
 [arsenal-move-preview.md](arsenal-move-preview.md) — the single plan, kept live in `plans/` across all four
 slices, with the resolved decisions + per-slice acceptance criteria + the manual-capture notes.
+
+## Arsenal move-preview fixes — the throw moves, the target drops, tobi-geri flies ✅ COMPLETE (2026-07-24)
+
+Two visibly broken previews reported off the back of the preview arc above: `throw` rendered as a frozen
+pose ("no movement, no animation") and `tobi-geri` — the arsenal's only aerial technique — previewed
+standing on the mat. Grilled into D1–D9, split into three PR-sized slices. Web-only (`web/`) — **no
+`src/` change: engine, TCB and `INPUT_HASH` untouched, `BENCHMARK_VERSION` held at `v19`**. web is outside
+the Node-only Stryker scope ⇒ every slice compensates with exact-assertion tests, a **scripted** manual
+mutator scan (mutant applied to real source → suite run → restored from a byte-exact backup; a kill
+recorded only when the run NAMES failing tests; baseline asserted green first), and a raw-Playwright Pixi
+capture for visual sign-off. **44 mutants applied across the arc, 43 killed, 1 equivalent survivor.**
+
+- **S1 — a throw winds up, grips, and releases** (PR #419, `feat/throw-eases`) — the root cause was not
+  preview-specific: `throwGrabFor` never read `attackPhase`, so all 23 ticks of a throw rendered
+  byte-identically on **every** surface, `/watch` included. The plan's shape was wrong in one load-bearing
+  way, found by reading the engine during RED: deleting the `isGrab` early-return in `strikeHandFor` was
+  necessary but _not sufficient_, because the engine gives a throw its own `state.kind === "throwing"`,
+  which emits `attacking: false` — so the function bailed one line earlier and the throw would still have
+  frozen. The gate became a **commitment** gate reading either signal. `throwGrabFor` was deleted outright,
+  the throw became an ordinary descriptor (`limb: "handR"` + `targetY` + `chamber`), and `grab` narrowed to
+  two duties: closing `handL` behind the **eased** lead hand, and being the commitment tell. The girdle is
+  held square for a grab — rotation models one shoulder swinging ahead of a _resting_ one, and a two-handed
+  grab has no resting shoulder. Net **−24 lines** in `scene.ts`. Contact is byte-unchanged.
+- **S2 — the target drops for the three techniques that knock it down** (PR #420,
+  `feat/preview-knockdown-target`) — a `knockdown` column on `ReachPreset` plus one pure tape transform
+  laying the target out from the contact tick to the loop's end. No new render mechanism: `poseFor`'s
+  full-body `PRONE` pose already shipped, so this only makes the tape tell the truth about the outcome.
+  `sweep` and `hiza-geri` both **score 0** — the knockdown is their entire payload — so before this their
+  previews showed nothing of what the move does. The column mirrors the engine's **behaviour**, not one
+  engine field: `sweep`/`hiza-geri` carry a literal `knockdown: true` on their specs, but `throw` has no
+  such field and downs its victim through `applyThrow` (`def.state = { kind: "downed" }`). RED opened on
+  `sweep` rather than `throw`, deliberately — proving a table-driven rule, not a second grab special case.
+- **S3 — tobi-geri leaps, kicks at the apex, and lands** (PR #421, `feat/preview-tobi-geri-airborne`) —
+  a new jump-physics mirror (`web/src/pages/dojo/jump-arc.ts`) transcribing `jumpImpulse` / `gravity` /
+  `jumpXSpeed` and **integrating** the arc from them with the engine's own recurrence (`rules.ts` documents
+  the heights in prose, but a stored list could agree with the prose while disagreeing with the physics —
+  the two constant-perturbing mutants are what prove the integration is real). Plus an `air` column and a
+  transform writing per-tick height, closing distance and derived posture, which unlocks `scene()`'s
+  existing lift, AIR stance, shrinking shadow and airborne hip-step suppression. Retires `/sheet`'s
+  `AIRBORNE_MOVES` set — "tobi-geri is airborne" now has one home. **Corrected an arithmetic slip in the
+  plan**: it said open the gap at `reach + total travel` (60000), but contact is tick 4, by which only
+  40000 has been travelled — 20000 short. The opening gap is `reach + travel-through-contact` (290000) and
+  the attacker lands at 230000, inside reach and past where it kicked, as a real jump-in does. Visual
+  sign-off also exposed a real test gap: every assertion covered the **tape** and none the **rendered
+  figure**, so a case now runs the preview tape through the same `scene()` the popover uses and pins the
+  drawn lift. Closes the arc.
+
+Known accepted costs, recorded rather than silently fixed: ~67% of tobi-geri's loop is grounded recovery
+(not static — `easeDriven` retracts the foot across it), posture flips 2 → 0 at touchdown exactly as
+`/watch` does on a real landing, and a travelling attacker drifts off `buildDojoTape`'s symmetric centring.
+
+[arsenal-preview-fixes.md](arsenal-preview-fixes.md) — the plan, kept live in `plans/` across all three
+slices, annotated in place with each shape correction as it was found.
+[arsenal-preview-fixes-decisions.md](arsenal-preview-fixes-decisions.md) — the D1–D9 grilling record.
