@@ -237,6 +237,23 @@
   outline: none;
 }
 
+/* Each side pairs a fighter's identity with their brand mark; the pair grows to fill its half of
+   the card so the marks pin to the outer edges. */
+.replay-card-side {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1;
+  /* Let the inner name truncate: the shrinking chain needs min-width:0 at every flex level. */
+  min-width: 0;
+}
+
+.replay-card-side .brand-mark {
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: none;
+}
+
 .replay-card-fighter {
   display: flex;
   flex-direction: column;
@@ -246,8 +263,7 @@
   flex: 1;
 }
 
-/* The second fighter reads right-to-left, so "A vs B" frames the bout symmetrically. */
-.replay-card-fighter:last-child {
+.replay-card-side-right .replay-card-fighter {
   align-items: flex-end;
   text-align: right;
 }

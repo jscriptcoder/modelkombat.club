@@ -78,6 +78,38 @@ describe("ReplayList — the /watch fight index", () => {
     expect(getByText("gpt")).toBeTruthy();
   });
 
+  it("flanks each fighter with its model's brand mark — left fighter's on the left, right fighter's on the right", async () => {
+    const load = ready([
+      summary({
+        fighters: [
+          fighter({ name: "aki", model: "claude-opus" }),
+          fighter({ name: "rex", model: "gpt" }),
+        ],
+      }),
+    ]);
+
+    const { findByRole } = render(() => <ReplayList load={load} />);
+
+    const card = await findByRole("link");
+
+    // In document order the card reads: challenger's mark → challenger → King → King's mark, so
+    // the Claude mark sits to the LEFT of "aki" and the OpenAI mark to the RIGHT of "rex".
+    const sequence = [
+      ...card.querySelectorAll(".brand-mark, .replay-card-name"),
+    ].map((el) =>
+      el.classList.contains("brand-mark")
+        ? `brand:${el.getAttribute("data-brand")}`
+        : `name:${el.textContent}`,
+    );
+
+    expect(sequence).toEqual([
+      "brand:claude",
+      "name:aki",
+      "name:rex",
+      "brand:openai",
+    ]);
+  });
+
   it("renders name-only for a fighter with no model, and no empty brand chip", async () => {
     const load = ready([
       summary({
