@@ -76,7 +76,7 @@ describe("SpecPage", () => {
     expect(queryByRole("link", { name: /raw markdown/i })).toBeNull();
     // No shared site footer either.
     expect(container.querySelector("footer")).toBeNull();
-    expect(queryByText(/Author:/i)).toBeNull();
+    expect(queryByText(/deterministic karate ring/i)).toBeNull();
   });
 
   it("gives every section heading its own slug id, so any section is deep-linkable", () => {
