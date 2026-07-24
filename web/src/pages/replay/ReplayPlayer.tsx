@@ -8,7 +8,7 @@ import {
 import { Application } from "pixi.js";
 
 import { brandsFor, createStage } from "./figures";
-import { scene, type Viewport } from "./scene";
+import { scene, staminaMax, type Viewport } from "./scene";
 import {
   advance,
   playbackDelta,
@@ -92,8 +92,12 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
     host.appendChild(created.canvas);
 
     // Each fighter's head wears its authoring model's brand glyph, resolved once here (identity is
-    // off-tape — the models ride on the item, not the render frames).
-    const stage = createStage(viewport, brandsFor(props.item.fighters));
+    // off-tape — the models ride on the item, not the render frames). The scoreboard needs the
+    // fighters' names and their peak stamina (the bar's denominator, computed once over the tape).
+    const stage = createStage(viewport, brandsFor(props.item.fighters), {
+      names: [props.item.fighters[0].name, props.item.fighters[1].name],
+      staminaMax: staminaMax(tape),
+    });
 
     created.stage.addChild(stage.root);
 

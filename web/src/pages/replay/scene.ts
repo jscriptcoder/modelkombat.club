@@ -626,7 +626,20 @@ export type Hud = {
   scoreB: number;
   scoredA: boolean;
   scoredB: boolean;
+  // Each fighter's current stamina at the playhead — the scoreboard bar's numerator (its max is the
+  // tape-constant `staminaMax`). 0 both when no meter is configured.
+  staminaA: number;
+  staminaB: number;
 };
+
+// Each fighter's PEAK stamina across the whole tape — the scoreboard bar's denominator. Stamina inits
+// at the meter's max and regen clamps to it (engine), so the tape's max IS the configured max; a
+// fighter with no meter reads 0 every tick, so max 0 (the sentinel the draw layer hides the bar on). A
+// fight-constant, so the player computes it once at mount rather than per frame.
+export const staminaMax = (tape: ReplayTape): { a: number; b: number } => ({
+  a: tape.reduce((m, t) => Math.max(m, t.a.stamina), 0),
+  b: tape.reduce((m, t) => Math.max(m, t.b.stamina), 0),
+});
 
 // The score-pop lookback: a fighter's score highlights if their points rose within the last N ticks
 // ending at the playhead (≈0.5 s at 60 fps). Held long enough to read as "that scored!".
@@ -1089,6 +1102,8 @@ export const scene = (
       scoreB: at.b.points,
       scoredA: scoredWithin(tape, p, (t) => t.a.points),
       scoredB: scoredWithin(tape, p, (t) => t.b.points),
+      staminaA: at.a.stamina,
+      staminaB: at.b.stamina,
     },
     contact: {
       a: contactFor(

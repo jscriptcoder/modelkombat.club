@@ -6,6 +6,7 @@ import {
   ringTransform,
   scene,
   SHOULDER_HALF_WIDTH,
+  staminaMax,
   type Joint,
   type Scene,
   type Viewport,
@@ -221,6 +222,39 @@ describe("scene — the ring inset transform (fighters shrink into a centred ban
     const t = ringTransform({ width: 1200, height: 800 });
 
     expect(t.y).toBe(108); // 800 · 0.9 ground-ratio · 0.15
+  });
+});
+
+describe("scene — stamina for the scoreboard", () => {
+  // The stamina bar's denominator is each fighter's PEAK stamina across the fight: stamina inits at
+  // rules.stamina.max and regen clamps to it (engine), so the tape's max IS the meter's max. A fighter
+  // with no meter reads 0 every tick ⇒ max 0, the sentinel the draw layer hides the bar on.
+  it("takes each fighter's peak stamina across the tape as the bar's max", () => {
+    const tape: ReplayTape = [
+      tickOf(0, { stamina: 100 }, { stamina: 80 }),
+      tickOf(1, { stamina: 70 }, { stamina: 80 }),
+      tickOf(2, { stamina: 55 }, { stamina: 62 }),
+    ];
+
+    expect(staminaMax(tape)).toEqual({ a: 100, b: 80 });
+  });
+
+  it("reports 0 when a fighter has no stamina meter (every tick 0)", () => {
+    const tape: ReplayTape = [tickOf(0, { stamina: 0 }, { stamina: 0 })];
+
+    expect(staminaMax(tape)).toEqual({ a: 0, b: 0 });
+  });
+
+  it("reads both fighters' current stamina at the playhead into the HUD", () => {
+    const tape: ReplayTape = [
+      tickOf(0, { stamina: 100 }, { stamina: 100 }),
+      tickOf(1, { stamina: 42 }, { stamina: 77 }),
+    ];
+
+    const s = scene(tape, 1, VIEWPORT);
+
+    expect(s.hud.staminaA).toBe(42);
+    expect(s.hud.staminaB).toBe(77);
   });
 });
 
