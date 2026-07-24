@@ -1,7 +1,7 @@
 # Plan: Arsenal move preview (hover-to-watch)
 
-**Branch**: one per slice (S1 `feat/arsenal-move-preview` → merged #414)
-**Status**: Active — S1 shipped; S2 next
+**Branch**: one per slice (S1 → #414, S2 `feat/arsenal-preview-s2` → merged #415)
+**Status**: Active — S1, S2 shipped; S3 next
 
 ## Goal
 
@@ -121,7 +121,7 @@ assessed after green.
 
 ---
 
-### Slice 2: A visitor opens the eye icon on one move (gyaku-zuki) and watches it loop in a small popover
+### Slice 2: A visitor opens the eye icon on one move (gyaku-zuki) and watches it loop in a small popover — ✅ SHIPPED (#415)
 
 **Value**: First real observable payoff — a visitor sees a live, looping move. The
 walking skeleton wires the whole path end-to-end on the workhorse move: eye
@@ -170,6 +170,9 @@ browser mode). `mutation-testing` → `N/A — web ∉ Stryker`. `refactoring` a
 
 **Value**: The feature at full breadth — all 13 moves preview, while still only ever
 one Pixi `Application` exists (the single portal's anchor + tape swap per open move).
+This slice also **kills the two mutants S2 deferred** (only killable once moves
+switch): the `stage() === undefined` lazy-load reuse guard and the `on(() => move)`
+playhead-reset — both need a second open of a _different_ move to observe.
 **Path**: each `<For>` move row renders the eye affordance → sets `openMove` to its
 id → the single preview portal re-anchors to that icon and applies
 `moveLoopTape(openMove)`; the `Application` is created once and reused (tape swap, not
@@ -177,10 +180,21 @@ re-init).
 **Class**: Behavior change (broaden).
 **Required implementation skills**: `tdd`, `testing`, `front-end-testing`.
 `mutation-testing` → `N/A — web ∉ Stryker`. `refactoring` assessed.
+**Resolved decisions (2026-07-24)**:
+
+- **Eye visibility**: every move card shows its 👁 eye **always** (once mounted) —
+  drop S2's `PREVIEW_MOVE` single-move gate. Most discoverable; the roster test
+  asserts exactly one eye per visible card.
+- **Small screens**: **no dedicated mobile slice** — the S2 anchor (flip
+  above/below to stay on-screen) is reused as-is for all 13.
+- **Playhead on switch**: opening a different move **resets the playhead to 0** so
+  the new move starts from its stance (this is the `on(() => move)` reset the plan
+  already carries; S3 makes it observable and kills the mutant).
+
 **Acceptance criteria** (confirm before code):
 
-- Every move in the roster has an eye affordance with a per-move accessible name;
-  opening any one previews that move (browser-mode, iterate the roster).
+- Every move in the roster has an **always-visible** eye affordance with a per-move
+  accessible name; opening any one previews that move (browser-mode, iterate the roster).
 - Opening a second move while one is open **switches** the preview (same single
   renderer) — assert no second `Application`/canvas is created (spy-stage
   construction count stays 1).

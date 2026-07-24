@@ -167,10 +167,6 @@ const FAMILIES: readonly Family[] = [
   },
 ];
 
-// The one move that carries an animated preview in this slice (S2 walking skeleton); S3 broadens the
-// eye control to the whole roster.
-const PREVIEW_MOVE = "gyaku-zuki";
-
 // Props are the injectable Pixi-stage loader (default = the real dynamic import, in MovePreview) so
 // tests drive the preview through a spy stage without a WebGL mount.
 type ArsenalProps = {
@@ -215,7 +211,7 @@ const Arsenal: Component<ArsenalProps> = (props) => {
                     <div class="move-header">
                       <code class="move-id">{move.id}</code>
                       <span class="move-gloss">{move.gloss}</span>
-                      <Show when={mounted() && move.id === PREVIEW_MOVE}>
+                      <Show when={mounted()}>
                         <button
                           type="button"
                           class="move-preview-eye"
