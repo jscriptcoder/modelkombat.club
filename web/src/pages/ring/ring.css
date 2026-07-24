@@ -189,17 +189,13 @@
   flex-direction: column;
 }
 
-/* The copy control sits UNDER the JSON, spaced off it (the .how-start .copy idiom), and spans the
-   full column width — button on top, the transient "Copied!" confirmation centred beneath it. */
+/* The copy control sits UNDER the JSON, spaced off it (the .how-start .copy idiom): the button
+   sized to its content and horizontally centred, with the transient "Copied!" confirmation centred
+   beneath it. */
 .ring-raw .copy {
   margin-top: 0.75rem;
   flex-direction: column;
-  align-items: stretch;
-}
-
-.ring-raw .copy-button {
-  width: 100%;
-  justify-content: center;
+  align-items: center;
 }
 
 .ring-raw .copy-status {
