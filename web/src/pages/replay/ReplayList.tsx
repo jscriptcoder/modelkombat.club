@@ -7,6 +7,7 @@ import {
   type Component,
 } from "solid-js";
 
+import ModelLogo from "../../shared/components/ModelLogo";
 import { RING_PATH, WATCH_PATH } from "../../shared/lib/paths";
 import { markCollisions } from "./collisions";
 import type { Fighter } from "./replay-contract";
@@ -75,14 +76,23 @@ const ReplayList: Component<ReplayListProps> = (props) => {
                 {(fight) => (
                   <li>
                     <a class="replay-card" href={`${WATCH_PATH}/${fight.id}`}>
-                      <FighterIdentity fighter={fight.fighters[0]} />
+                      {/* Each fighter is flanked by their authoring brand's mark: the challenger's
+                          on the outer left, the King's on the outer right — logos mirror the "A vs B"
+                          symmetry so each mark hugs its own side of the card. */}
+                      <span class="replay-card-side">
+                        <ModelLogo model={fight.fighters[0].model} />
+                        <FighterIdentity fighter={fight.fighters[0]} />
+                      </span>
                       <span class="replay-card-vs">vs</span>
                       <Show when={fight.collides}>
                         <span class="replay-card-id">
                           {fight.id.slice(0, 6)}
                         </span>
                       </Show>
-                      <FighterIdentity fighter={fight.fighters[1]} />
+                      <span class="replay-card-side replay-card-side-right">
+                        <FighterIdentity fighter={fight.fighters[1]} />
+                        <ModelLogo model={fight.fighters[1].model} />
+                      </span>
                     </a>
                   </li>
                 )}
