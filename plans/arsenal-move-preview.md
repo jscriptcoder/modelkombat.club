@@ -1,7 +1,7 @@
 # Plan: Arsenal move preview (hover-to-watch)
 
-**Branch**: one per slice (S1 → #414, S2 `feat/arsenal-preview-s2` → merged #415)
-**Status**: Active — S1, S2 shipped; S3 next
+**Branch**: one per slice (S1 → #414, S2 → #415, S3 `feat/arsenal-preview-s3` → merged #416)
+**Status**: Active — S1–S3 shipped; S4 (the final slice) next
 
 ## Goal
 
@@ -55,16 +55,16 @@ Out of scope (follow-up, per the user): deleting the `/sheet` contact-sheet page
 
 ## Acceptance Criteria
 
-- [ ] Hovering, tapping, or keyboard-focusing a move's eye affordance opens a small
+- [x] Hovering, tapping, or keyboard-focusing a move's eye affordance opens a small
       popover previewing **that** move; leaving / Escape / outside-interaction closes it.
-- [ ] The previewed stickman performs the move on a **seamless loop** (attacker
+- [x] The previewed stickman performs the move on a **seamless loop** (attacker
       driving into a **dimmed** passive target at the move's reach).
-- [ ] Every one of the 13 Arsenal moves has its own working eye preview.
-- [ ] At most **one** Pixi `Application` exists at a time; switching moves swaps the
+- [x] Every one of the 13 Arsenal moves has its own working eye preview.
+- [x] At most **one** Pixi `Application` exists at a time; switching moves swaps the
       tape/anchor, it does not spin up a second renderer.
-- [ ] The home page ships **no Pixi** in its initial bundle; Pixi loads only after a
+- [x] The home page ships **no Pixi** in its initial bundle; Pixi loads only after a
       preview is first opened (verified by a lazy/dynamic import boundary).
-- [ ] With JS disabled (prerender/SSR), the Arsenal renders exactly as today — no eye
+- [x] With JS disabled (prerender/SSR), the Arsenal renders exactly as today — no eye
       affordance, roster + descriptors + badges unchanged (existing exact-assertion
       test still passes untouched in spirit; roster data is not edited).
 - [ ] `prefers-reduced-motion: reduce` shows a **still** contact-phase frame instead
@@ -166,7 +166,7 @@ browser mode). `mutation-testing` → `N/A — web ∉ Stryker`. `refactoring` a
 
 ---
 
-### Slice 3: Every Arsenal move exposes its own eye preview, driven by the one shared canvas
+### Slice 3: Every Arsenal move exposes its own eye preview, driven by the one shared canvas — ✅ SHIPPED (#416)
 
 **Value**: The feature at full breadth — all 13 moves preview, while still only ever
 one Pixi `Application` exists (the single portal's anchor + tape swap per open move).
@@ -248,4 +248,6 @@ does not start the ticker loop.
 
 ---
 
-_Delete this file when the plan is complete. If `plans/` is empty, delete the directory._
+_When the arc completes (after S4), **archive** this file under `docs/archive/` with a
+`README.md` index entry — do **not** delete it (repo convention; overrides the planning
+skill's default "delete" footer)._
