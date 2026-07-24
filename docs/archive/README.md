@@ -1929,3 +1929,39 @@ compensate the Node-only Stryker scope with exhaustive exact-assertion browser t
 [pure-koth-decisions.md](pure-koth-decisions.md) (D1–D20) + [pure-koth-stories.md](pure-koth-stories.md) (the S1–S3
 split) — was kept live in `plans/` across all three stories and is now archived here alongside the slice plans. No
 pure-koth files remain in `plans/`.
+
+## Arsenal move preview — hover-to-watch each technique (web) ✅ COMPLETE (2026-07-24) — the last change before opening `/watch` to the public
+
+Each Arsenal move on the home page gains an 👁 eye affordance that opens a small popover **looping** that
+move's stickman — an attacker driving into a **dimmed** passive target — so the Arsenal _shows_ each
+technique instead of only describing it. Built on the existing `buildDojoTape` / `createStage` / `scene`
+pipeline ("what you tune is what ships"), behind a single **lazily-loaded** Pixi `Application`, so the home
+bundle stays Pixi-free until a visitor first opens a preview (guarded by a Node `*.ssr.test.tsx` source
+scan). Web-only (`web/`) — **no `INPUT_HASH` / `BENCHMARK_VERSION` (`v20`) / TCB change**. web is outside
+the Node-only Stryker scope ⇒ each slice compensates with exact-assertion + independently-restated-roster
+tests, a manual mutator scan, and (for the frame-changing slices) a manual raw-Playwright Pixi capture.
+
+- **S1 — the pure render-model core** (PR #414, `feat/arsenal-move-preview`) — `moveLoopTape(move)` turns
+  one move id into a seamless looping `ReplayTape` (attacker committed via `selectMove`, an idle
+  `DEFAULT_KING` partner, centred the move's own reach apart) + `loopIndex(playhead, length)`, the
+  fractional-playhead wrap. Pure maths, no Pixi/DOM (`web/src/pages/home/move-preview.ts`); unit-tested in
+  `move-preview.test.tsx` (the web project globs `*.test.tsx`, but this file stays DOM/Pixi-free).
+- **S2 — the gyaku-zuki walking skeleton** (PR #415, `feat/arsenal-preview-s2`) — the whole path
+  end-to-end on one move: a client-only 👁 eye button → a portalled popover → a **lazily** `import()`-ed
+  shared Pixi mount (`PreviewStage.tsx`) looping the tape with the passive target dimmed. The clock +
+  render-model wiring live above an **injectable stage seam** (`MovePreview.tsx`), so open/close, the loop,
+  the lazy-load timing, and the dim are all assertable without WebGL; the real mount is a thin edge.
+- **S3 — broaden to the whole roster through the one canvas** (PR #416, `feat/arsenal-preview-s3`) — the
+  eye goes on all 13 moves; opening any previews that move and switching re-aims the single `Application`
+  (never a second), restarting the loop from the new move's stance. GREEN was a **net deletion** (drop the
+  `PREVIEW_MOVE` gate — S2's refactor had pre-built the switching machinery); the new tests finally
+  exercise switching, killing the reuse-guard + playhead-reset mutants the S2 scan deferred.
+- **S4 — honor `prefers-reduced-motion`** (PR #417, `feat/arsenal-preview-s4`) — a motion-sensitive
+  visitor gets a still **contact frame** (the move's first active tick — `contactFrame(move) =
+presetFor(move)?.startup ?? 0`) instead of the loop. The decision lives above the seam (injectable
+  `reducedMotion`, sampled **once at open**): `tick` holds the contact frame, the ticker's `onTick` is
+  ignored, and `paused: true` tells the mount to skip its ticker. Closes the arc — all 7 acceptance
+  criteria met.
+
+[arsenal-move-preview.md](arsenal-move-preview.md) — the single plan, kept live in `plans/` across all four
+slices, with the resolved decisions + per-slice acceptance criteria + the manual-capture notes.
