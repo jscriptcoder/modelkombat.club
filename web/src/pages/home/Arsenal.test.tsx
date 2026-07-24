@@ -3,7 +3,7 @@ import { fireEvent, render, within } from "@solidjs/testing-library";
 import { afterEach, describe, expect, it } from "vitest";
 
 import Arsenal from "./Arsenal";
-import { loopIndex, moveLoopTape } from "./move-preview";
+import { contactFrame, loopIndex, moveLoopTape } from "./move-preview";
 import type { PreviewStageProps } from "./PreviewStage";
 import type { ReplayTape } from "../replay/replay-contract";
 
@@ -297,6 +297,7 @@ const spyStage = () => {
   const tapes: ReplayTape[] = [];
   const ticks: number[] = [];
   const alphas: PreviewStageProps["figureAlpha"][] = [];
+  const pauseds: (boolean | undefined)[] = [];
   let onTick: ((delta: number) => void) | undefined;
   let loads = 0;
 
@@ -311,6 +312,10 @@ const spyStage = () => {
 
     createEffect(() => {
       alphas.push(props.figureAlpha);
+    });
+
+    createEffect(() => {
+      pauseds.push(props.paused);
     });
 
     onTick = props.onTick;
@@ -329,6 +334,10 @@ const spyStage = () => {
     latestTape: () => tapes[tapes.length - 1],
     latestTick: () => ticks[ticks.length - 1],
     latestAlpha: () => alphas[alphas.length - 1],
+    latestPaused: () => pauseds[pauseds.length - 1],
+    // Every tick the stage was ever handed — so "the frame NEVER advanced" can be asserted, not just
+    // "the last frame happens to match".
+    tickHistory: () => ticks.slice(),
     // Drive the loop clock as the real Pixi ticker would, in playhead-tick units.
     pump: (delta: number) => onTick?.(delta),
   };
@@ -583,5 +592,87 @@ describe("Arsenal — move preview across the whole roster (S3)", () => {
     fireEvent.click(await eyeFor(findByRole, "mae-geri"));
 
     await expect.poll(() => stage.latestTick()).toBe(0);
+  });
+});
+
+// S4 — the final slice: previews honor `prefers-reduced-motion`. A motion-sensitive visitor gets the
+// move's SHAPE without the loop: opening a preview freezes on the technique's contact frame and never
+// animates. The decision lives ABOVE the seam in MovePreview (sampled once at open, injected in tests
+// via `reducedMotion`), so both branches are deterministic and the spy stage proves them without WebGL:
+// a held `tick` at contactFrame, an ignored clock, and `paused` telling the real mount to skip its
+// ticker. Motion-allowed is the S3 loop, unchanged. web ∉ Stryker → exact assertions + manual scan.
+
+describe("Arsenal — move preview honors prefers-reduced-motion (S4)", () => {
+  it("freezes on the move's contact frame and never advances when motion is reduced", async () => {
+    const stage = spyStage();
+
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} reducedMotion={() => true} />
+    ));
+
+    fireEvent.click(await eyeFor(findByRole, "mae-geri"));
+    await body().findByTestId("preview-stage");
+
+    // Held on mae-geri's contact frame (its first active tick), not the stance...
+    expect(stage.latestTick()).toBe(contactFrame("mae-geri"));
+
+    // ...and pumping the clock does NOT advance it — every frame the stage ever saw is the same
+    // contact frame, so a motion-sensitive visitor sees a still image, not a loop.
+    stage.pump(12);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(
+      stage.tickHistory().every((t) => t === contactFrame("mae-geri")),
+    ).toBe(true);
+  });
+
+  it("holds the still contact frame for a slow-startup move too — not a fixed index", async () => {
+    // ushiro-geri opens its active window much later than mae-geri; a hardcoded freeze index would
+    // land on the wrong phase here.
+    const stage = spyStage();
+
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} reducedMotion={() => true} />
+    ));
+
+    fireEvent.click(await eyeFor(findByRole, "ushiro-geri"));
+    await body().findByTestId("preview-stage");
+
+    expect(stage.latestTick()).toBe(contactFrame("ushiro-geri"));
+    // The held frame is genuinely the contact (active) phase of the technique.
+    expect(stage.latestTape()[stage.latestTick()].a.attackPhase).toBe(2);
+  });
+
+  it("tells the stage to pause (skip its ticker) when motion is reduced", async () => {
+    const stage = spyStage();
+
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} reducedMotion={() => true} />
+    ));
+
+    fireEvent.click(await eyeFor(findByRole, "gyaku-zuki"));
+    await body().findByTestId("preview-stage");
+
+    expect(stage.latestPaused()).toBe(true);
+  });
+
+  it("still loops, and does not pause, when motion is allowed — unchanged from S3", async () => {
+    const stage = spyStage();
+
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} reducedMotion={() => false} />
+    ));
+
+    fireEvent.click(await eyeFor(findByRole, "gyaku-zuki"));
+    await body().findByTestId("preview-stage");
+
+    const length = moveLoopTape("gyaku-zuki").length;
+
+    // The clock advances (the loop runs)...
+    stage.pump(5);
+    await expect.poll(() => stage.latestTick()).toBe(loopIndex(5, length));
+
+    // ...and the stage is not told to pause.
+    expect(stage.latestPaused()).toBeFalsy();
   });
 });

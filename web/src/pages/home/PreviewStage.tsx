@@ -81,6 +81,11 @@ const PreviewStage: Component<PreviewStageProps> = (props) => {
     created.stage.addChild(mounted.root);
     setStage(mounted);
 
+    // A reduced-motion preview is a single still contact frame — starting no ticker at all is the
+    // honest way to "not animate" (the frozen `tick` above the seam already holds the frame). Sampled
+    // at mount: `paused` is read once when a preview opens, before the stage mounts.
+    if (props.paused) return;
+
     // Drive the clock above the seam. The delta is scaled here (the legibility slowdown), so
     // MovePreview receives it already in the playhead-tick units its loop-wrap works in.
     created.ticker.add((ticker) => {
@@ -126,5 +131,7 @@ export type PreviewStageProps = {
   // Each ticker frame's delta (in playhead-tick units), reported up to the loop clock. Absent in
   // tests (the spy runs no ticker), which keeps the loop assertions deterministic.
   onTick?: (delta: number) => void;
+  // When true (a reduced-motion preview), the mount starts no ticker — it just draws the held frame.
+  paused?: boolean;
   viewport?: Viewport;
 };

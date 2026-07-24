@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { REACH_PRESETS } from "../dojo/reach-presets";
-import { loopIndex, moveLoopTape } from "./move-preview";
+import { contactFrame, loopIndex, moveLoopTape } from "./move-preview";
 
 // move-preview.ts is the Arsenal preview's pure render-model core: it turns ONE move id into a
 // looping ReplayTape — an attacker driving a passive target — that the popover plays through the
@@ -130,6 +130,37 @@ describe("loopIndex — seamless wrap from a fractional playhead to a tape index
       expect(Number.isInteger(idx)).toBe(true);
       expect(idx).toBeGreaterThanOrEqual(0);
       expect(idx).toBeLessThan(length);
+    }
+  });
+});
+
+describe("contactFrame — the still frame a reduced-motion preview freezes on", () => {
+  it("lands inside the active (contact) window for EVERY arsenal move", () => {
+    // The chosen frame must be the strike AT CONTACT — phase 2 (active) in the engine encoding — not
+    // a wind-up (1) or recovery (3) frame. Asserted through moveLoopTape itself for the whole roster,
+    // so a wrong window or an off-by-one on the boundary surfaces here (web ∉ Stryker guard).
+    for (const preset of REACH_PRESETS) {
+      const tape = moveLoopTape(preset.move);
+      const frame = contactFrame(preset.move);
+
+      expect(tape[frame].a.attackPhase).toBe(2);
+    }
+  });
+
+  it("freezes on the FIRST active tick — the moment the strike reaches contact", () => {
+    // The active window opens exactly at `startup`; the still frame sits on its first tick, not the
+    // last wind-up frame (startup - 1) nor the first recovery frame (startup + active).
+    expect(contactFrame("gyaku-zuki")).toBe(7); // 7 startup → active opens at 7
+    expect(contactFrame("mae-geri")).toBe(9); // the dojo's "contact tick"
+    expect(contactFrame("tobi-geri")).toBe(4); // the fastest wind-up
+    expect(contactFrame("ushiro-geri")).toBe(13); // the slowest
+  });
+
+  it("falls back to frame 0 for an unknown or empty move id (M7 totality)", () => {
+    // An unknown move has a single-tick idle tape; freezing on tick 0 is the only valid index and
+    // must never read off the end or throw.
+    for (const id of ["kokoro-nage", ""]) {
+      expect(contactFrame(id)).toBe(0);
     }
   });
 });

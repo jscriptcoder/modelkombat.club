@@ -10,7 +10,7 @@ import {
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 
-import { loopIndex, moveLoopTape } from "./move-preview";
+import { contactFrame, loopIndex, moveLoopTape } from "./move-preview";
 import type { PreviewStageProps } from "./PreviewStage";
 
 // The move preview's popover + loop clock — everything ABOVE the Pixi seam. When a move is open it
@@ -29,6 +29,13 @@ const loadPreviewStage = (): Promise<Component<PreviewStageProps>> =>
 // the subject of the preview. The exact fade is eye-tuned — the seam test pins only the relationship.
 const PREVIEW_FIGURE_ALPHA = { a: 1, b: 0.4 } as const;
 
+// Whether the visitor asked the OS to reduce motion. The default reads the media query live; it is
+// sampled ONCE when a preview opens (below), so a mid-session OS toggle takes effect on the next open
+// rather than mid-preview. Guarded for SSR, though the sample only runs client-side (on open).
+const defaultReducedMotion = (): boolean =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export type MovePreviewProps = {
   // The open move id, or null when closed. Null renders nothing (the popover is portalled only while
   // open); switching moves re-aims the one preview.
@@ -38,6 +45,9 @@ export type MovePreviewProps = {
   anchor?: DOMRect | null;
   // The Pixi renderer loader — injected in tests (a spy stage), the real dynamic import in production.
   loadStage?: () => Promise<Component<PreviewStageProps>>;
+  // Injectable reduced-motion source (default the real media-query read). Tests pass `() => true` /
+  // `() => false` to drive both branches deterministically.
+  reducedMotion?: () => boolean;
 };
 
 const MovePreview: Component<MovePreviewProps> = (props) => {
@@ -76,9 +86,25 @@ const MovePreview: Component<MovePreviewProps> = (props) => {
     ),
   );
 
+  // Reduced-motion, sampled ONCE per open: false while closed, the media-query value at the moment a
+  // move opens. A memo (not an effect-set signal) so `tick` reads the settled value synchronously on
+  // the first draw — no wind-up frame slips out before the freeze takes hold.
+  const reduced = createMemo(
+    on(
+      () => props.move,
+      (move) =>
+        move !== null && (props.reducedMotion ?? defaultReducedMotion)(),
+    ),
+  );
+
   const tape = createMemo(() => moveLoopTape(props.move ?? ""));
 
-  const tick = () => loopIndex(playhead(), tape().length);
+  // The frame to draw: the seamless loop index normally, or a still contact frame held for the whole
+  // preview when the visitor asked to reduce motion.
+  const tick = () =>
+    reduced()
+      ? contactFrame(props.move ?? "")
+      : loopIndex(playhead(), tape().length);
 
   // Escape and outside-pointer dismissal, live only while a preview is open. The eye control and the
   // popover both carry `data-move-preview`, so interacting with either keeps it open.
@@ -138,7 +164,11 @@ const MovePreview: Component<MovePreviewProps> = (props) => {
                 tape={tape()}
                 tick={tick()}
                 figureAlpha={PREVIEW_FIGURE_ALPHA}
-                onTick={(delta: number) => setPlayhead((p) => p + delta)}
+                paused={reduced()}
+                onTick={(delta: number) => {
+                  // A reduced-motion preview ignores the clock — the held contact frame never advances.
+                  if (!reduced()) setPlayhead((p) => p + delta);
+                }}
               />
             )}
           </Show>

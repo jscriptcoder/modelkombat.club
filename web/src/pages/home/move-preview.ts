@@ -52,3 +52,11 @@ export const loopIndex = (playhead: number, length: number): number => {
 
   return wrapped < 0 ? wrapped + length : wrapped;
 };
+
+// contactFrame: the still frame a reduced-motion preview freezes on — the move's FIRST ACTIVE tick, the
+// strike at contact / full extension (the same tick the dojo calls "contact"). The active window opens
+// exactly at `startup` (see phaseAt), so that index is it. An unknown move has no timing and only a
+// single idle tick, so it freezes on tick 0 — the only valid index (M7 totality; never reads off the
+// end).
+export const contactFrame = (move: string): number =>
+  presetFor(move)?.startup ?? 0;

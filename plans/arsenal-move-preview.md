@@ -1,7 +1,7 @@
 # Plan: Arsenal move preview (hover-to-watch)
 
-**Branch**: one per slice (S1 → #414, S2 `feat/arsenal-preview-s2` → merged #415)
-**Status**: Active — S1, S2 shipped; S3 next
+**Branch**: one per slice (S1 → #414, S2 → #415, S3 `feat/arsenal-preview-s3` → merged #416)
+**Status**: Active — S1–S3 shipped; S4 (the final slice) next
 
 ## Goal
 
@@ -55,19 +55,19 @@ Out of scope (follow-up, per the user): deleting the `/sheet` contact-sheet page
 
 ## Acceptance Criteria
 
-- [ ] Hovering, tapping, or keyboard-focusing a move's eye affordance opens a small
+- [x] Hovering, tapping, or keyboard-focusing a move's eye affordance opens a small
       popover previewing **that** move; leaving / Escape / outside-interaction closes it.
-- [ ] The previewed stickman performs the move on a **seamless loop** (attacker
+- [x] The previewed stickman performs the move on a **seamless loop** (attacker
       driving into a **dimmed** passive target at the move's reach).
-- [ ] Every one of the 13 Arsenal moves has its own working eye preview.
-- [ ] At most **one** Pixi `Application` exists at a time; switching moves swaps the
+- [x] Every one of the 13 Arsenal moves has its own working eye preview.
+- [x] At most **one** Pixi `Application` exists at a time; switching moves swaps the
       tape/anchor, it does not spin up a second renderer.
-- [ ] The home page ships **no Pixi** in its initial bundle; Pixi loads only after a
+- [x] The home page ships **no Pixi** in its initial bundle; Pixi loads only after a
       preview is first opened (verified by a lazy/dynamic import boundary).
-- [ ] With JS disabled (prerender/SSR), the Arsenal renders exactly as today — no eye
+- [x] With JS disabled (prerender/SSR), the Arsenal renders exactly as today — no eye
       affordance, roster + descriptors + badges unchanged (existing exact-assertion
       test still passes untouched in spirit; roster data is not edited).
-- [ ] `prefers-reduced-motion: reduce` shows a **still** contact-phase frame instead
+- [x] `prefers-reduced-motion: reduce` shows a **still** contact-phase frame instead
       of looping.
 
 ## Slices
@@ -166,7 +166,7 @@ browser mode). `mutation-testing` → `N/A — web ∉ Stryker`. `refactoring` a
 
 ---
 
-### Slice 3: Every Arsenal move exposes its own eye preview, driven by the one shared canvas
+### Slice 3: Every Arsenal move exposes its own eye preview, driven by the one shared canvas — ✅ SHIPPED (#416)
 
 **Value**: The feature at full breadth — all 13 moves preview, while still only ever
 one Pixi `Application` exists (the single portal's anchor + tape swap per open move).
@@ -215,26 +215,43 @@ re-init).
 
 **Value**: Accessibility correctness — motion-sensitive visitors get the move's shape
 without the loop.
-**Path**: the preview mount reads `matchMedia("(prefers-reduced-motion: reduce)")`;
-when reduced, it draws a single **active/contact-phase** frame of `moveLoopTape` and
-does not start the ticker loop.
+**Path**: `MovePreview` (ABOVE the seam) samples reduced-motion **once when a preview
+opens**; when reduced it holds `tick` at `contactFrame(move)`, ignores the ticker's
+`onTick` (playhead never advances), and passes `paused: true` down so the real mount
+skips starting its ticker. Motion-allowed is the S3 loop untouched.
 **Class**: Behavior change.
 **Required implementation skills**: `tdd`, `testing`, `front-end-testing`.
 `mutation-testing` → `N/A — web ∉ Stryker`. `refactoring` assessed.
-**Acceptance criteria** (confirm before code):
+**Resolved decisions (2026-07-24)**:
 
-- With the reduced-motion media query matching (injected in test), opening a preview
-  applies a single contact-phase frame and starts **no** loop (assert the clock
-  never advances / the ticker is not driven, via the seam).
-- With motion allowed, behavior is unchanged from S3 (loops).
-- The media-query source is injectable so both branches are deterministic in tests.
-  **RED**: browser-mode/seam tests for both branches (reduced → static frame, no clock
-  advance; normal → loops).
-  **GREEN**: minimal branch at the mount edge.
-  **MUTATE**: `N/A — web ∉ Stryker`; manual scan of the branch + chosen frame index.
+- **Still frame** = the move's **first active tick** (`presetFor(move)?.startup ?? 0`) —
+  the strike at contact / full extension, matching the dojo's "contact tick" convention.
+  New pure core `contactFrame(move)` in `move-preview.ts`, unit-tested beside `loopIndex`.
+- **Read timing** = sample `matchMedia("(prefers-reduced-motion: reduce)")` **once at
+  open** (not reactive) — an OS toggle mid-session takes effect on the next open.
+- **Injectable**: `MovePreview`/`Arsenal` take an optional `reducedMotion?: () => boolean`
+  (default the real `matchMedia` read) so both branches are deterministic in tests.
+- **Seam-observable**: the spy stage captures `paused` and `onTick`, so "freezes on the
+  contact frame + never advances + won't run the ticker" is all assertable without WebGL.
+
+**Acceptance criteria** (confirmed):
+
+- `contactFrame(move)` lands inside the move's **active** window for every roster move
+  (`moveLoopTape(move)[contactFrame(move)].a.attackPhase === 2`); unknown/`""` → `0`.
+- Reduced-motion (injected `() => true`): opening any preview holds `tick` at
+  `contactFrame(move)` and **pumping the clock never changes it**; it passes `paused: true`.
+- Motion allowed (injected `() => false`): behavior is unchanged from S3 — pumping the
+  clock advances via `loopIndex`, and `paused` is falsy.
+  **RED**: pure `contactFrame` tests + seam tests for both branches (reduced → static
+  frame, no clock advance, paused; normal → loops, not paused).
+  **GREEN**: `contactFrame` pure core + a reduced-motion branch above the seam in
+  `MovePreview` (tick, onTick-ignore, paused) threaded through `Arsenal`; the real mount
+  skips its ticker when `paused` (untested edge).
+  **MUTATE**: `N/A — web ∉ Stryker`; manual scan of the branch + the frame-index pick.
   **KILL MUTANTS**: N/A.
   **REFACTOR**: assess.
-  **Done when**: both branches proven, gates green, commit approved.
+  **Done when**: both branches proven, gates green, manual capture confirms the still
+  contact frame, commit approved.
 
 ## Pre-PR Quality Gate (every slice)
 
@@ -248,4 +265,6 @@ does not start the ticker loop.
 
 ---
 
-_Delete this file when the plan is complete. If `plans/` is empty, delete the directory._
+_When the arc completes (after S4), **archive** this file under `docs/archive/` with a
+`README.md` index entry — do **not** delete it (repo convention; overrides the planning
+skill's default "delete" footer)._
