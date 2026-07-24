@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BODY_HEIGHT_SUB,
+  ringLayout,
   ringTransform,
   scene,
   SHOULDER_HALF_WIDTH,
@@ -220,6 +221,34 @@ describe("scene — the ring inset transform (fighters shrink into a centred ban
     const t = ringTransform({ width: 1200, height: 800 });
 
     expect(t.y).toBe(108); // 800 · 0.9 ground-ratio · 0.15
+  });
+});
+
+describe("scene — the tatami ring layout (the decorated backdrop)", () => {
+  // The mat is a full-canvas backdrop drawn in SCREEN px behind the inset world container, so its
+  // ground line aligns with the fighters' feet (both fixed at 540) and its left/right edges sit on the
+  // ring band the world container occupies (the jogai out-of-bounds boundary). Pure geometry — the
+  // fills / stripe tones / stroke widths are eye-tuned (no test). Concrete expectations catch a flipped
+  // ratio or a dropped term; a second viewport pins the width/height derivations.
+  it("lays the mat on the ring band, ground at the fighters' feet, horizon above them", () => {
+    const l = ringLayout(VIEWPORT);
+
+    expect(l.groundY).toBe(540); // 600 · 0.9 ground-ratio — the feet line
+    expect(l.horizonY).toBe(456); // 600 · 0.76 — the mat's back edge, above the feet
+    expect(l.left).toBe(90); // the ring band's left edge == ringTransform.x (the jogai line)
+    expect(l.right).toBe(1110); // 1200 − 90, symmetric
+    expect(l.centerX).toBe(600); // 1200 / 2 — the referee centre mark
+    expect(l.panels).toBe(10); // tatami two-tone band count
+  });
+
+  it("scales the mat's edges with the canvas so it always frames the ring band", () => {
+    const l = ringLayout({ width: 2400, height: 800 });
+
+    expect(l.groundY).toBe(720); // 800 · 0.9
+    expect(l.horizonY).toBe(608); // 800 · 0.76
+    expect(l.left).toBe(180); // (2400 · 0.15) / 2
+    expect(l.right).toBe(2220); // 2400 − 180
+    expect(l.centerX).toBe(1200); // 2400 / 2
   });
 });
 

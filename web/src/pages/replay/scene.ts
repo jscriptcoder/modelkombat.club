@@ -756,6 +756,41 @@ export const ringTransform = (viewport: Viewport): RingTransform => ({
   y: Math.round(viewport.height * GROUND_RATIO * (1 - RING_FILL)),
 });
 
+// The tatami floor's back edge, as a fraction of canvas height: the horizon where the mat meets the
+// dark hall. Below the fighters' heads and above their feet, so the floor reads as a shallow plane the
+// figures stand near the front of. Eye-tunable.
+const HORIZON_RATIO = 0.76;
+
+// How many two-tone vertical bands the tatami floor is split into — the woven-panel texture. Eye-tunable.
+const TATAMI_PANELS = 10;
+
+// The tatami ring's geometry in SCREEN px (the decorated backdrop). Drawn behind the inset world
+// container, so its `groundY` lands on the fighters' feet (both fixed at GROUND_RATIO) and its
+// left/right edges sit on the ring band the world container occupies — those edges ARE the jogai
+// out-of-bounds boundary. Pure in the viewport (reusing ringTransform for the band's left edge), so the
+// mat geometry is exact-assertion testable while its fills / tones / stroke widths stay eye-tuned.
+export type RingLayout = {
+  groundY: number; // the feet line (mat surface at the front)
+  horizonY: number; // the mat's back edge (floor meets hall)
+  left: number; // ring band's left edge == jogai boundary
+  right: number; // ring band's right edge == jogai boundary
+  centerX: number; // ring centre (the referee mark)
+  panels: number; // tatami two-tone band count
+};
+
+export const ringLayout = (viewport: Viewport): RingLayout => {
+  const left = ringTransform(viewport).x;
+
+  return {
+    groundY: Math.round(viewport.height * GROUND_RATIO),
+    horizonY: Math.round(viewport.height * HORIZON_RATIO),
+    left,
+    right: viewport.width - left,
+    centerX: viewport.width / 2,
+    panels: TATAMI_PANELS,
+  };
+};
+
 // The reference skeleton's head-to-foot span in local px (feet planted at y 0, head at STAND.head.y)
 // — the unit the pose constants (STAND/CROUCH/AIR/PRONE + the reach layers) are authored in. Derived
 // from STAND so it can never drift from the model it measures.

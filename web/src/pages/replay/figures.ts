@@ -2,7 +2,9 @@ import { Container, Graphics, Text } from "pixi.js";
 
 import {
   bodyHeightPx,
+  ringLayout,
   ringTransform,
+  type RingLayout,
   type Scene,
   type Skeleton,
   type Viewport,
@@ -263,11 +265,66 @@ const applyFlash = (flash: Graphics, mark: Scene["contact"]["a"]): void => {
   flash.alpha = flashAlpha(mark.age);
 };
 
+// ─── the tatami ring backdrop ─────────────────────────────────────────────────────────────────────
+// The decorated floor, drawn ONCE behind the fighters. All eye-tuned on a dark canvas (bg 0x0b0e14):
+// muted warm-olive tatami so it never glows, two close tones for the woven panels, faint mat lines, and
+// a dull-red jogai border marking the out-of-bounds edges. No test pins these — the geometry is
+// ringLayout's (unit-tested); here we only stroke it (a Graphics path is opaque to display assertions,
+// so the wiring test asserts z-order + membership, and a manual scan covers the drawing — as with BONES).
+const TATAMI_BASE = 0x272f1b;
+const TATAMI_ALT = 0x323a23;
+const MAT_LINE = 0x44503a;
+const CENTER_LINE = 0x55634a;
+const JOGAI_COLOR = 0x9c4f4f;
+
+// Stroke the tatami floor into `ring`: the base floor from the horizon down to the canvas bottom, the
+// alternate-tone woven panels, the horizon + ground reference lines, the referee centre mark, and the
+// two jogai out-of-bounds borders on the ring edges. Screen px throughout (the ring rides root, not the
+// inset world), so the ground line lands on the fighters' feet.
+const drawRing = (ring: Graphics, layout: RingLayout, bottom: number): void => {
+  const { left, right, horizonY, groundY, centerX, panels } = layout;
+  const width = right - left;
+  const floorH = bottom - horizonY;
+
+  ring.rect(left, horizonY, width, floorH).fill(TATAMI_BASE);
+
+  // Every other vertical band a touch lighter → the woven two-tone panels.
+  const panelW = width / panels;
+
+  for (let i = 0; i < panels; i += 2) {
+    ring.rect(left + i * panelW, horizonY, panelW, floorH).fill(TATAMI_ALT);
+  }
+
+  ring.moveTo(left, horizonY).lineTo(right, horizonY).stroke({
+    width: 2,
+    color: MAT_LINE,
+  });
+  ring.moveTo(left, groundY).lineTo(right, groundY).stroke({
+    width: 1,
+    color: MAT_LINE,
+  });
+  ring.moveTo(centerX, horizonY).lineTo(centerX, bottom).stroke({
+    width: 1,
+    color: CENTER_LINE,
+  });
+  ring.moveTo(left, horizonY).lineTo(left, bottom).stroke({
+    width: 4,
+    color: JOGAI_COLOR,
+  });
+  ring.moveTo(right, horizonY).lineTo(right, bottom).stroke({
+    width: 4,
+    color: JOGAI_COLOR,
+  });
+};
+
 // The mounted stage: the root container to add to the Pixi stage, the two fighters' joint nodes
 // (exposed for display-object assertions), and the HUD text, plus `apply` — the pure Scene →
 // display projection the player calls every frame.
 export type Stage = {
   root: Container;
+  // The tatami ring backdrop, drawn once behind everything (root's first child). Exposed so the wiring
+  // test can pin its z-order; the drawing itself is eye-tuned (manual scan).
+  ring: Graphics;
   // The inset world container the fighters + flashes ride inside — down-scaled + centred by
   // `ringTransform` so they read as figures IN a ring rather than filling the frame (slice 2). The HUD
   // is added to `root`, NOT here, so the scoreboard stays crisp at full canvas size. Exposed for
@@ -319,9 +376,14 @@ export const createStage = (
   world.y = inset.y;
   world.addChild(a.nodes.root, b.nodes.root, flashA, flashB);
 
+  // The tatami backdrop, drawn once in screen px behind the world container + HUD.
+  const ring = new Graphics();
+
+  drawRing(ring, ringLayout(viewport), viewport.height);
+
   const root = new Container();
 
-  root.addChild(world, hud);
+  root.addChild(ring, world, hud);
 
   const apply = (scene: Scene): void => {
     applyFigure(a, scene.a);
@@ -337,6 +399,7 @@ export const createStage = (
 
   return {
     root,
+    ring,
     world,
     a: a.nodes,
     b: b.nodes,

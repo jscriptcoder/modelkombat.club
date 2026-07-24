@@ -62,6 +62,19 @@ const tickOf = (
 ): ReplayTick => ({ tick, a: frame(a), b: frame(b) });
 
 describe("figures — the Pixi draw layer applies a Scene to display objects", () => {
+  it("draws the tatami ring backdrop first, behind the fighters and the HUD", () => {
+    // The mat rides root (screen px), not the inset world, so its ground line meets the fighters' feet.
+    // It must be root's FIRST child so it strokes behind everything — the geometry is ringLayout's
+    // (unit-tested); here we pin only the z-order + membership (a Graphics path is opaque to assertions).
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    expect(stage.root.children).toContain(stage.ring);
+    expect(stage.root.children[0]).toBe(stage.ring); // first ⇒ at the back
+    expect(stage.root.children.indexOf(stage.ring)).toBeLessThan(
+      stage.root.children.indexOf(stage.world),
+    );
+  });
+
   it("nests the fighters + flashes in a centred, down-scaled world container; the HUD stays full-size", () => {
     // The on-screen shrink (slice 2) is one transform on a WORLD container the fighters ride inside —
     // the scene coords stay full-scale (every position test below is unchanged). The HUD is added to
