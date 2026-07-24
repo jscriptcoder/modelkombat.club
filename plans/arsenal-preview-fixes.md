@@ -9,8 +9,8 @@
 | Slice                  | Branch                            | State                                                 |
 | ---------------------- | --------------------------------- | ----------------------------------------------------- |
 | 1 — throw eases        | `feat/throw-eases`                | ✅ shipped — PR #419, squashed to `main` as `8a98128` |
-| 2 — knockdown target   | `feat/preview-knockdown-target`   | green — awaiting commit approval                      |
-| 3 — airborne tobi-geri | `feat/preview-tobi-geri-airborne` | not started                                           |
+| 2 — knockdown target   | `feat/preview-knockdown-target`   | ✅ shipped — PR #420, squashed to `main` as `8e00189` |
+| 3 — airborne tobi-geri | `feat/preview-tobi-geri-airborne` | green — awaiting commit approval                      |
 
 ## Goal
 
@@ -26,12 +26,12 @@ the second.
 - [x] Opening the eye on `throw`, `sweep` or `hiza-geri` shows the dimmed target standing until the
       technique's contact tick, then prone for the remainder of the loop
 - [x] The other ten moves' targets never go prone
-- [ ] Opening the eye on `tobi-geri` shows the attacker leave the ground, rise, kick at the apex,
+- [x] Opening the eye on `tobi-geri` shows the attacker leave the ground, rise, kick at the apex,
       descend, land, and recover grounded — while closing the distance toward the target
-- [ ] The other twelve moves stay grounded at a fixed gap
-- [ ] A reduced-motion `tobi-geri` preview freezes on an **airborne** contact frame
-- [ ] "tobi-geri is airborne" has exactly one home — `/sheet`'s `AIRBORNE_MOVES` duplicate is gone
-- [ ] No `src/` change: engine, TCB and `INPUT_HASH` untouched, `BENCHMARK_VERSION` held at `v19`
+- [x] The other twelve moves stay grounded at a fixed gap
+- [x] A reduced-motion `tobi-geri` preview freezes on an **airborne** contact frame
+- [x] "tobi-geri is airborne" has exactly one home — `/sheet`'s `AIRBORNE_MOVES` duplicate is gone
+- [x] No `src/` change: engine, TCB and `INPUT_HASH` untouched, `BENCHMARK_VERSION` held at `v19`
 
 ## Testing convention (applies to every slice)
 
@@ -127,7 +127,7 @@ human approves the commit.
 
 ---
 
-### Slice 2: The target drops for the three moves that knock it down
+### Slice 2: The target drops for the three moves that knock it down — ✅ SHIPPED (#420)
 
 > **Two departures from the shape below, both deliberate.** (1) The transform is **not exported** —
 > everything the acceptance criteria describe, totality included, is observable through `moveLoopTape`,
@@ -194,6 +194,15 @@ scoring move, human approves the commit.
 ---
 
 ### Slice 3: tobi-geri leaps, kicks at the apex, and lands
+
+> **Arithmetic conflict found before RED — AC5 is binding, the Shape line is loose.** The engine's
+> constants are `jumpImpulse: 12000` / `gravity: 4000` / `jumpXSpeed: 10000` (`rules.ts`), giving six
+> airborne ticks (1–6) and therefore **60000 of total travel** — which is where the decisions doc's
+> "60000" came from; it is the trip, not the per-tick speed. But contact is tick 4, by which point only
+> **40000** has been travelled. So opening at `reach + total travel` would leave the foot **20000
+> short** at contact, contradicting AC5's "one true `reach` away at contact". The opening gap is
+> therefore `reach + travel-through-contact` = `250000 + 40000 = 290000`, and the attacker lands at
+> `230000` — inside reach, past where it kicked, which is what a real jump-in does.
 
 **Value**: A visitor opening the eye on the arsenal's only aerial technique sees it performed in the
 air. Today `ATTACKER_BASE` pins `posture: 0` and `controlsToFrame` pins `y: 0`, so it previews as a

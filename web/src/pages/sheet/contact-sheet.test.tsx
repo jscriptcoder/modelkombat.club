@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { contactSheetCells } from "./contact-sheet";
-import { REACH_PRESETS } from "../dojo/reach-presets";
+import { REACH_PRESETS, type ReachPreset } from "../dojo/reach-presets";
 import type { Viewport } from "../replay/scene";
 
 // The contact sheet's DATA layer (S7): one attacker figure per arsenal move, each posed at its ACTIVE
@@ -76,6 +76,26 @@ describe("contactSheetCells — one attacker figure per arsenal move", () => {
     expect(tobi.placement.pose.footL.y).toBeLessThan(
       maeGeri.placement.pose.footL.y,
     );
+  });
+
+  it("poses exactly the techniques the preset table marks airborne, sourced from that table", () => {
+    // "tobi-geri is airborne" has ONE home: the preset table's `air` column. Walking the whole roster
+    // proves the sheet reads that column rather than keeping its own list — a second aerial technique
+    // added to the table would have to show up here, where a local set would silently disagree.
+    //
+    // The discriminator is the LOWER foot (y grows downward, so the max of the two). Every grounded
+    // technique keeps one foot planted even when the other drives a kick; only the AIR stance tucks
+    // BOTH up. A relation, not an eye-tuned literal (decision 9).
+    // Read through the declared ReachPreset for the same reason the table's own tests do: `air` is a
+    // genuinely optional key, absent on the twelve grounded techniques.
+    const presets: readonly ReachPreset[] = REACH_PRESETS;
+
+    for (const preset of presets) {
+      const { pose } = cellFor(preset.move).placement;
+      const bothFeetOffTheGround = Math.max(pose.footL.y, pose.footR.y) < 0;
+
+      expect(bothFeetOffTheGround).toBe(preset.air === true);
+    }
   });
 
   it("poses each move at ITS OWN true reach — a longer-reaching move extends further", () => {
