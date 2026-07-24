@@ -757,11 +757,13 @@ precedent). Two slices, PR per slice.
 
 [variety-telemetry-s5c.md](variety-telemetry-s5c.md)
 
-**S1a–S5c complete; the variety-telemetry arc is done bar the no-build S5a.** The sibling scoping +
-story-split docs — `variety-telemetry-harness.md` (grill-me: 12 resolved decisions) +
-`variety-telemetry-stories.md` (story split S1a–S5c) — stay live in `plans/` as the trail for the one
-remaining post-launch story **S5a** (an external submission corpus — no build, just the S1b `-- <path…>`
-override on a submissions dir).
+**S1a–S5c complete; the variety-telemetry arc is done bar the no-build S5a — arc parent docs now archived.**
+The sibling scoping + story-split docs — [variety-telemetry-harness.md](variety-telemetry-harness.md)
+(grill-me: 12 resolved decisions) + [variety-telemetry-stories.md](variety-telemetry-stories.md) (story
+split S1a–S5c) — are archived here alongside their slices; `plans/` is now empty. The one remaining story,
+post-launch **S5a** (an external submission corpus), is **not a build** — it just points the S1b
+`-- <path…>` override at a submissions dir once real bots exist; its spec is preserved verbatim in the
+archived `variety-telemetry-stories.md`.
 
 ## `/fight` practice-by-default, compete opt-in ✅ COMPLETE
 
