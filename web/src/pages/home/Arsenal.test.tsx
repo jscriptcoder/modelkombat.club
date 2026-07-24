@@ -1,7 +1,11 @@
-import { render, within } from "@solidjs/testing-library";
-import { describe, expect, it } from "vitest";
+import { createEffect, type Component } from "solid-js";
+import { fireEvent, render, within } from "@solidjs/testing-library";
+import { afterEach, describe, expect, it } from "vitest";
 
 import Arsenal from "./Arsenal";
+import { loopIndex, moveLoopTape } from "./move-preview";
+import type { PreviewStageProps } from "./PreviewStage";
+import type { ReplayTape } from "../replay/replay-contract";
 
 // The expected roster is hardcoded here — deliberately NOT imported from the
 // component — so a renamed, dropped, or reordered move-id/gloss in production
@@ -271,5 +275,234 @@ describe("Arsenal section", () => {
     expect(specLink.getAttribute("href")).toBe("/spec-guide#frame-table");
     // Opens in a new tab, matching the nav + CTA spec links.
     expect(specLink.getAttribute("target")).toBe("_blank");
+  });
+});
+
+// S2 — the move preview (walking skeleton, gyaku-zuki only). A visitor opens an 👁 eye control on
+// the gyaku-zuki row and watches the move loop in a small popover. The clock + the render-model
+// wiring live above an INJECTABLE Pixi stage seam (mirroring DojoApp), so open/close, the loop tape,
+// the loop-wrap, the lazy-load timing, and the dim are all assertable without a WebGL mount — the real
+// PreviewStage (which imports Pixi) is a thin edge that only loads on first open. The pose maths is
+// covered in move-preview.test (the pure tape + wrap) and figures.test (the draw layer); here we prove
+// the PAGE wiring. web ∉ Stryker, so these are exact assertions + a manual mutator scan.
+
+// A spy render sink standing in for the real Pixi stage: it captures every tape / tick / figure-alpha
+// the preview hands down (newest last), lets a test PUMP the loop clock by invoking the captured
+// ticker callback, and counts how many times it was LAZILY LOADED (so "not until open" and "once" are
+// assertable). It never runs a clock of its own, so the playhead only moves when a test pumps it.
+const spyStage = () => {
+  const tapes: ReplayTape[] = [];
+  const ticks: number[] = [];
+  const alphas: PreviewStageProps["figureAlpha"][] = [];
+  let onTick: ((delta: number) => void) | undefined;
+  let loads = 0;
+
+  const Stage: Component<PreviewStageProps> = (props) => {
+    createEffect(() => {
+      tapes.push(props.tape);
+    });
+
+    createEffect(() => {
+      ticks.push(props.tick);
+    });
+
+    createEffect(() => {
+      alphas.push(props.figureAlpha);
+    });
+
+    onTick = props.onTick;
+
+    return <div data-testid="preview-stage" />;
+  };
+
+  return {
+    // The lazy loader the page awaits on first open; each call is one load (S3 will assert it stays 1).
+    loadStage: () => {
+      loads += 1;
+
+      return Promise.resolve(Stage);
+    },
+    loads: () => loads,
+    latestTape: () => tapes[tapes.length - 1],
+    latestTick: () => ticks[ticks.length - 1],
+    latestAlpha: () => alphas[alphas.length - 1],
+    // Drive the loop clock as the real Pixi ticker would, in playhead-tick units.
+    pump: (delta: number) => onTick?.(delta),
+  };
+};
+
+// The popover is portalled to <body> (it must escape the card's overflow), so its dialog + the stage
+// host are queried from the document, not the render container.
+const body = () => within(document.body);
+
+// The popover portals OUTSIDE the render container, so the library's container-scoped auto-cleanup
+// doesn't reach a preview left open at a test's end. Drop any stray portal so every test starts from a
+// clean <body> (idempotency — Browser Mode runs tests in parallel).
+afterEach(() => {
+  for (const node of document.querySelectorAll(".move-preview-popover")) {
+    node.remove();
+  }
+});
+
+const findEye = (findByRole: ReturnType<typeof render>["findByRole"]) =>
+  findByRole("button", { name: /preview gyaku-zuki/i });
+
+describe("Arsenal — move preview eye control (S2)", () => {
+  it("adds an eye preview control to the gyaku-zuki row only, as an accessible button", async () => {
+    const { findByRole, queryByRole } = render(() => <Arsenal />);
+
+    // The workhorse move gets the control...
+    expect(await findEye(findByRole)).toBeTruthy();
+
+    // ...and no other move does yet (S3 broadens to the whole roster).
+    expect(queryByRole("button", { name: /preview kizami-zuki/i })).toBeNull();
+    expect(queryByRole("button", { name: /preview mae-geri/i })).toBeNull();
+  });
+
+  it("opens the looping preview when the eye control is hovered", async () => {
+    const { loadStage } = spyStage();
+    const { findByRole } = render(() => <Arsenal loadStage={loadStage} />);
+
+    const eye = await findEye(findByRole);
+
+    expect(eye.getAttribute("aria-expanded")).toBe("false");
+    expect(body().queryByRole("dialog")).toBeNull();
+
+    fireEvent.pointerEnter(eye);
+
+    expect(eye.getAttribute("aria-expanded")).toBe("true");
+    expect(body().getByRole("dialog", { name: /gyaku-zuki/i })).toBeTruthy();
+  });
+
+  it("opens the preview on tap/click", async () => {
+    const { loadStage } = spyStage();
+    const { findByRole } = render(() => <Arsenal loadStage={loadStage} />);
+
+    const eye = await findEye(findByRole);
+
+    fireEvent.click(eye);
+
+    expect(body().getByRole("dialog", { name: /gyaku-zuki/i })).toBeTruthy();
+  });
+
+  it("opens the preview on keyboard focus", async () => {
+    const { loadStage } = spyStage();
+    const { findByRole } = render(() => <Arsenal loadStage={loadStage} />);
+
+    const eye = await findEye(findByRole);
+
+    fireEvent.focus(eye);
+
+    expect(body().getByRole("dialog", { name: /gyaku-zuki/i })).toBeTruthy();
+  });
+
+  it("closes the preview when the pointer leaves the eye control", async () => {
+    const { loadStage } = spyStage();
+    const { findByRole } = render(() => <Arsenal loadStage={loadStage} />);
+
+    const eye = await findEye(findByRole);
+
+    fireEvent.pointerEnter(eye);
+    expect(body().queryByRole("dialog")).toBeTruthy();
+
+    fireEvent.pointerLeave(eye);
+
+    expect(eye.getAttribute("aria-expanded")).toBe("false");
+    expect(body().queryByRole("dialog")).toBeNull();
+  });
+
+  it("closes the preview when Escape is pressed", async () => {
+    const { loadStage } = spyStage();
+    const { findByRole } = render(() => <Arsenal loadStage={loadStage} />);
+
+    const eye = await findEye(findByRole);
+
+    fireEvent.click(eye);
+    expect(body().queryByRole("dialog")).toBeTruthy();
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    expect(body().queryByRole("dialog")).toBeNull();
+  });
+
+  it("closes the preview on an outside interaction", async () => {
+    const { loadStage } = spyStage();
+    const { findByRole } = render(() => <Arsenal loadStage={loadStage} />);
+
+    const eye = await findEye(findByRole);
+
+    fireEvent.click(eye);
+    expect(body().queryByRole("dialog")).toBeTruthy();
+
+    // A pointer-down anywhere outside the eye + popover dismisses it.
+    fireEvent.pointerDown(document.body);
+
+    expect(body().queryByRole("dialog")).toBeNull();
+  });
+
+  it("does not load the Pixi preview stage until a preview is first opened", async () => {
+    const stage = spyStage();
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} />
+    ));
+
+    const eye = await findEye(findByRole);
+
+    // Nothing Pixi has loaded just from rendering the page — the home bundle stays Pixi-free.
+    expect(stage.loads()).toBe(0);
+
+    fireEvent.click(eye);
+
+    // The first open triggers exactly one lazy load.
+    expect(stage.loads()).toBe(1);
+  });
+
+  it("plays the gyaku-zuki loop tape through the preview stage", async () => {
+    const stage = spyStage();
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} />
+    ));
+
+    fireEvent.click(await findEye(findByRole));
+    await body().findByTestId("preview-stage");
+
+    // The tape is gyaku-zuki's own looping technique (span 24), committed on the attacker.
+    expect(stage.latestTape()).toHaveLength(24);
+    expect(stage.latestTape()[0].a.attackMove).toBe("gyaku-zuki");
+  });
+
+  it("loops the technique — the playhead wraps past the final tick back to the start", async () => {
+    const stage = spyStage();
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} />
+    ));
+
+    fireEvent.click(await findEye(findByRole));
+    await body().findByTestId("preview-stage");
+
+    const length = moveLoopTape("gyaku-zuki").length; // 24
+
+    // Advance the clock past the end: a looping preview wraps back near the start (loopIndex),
+    // where a fight clock (transport) would clamp and sit frozen on the last frame (23).
+    stage.pump(length + 3);
+
+    await expect
+      .poll(() => stage.latestTick())
+      .toBe(loopIndex(length + 3, length)); // 3, not 23
+  });
+
+  it("dims the passive target and leaves the attacker at full strength", async () => {
+    const stage = spyStage();
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} />
+    ));
+
+    fireEvent.click(await findEye(findByRole));
+    await body().findByTestId("preview-stage");
+
+    // The attacker (a) reads full; the passive target (b) is faded so the eye reads the attacker
+    // as the subject. The exact fade is eye-tuned — only the relationship is pinned.
+    expect(stage.latestAlpha().a).toBe(1);
+    expect(stage.latestAlpha().b).toBeLessThan(1);
   });
 });
