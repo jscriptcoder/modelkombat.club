@@ -619,41 +619,46 @@ const RingPage: Component<RingPageProps> = (props) => {
                         {(row) => (
                           <li class="ring-defender-row">
                             <ModelLogo model={row.defender.model} />
-                            <code class="ring-defender-name">
-                              {row.defender.name}
-                            </code>
-                            <Show when={row.isKing}>
-                              <span class="ring-defender-crown">King</span>
-                            </Show>
-                            <Show when={row.defender.handle}>
-                              {(handle) => (
-                                <span class="ring-defender-handle">
-                                  by {handle()}
-                                </span>
-                              )}
-                            </Show>
-                            <span class="ring-defender-rate">
-                              {formatRate(row.winRate)}
-                            </span>
-                            <span
-                              class="ring-defender-result"
-                              classList={{
-                                "ring-defender-result-beat": row.winRate > 0.5,
-                              }}
-                            >
-                              {beatLabel(row.winRate)}
-                            </span>
-                            <Show when={row.replayId}>
-                              {(id) => (
-                                <a
-                                  class="ring-defender-watch"
-                                  href={`${WATCH_PATH}/${id()}`}
-                                  aria-label={`Watch the fight against ${row.defender.name}`}
-                                >
-                                  Watch
-                                </a>
-                              )}
-                            </Show>
+                            <div class="ring-defender-id">
+                              <code class="ring-defender-name">
+                                {row.defender.name}
+                              </code>
+                              <Show when={row.isKing}>
+                                <span class="ring-defender-crown">King</span>
+                              </Show>
+                              <Show when={row.defender.handle}>
+                                {(handle) => (
+                                  <span class="ring-defender-handle">
+                                    by {handle()}
+                                  </span>
+                                )}
+                              </Show>
+                            </div>
+                            <div class="ring-defender-score">
+                              <span class="ring-defender-rate">
+                                {formatRate(row.winRate)}
+                              </span>
+                              <span
+                                class="ring-defender-result"
+                                classList={{
+                                  "ring-defender-result-beat":
+                                    row.winRate > 0.5,
+                                }}
+                              >
+                                {beatLabel(row.winRate)}
+                              </span>
+                              <Show when={row.replayId}>
+                                {(id) => (
+                                  <a
+                                    class="ring-defender-watch"
+                                    href={`${WATCH_PATH}/${id()}`}
+                                    aria-label={`Watch the fight against ${row.defender.name}`}
+                                  >
+                                    Watch
+                                  </a>
+                                )}
+                              </Show>
+                            </div>
                           </li>
                         )}
                       </For>

@@ -280,13 +280,13 @@
   text-align: left;
 }
 
-/* One defender row: model mark · name · [King] · [by handle] · win rate · beat/lost pill. Flex so
-   the optional King/handle tokens flow inline; the rate + result are pushed to the trailing edge. */
+/* One defender row, in three zones: the model mark pinned LEFT, the identity (name · [King] ·
+   [by handle]) CENTRED in the middle, and the score (win rate · beat/lost · [Watch]) pinned RIGHT.
+   The centre zone grows (flex: 1) to fill the gap, pushing the score to the trailing edge. */
 .ring-defender-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.75rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -296,6 +296,27 @@
   width: 1.75rem;
   height: 1.75rem;
   flex: none;
+}
+
+/* The centred identity zone: name + optional King/handle tokens, flowing inline and centred as a
+   group. `flex: 1` claims the middle space (so the score sits at the far right); `min-width: 0`
+   lets a long name wrap inside the row rather than push the page sideways. */
+.ring-defender-id {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* The score zone pinned to the trailing edge: win rate · beat/lost pill · optional Watch link. */
+.ring-defender-score {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* Name chip: the shared .move-id / .fighter-name token treatment (accent on code-bg). */
@@ -324,9 +345,9 @@
   font-size: 0.85rem;
 }
 
-/* Win rate + result are pushed to the trailing edge (auto left margin on the first of the pair). */
+/* Win rate — leads the right-hand score zone (its trailing-edge placement comes from the centre
+   zone's `flex: 1`, not a margin here). Tabular figures keep the percentages column-aligned. */
 .ring-defender-rate {
-  margin-left: auto;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   font-size: 0.9rem;
