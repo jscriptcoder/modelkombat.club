@@ -197,7 +197,7 @@
   top: 0.5rem;
   /* Cleared enough from the edge to sit clear of the pane's vertical scrollbar (the JSON usually
      overflows its max-height), not just the border. */
-  right: 1rem;
+  right: 1.4rem;
   flex-direction: column;
   align-items: flex-end;
 }
