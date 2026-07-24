@@ -727,7 +727,34 @@ const GROUND_RATIO = 0.9;
 // longer fill the frame (M2 / M12 vertical-fit); a smaller body stands further from its opponent in
 // body-heights, so a committed strike telescopes a little more to connect (bounded — see rootTravel).
 // Exported so the head glyph (Slice 2) can size itself as a proportion of the same height.
+//
+// This governs the body's size relative to the RING (and thus the reach geometry — do NOT lower it to
+// shrink the on-screen figure; that stretches the striking limbs past their tuned bounds). To shrink
+// the figure in the FRAME, inset the ring within the canvas via RING_FILL below, which scales body and
+// reach together and leaves the geometry untouched.
 export const BODY_HEIGHT_SUB = 210_000;
+
+// The ring INSET fraction: the fighters + ring draw into a centred sub-band of the canvas at this
+// fraction of full size, so they read as two figures IN a ring rather than filling the frame (the
+// "make them smaller" ask). Applied as ONE transform on the world container in the Pixi layer, so the
+// pure projection stays FULL-scale — SUBUNIT_TO_LOCAL and the lean/step bounds are untouched, unlike
+// lowering BODY_HEIGHT_SUB which stretches the striking limbs. The leftover margin is the tatami
+// surround (the ring decoration). Eye-tunable — no test pins it beyond the `ringTransform` cases.
+export const RING_FILL = 0.85;
+
+// The world container's transform that insets the ring (consumed by the Pixi layer's createStage): a
+// uniform down-scale to RING_FILL, centred horizontally, with a vertical offset chosen so the GROUND
+// LINE stays fixed after scaling (the body shrinks upward from planted feet, matching the "feet grow
+// up" design — see scalePose). Pure in the viewport, so the inset is exact-assertion testable here
+// while the projection itself stays full-scale.
+export type RingTransform = { scale: number; x: number; y: number };
+
+export const ringTransform = (viewport: Viewport): RingTransform => ({
+  scale: RING_FILL,
+  // Whole-pixel offsets (crisp, consistent with scalePose's rounding); the scale itself stays exact.
+  x: Math.round((viewport.width * (1 - RING_FILL)) / 2),
+  y: Math.round(viewport.height * GROUND_RATIO * (1 - RING_FILL)),
+});
 
 // The reference skeleton's head-to-foot span in local px (feet planted at y 0, head at STAND.head.y)
 // — the unit the pose constants (STAND/CROUCH/AIR/PRONE + the reach layers) are authored in. Derived

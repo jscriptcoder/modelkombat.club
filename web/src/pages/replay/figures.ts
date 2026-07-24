@@ -2,6 +2,7 @@ import { Container, Graphics, Text } from "pixi.js";
 
 import {
   bodyHeightPx,
+  ringTransform,
   type Scene,
   type Skeleton,
   type Viewport,
@@ -267,6 +268,11 @@ const applyFlash = (flash: Graphics, mark: Scene["contact"]["a"]): void => {
 // display projection the player calls every frame.
 export type Stage = {
   root: Container;
+  // The inset world container the fighters + flashes ride inside — down-scaled + centred by
+  // `ringTransform` so they read as figures IN a ring rather than filling the frame (slice 2). The HUD
+  // is added to `root`, NOT here, so the scoreboard stays crisp at full canvas size. Exposed for
+  // display-object assertions.
+  world: Container;
   a: FigureNodes;
   b: FigureNodes;
   hud: Text;
@@ -303,9 +309,19 @@ export const createStage = (
   flashA.visible = false;
   flashB.visible = false;
 
+  // The fighters + flashes ride inside a world container the ring-inset transform down-scales +
+  // centres (slice 2); the HUD is added straight to root so the scoreboard stays full canvas size.
+  const world = new Container();
+  const inset = ringTransform(viewport);
+
+  world.scale.set(inset.scale);
+  world.x = inset.x;
+  world.y = inset.y;
+  world.addChild(a.nodes.root, b.nodes.root, flashA, flashB);
+
   const root = new Container();
 
-  root.addChild(a.nodes.root, b.nodes.root, flashA, flashB, hud);
+  root.addChild(world, hud);
 
   const apply = (scene: Scene): void => {
     applyFigure(a, scene.a);
@@ -321,6 +337,7 @@ export const createStage = (
 
   return {
     root,
+    world,
     a: a.nodes,
     b: b.nodes,
     hud,

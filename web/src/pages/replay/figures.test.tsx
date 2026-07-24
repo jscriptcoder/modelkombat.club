@@ -62,6 +62,27 @@ const tickOf = (
 ): ReplayTick => ({ tick, a: frame(a), b: frame(b) });
 
 describe("figures — the Pixi draw layer applies a Scene to display objects", () => {
+  it("nests the fighters + flashes in a centred, down-scaled world container; the HUD stays full-size", () => {
+    // The on-screen shrink (slice 2) is one transform on a WORLD container the fighters ride inside —
+    // the scene coords stay full-scale (every position test below is unchanged). The HUD is added to
+    // the ROOT, not the world, so the scoreboard text stays crisp at full canvas size.
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    expect(stage.world.scale.x).toBeCloseTo(0.85);
+    expect(stage.world.scale.y).toBeCloseTo(0.85);
+    expect(stage.world.x).toBe(90); // (1200 · 0.15) / 2
+    expect(stage.world.y).toBe(81); // ground held at 540
+
+    // The two fighters + both impact flashes ride inside the inset world; the HUD does not.
+    expect(stage.world.children).toContain(stage.a.root);
+    expect(stage.world.children).toContain(stage.b.root);
+    expect(stage.world.children).toContain(stage.flashes.a);
+    expect(stage.world.children).toContain(stage.flashes.b);
+    expect(stage.root.children).toContain(stage.world);
+    expect(stage.root.children).toContain(stage.hud);
+    expect(stage.world.children).not.toContain(stage.hud);
+  });
+
   it("positions the two figures at their scene pixels (x and y)", () => {
     // Distinct per-fighter y (a airborne, b grounded) pins the y wiring and catches an a/b swap.
     const tape: ReplayTape = [

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   BODY_HEIGHT_SUB,
+  ringTransform,
   scene,
   SHOULDER_HALF_WIDTH,
   type Joint,
@@ -190,6 +191,35 @@ describe("scene — world-scaled body (Story 3)", () => {
 
     expect(spanOf(small)).toBe(420); // 210000 · (1200/600000)
     expect(spanOf(big)).toBe(840); // 210000 · (2400/600000) — exactly twice
+  });
+});
+
+describe("scene — the ring inset transform (fighters shrink into a centred band)", () => {
+  // The pure projection stays FULL-scale (every test above is unchanged); the on-screen shrink is one
+  // transform applied to the world container in the Pixi layer. It scales the ring to RING_FILL of the
+  // canvas, centres it horizontally, and offsets it vertically so the GROUND LINE stays put — the body
+  // shrinks upward from planted feet. Concrete expectations (not RING_FILL·something) so a flipped
+  // formula or a wrong fill fraction is caught; the ground-fixed offset re-derives per viewport height.
+  it("insets the ring to 0.85 of the canvas, centred horizontally, with the ground line held fixed", () => {
+    const t = ringTransform(VIEWPORT);
+
+    expect(t.scale).toBeCloseTo(0.85); // the fill fraction
+    expect(t.x).toBe(90); // (1200 · (1 − 0.85)) / 2 — even margins left + right
+    expect(t.y).toBe(81); // 540 ground · (1 − 0.85) — keeps the ground at 540 after the down-scale
+  });
+
+  it("grows the horizontal margin with the canvas width but holds the fill fraction", () => {
+    const t = ringTransform({ width: 2400, height: 600 });
+
+    expect(t.scale).toBeCloseTo(0.85); // fill is viewport-independent
+    expect(t.x).toBe(180); // (2400 · 0.15) / 2
+    expect(t.y).toBe(81); // height unchanged ⇒ same ground offset
+  });
+
+  it("derives the vertical offset from the canvas height so the ground stays put at any height", () => {
+    const t = ringTransform({ width: 1200, height: 800 });
+
+    expect(t.y).toBe(108); // 800 · 0.9 ground-ratio · 0.15
   });
 });
 
