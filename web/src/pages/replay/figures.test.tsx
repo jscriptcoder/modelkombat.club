@@ -62,6 +62,137 @@ const tickOf = (
 ): ReplayTick => ({ tick, a: frame(a), b: frame(b) });
 
 describe("figures — the Pixi draw layer applies a Scene to display objects", () => {
+  it("plants a soft shadow under each fighter, inside the world and behind them", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    stage.apply(
+      scene(
+        [tickOf(0, { x: 150_000, y: 0 }, { x: 450_000, y: 0 })],
+        0,
+        VIEWPORT,
+      ),
+    );
+
+    // Shadows ride the world container (so they scale + inset with the fighters) and draw BEHIND the
+    // figure roots. Positioned under the fighter's feet, scaled by the scene's shadow scale.
+    expect(stage.world.children).toContain(stage.shadows.a);
+    expect(stage.world.children.indexOf(stage.shadows.a)).toBeLessThan(
+      stage.world.children.indexOf(stage.a.root),
+    );
+    expect(stage.shadows.a.x).toBe(300);
+    expect(stage.shadows.a.y).toBe(540);
+    expect(stage.shadows.a.scale.x).toBe(1);
+  });
+
+  it("renders each fighter's name and a stamina bar filled to their current fraction", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"], {
+      names: ["You", "King"],
+      staminaMax: { a: 100, b: 80 },
+    });
+
+    stage.apply(
+      scene([tickOf(0, { stamina: 50 }, { stamina: 20 })], 0, VIEWPORT),
+    );
+
+    expect(stage.scoreboard.a.name.text).toBe("You");
+    expect(stage.scoreboard.b.name.text).toBe("King");
+    // The fill bar is drawn at full width and scaled to the stamina fraction (current / peak).
+    expect(stage.scoreboard.a.fill.scale.x).toBeCloseTo(0.5); // 50 / 100
+    expect(stage.scoreboard.b.fill.scale.x).toBeCloseTo(0.25); // 20 / 80
+    expect(stage.scoreboard.a.bar.visible).toBe(true);
+  });
+
+  it("hides a fighter's stamina bar when they have no meter (max 0)", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"], {
+      names: ["A", "B"],
+      staminaMax: { a: 0, b: 100 },
+    });
+
+    stage.apply(
+      scene([tickOf(0, { stamina: 0 }, { stamina: 60 })], 0, VIEWPORT),
+    );
+
+    expect(stage.scoreboard.a.bar.visible).toBe(false); // no meter ⇒ no bar
+    expect(stage.scoreboard.b.bar.visible).toBe(true);
+    expect(stage.scoreboard.b.fill.scale.x).toBeCloseTo(0.6); // 60 / 100
+  });
+
+  it("fades in a TIME card with the final score and winner as the outro completes", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"], {
+      names: ["warden", "vulture"],
+      staminaMax: { a: 100, b: 100 },
+    });
+
+    // Mid-fight (outro 0): the card is hidden.
+    stage.apply(
+      scene([tickOf(0, { points: 3 }, { points: 1 })], 0, VIEWPORT, 0),
+    );
+    expect(stage.card.container.visible).toBe(false);
+
+    // End of the settle (outro 1): the card is fully faded in with the final score + winner.
+    stage.apply(
+      scene([tickOf(0, { points: 7 }, { points: 5 })], 0, VIEWPORT, 1),
+    );
+    expect(stage.card.container.visible).toBe(true);
+    expect(stage.card.container.alpha).toBeCloseTo(1);
+    expect(stage.card.heading.text).toBe("TIME");
+    expect(stage.card.score.text).toMatch(/7\s*–\s*5/);
+    expect(stage.card.winner.text).toBe("warden wins"); // A led ⇒ challenger wins
+
+    // The mirror: B leads ⇒ the King's name is the winner (kills a fixed-side / swapped-branch mutant).
+    stage.apply(
+      scene([tickOf(0, { points: 2 }, { points: 6 })], 0, VIEWPORT, 1),
+    );
+    expect(stage.card.winner.text).toBe("vulture wins");
+  });
+
+  it("declares a draw on the card when the scores are level", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"], {
+      names: ["warden", "vulture"],
+      staminaMax: { a: 0, b: 0 },
+    });
+
+    stage.apply(
+      scene([tickOf(0, { points: 4 }, { points: 4 })], 0, VIEWPORT, 1),
+    );
+
+    expect(stage.card.winner.text).toBe("DRAW");
+  });
+
+  it("draws the tatami ring backdrop first, behind the fighters and the HUD", () => {
+    // The mat rides root (screen px), not the inset world, so its ground line meets the fighters' feet.
+    // It must be root's FIRST child so it strokes behind everything — the geometry is ringLayout's
+    // (unit-tested); here we pin only the z-order + membership (a Graphics path is opaque to assertions).
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    expect(stage.root.children).toContain(stage.ring);
+    expect(stage.root.children[0]).toBe(stage.ring); // first ⇒ at the back
+    expect(stage.root.children.indexOf(stage.ring)).toBeLessThan(
+      stage.root.children.indexOf(stage.world),
+    );
+  });
+
+  it("nests the fighters + flashes in a centred, down-scaled world container; the HUD stays full-size", () => {
+    // The on-screen shrink (slice 2) is one transform on a WORLD container the fighters ride inside —
+    // the scene coords stay full-scale (every position test below is unchanged). The HUD is added to
+    // the ROOT, not the world, so the scoreboard text stays crisp at full canvas size.
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    expect(stage.world.scale.x).toBeCloseTo(0.85);
+    expect(stage.world.scale.y).toBeCloseTo(0.85);
+    expect(stage.world.x).toBe(90); // (1200 · 0.15) / 2
+    expect(stage.world.y).toBe(81); // ground held at 540
+
+    // The two fighters + both impact flashes ride inside the inset world; the scoreboard does not.
+    expect(stage.world.children).toContain(stage.a.root);
+    expect(stage.world.children).toContain(stage.b.root);
+    expect(stage.world.children).toContain(stage.flashes.a);
+    expect(stage.world.children).toContain(stage.flashes.b);
+    expect(stage.root.children).toContain(stage.world);
+    expect(stage.root.children).toContain(stage.scoreboard.container);
+    expect(stage.world.children).not.toContain(stage.scoreboard.container);
+  });
+
   it("positions the two figures at their scene pixels (x and y)", () => {
     // Distinct per-fighter y (a airborne, b grounded) pins the y wiring and catches an a/b swap.
     const tape: ReplayTape = [
@@ -105,7 +236,7 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     expect(stage.b.root.scale.x).toBe(1);
   });
 
-  it("writes the tick and both scores into the HUD text", () => {
+  it("writes the tick and each fighter's score into the scoreboard", () => {
     const tape: ReplayTape = [
       { tick: 12, a: frame({ points: 3 }), b: frame({ points: 1 }) },
     ];
@@ -114,10 +245,11 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene(tape, 0, VIEWPORT));
 
-    expect(stage.hud.text).toContain("tick 12");
-    // Score ORDER (challenger : King) — asserting "3 : 1" (not just both digits) catches a
-    // scoreA/scoreB swap, which a bare toContain("3")+toContain("1") would miss.
-    expect(stage.hud.text).toMatch(/3\s*:\s*1/);
+    expect(stage.scoreboard.tick.text).toContain("tick 12");
+    // Separate per-fighter score Texts (challenger left, King right) — asserting each catches a
+    // scoreA/scoreB swap.
+    expect(stage.scoreboard.a.score.text).toBe("3");
+    expect(stage.scoreboard.b.score.text).toBe("1");
   });
 
   it("lowers the head joint display object for a crouching fighter", () => {
@@ -246,8 +378,8 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene(tape, 1, VIEWPORT));
 
-    expect(stage.hud.text).toContain("★3");
-    expect(stage.hud.text).not.toContain("★0"); // B did not score — no marker
+    expect(stage.scoreboard.a.score.text).toBe("★3");
+    expect(stage.scoreboard.b.score.text).toBe("0"); // B did not score — no marker
   });
 
   it("marks only the fighter who scored, leaving the other plain", () => {
@@ -261,7 +393,8 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     stage.apply(scene(tape, 1, VIEWPORT));
 
     // B scored → the marker sits on B's score; A's stays a bare digit.
-    expect(stage.hud.text).toMatch(/0 : ★2/);
+    expect(stage.scoreboard.a.score.text).toBe("0");
+    expect(stage.scoreboard.b.score.text).toBe("★2");
   });
 
   it("leaves both scores plain when nobody scored in the window", () => {
@@ -275,8 +408,11 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
 
     stage.apply(scene(tape, 1, VIEWPORT));
 
-    expect(stage.hud.text).toMatch(/^tick 1 +3 : 1$/);
-    expect(stage.hud.text).not.toContain("★");
+    expect(stage.scoreboard.tick.text).toBe("tick 1");
+    expect(stage.scoreboard.a.score.text).toBe("3");
+    expect(stage.scoreboard.b.score.text).toBe("1");
+    expect(stage.scoreboard.a.score.text).not.toContain("★");
+    expect(stage.scoreboard.b.score.text).not.toContain("★");
   });
 
   it("lays the joint display objects prone for a knocked-down fighter", () => {

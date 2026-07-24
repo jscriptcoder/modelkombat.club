@@ -8,9 +8,10 @@ import {
 import { Application } from "pixi.js";
 
 import { brandsFor, createStage } from "./figures";
-import { scene, type Viewport } from "./scene";
+import { scene, staminaMax, type Viewport } from "./scene";
 import {
   advance,
+  playbackDelta,
   seek,
   startTransport,
   step,
@@ -91,8 +92,12 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
     host.appendChild(created.canvas);
 
     // Each fighter's head wears its authoring model's brand glyph, resolved once here (identity is
-    // off-tape — the models ride on the item, not the render frames).
-    const stage = createStage(viewport, brandsFor(props.item.fighters));
+    // off-tape — the models ride on the item, not the render frames). The scoreboard needs the
+    // fighters' names and their peak stamina (the bar's denominator, computed once over the tape).
+    const stage = createStage(viewport, brandsFor(props.item.fighters), {
+      names: [props.item.fighters[0].name, props.item.fighters[1].name],
+      staminaMax: staminaMax(tape),
+    });
 
     created.stage.addChild(stage.root);
 
@@ -101,11 +106,17 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
     // Advance the clock ~one engine tick per rendered frame while playing (a paused clock is
     // unchanged), then draw the frame the playhead lands on. Reading the signal each frame picks up
     // pause / restart from the controls; a restart resets the playhead and the next frame draws it.
+    // Past the last tick the clock's `outro` ramps (see transport): it drives the ease-back-to-neutral
+    // + the TIME card fade, so the fight settles to a close rather than freezing on the final frame.
     created.ticker.add((ticker) => {
-      const next = advance(transport(), ticker.deltaTime * speed(), lastTick);
+      const next = advance(
+        transport(),
+        playbackDelta(ticker.deltaTime, speed()),
+        lastTick,
+      );
 
       setTransport(next);
-      stage.apply(scene(tape, Math.round(next.playhead), viewport));
+      stage.apply(scene(tape, Math.round(next.playhead), viewport, next.outro));
     });
   });
 

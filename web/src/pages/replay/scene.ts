@@ -626,7 +626,20 @@ export type Hud = {
   scoreB: number;
   scoredA: boolean;
   scoredB: boolean;
+  // Each fighter's current stamina at the playhead — the scoreboard bar's numerator (its max is the
+  // tape-constant `staminaMax`). 0 both when no meter is configured.
+  staminaA: number;
+  staminaB: number;
 };
+
+// Each fighter's PEAK stamina across the whole tape — the scoreboard bar's denominator. Stamina inits
+// at the meter's max and regen clamps to it (engine), so the tape's max IS the configured max; a
+// fighter with no meter reads 0 every tick, so max 0 (the sentinel the draw layer hides the bar on). A
+// fight-constant, so the player computes it once at mount rather than per frame.
+export const staminaMax = (tape: ReplayTape): { a: number; b: number } => ({
+  a: tape.reduce((m, t) => Math.max(m, t.a.stamina), 0),
+  b: tape.reduce((m, t) => Math.max(m, t.b.stamina), 0),
+});
 
 // The score-pop lookback: a fighter's score highlights if their points rose within the last N ticks
 // ending at the playhead (≈0.5 s at 60 fps). Held long enough to read as "that scored!".
@@ -697,6 +710,11 @@ const phaseRunAt = (
 // while the fighters yame-reset during the fade — not recomputed from the moving current frame.
 export type Mark = { x: number; y: number; age: number };
 
+// A fighter's ground shadow: where it sits on the mat (`x` under the fighter, `y` on the ground line)
+// and how large (`scale` — 1 planted, shrinking toward SHADOW_MIN_SCALE as the fighter lifts off, so a
+// jump reads). Drawn in the world container behind the fighter (figures.ts).
+export type Shadow = { x: number; y: number; scale: number };
+
 export type Scene = {
   a: Figure;
   b: Figure;
@@ -704,6 +722,11 @@ export type Scene = {
   // Per scorer: `a` is where challenger `a`'s strike/throw landed on the King, `b` the mirror. Each
   // side is independent, so a same-tick trade flashes both; `null` when that side has no live score.
   contact: { a: Mark | null; b: Mark | null };
+  // Each fighter's ground shadow, tracking their x on the mat and shrinking when airborne.
+  shadows: { a: Shadow; b: Shadow };
+  // The end-of-fight overlay state: `cardAlpha` (0..1) fades in the TIME card over the tail of the
+  // settle. 0 all through the fight (and at outro 0).
+  outro: { cardAlpha: number };
 };
 
 // The canvas the scene is drawn into (supplied by the Pixi layer; fixed in tests for exact maths).
@@ -720,6 +743,18 @@ export const WORLD_WIDTH = 600_000;
 // on both axes — so x and y share a single px-per-subunit scale and proportions hold.
 const GROUND_RATIO = 0.9;
 
+// The ground shadow shrinks as a fighter lifts off the mat: `scale = 1 − lift / (bodyHeight · SPAN)`,
+// floored so a big jump never inverts or vanishes it. SPAN = 1.5 body-heights of lift spends the full
+// shrink range; both eye-tunable.
+const SHADOW_LIFT_SPAN = 1.5;
+const SHADOW_MIN_SCALE = 0.5;
+
+// The end-of-fight settle: the pose reaches its neutral stance by SETTLE_END of the outro (the front
+// 60%), leaving the tail for the TIME card, which fades in over [CARD_FADE_START, 1] of the outro. Both
+// eye-tunable; the outro itself (0..1) is the transport's settle progress.
+const SETTLE_END = 0.6;
+const CARD_FADE_START = 0.45;
+
 // The fighter's body height in world sub-units — the single tunable knob every body dimension
 // derives from (decision 3 / M2). Projected by the SAME pxPerSubunit that positions the fighter, so
 // the body grows with the ring instead of staying a fixed ~76px across a void of empty world. Tuned
@@ -727,7 +762,69 @@ const GROUND_RATIO = 0.9;
 // longer fill the frame (M2 / M12 vertical-fit); a smaller body stands further from its opponent in
 // body-heights, so a committed strike telescopes a little more to connect (bounded — see rootTravel).
 // Exported so the head glyph (Slice 2) can size itself as a proportion of the same height.
+//
+// This governs the body's size relative to the RING (and thus the reach geometry — do NOT lower it to
+// shrink the on-screen figure; that stretches the striking limbs past their tuned bounds). To shrink
+// the figure in the FRAME, inset the ring within the canvas via RING_FILL below, which scales body and
+// reach together and leaves the geometry untouched.
 export const BODY_HEIGHT_SUB = 210_000;
+
+// The ring INSET fraction: the fighters + ring draw into a centred sub-band of the canvas at this
+// fraction of full size, so they read as two figures IN a ring rather than filling the frame (the
+// "make them smaller" ask). Applied as ONE transform on the world container in the Pixi layer, so the
+// pure projection stays FULL-scale — SUBUNIT_TO_LOCAL and the lean/step bounds are untouched, unlike
+// lowering BODY_HEIGHT_SUB which stretches the striking limbs. The leftover margin is the tatami
+// surround (the ring decoration). Eye-tunable — no test pins it beyond the `ringTransform` cases.
+export const RING_FILL = 0.85;
+
+// The world container's transform that insets the ring (consumed by the Pixi layer's createStage): a
+// uniform down-scale to RING_FILL, centred horizontally, with a vertical offset chosen so the GROUND
+// LINE stays fixed after scaling (the body shrinks upward from planted feet, matching the "feet grow
+// up" design — see scalePose). Pure in the viewport, so the inset is exact-assertion testable here
+// while the projection itself stays full-scale.
+export type RingTransform = { scale: number; x: number; y: number };
+
+export const ringTransform = (viewport: Viewport): RingTransform => ({
+  scale: RING_FILL,
+  // Whole-pixel offsets (crisp, consistent with scalePose's rounding); the scale itself stays exact.
+  x: Math.round((viewport.width * (1 - RING_FILL)) / 2),
+  y: Math.round(viewport.height * GROUND_RATIO * (1 - RING_FILL)),
+});
+
+// The tatami floor's back edge, as a fraction of canvas height: the horizon where the mat meets the
+// dark hall. Below the fighters' heads and above their feet, so the floor reads as a shallow plane the
+// figures stand near the front of. Eye-tunable.
+const HORIZON_RATIO = 0.76;
+
+// How many two-tone vertical bands the tatami floor is split into — the woven-panel texture. Eye-tunable.
+const TATAMI_PANELS = 10;
+
+// The tatami ring's geometry in SCREEN px (the decorated backdrop). Drawn behind the inset world
+// container, so its `groundY` lands on the fighters' feet (both fixed at GROUND_RATIO) and its
+// left/right edges sit on the ring band the world container occupies — those edges ARE the jogai
+// out-of-bounds boundary. Pure in the viewport (reusing ringTransform for the band's left edge), so the
+// mat geometry is exact-assertion testable while its fills / tones / stroke widths stay eye-tuned.
+export type RingLayout = {
+  groundY: number; // the feet line (mat surface at the front)
+  horizonY: number; // the mat's back edge (floor meets hall)
+  left: number; // ring band's left edge == jogai boundary
+  right: number; // ring band's right edge == jogai boundary
+  centerX: number; // ring centre (the referee mark)
+  panels: number; // tatami two-tone band count
+};
+
+export const ringLayout = (viewport: Viewport): RingLayout => {
+  const left = ringTransform(viewport).x;
+
+  return {
+    groundY: Math.round(viewport.height * GROUND_RATIO),
+    horizonY: Math.round(viewport.height * HORIZON_RATIO),
+    left,
+    right: viewport.width - left,
+    centerX: viewport.width / 2,
+    panels: TATAMI_PANELS,
+  };
+};
 
 // The reference skeleton's head-to-foot span in local px (feet planted at y 0, head at STAND.head.y)
 // — the unit the pose constants (STAND/CROUCH/AIR/PRONE + the reach layers) are authored in. Derived
@@ -881,6 +978,32 @@ const scalePose = (pose: Skeleton, scale: number): Skeleton => {
   };
 };
 
+// Lerp a whole skeleton toward another, joint by joint, rounding to whole px (like scalePose). Used by
+// the end-of-fight settle to ease a final pose toward its neutral stance; at t=1 it returns `to`
+// exactly (both inputs are already rounded), so a full settle lands precisely on the neutral pose.
+const lerpSkeleton = (from: Skeleton, to: Skeleton, t: number): Skeleton => {
+  const j = (a: Joint, b: Joint): Joint => ({
+    x: Math.round(a.x + (b.x - a.x) * t),
+    y: Math.round(a.y + (b.y - a.y) * t),
+  });
+
+  return {
+    head: j(from.head, to.head),
+    shoulder: j(from.shoulder, to.shoulder),
+    hip: j(from.hip, to.hip),
+    handL: j(from.handL, to.handL),
+    handR: j(from.handR, to.handR),
+    footL: j(from.footL, to.footL),
+    footR: j(from.footR, to.footR),
+    shoulderL: j(from.shoulderL, to.shoulderL),
+    shoulderR: j(from.shoulderR, to.shoulderR),
+    elbowL: j(from.elbowL, to.elbowL),
+    elbowR: j(from.elbowR, to.elbowR),
+    kneeL: j(from.kneeL, to.kneeL),
+    kneeR: j(from.kneeR, to.kneeR),
+  };
+};
+
 // Keep the playhead inside the tape: a value past the last tick shows the final frame, a negative
 // one shows the first. The player never renders a frame off the ends of a real fight.
 const clampPlayhead = (playhead: number, length: number): number =>
@@ -890,10 +1013,22 @@ export const scene = (
   tape: ReplayTape,
   playhead: number,
   viewport: Viewport,
+  outro: number = 0,
 ): Scene => {
   const pxPerSubunit = viewport.width / WORLD_WIDTH;
   const groundY = viewport.height * GROUND_RATIO;
   const scale = bodyScale(viewport);
+
+  // The end-of-fight settle: how far each pose has eased toward its neutral stance (0 → the raw final
+  // frame, 1 → fully neutral). Smoothstepped and reaching 1 by SETTLE_END of the outro, so the fighters
+  // relax over the front of the outro and hold neutral under the card.
+  const settleT = outro <= 0 ? 0 : smoothstep(Math.min(1, outro / SETTLE_END));
+
+  // The TIME card fade, over the tail [CARD_FADE_START, 1] of the outro (0 until then), smoothed.
+  const cardAlpha =
+    outro <= CARD_FADE_START
+      ? 0
+      : smoothstep((outro - CARD_FADE_START) / (1 - CARD_FADE_START));
 
   // Each fighter's pose needs the OTHER's frame: the reach-to-target solves aim the striking hand and
   // the throw grab at the opponent's near edge (strikeHandFor / throwGrabFor). Everything else is a
@@ -903,11 +1038,14 @@ export const scene = (
     frame: ReplayFrame,
     opponent: ReplayFrame,
     run: PhaseRun,
-  ): Figure => ({
-    x: frame.x * pxPerSubunit,
-    y: groundY - frame.y * pxPerSubunit,
-    facing: frame.facing,
-    pose: scalePose(
+  ): Figure => {
+    const placement = {
+      x: frame.x * pxPerSubunit,
+      y: groundY - frame.y * pxPerSubunit,
+      facing: frame.facing,
+    };
+
+    const pose = scalePose(
       poseFor(
         frame,
         strikeHandFor(frame, opponent),
@@ -915,8 +1053,31 @@ export const scene = (
         run,
       ),
       scale,
-    ),
-  });
+    );
+
+    // No settle, or a downed fighter (prone stays prone — no magic stand-up): the raw pose.
+    if (settleT <= 0 || frame.knockdown) return { ...placement, pose };
+
+    // Ease toward the fighter's NEUTRAL stance: the same frame de-committed (no strike / throw / guard,
+    // standing), so a mid-technique final frame relaxes to a ready stance in place.
+    const neutralFrame: ReplayFrame = {
+      ...frame,
+      posture: 0,
+      attacking: false,
+      throwing: false,
+      guardBand: 0,
+      attackMove: "",
+      attackPhase: 0,
+      attackReach: 0,
+    };
+
+    const neutralPose = scalePose(
+      poseFor(neutralFrame, null, null, run),
+      scale,
+    );
+
+    return { ...placement, pose: lerpSkeleton(pose, neutralPose, settleT) };
+  };
 
   const p = clampPlayhead(playhead, tape.length);
   const at = tape[p];
@@ -980,23 +1141,42 @@ export const scene = (
     return null;
   };
 
+  const figA = figure(
+    at.a,
+    at.b,
+    phaseRunAt(tape, p, (t) => t.a),
+  );
+
+  const figB = figure(
+    at.b,
+    at.a,
+    phaseRunAt(tape, p, (t) => t.b),
+  );
+
+  // A fighter's ground shadow: on the ground line (`groundY`) under its x, shrinking as it lifts off
+  // (`groundY − fig.y` is the jump height in screen px). Clamped so a big jump floors, not inverts.
+  const shadowFor = (fig: Figure): Shadow => {
+    const lift = Math.max(0, groundY - fig.y);
+
+    const scale = Math.max(
+      SHADOW_MIN_SCALE,
+      1 - lift / (bodyHeightPx(viewport) * SHADOW_LIFT_SPAN),
+    );
+
+    return { x: fig.x, y: groundY, scale };
+  };
+
   return {
-    a: figure(
-      at.a,
-      at.b,
-      phaseRunAt(tape, p, (t) => t.a),
-    ),
-    b: figure(
-      at.b,
-      at.a,
-      phaseRunAt(tape, p, (t) => t.b),
-    ),
+    a: figA,
+    b: figB,
     hud: {
       tick: at.tick,
       scoreA: at.a.points,
       scoreB: at.b.points,
       scoredA: scoredWithin(tape, p, (t) => t.a.points),
       scoredB: scoredWithin(tape, p, (t) => t.b.points),
+      staminaA: at.a.stamina,
+      staminaB: at.b.stamina,
     },
     contact: {
       a: contactFor(
@@ -1010,5 +1190,7 @@ export const scene = (
         (t) => t.b.points,
       ),
     },
+    shadows: { a: shadowFor(figA), b: shadowFor(figB) },
+    outro: { cardAlpha },
   };
 };

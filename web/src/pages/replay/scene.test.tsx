@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   BODY_HEIGHT_SUB,
+  ringLayout,
+  ringTransform,
   scene,
   SHOULDER_HALF_WIDTH,
+  staminaMax,
   type Joint,
   type Scene,
   type Viewport,
@@ -190,6 +193,215 @@ describe("scene — world-scaled body (Story 3)", () => {
 
     expect(spanOf(small)).toBe(420); // 210000 · (1200/600000)
     expect(spanOf(big)).toBe(840); // 210000 · (2400/600000) — exactly twice
+  });
+});
+
+describe("scene — the ring inset transform (fighters shrink into a centred band)", () => {
+  // The pure projection stays FULL-scale (every test above is unchanged); the on-screen shrink is one
+  // transform applied to the world container in the Pixi layer. It scales the ring to RING_FILL of the
+  // canvas, centres it horizontally, and offsets it vertically so the GROUND LINE stays put — the body
+  // shrinks upward from planted feet. Concrete expectations (not RING_FILL·something) so a flipped
+  // formula or a wrong fill fraction is caught; the ground-fixed offset re-derives per viewport height.
+  it("insets the ring to 0.85 of the canvas, centred horizontally, with the ground line held fixed", () => {
+    const t = ringTransform(VIEWPORT);
+
+    expect(t.scale).toBeCloseTo(0.85); // the fill fraction
+    expect(t.x).toBe(90); // (1200 · (1 − 0.85)) / 2 — even margins left + right
+    expect(t.y).toBe(81); // 540 ground · (1 − 0.85) — keeps the ground at 540 after the down-scale
+  });
+
+  it("grows the horizontal margin with the canvas width but holds the fill fraction", () => {
+    const t = ringTransform({ width: 2400, height: 600 });
+
+    expect(t.scale).toBeCloseTo(0.85); // fill is viewport-independent
+    expect(t.x).toBe(180); // (2400 · 0.15) / 2
+    expect(t.y).toBe(81); // height unchanged ⇒ same ground offset
+  });
+
+  it("derives the vertical offset from the canvas height so the ground stays put at any height", () => {
+    const t = ringTransform({ width: 1200, height: 800 });
+
+    expect(t.y).toBe(108); // 800 · 0.9 ground-ratio · 0.15
+  });
+});
+
+describe("scene — the end-of-fight settle (ease back to neutral)", () => {
+  // A fourth `outro` arg (0..1) eases every fighter's pose from its final frame toward a neutral
+  // stance, so a fight that ends mid-technique relaxes rather than freezing. 0 = no settle
+  // (byte-identical to the 3-arg call); 1 = fully neutral. A knocked-down fighter stays prone.
+  const strike = {
+    attacking: true,
+    attackBand: 2,
+    attackReach: 240_000,
+    attackMove: "kizami-zuki",
+    attackPhase: 2,
+  };
+
+  it("eases a committed strike to its neutral stance by the end of the settle", () => {
+    const strikeTape: ReplayTape = [
+      tickOf(0, { x: 150_000, ...strike }, { x: 450_000 }),
+    ];
+
+    const idlePose = scene(
+      [tickOf(0, { x: 150_000 }, { x: 450_000 })],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    const struckHand = scene(strikeTape, 0, VIEWPORT, 0).a.pose.handR.x;
+    const settled = scene(strikeTape, 0, VIEWPORT, 1).a.pose;
+
+    expect(struckHand).toBeGreaterThan(idlePose.handR.x); // the strike reaches out
+    expect(settled).toEqual(idlePose); // fully settled == the neutral stance
+  });
+
+  it("blends partway at a mid outro — relaxing but not yet neutral", () => {
+    const strikeTape: ReplayTape = [
+      tickOf(0, { x: 150_000, ...strike }, { x: 450_000 }),
+    ];
+
+    const struck = scene(strikeTape, 0, VIEWPORT, 0).a.pose.handR.x;
+
+    const idle = scene([tickOf(0, { x: 150_000 }, { x: 450_000 })], 0, VIEWPORT)
+      .a.pose.handR.x;
+
+    const mid = scene(strikeTape, 0, VIEWPORT, 0.3).a.pose.handR.x;
+
+    expect(mid).toBeLessThan(struck); // retracting
+    expect(mid).toBeGreaterThan(idle); // not all the way back yet
+  });
+
+  it("leaves the pose byte-identical at outro 0 (the 3-arg call and outro:0 agree)", () => {
+    const strikeTape: ReplayTape = [
+      tickOf(0, { x: 150_000, ...strike }, { x: 450_000 }),
+    ];
+
+    expect(scene(strikeTape, 0, VIEWPORT, 0).a.pose).toEqual(
+      scene(strikeTape, 0, VIEWPORT).a.pose,
+    );
+  });
+
+  it("keeps a knocked-down fighter prone through the settle (no magic stand-up)", () => {
+    const downTape: ReplayTape = [tickOf(0, { knockdown: true }, {})];
+
+    expect(scene(downTape, 0, VIEWPORT, 1).a.pose).toEqual(
+      scene(downTape, 0, VIEWPORT, 0).a.pose,
+    );
+  });
+
+  it("fades the TIME card in over the tail of the outro", () => {
+    const tape: ReplayTape = [tickOf(0, {}, {})];
+
+    expect(scene(tape, 0, VIEWPORT, 0).outro.cardAlpha).toBe(0);
+    expect(scene(tape, 0, VIEWPORT, 0.4).outro.cardAlpha).toBe(0); // before the fade start
+    // Partway through the fade window (0.45 → 1): strictly between, so a flipped offset that would
+    // read fully-in (or fully-out) here is caught.
+    const midFade = scene(tape, 0, VIEWPORT, 0.725).outro.cardAlpha;
+
+    expect(midFade).toBeGreaterThan(0);
+    expect(midFade).toBeLessThan(1);
+    expect(scene(tape, 0, VIEWPORT, 1).outro.cardAlpha).toBe(1); // fully in at the end
+  });
+});
+
+describe("scene — stamina for the scoreboard", () => {
+  // The stamina bar's denominator is each fighter's PEAK stamina across the fight: stamina inits at
+  // rules.stamina.max and regen clamps to it (engine), so the tape's max IS the meter's max. A fighter
+  // with no meter reads 0 every tick ⇒ max 0, the sentinel the draw layer hides the bar on.
+  it("takes each fighter's peak stamina across the tape as the bar's max", () => {
+    const tape: ReplayTape = [
+      tickOf(0, { stamina: 100 }, { stamina: 80 }),
+      tickOf(1, { stamina: 70 }, { stamina: 80 }),
+      tickOf(2, { stamina: 55 }, { stamina: 62 }),
+    ];
+
+    expect(staminaMax(tape)).toEqual({ a: 100, b: 80 });
+  });
+
+  it("reports 0 when a fighter has no stamina meter (every tick 0)", () => {
+    const tape: ReplayTape = [tickOf(0, { stamina: 0 }, { stamina: 0 })];
+
+    expect(staminaMax(tape)).toEqual({ a: 0, b: 0 });
+  });
+
+  it("reads both fighters' current stamina at the playhead into the HUD", () => {
+    const tape: ReplayTape = [
+      tickOf(0, { stamina: 100 }, { stamina: 100 }),
+      tickOf(1, { stamina: 42 }, { stamina: 77 }),
+    ];
+
+    const s = scene(tape, 1, VIEWPORT);
+
+    expect(s.hud.staminaA).toBe(42);
+    expect(s.hud.staminaB).toBe(77);
+  });
+});
+
+describe("scene — ground shadows (grounding the fighters on the mat)", () => {
+  // A soft shadow rides the mat under each fighter: it tracks their x, stays on the GROUND LINE even
+  // when they jump, and shrinks with height so a leap reads as lifting off. Pure scene data (drawn in
+  // the world container behind the fighters) — exact where it matters, monotone where it's eye-tuned.
+  it("plants each shadow on the ground line under the fighter, full size when grounded", () => {
+    const s = scene(
+      [tickOf(0, { x: 150_000, y: 0 }, { x: 450_000, y: 0 })],
+      0,
+      VIEWPORT,
+    );
+
+    expect(s.shadows.a).toEqual({ x: 300, y: 540, scale: 1 }); // 150000·0.002, ground 540
+    expect(s.shadows.b).toEqual({ x: 900, y: 540, scale: 1 });
+  });
+
+  it("keeps an airborne fighter's shadow on the ground but shrinks it", () => {
+    const s = scene(
+      [tickOf(0, { x: 150_000, y: 120_000 }, { x: 450_000, y: 0 })],
+      0,
+      VIEWPORT,
+    );
+
+    expect(s.shadows.a.x).toBe(300); // still under the fighter's x
+    expect(s.shadows.a.y).toBe(540); // stays on the ground though the fighter lifted off it
+    expect(s.shadows.a.scale).toBeLessThan(1); // smaller the higher they are
+    expect(s.shadows.a.scale).toBeGreaterThan(0.5);
+    expect(s.shadows.b.scale).toBe(1); // the grounded fighter is unaffected
+  });
+
+  it("floors the shadow scale so a big jump never inverts or vanishes it", () => {
+    const s = scene(
+      [tickOf(0, { x: 150_000, y: 400_000 }, { x: 450_000, y: 0 })],
+      0,
+      VIEWPORT,
+    );
+
+    expect(s.shadows.a.scale).toBe(0.5); // clamped at the floor, not negative
+  });
+});
+
+describe("scene — the tatami ring layout (the decorated backdrop)", () => {
+  // The mat is a full-canvas backdrop drawn in SCREEN px behind the inset world container, so its
+  // ground line aligns with the fighters' feet (both fixed at 540) and its left/right edges sit on the
+  // ring band the world container occupies (the jogai out-of-bounds boundary). Pure geometry — the
+  // fills / stripe tones / stroke widths are eye-tuned (no test). Concrete expectations catch a flipped
+  // ratio or a dropped term; a second viewport pins the width/height derivations.
+  it("lays the mat on the ring band, ground at the fighters' feet, horizon above them", () => {
+    const l = ringLayout(VIEWPORT);
+
+    expect(l.groundY).toBe(540); // 600 · 0.9 ground-ratio — the feet line
+    expect(l.horizonY).toBe(456); // 600 · 0.76 — the mat's back edge, above the feet
+    expect(l.left).toBe(90); // the ring band's left edge == ringTransform.x (the jogai line)
+    expect(l.right).toBe(1110); // 1200 − 90, symmetric
+    expect(l.centerX).toBe(600); // 1200 / 2 — the referee centre mark
+    expect(l.panels).toBe(10); // tatami two-tone band count
+  });
+
+  it("scales the mat's edges with the canvas so it always frames the ring band", () => {
+    const l = ringLayout({ width: 2400, height: 800 });
+
+    expect(l.groundY).toBe(720); // 800 · 0.9
+    expect(l.horizonY).toBe(608); // 800 · 0.76
+    expect(l.left).toBe(180); // (2400 · 0.15) / 2
+    expect(l.right).toBe(2220); // 2400 − 180
+    expect(l.centerX).toBe(1200); // 2400 / 2
   });
 });
 

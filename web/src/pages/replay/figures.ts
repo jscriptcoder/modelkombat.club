@@ -2,6 +2,9 @@ import { Container, Graphics, Text } from "pixi.js";
 
 import {
   bodyHeightPx,
+  ringLayout,
+  ringTransform,
+  type RingLayout,
   type Scene,
   type Skeleton,
   type Viewport,
@@ -262,37 +265,334 @@ const applyFlash = (flash: Graphics, mark: Scene["contact"]["a"]): void => {
   flash.alpha = flashAlpha(mark.age);
 };
 
+// ─── ground shadows ───────────────────────────────────────────────────────────────────────────────
+// A soft dark ellipse under each fighter, drawn once at a body-proportioned size then moved + scaled
+// per frame by the scene's shadow (position on the mat, scale by height). Sized off the body height so
+// it grows with the figure; low alpha so it reads as a shadow, not a disc. Eye-tuned.
+const SHADOW_COLOR = 0x000000;
+const SHADOW_ALPHA = 0.32;
+const SHADOW_HALF_W_RATIO = 0.26; // ellipse half-width as a fraction of body height
+const SHADOW_HALF_H_RATIO = 0.055; // ellipse half-height
+
+const createShadow = (bodyPx: number): Graphics =>
+  new Graphics()
+    .ellipse(0, 0, SHADOW_HALF_W_RATIO * bodyPx, SHADOW_HALF_H_RATIO * bodyPx)
+    .fill({ color: SHADOW_COLOR, alpha: SHADOW_ALPHA });
+
+// Move a fighter's shadow under their feet and scale it by height (shrinks as they lift off the mat).
+const applyShadow = (shadow: Graphics, mark: Scene["shadows"]["a"]): void => {
+  shadow.x = mark.x;
+  shadow.y = mark.y;
+  shadow.scale.set(mark.scale);
+};
+
+// ─── the tatami ring backdrop ─────────────────────────────────────────────────────────────────────
+// The decorated floor, drawn ONCE behind the fighters. All eye-tuned on a dark canvas (bg 0x0b0e14):
+// muted warm-olive tatami so it never glows, two close tones for the woven panels, faint mat lines, and
+// a dull-red jogai border marking the out-of-bounds edges. No test pins these — the geometry is
+// ringLayout's (unit-tested); here we only stroke it (a Graphics path is opaque to display assertions,
+// so the wiring test asserts z-order + membership, and a manual scan covers the drawing — as with BONES).
+const TATAMI_BASE = 0x272f1b;
+const TATAMI_ALT = 0x323a23;
+const MAT_LINE = 0x44503a;
+const CENTER_LINE = 0x55634a;
+const JOGAI_COLOR = 0x9c4f4f;
+
+// Stroke the tatami floor into `ring`: the base floor from the horizon down to the canvas bottom, the
+// alternate-tone woven panels, the horizon + ground reference lines, the referee centre mark, and the
+// two jogai out-of-bounds borders on the ring edges. Screen px throughout (the ring rides root, not the
+// inset world), so the ground line lands on the fighters' feet.
+const drawRing = (ring: Graphics, layout: RingLayout, bottom: number): void => {
+  const { left, right, horizonY, groundY, centerX, panels } = layout;
+  const width = right - left;
+  const floorH = bottom - horizonY;
+
+  ring.rect(left, horizonY, width, floorH).fill(TATAMI_BASE);
+
+  // Every other vertical band a touch lighter → the woven two-tone panels.
+  const panelW = width / panels;
+
+  for (let i = 0; i < panels; i += 2) {
+    ring.rect(left + i * panelW, horizonY, panelW, floorH).fill(TATAMI_ALT);
+  }
+
+  ring.moveTo(left, horizonY).lineTo(right, horizonY).stroke({
+    width: 2,
+    color: MAT_LINE,
+  });
+  ring.moveTo(left, groundY).lineTo(right, groundY).stroke({
+    width: 1,
+    color: MAT_LINE,
+  });
+  ring.moveTo(centerX, horizonY).lineTo(centerX, bottom).stroke({
+    width: 1,
+    color: CENTER_LINE,
+  });
+  ring.moveTo(left, horizonY).lineTo(left, bottom).stroke({
+    width: 4,
+    color: JOGAI_COLOR,
+  });
+  ring.moveTo(right, horizonY).lineTo(right, bottom).stroke({
+    width: 4,
+    color: JOGAI_COLOR,
+  });
+};
+
+// ─── the scoreboard ───────────────────────────────────────────────────────────────────────────────
+// The top overlay: each fighter's name + score + a stamina bar (their colour), with the tick centred
+// between them. Lives on `root` at full canvas size (outside the inset world) so the text stays crisp.
+// The name + colour are fight-constant (set once); the score, tick, and stamina fraction update each
+// frame from the Hud. A fighter with no stamina meter (max 0) hides their bar.
+const BOARD_TOP = 14;
+const BOARD_PAD = 28;
+const BAR_W = 160;
+const BAR_H = 9;
+const BAR_ROW_Y = BOARD_TOP + 22;
+const NAME_SIZE = 14;
+const SCORE_SIZE = 26;
+const TICK_SIZE = 14;
+const BAR_TRACK_COLOR = 0x20262f;
+const TICK_COLOR = 0x8a94a6;
+const SCORE_COLOR = 0xffffff;
+
+// The identity the scoreboard needs beyond the per-frame Hud: the two fighters' display names and each
+// one's peak stamina (the bar's denominator, `staminaMax` — 0 hides the bar). Optional on createStage;
+// the dojo/sheet pose labs pass none and get a nameless, meterless board.
+export type ScoreboardIdentity = {
+  names: readonly [string, string];
+  staminaMax: { a: number; b: number };
+};
+
+const DEFAULT_BOARD: ScoreboardIdentity = {
+  names: ["", ""],
+  staminaMax: { a: 0, b: 0 },
+};
+
+type ScoreboardSide = {
+  name: Text;
+  score: Text;
+  // The bar CONTAINER (track + fill), toggled off when the fighter has no meter; `fill` is the coloured
+  // bar drawn full-width and scaled by the stamina fraction each frame.
+  bar: Container;
+  fill: Graphics;
+};
+
+export type Scoreboard = {
+  container: Container;
+  tick: Text;
+  a: ScoreboardSide;
+  b: ScoreboardSide;
+  apply: (hud: Scene["hud"]) => void;
+};
+
+const boardText = (text: string, size: number, color: number): Text =>
+  new Text({
+    text,
+    style: { fill: color, fontSize: size, fontFamily: "monospace" },
+  });
+
+// One fighter's stamina bar at `x`: a dark track under a colour fill drawn full-width; the fill is
+// scaled horizontally to the stamina fraction each frame (so an empty bar is scale 0, full is 1).
+const createBar = (
+  x: number,
+  color: number,
+): { bar: Container; fill: Graphics } => {
+  const track = new Graphics().rect(0, 0, BAR_W, BAR_H).fill(BAR_TRACK_COLOR);
+  const fill = new Graphics().rect(0, 0, BAR_W, BAR_H).fill(color);
+  const bar = new Container();
+
+  bar.x = x;
+  bar.y = BAR_ROW_Y;
+  bar.addChild(track, fill);
+
+  return { bar, fill };
+};
+
+const createScoreboard = (
+  viewport: Viewport,
+  board: ScoreboardIdentity,
+): Scoreboard => {
+  const w = viewport.width;
+
+  // Challenger `a` on the left (name at the edge, score toward the centre), King `b` mirrored right.
+  const nameA = boardText(board.names[0], NAME_SIZE, CHALLENGER_COLOR);
+  const nameB = boardText(board.names[1], NAME_SIZE, KING_COLOR);
+
+  nameA.anchor.set(0, 0);
+  nameA.x = BOARD_PAD;
+  nameA.y = BOARD_TOP;
+  nameB.anchor.set(1, 0);
+  nameB.x = w - BOARD_PAD;
+  nameB.y = BOARD_TOP;
+
+  const barA = createBar(BOARD_PAD, CHALLENGER_COLOR);
+  const barB = createBar(w - BOARD_PAD - BAR_W, KING_COLOR);
+
+  const scoreA = boardText("0", SCORE_SIZE, SCORE_COLOR);
+  const scoreB = boardText("0", SCORE_SIZE, SCORE_COLOR);
+
+  scoreA.anchor.set(0, 0);
+  scoreA.x = BOARD_PAD + BAR_W + 14;
+  scoreA.y = BOARD_TOP + 2;
+  scoreB.anchor.set(1, 0);
+  scoreB.x = w - BOARD_PAD - BAR_W - 14;
+  scoreB.y = BOARD_TOP + 2;
+
+  const tick = boardText("", TICK_SIZE, TICK_COLOR);
+
+  tick.anchor.set(0.5, 0);
+  tick.x = w / 2;
+  tick.y = BOARD_TOP + 6;
+
+  const container = new Container();
+
+  container.addChild(barA.bar, barB.bar, nameA, nameB, scoreA, scoreB, tick);
+
+  // Fill the bar to the stamina fraction (current / peak), clamped to [0,1]; hide it entirely when the
+  // fighter has no meter (max 0), so a meterless fight shows scores only.
+  const applyBar = (
+    bar: Container,
+    fill: Graphics,
+    current: number,
+    max: number,
+  ): void => {
+    const active = max > 0;
+
+    bar.visible = active;
+    fill.scale.x = active ? Math.min(1, Math.max(0, current / max)) : 0;
+  };
+
+  const apply = (hud: Scene["hud"]): void => {
+    tick.text = `tick ${hud.tick}`;
+    scoreA.text = scoreLabel(hud.scoreA, hud.scoredA);
+    scoreB.text = scoreLabel(hud.scoreB, hud.scoredB);
+    applyBar(barA.bar, barA.fill, hud.staminaA, board.staminaMax.a);
+    applyBar(barB.bar, barB.fill, hud.staminaB, board.staminaMax.b);
+  };
+
+  return {
+    container,
+    tick,
+    a: { name: nameA, score: scoreA, bar: barA.bar, fill: barA.fill },
+    b: { name: nameB, score: scoreB, bar: barB.bar, fill: barB.fill },
+    apply,
+  };
+};
+
+// ─── the TIME card (end-of-fight overlay) ─────────────────────────────────────────────────────────
+// A centred panel that fades in over the tail of the settle (scene.outro.cardAlpha): "TIME", the final
+// score, and the winner (in the winner's colour, or a muted "DRAW" when level). Drawn last (over
+// everything) and hidden while cardAlpha is 0. The winner is derived from the final scores; a level
+// score reads DRAW — the tape carries no senshu tie-break, so a senshu-decided bout shows DRAW here.
+const CARD_W = 460;
+const CARD_H = 200;
+const CARD_BG = 0x0b0e14;
+const CARD_BG_ALPHA = 0.92;
+const CARD_BORDER = 0x2b333f;
+const CARD_HEADING_COLOR = 0xd7dde5;
+const CARD_DRAW_COLOR = 0x8a94a6;
+
+export type OutroCard = {
+  container: Container;
+  heading: Text;
+  score: Text;
+  winner: Text;
+  apply: (hud: Scene["hud"], cardAlpha: number) => void;
+};
+
+const createOutroCard = (
+  viewport: Viewport,
+  board: ScoreboardIdentity,
+): OutroCard => {
+  const cx = viewport.width / 2;
+  const cy = viewport.height / 2;
+
+  const panel = new Graphics()
+    .roundRect(cx - CARD_W / 2, cy - CARD_H / 2, CARD_W, CARD_H, 14)
+    .fill({ color: CARD_BG, alpha: CARD_BG_ALPHA })
+    .stroke({ width: 2, color: CARD_BORDER });
+
+  const heading = boardText("TIME", 30, CARD_HEADING_COLOR);
+  const score = boardText("", 40, 0xffffff);
+  const winner = boardText("", 20, CARD_HEADING_COLOR);
+
+  heading.anchor.set(0.5);
+  heading.x = cx;
+  heading.y = cy - 58;
+  score.anchor.set(0.5);
+  score.x = cx;
+  score.y = cy - 4;
+  winner.anchor.set(0.5);
+  winner.x = cx;
+  winner.y = cy + 52;
+
+  const container = new Container();
+
+  container.addChild(panel, heading, score, winner);
+  container.visible = false;
+
+  const apply = (hud: Scene["hud"], cardAlpha: number): void => {
+    container.visible = cardAlpha > 0;
+    container.alpha = cardAlpha;
+
+    // An en-dash between the scores; the winner is whoever leads, in their colour (or a muted DRAW).
+    score.text = `${hud.scoreA} – ${hud.scoreB}`;
+
+    if (hud.scoreA > hud.scoreB) {
+      winner.text = `${board.names[0]} wins`;
+      winner.style.fill = CHALLENGER_COLOR;
+    } else if (hud.scoreB > hud.scoreA) {
+      winner.text = `${board.names[1]} wins`;
+      winner.style.fill = KING_COLOR;
+    } else {
+      winner.text = "DRAW";
+      winner.style.fill = CARD_DRAW_COLOR;
+    }
+  };
+
+  return { container, heading, score, winner, apply };
+};
+
 // The mounted stage: the root container to add to the Pixi stage, the two fighters' joint nodes
-// (exposed for display-object assertions), and the HUD text, plus `apply` — the pure Scene →
-// display projection the player calls every frame.
+// (exposed for display-object assertions), the scoreboard, and the end-of-fight card, plus `apply` —
+// the pure Scene → display projection the player calls every frame.
 export type Stage = {
   root: Container;
+  // The tatami ring backdrop, drawn once behind everything (root's first child). Exposed so the wiring
+  // test can pin its z-order; the drawing itself is eye-tuned (manual scan).
+  ring: Graphics;
+  // The inset world container the fighters + flashes ride inside — down-scaled + centred by
+  // `ringTransform` so they read as figures IN a ring rather than filling the frame (slice 2). The HUD
+  // is added to `root`, NOT here, so the scoreboard stays crisp at full canvas size. Exposed for
+  // display-object assertions.
+  world: Container;
   a: FigureNodes;
   b: FigureNodes;
-  hud: Text;
+  // The top overlay (names · scores · stamina bars · centred tick), on root at full canvas size.
+  scoreboard: Scoreboard;
+  // The end-of-fight TIME card, drawn over everything and faded in by the outro. Hidden mid-fight.
+  card: OutroCard;
   // The two impact-flash Graphics (challenger `a`, King `b`), exposed for display-object assertions —
   // positioned + faded per frame by `apply`, hidden when that side has no live score.
   flashes: { a: Graphics; b: Graphics };
+  // The two ground-shadow Graphics, drawn inside the world container behind the fighters and moved +
+  // scaled under their feet each frame.
+  shadows: { a: Graphics; b: Graphics };
   apply: (scene: Scene) => void;
 };
 
 export const createStage = (
   viewport: Viewport,
   brands: readonly [Brand, Brand],
+  board: ScoreboardIdentity = DEFAULT_BOARD,
 ): Stage => {
   const headPx = HEAD_HEIGHT_RATIO * bodyHeightPx(viewport);
 
   const a = createFigure(CHALLENGER_COLOR, brands[0], headPx);
   const b = createFigure(KING_COLOR, brands[1], headPx);
 
-  const hud = new Text({
-    text: "",
-    style: { fill: 0xffffff, fontSize: 20, fontFamily: "monospace" },
-  });
-
-  hud.anchor.set(0.5, 0);
-  hud.x = viewport.width / 2;
-  hud.y = 24;
+  const scoreboard = createScoreboard(viewport, board);
+  const card = createOutroCard(viewport, board);
 
   // The impact flashes sit ABOVE the fighters (drawn after them) but below the HUD, and start hidden.
   const flashA = new Graphics();
@@ -303,28 +603,54 @@ export const createStage = (
   flashA.visible = false;
   flashB.visible = false;
 
+  // A soft ground shadow per fighter, drawn FIRST inside the world so it sits behind the figures.
+  const shadowPx = bodyHeightPx(viewport);
+  const shadowA = createShadow(shadowPx);
+  const shadowB = createShadow(shadowPx);
+
+  // The shadows + fighters + flashes ride inside a world container the ring-inset transform down-scales
+  // + centres (slice 2); the HUD is added straight to root so the scoreboard stays full canvas size.
+  // Order = z-order: shadows behind, then the figures, then the flashes on top.
+  const world = new Container();
+  const inset = ringTransform(viewport);
+
+  world.scale.set(inset.scale);
+  world.x = inset.x;
+  world.y = inset.y;
+  world.addChild(shadowA, shadowB, a.nodes.root, b.nodes.root, flashA, flashB);
+
+  // The tatami backdrop, drawn once in screen px behind the world container + scoreboard.
+  const ring = new Graphics();
+
+  drawRing(ring, ringLayout(viewport), viewport.height);
+
   const root = new Container();
 
-  root.addChild(a.nodes.root, b.nodes.root, flashA, flashB, hud);
+  // The TIME card sits over everything (drawn last), so the end-of-fight overlay reads above the ring,
+  // the fighters, and the scoreboard.
+  root.addChild(ring, world, scoreboard.container, card.container);
 
   const apply = (scene: Scene): void => {
+    applyShadow(shadowA, scene.shadows.a);
+    applyShadow(shadowB, scene.shadows.b);
     applyFigure(a, scene.a);
     applyFigure(b, scene.b);
     applyFlash(flashA, scene.contact.a);
     applyFlash(flashB, scene.contact.b);
-
-    const scoreA = scoreLabel(scene.hud.scoreA, scene.hud.scoredA);
-    const scoreB = scoreLabel(scene.hud.scoreB, scene.hud.scoredB);
-
-    hud.text = `tick ${scene.hud.tick}    ${scoreA} : ${scoreB}`;
+    scoreboard.apply(scene.hud);
+    card.apply(scene.hud, scene.outro.cardAlpha);
   };
 
   return {
     root,
+    ring,
+    world,
     a: a.nodes,
     b: b.nodes,
-    hud,
+    scoreboard,
+    card,
     flashes: { a: flashA, b: flashB },
+    shadows: { a: shadowA, b: shadowB },
     apply,
   };
 };
