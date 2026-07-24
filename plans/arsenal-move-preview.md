@@ -1,7 +1,7 @@
 # Plan: Arsenal move preview (hover-to-watch)
 
-**Branch**: feat/arsenal-move-preview
-**Status**: Active
+**Branch**: one per slice (S1 `feat/arsenal-move-preview` → merged #414)
+**Status**: Active — S1 shipped; S2 next
 
 ## Goal
 
@@ -80,14 +80,14 @@ Arsenal test's mutation-guard note before writing slices.
 
 ---
 
-### Slice 1: A pure `moveLoopTape(moveId)` builds a seamless single-move looping tape for every arsenal move
+### Slice 1: A pure `moveLoopTape(moveId)` builds a seamless single-move looping tape for every arsenal move — ✅ SHIPPED (#414)
 
 **Value**: The render-model core the animated preview plays. No UI yet — this is the
 pure, unit-tested seam (the same shape as `buildDojoTape`) that unlocks S2's walking
 skeleton. Independently verifiable, smaller than doing it inside the Pixi mount.
 **Path**: `moveId` → `selectMove`/`controlsToFrame` (attacker) + idle facing partner
 → `buildDojoTape({a, b, gap: presetFor(move).reach})` → `ReplayTape`; plus a pure
-loop-wrap `loopPlayhead(playhead, span)` for the clock. Consumed by S2's mount.
+loop-wrap `loopIndex(playhead, length)` for the clock. Consumed by S2's mount.
 **Class**: Behavior change (new pure function behavior).
 **Reduction program**: N/A.
 **Transition/terminal evidence**: N/A.
@@ -104,13 +104,16 @@ assessed after green.
   (`attacking: false`, facing the attacker).
 - The two figures are placed the move's reach apart (contact distance), centred on
   the ring — reusing `buildDojoTape`'s centring, not re-deriving it.
-- `loopPlayhead` wraps: within `[0, span)` it is identity-ish; at/over `span` it wraps
+- `loopIndex` wraps: within `[0, length)` it is identity-ish; at/over `length` it wraps
   back into range (seamless loop), and is pure/exact-assertable like `transport`.
 - An unknown/`""` move id falls back safely (no throw) — totality, matching M7.
-  **RED**: unit tests (node project, `*.test.ts`) asserting span/commit/placement per
-  move (parameterized over the roster) + loop-wrap cases — all failing first.
-  **GREEN**: minimal builder + wrap composed from the existing dojo/reach-preset
-  helpers; no new pose maths.
+  **RED**: unit tests asserting span/commit/placement per move + loop-wrap cases —
+  all failing first. (Shipped as `web/src/pages/home/move-preview.test.tsx`: the pure
+  core lives in the **web** project, which only globs `*.test.tsx` — the file runs in
+  browser mode but is Pixi/DOM-free, so it stays a pure unit test.)
+  **GREEN**: minimal builder (`moveLoopTape`) + wrap (`loopIndex`) composed from the
+  existing dojo/reach-preset helpers; no new pose maths. Shipped in
+  `web/src/pages/home/move-preview.ts`.
   **MUTATE**: `N/A — web ∉ Stryker`; independent roster duplication + manual scan.
   **KILL MUTANTS**: N/A (manual scan of arithmetic/boundary in the wrap + span).
   **REFACTOR**: only if it removes duplication vs `buildDojoTape`.
@@ -127,7 +130,7 @@ with the passive target dimmed.
 **Path**: eye `<button>` on the gyaku-zuki row (client-only reveal) → hover/tap/focus
 sets `openMove` signal → portal popover anchored to the icon → on first open,
 `await import("pixi.js")` + the preview stage module → `createStage` once →
-ticker drives `loopPlayhead` → `stage.apply(scene(moveLoopTape("gyaku-zuki"), tick))`
+ticker drives `loopIndex` → `stage.apply(scene(moveLoopTape("gyaku-zuki"), tick))`
 → leave/Escape/outside closes and pauses.
 **Class**: Behavior change (walking skeleton).
 **Required implementation skills**: `tdd`, `testing`, `front-end-testing` (Vitest
@@ -144,7 +147,7 @@ browser mode). `mutation-testing` → `N/A — web ∉ Stryker`. `refactoring` a
   statically import `pixi.js`; import boundary lives in the preview mount).
 - The preview stage exposes its scene graph for assertion (like `DojoStage` does):
   the passive target figure's root `alpha` is `< 1` (dimmed), the attacker's is `1`.
-- The clock loops (a pure-side assertion on `loopPlayhead` wiring; the WebGL draw
+- The clock loops (a pure-side assertion on `loopIndex` wiring; the WebGL draw
   itself is manual capture — `agent-browser` hangs on Pixi).
 - No-JS: the row is unchanged from today (no eye button); existing Arsenal roster
   test remains green.

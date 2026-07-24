@@ -1,5 +1,7 @@
-import { For } from "solid-js";
+import { createSignal, For, onMount, Show, type Component } from "solid-js";
 
+import MovePreview from "./MovePreview";
+import type { PreviewStageProps } from "./PreviewStage";
 import { SPEC_GUIDE_PATH } from "../../shared/lib/paths";
 
 // A score badge: the numeric glyph the eye reads, plus the label a screen
@@ -165,7 +167,33 @@ const FAMILIES: readonly Family[] = [
   },
 ];
 
-export default function Arsenal() {
+// The one move that carries an animated preview in this slice (S2 walking skeleton); S3 broadens the
+// eye control to the whole roster.
+const PREVIEW_MOVE = "gyaku-zuki";
+
+// Props are the injectable Pixi-stage loader (default = the real dynamic import, in MovePreview) so
+// tests drive the preview through a spy stage without a WebGL mount.
+type ArsenalProps = {
+  loadStage?: () => Promise<Component<PreviewStageProps>>;
+};
+
+const Arsenal: Component<ArsenalProps> = (props) => {
+  // The eye control is a client-only enhancement: revealed on mount, so no-JS / prerender renders the
+  // Arsenal exactly as before (no dead affordance). `onMount` never runs under SSR.
+  const [mounted, setMounted] = createSignal(false);
+
+  onMount(() => setMounted(true));
+
+  // The open move (one preview at a time) and the eye control's on-screen rect, so the popover sits
+  // beside the icon that opened it.
+  const [openMove, setOpenMove] = createSignal<string | null>(null);
+  const [anchor, setAnchor] = createSignal<DOMRect | null>(null);
+
+  const open = (id: string, control: HTMLElement): void => {
+    setAnchor(control.getBoundingClientRect());
+    setOpenMove(id);
+  };
+
   return (
     <section id="arsenal" aria-labelledby="arsenal-heading" class="section">
       <h2 id="arsenal-heading">The Arsenal</h2>
@@ -187,6 +215,27 @@ export default function Arsenal() {
                     <div class="move-header">
                       <code class="move-id">{move.id}</code>
                       <span class="move-gloss">{move.gloss}</span>
+                      <Show when={mounted() && move.id === PREVIEW_MOVE}>
+                        <button
+                          type="button"
+                          class="move-preview-eye"
+                          data-move-preview
+                          aria-label={`Preview ${move.id}`}
+                          aria-expanded={openMove() === move.id}
+                          onPointerEnter={(event) =>
+                            open(move.id, event.currentTarget)
+                          }
+                          onClick={(event) =>
+                            open(move.id, event.currentTarget)
+                          }
+                          onFocus={(event) =>
+                            open(move.id, event.currentTarget)
+                          }
+                          onPointerLeave={() => setOpenMove(null)}
+                        >
+                          <span aria-hidden="true">👁</span>
+                        </button>
+                      </Show>
                       <span
                         class="move-badge"
                         role="img"
@@ -203,6 +252,12 @@ export default function Arsenal() {
           </section>
         )}
       </For>
+      <MovePreview
+        move={openMove()}
+        onClose={() => setOpenMove(null)}
+        anchor={anchor()}
+        loadStage={props.loadStage}
+      />
       <p class="arsenal-spec">
         <a href={`${SPEC_GUIDE_PATH}#frame-table`} target="_blank">
           Reach, frames, stamina, cancels — see the full frame table{" "}
@@ -211,4 +266,6 @@ export default function Arsenal() {
       </p>
     </section>
   );
-}
+};
+
+export default Arsenal;

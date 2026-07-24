@@ -661,6 +661,46 @@ main,
   font-size: 0.9rem;
 }
 
+/* The move-preview eye: a small client-only affordance that opens the animated preview. Sits after
+   the gloss (the badge keeps its margin-left:auto pin to the trailing edge). */
+.move-preview-eye {
+  flex-shrink: 0;
+  padding: 0.1rem 0.35rem;
+  line-height: 1;
+  font-size: 0.9rem;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.move-preview-eye:hover,
+.move-preview-eye:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* The portalled preview popover: a small dark card holding the looping canvas, positioned beside its
+   eye control (top/left set inline) and capped so it never overruns the viewport. */
+.move-preview-popover {
+  position: fixed;
+  z-index: 50;
+  max-width: calc(100vw - 1rem);
+  padding: 6px;
+  background: var(--panel, #0b0e14);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.move-preview-stage {
+  display: block;
+  line-height: 0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
 /* The Gauntlet: the six house fighters as a responsive card grid — the same
    idiom as the Arsenal (two-up on desktop, one column on narrow viewports; the
    min(100%, …) cap keeps it from scrolling sideways at 360px). */
