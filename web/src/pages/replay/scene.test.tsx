@@ -1057,9 +1057,12 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     expect(pose.handL).toEqual(
       scaled({ x: landingLocal(120_000, 120_000) - GRAB_SPREAD, y: GRAB_Y }),
     );
-    // ...and the torso does NOT lean — a grab suppresses its strike layer, so /dojo == /watch.
-    expect(pose.head).toEqual(scaled({ x: 0, y: -76 }));
-    expect(pose.shoulder).toEqual(scaled({ x: 0, y: -64 }));
+    // ...and the /dojo picker's frame draws the SAME figure as a real /watch throw does. The two carry
+    // different flags — the picker stamps `attacking:true` + a band, the engine emits `throwing:true`
+    // with `attacking:false` and `attackBand:0` — and neither is what decides: the grab commits on its
+    // descriptor and grips at its own fixed height, so the band and the flag are both ignored. Pins the
+    // parity directly, rather than by asserting a bare upright torso on both sides.
+    expect(pose).toEqual(poseThrowing({ gap: 120_000, reach: 120_000 }));
   });
 
   it("no longer gates on the throwing flag — a stale throwing:true without the throw MOVE draws nothing", () => {
@@ -1214,6 +1217,137 @@ describe("scene — throw grab reaches the opponent (M8)", () => {
     expect(backAgain).toEqual(
       scaled({ x: landingLocal(120_000, 120_000), y: GRAB_Y }),
     );
+  });
+});
+
+describe("scene — a throw grips through its phases instead of holding one frame", () => {
+  // The throw was the LAST technique still drawn as a single held pose: the grip was solved once and
+  // stamped on every one of its 23 ticks, so a throw read as a frozen statue while every other move
+  // wound up, committed and recovered (S8). These cases make it EASE like the rest — stance → chamber
+  // → the held grip → stance.
+  //
+  // Every tape below is a REAL /watch throw, not the /dojo picker's: the engine emits a throw as
+  // `throwing:true` with `attacking:FALSE` and `attackBand:0` (its own `state.kind === "throwing"`,
+  // sim.ts), carrying only `attackMove:"throw"`, `attackReach` and a real `attackPhase`. So these
+  // assertions are the /watch path itself, not a dojo-only approximation.
+  //
+  // Relations are what is pinned (decision 9): the grip MOVED between phases, the two hands stay a
+  // spread apart, the contact keyframe is unchanged. The chamber literal mirrors the descriptor's
+  // authored value independently, exactly as the S8 gyaku-zuki cases mirror theirs.
+  const STARTUP = 1;
+  const CONTACT = 2;
+  const RECOVER = 3;
+
+  const GRAB_Y = -44; // the throw's authored grip height (no band — a grab is not a strike)
+  const GRAB_SPREAD = 8; // the rear hand closes this far behind the lead one
+  const STANCE_HAND_R = { x: 18, y: -44 }; // STAND front hand — where the grip starts and ends
+  const CHAMBER_HAND_R = { x: 10, y: -38 }; // the throw's authored wind-up: hands cocked back and low
+
+  // Where the lead hand lands at contact: the reach-to-target solve at the grip height. Unchanged by
+  // this slice — the whole point is that only the OTHER phases start moving.
+  const GRIP = { x: landingLocal(120_000, 120_000), y: GRAB_Y };
+
+  // A run of `phases` ticks, every one a committed throw at the engine's own throw reach (120k) with
+  // the opponent exactly that far away (270000 − 150000), so the grip lands on the near edge.
+  const throwRun = (phases: readonly number[]): ReplayTape =>
+    phases.map((attackPhase, i) =>
+      tickOf(
+        i,
+        {
+          throwing: true,
+          attackMove: "throw",
+          attackReach: 120_000,
+          x: 150_000,
+          facing: 1,
+          attackPhase,
+        },
+        { x: 270_000 },
+      ),
+    );
+
+  const poseAt = (tape: ReplayTape, playhead: number) =>
+    scene(tape, playhead, VIEWPORT).a.pose;
+
+  it("winds the grip back from the stance to its chamber across startup", () => {
+    // Three consecutive startup ticks. Today all three draw the identical solved grip — the headline
+    // defect. Eased, the lead hand travels from its STANCE to the authored chamber, reaching the
+    // chamber at the last startup tick (the startup→active boundary, M14c).
+    const tape = throwRun([STARTUP, STARTUP, STARTUP]);
+
+    expect(poseAt(tape, 0).handR).toEqual(scaled(STANCE_HAND_R));
+    expect(poseAt(tape, 2).handR).toEqual(scaled(CHAMBER_HAND_R));
+    expect(poseAt(tape, 0).handR).not.toEqual(poseAt(tape, 2).handR);
+
+    // Directional: the chamber cocks BEHIND the stance hand, so x decreases across the wind-up — the
+    // hands draw back to seize rather than creeping forward.
+    expect(poseAt(tape, 0).handR.x).toBeGreaterThan(poseAt(tape, 1).handR.x);
+    expect(poseAt(tape, 1).handR.x).toBeGreaterThan(poseAt(tape, 2).handR.x);
+  });
+
+  it("holds the grip on the opponent across the whole active window (contact unchanged)", () => {
+    // The kime hold applies to a grab too: the grip commits on the first active tick and HOLDS for
+    // every remaining one — which is also where the engine awards the throw's 3 points, so the
+    // scoring tick always shows hands ON the opponent. Passes today and must keep passing: this is
+    // the guarantee that the contact frame is byte-unchanged by the slice.
+    const tape = throwRun([CONTACT, CONTACT, CONTACT]);
+
+    expect(poseAt(tape, 0).handR).toEqual(scaled(GRIP));
+    expect(poseAt(tape, 1).handR).toEqual(scaled(GRIP));
+    expect(poseAt(tape, 2).handR).toEqual(scaled(GRIP));
+  });
+
+  it("releases the grip back to the stance across recovery", () => {
+    // Recovery retracts from the HELD grip (continuous with the active window that ended there) back
+    // to the stance, reaching it at the last recovery tick. Today every recovery tick still draws the
+    // grip, so the thrower never lets go.
+    const tape = throwRun([RECOVER, RECOVER, RECOVER]);
+
+    expect(poseAt(tape, 0).handR).toEqual(scaled(GRIP));
+    expect(poseAt(tape, 2).handR).toEqual(scaled(STANCE_HAND_R));
+
+    expect(poseAt(tape, 0).handR.x).toBeGreaterThan(poseAt(tape, 1).handR.x);
+    expect(poseAt(tape, 1).handR.x).toBeGreaterThan(poseAt(tape, 2).handR.x);
+  });
+
+  it("keeps both hands a grab spread apart at every phase, not only at contact", () => {
+    // The rear hand RIDES the lead one wherever the ease takes it, so the figure reads as a
+    // two-handed grip through the whole technique — never one hand travelling and one left behind.
+    // Walked across a full-duration throw: the engine's real timing is 7 startup / 2 active / 14
+    // recovery (rules.ts), so tick 6 is the last startup, 7 the first active, 22 the last recovery.
+    const full = throwRun([
+      ...Array<number>(7).fill(STARTUP),
+      ...Array<number>(2).fill(CONTACT),
+      ...Array<number>(14).fill(RECOVER),
+    ]);
+
+    const spreadBehind = (lead: { x: number; y: number }) =>
+      scaled({ x: lead.x - GRAB_SPREAD, y: lead.y });
+
+    expect(poseAt(full, 0).handL).toEqual(spreadBehind(STANCE_HAND_R));
+    expect(poseAt(full, 6).handL).toEqual(spreadBehind(CHAMBER_HAND_R));
+    expect(poseAt(full, 7).handL).toEqual(spreadBehind(GRIP));
+    expect(poseAt(full, 22).handL).toEqual(spreadBehind(STANCE_HAND_R));
+  });
+
+  it("commits the torso into the grip at contact, and stays upright while winding up", () => {
+    // A throw is a whole-body technique, but until now the grab suppressed its own strike layer, so
+    // the torso was pinned rigid at lean 0 for all 23 ticks. Driving the grip through the shared path
+    // gives it the same reach-derived lean every hand technique has — gated to the ACTIVE phase (M9),
+    // because a fighter leans INTO a technique as it commits, not while cocking it.
+    const idle = scene(
+      [tickOf(0, { x: 150_000, facing: 1 }, { x: 270_000 })],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    const contact = poseAt(throwRun([CONTACT]), 0);
+    const winding = poseAt(throwRun([STARTUP]), 0);
+
+    expect(contact.head.x).toBeGreaterThan(idle.head.x);
+    expect(contact.shoulder.x).toBeGreaterThan(idle.shoulder.x);
+
+    expect(winding.head.x).toEqual(idle.head.x);
+    expect(winding.shoulder.x).toEqual(idle.shoulder.x);
   });
 });
 
@@ -3313,10 +3447,12 @@ describe("scene — the torso rotates into the punch (S4 · Slice 5)", () => {
     expect(pose.handR.x).toBeLessThan(pose.shoulderR.x);
   });
 
-  it("does not rotate the girdle for a kick or a throw — those never lean", () => {
-    // Criterion 5. Rotation is a hand-strike property (the lean is already zero for a kick and for a
-    // throw), so both keep a square, centred girdle. Status-quo guard: a mutant that rotated on every
-    // committed action would splay these.
+  it("does not rotate the girdle for a kick or a throw", () => {
+    // Criterion 5. Rotation is a SINGLE-arm property: it models the driving shoulder swinging ahead of
+    // a resting one. A kick keeps a square girdle because it never leans at all (M9); a throw keeps one
+    // for a different reason — it DOES lean into the grip, but a two-handed grab has no resting
+    // shoulder, so the upper body pitches forward without twisting. Status-quo guard: a mutant that
+    // rotated on every committed action, or on every leaning one, would splay these.
     const kick = poseOf({ move: "mae-geri", band: 2, reach: 270_000 });
 
     expect(kick.shoulderL).toEqual(scaled({ x: -HALF, y: -64 }));
@@ -3340,8 +3476,17 @@ describe("scene — the torso rotates into the punch (S4 · Slice 5)", () => {
       VIEWPORT,
     ).a.pose;
 
-    expect(throwPose.shoulderL).toEqual(scaled({ x: -HALF, y: -64 }));
-    expect(throwPose.shoulderR).toEqual(scaled({ x: HALF, y: -64 }));
+    // The girdle bar keeps its FULL width: a square girdle spans exactly 2 · HALF whatever the torso
+    // does, where a rotated one splits ± lean/2 beyond the ends and spans 2 · HALF + lean. Asserted as
+    // the span rather than two absolute points, because the throw's whole upper body has advanced.
+    expect(throwPose.shoulderR.x - throwPose.shoulderL.x).toBe(
+      scaled({ x: 2 * HALF, y: 0 }).x,
+    );
+    expect(throwPose.shoulderL.y).toBe(scaled({ x: 0, y: -64 }).y);
+    expect(throwPose.shoulderR.y).toBe(scaled({ x: 0, y: -64 }).y);
+
+    // ...and it HAS pitched forward — the throw leans into its grip, it simply does not twist.
+    expect(throwPose.shoulder.x).toBeGreaterThan(0);
   });
 
   it("retires the hand-ride — a jab's resting rear hand stays at its stance position", () => {

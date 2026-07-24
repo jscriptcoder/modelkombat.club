@@ -104,12 +104,11 @@ const bandHeight = (band: number): number | null =>
 // the rear hand (handL), so a strike and a guard never fight over the same arm.
 const GUARD_REACH_X = 8;
 
-// A throw's grab reaches BOTH hands to the opponent's near edge at chest height (M8) — the cue that
-// reads a throw. Chest height (no band, unlike a strike) and the spread between the two grab hands: the
-// front hand (handR) leads onto the near edge, the rear hand (handL) closes a hand's-width behind it,
-// so two arms read as a two-handed grab rather than one hand drawn twice. The forward x is solved
-// per-frame by throwGrabFor (reach-to-target), not authored here.
-const GRAB_Y = -44;
+// How far behind the LEAD grab hand the rear one closes (M8), so two arms read as a two-handed grab
+// rather than one hand drawn twice. The lead hand is the throw's driven endpoint — solved, eased and
+// held by the shared technique path like any other move — and the rear hand rides a spread behind
+// wherever that puts it. The grip HEIGHT is the descriptor's `targetY` (move-descriptors.ts), the same
+// band-independent override a sweep uses; only this spacing is grab geometry.
 const GRAB_SPREAD = 8;
 
 // A knocked-down fighter lies PRONE: the whole body laid horizontal just above the ground line —
@@ -394,7 +393,6 @@ type PhaseRun = { index: number; length: number };
 const poseFor = (
   frame: ReplayFrame,
   strikeHand: Joint | null,
-  grab: Pick<Stance, "handL" | "handR"> | null,
   run: PhaseRun,
 ): Skeleton => {
   if (frame.knockdown) return PRONE;
@@ -534,11 +532,18 @@ const poseFor = (
   // The girdle ROTATES (S4 · Slice 5): the driving shoulder swings forward by the full lean while the
   // resting one holds, so the two ends split ± lean/2 around a midpoint that itself advances lean/2
   // (M12 e/f). deriveSkeleton offsets each end beyond ± HALF by this much; head + shoulder below carry
-  // the other half. Zero for a kick / throw / idle, where the lean is 0 and the girdle stays square.
-  const girdle: GirdleShift = {
-    L: (limb === "handL" ? 1 : -1) * (lean / 2),
-    R: (limb === "handR" ? 1 : -1) * (lean / 2),
-  };
+  // the other half. Zero for a kick / idle, where the lean is 0 and the girdle stays square.
+  //
+  // A GRAB stays square even though it DOES lean: rotation models one shoulder swinging ahead of a
+  // resting one, and a two-handed grip has no resting shoulder — both arms drive into the opponent
+  // together. So a throw pitches its whole upper body forward without twisting, which is also what it
+  // drew before the grab joined the shared technique path.
+  const girdle: GirdleShift = isGrab(frame.attackMove)
+    ? { L: 0, R: 0 }
+    : {
+        L: (limb === "handL" ? 1 : -1) * (lean / 2),
+        R: (limb === "handR" ? 1 : -1) * (lean / 2),
+      };
 
   const endpoints: Stance = {
     ...stance,
@@ -598,7 +603,14 @@ const poseFor = (
     ...(guardY === null || (driven !== null && limb === "handL")
       ? {}
       : { handL: { x: GUARD_REACH_X, y: guardY } }),
-    ...(grab === null ? {} : grab),
+    // A GRAB closes the REAR hand a spread behind the lead one (M8). The lead hand is already placed
+    // by the endpoint layer above — solved and eased like any other driven point — so the grip travels
+    // as one pair through every phase instead of being stamped at a fixed point for the whole throw.
+    // Derived from `driven` (not from the solve) so the two hands can never separate mid-ease. Applied
+    // AFTER the guard, so a throw that also raised one wins the rear arm, as it always has.
+    ...(driven === null || !isGrab(frame.attackMove)
+      ? {}
+      : { handL: { x: driven.x - GRAB_SPREAD, y: driven.y } }),
   };
 
   const skeleton = deriveSkeleton(endpoints, girdle);
@@ -880,21 +892,20 @@ const reachTargetX = (
   return Math.max(floor, Math.min(edgeGap, cap));
 };
 
-// Where the striking front hand (handR) lands: the reach-to-target x at the band height — or `null`
-// when there is no strike to draw (not attacking, an unmapped band, or a defensively-rejected reach ⇒
-// the stance hand stays). The y is the band height; only the x reaches (via reachTargetX).
+// Where the committed technique's driven point lands: the reach-to-target x at the target height — or
+// `null` when there is nothing to draw (nothing committed, an unmapped band, or a defensively-rejected
+// reach ⇒ the stance endpoint stays). The y is the band height (or the move's fixed `targetY`); only
+// the x reaches (via reachTargetX). A throw's GRIP is solved here too — it is a reach to a fixed chest
+// height, which is the same solve a sweep's floor reap already used.
 const strikeHandFor = (
   striker: ReplayFrame,
   opponent: ReplayFrame,
 ): Joint | null => {
-  if (!striker.attacking) return null;
-
-  // A GRAB (throw) is not a strike — it draws BOTH hands into a grip (throwGrabFor), so it suppresses
-  // the single-hand strike layer here (S6 · Slice 3). Without this, a /dojo throw — which the picker
-  // stamps `attacking:true` alongside `attackMove:"throw"` — would compute a phantom strike hand (and
-  // its M2 lean) beneath the grab that overrides it, leaning the torso where a shipped /watch throw
-  // (never `attacking`) does not. Suppressing it makes /dojo render the throw exactly as /watch does.
-  if (isGrab(striker.attackMove)) return null;
+  // The COMMITMENT gate. `attacking` covers every strike — but never a throw: the engine gives a throw
+  // its own `state.kind === "throwing"`, which emits `attacking:false` and `attackBand:0` (sim.ts), so
+  // a grab has to announce itself through the descriptor instead. Reading either is what lets the throw
+  // solve, ease and lean down the SAME path as a strike rather than being drawn as a special case.
+  if (!striker.attacking && !isGrab(striker.attackMove)) return null;
 
   // The target height: a move with a fixed-height descriptor (a sweep reaps at a floor y, S6) takes
   // that; every banded strike takes `bandHeight(attackBand)` as before. `null` (an unmapped band on a
@@ -909,33 +920,6 @@ const strikeHandFor = (
   if (x === null) return null;
 
   return { x, y };
-};
-
-// Where a throw's TWO grab hands land (M8): both reach the reach-to-target x at chest height, so the
-// grab lands on the opponent instead of grabbing air — the same solve as a strike, applied to both
-// hands. The front hand (handR) leads onto the near edge; the rear hand (handL) closes a GRAB_SPREAD
-// behind it, so two arms read as a two-handed grab. `null` when there is no grab to draw.
-//
-// The gate is the DESCRIPTOR (`isGrab(attackMove)`), not the `frame.throwing` boolean it used to read
-// (S6 · Slice 3) — the throw was the last move drawn off a special-case flag rather than the descriptor
-// table. The engine emits `attackMove:"throw"` on every throw frame (the same `state.kind` that sets
-// `throwing`), so a real /watch throw renders byte-identically; the /dojo picker, which stamps the move
-// id but never the flag, now draws the grab instead of a generic hand. Still gated on a valid reach, so
-// a stale id with no committed reach draws nothing (the M7 idle fallback).
-const throwGrabFor = (
-  thrower: ReplayFrame,
-  opponent: ReplayFrame,
-): Pick<Stance, "handL" | "handR"> | null => {
-  if (!isGrab(thrower.attackMove)) return null;
-
-  const x = reachTargetX(thrower, opponent);
-
-  if (x === null) return null;
-
-  return {
-    handR: { x, y: GRAB_Y },
-    handL: { x: x - GRAB_SPREAD, y: GRAB_Y },
-  };
 };
 
 // The uniform body scale: how many screen px one reference-px becomes, chosen so a
@@ -1046,12 +1030,7 @@ export const scene = (
     };
 
     const pose = scalePose(
-      poseFor(
-        frame,
-        strikeHandFor(frame, opponent),
-        throwGrabFor(frame, opponent),
-        run,
-      ),
+      poseFor(frame, strikeHandFor(frame, opponent), run),
       scale,
     );
 
@@ -1071,10 +1050,7 @@ export const scene = (
       attackReach: 0,
     };
 
-    const neutralPose = scalePose(
-      poseFor(neutralFrame, null, null, run),
-      scale,
-    );
+    const neutralPose = scalePose(poseFor(neutralFrame, null, run), scale);
 
     return { ...placement, pose: lerpSkeleton(pose, neutralPose, settleT) };
   };
@@ -1096,12 +1072,12 @@ export const scene = (
     return -1;
   };
 
-  // The scoring fighter's committed-action landing point in the pose's LOCAL frame — a strike's
-  // reach-to-target endpoint (`strikeHandFor`) or a throw's front grab hand (`throwGrabFor`), or `null`
-  // when nothing is committed (an idle / finish frame). Reuses the exact solves the pose is drawn from,
-  // so the mark sits on the drawn limb whichever it is (hand, foot, elbow, knee).
+  // The scoring fighter's committed-action landing point in the pose's LOCAL frame — the reach-to-target
+  // endpoint every technique now solves through (`strikeHandFor`), or `null` when nothing is committed
+  // (an idle / finish frame). Reuses the exact solve the pose is drawn from, so the mark sits on the
+  // drawn limb whichever it is (hand, foot, elbow, knee — or a throw's lead grab hand).
   const targetLocal = (self: ReplayFrame, opp: ReplayFrame): Joint | null =>
-    strikeHandFor(self, opp) ?? throwGrabFor(self, opp)?.handR ?? null;
+    strikeHandFor(self, opp);
 
   // Project a LOCAL pose point to absolute screen px with the SAME transform `figure()` draws a limb
   // by: the fighter's root pixel plus the facing-flipped, scaled-and-rounded joint. So the flash lands
