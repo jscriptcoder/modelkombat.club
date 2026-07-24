@@ -182,24 +182,37 @@
   overflow-wrap: anywhere;
 }
 
-/* A column: the JSON pane on top, the copy control beneath it. */
+/* The raw JSON pane is the positioning context (position: relative) for the Copy control overlaid
+   on its top-right corner — see below. */
 .ring-raw {
-  margin-top: 1rem;
-  display: flex;
-  flex-direction: column;
+  position: relative;
 }
 
-/* The copy control sits UNDER the JSON, spaced off it (the .how-start .copy idiom): the button
-   sized to its content and horizontally centred, with the transient "Copied!" confirmation centred
-   beneath it. */
+/* The Copy control, overlaid on the pane's top-right corner so it stays pinned there as the
+   (scrollable) JSON moves under it. The pane's first line is just "{", so nothing is obscured at
+   rest; the solid button background lifts it clear of any code it does overlap. The transient
+   "Copied!" confirmation drops just beneath the button, right-aligned to it. */
 .ring-raw .copy {
-  margin-top: 0.75rem;
+  position: absolute;
+  top: 0.5rem;
+  /* Cleared enough from the edge to sit clear of the pane's vertical scrollbar (the JSON usually
+     overflows its max-height), not just the border. */
+  right: 1rem;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
+}
+
+.ring-raw .copy-button {
+  background: var(--bg);
+}
+
+.ring-raw .copy-button:hover {
+  background: rgba(122, 162, 255, 0.15);
 }
 
 .ring-raw .copy-status {
-  text-align: center;
+  margin-top: 0.35rem;
+  text-align: right;
 }
 
 /* The raw /fight JSON: a monospaced, scrollable block. Long lines scroll INSIDE the block
