@@ -479,9 +479,83 @@ const createScoreboard = (
   };
 };
 
+// ─── the TIME card (end-of-fight overlay) ─────────────────────────────────────────────────────────
+// A centred panel that fades in over the tail of the settle (scene.outro.cardAlpha): "TIME", the final
+// score, and the winner (in the winner's colour, or a muted "DRAW" when level). Drawn last (over
+// everything) and hidden while cardAlpha is 0. The winner is derived from the final scores; a level
+// score reads DRAW — the tape carries no senshu tie-break, so a senshu-decided bout shows DRAW here.
+const CARD_W = 460;
+const CARD_H = 200;
+const CARD_BG = 0x0b0e14;
+const CARD_BG_ALPHA = 0.92;
+const CARD_BORDER = 0x2b333f;
+const CARD_HEADING_COLOR = 0xd7dde5;
+const CARD_DRAW_COLOR = 0x8a94a6;
+
+export type OutroCard = {
+  container: Container;
+  heading: Text;
+  score: Text;
+  winner: Text;
+  apply: (hud: Scene["hud"], cardAlpha: number) => void;
+};
+
+const createOutroCard = (
+  viewport: Viewport,
+  board: ScoreboardIdentity,
+): OutroCard => {
+  const cx = viewport.width / 2;
+  const cy = viewport.height / 2;
+
+  const panel = new Graphics()
+    .roundRect(cx - CARD_W / 2, cy - CARD_H / 2, CARD_W, CARD_H, 14)
+    .fill({ color: CARD_BG, alpha: CARD_BG_ALPHA })
+    .stroke({ width: 2, color: CARD_BORDER });
+
+  const heading = boardText("TIME", 30, CARD_HEADING_COLOR);
+  const score = boardText("", 40, 0xffffff);
+  const winner = boardText("", 20, CARD_HEADING_COLOR);
+
+  heading.anchor.set(0.5);
+  heading.x = cx;
+  heading.y = cy - 58;
+  score.anchor.set(0.5);
+  score.x = cx;
+  score.y = cy - 4;
+  winner.anchor.set(0.5);
+  winner.x = cx;
+  winner.y = cy + 52;
+
+  const container = new Container();
+
+  container.addChild(panel, heading, score, winner);
+  container.visible = false;
+
+  const apply = (hud: Scene["hud"], cardAlpha: number): void => {
+    container.visible = cardAlpha > 0;
+    container.alpha = cardAlpha;
+
+    // An en-dash between the scores; the winner is whoever leads, in their colour (or a muted DRAW).
+    score.text = `${hud.scoreA} – ${hud.scoreB}`;
+
+    if (hud.scoreA > hud.scoreB) {
+      winner.text = `${board.names[0]} wins`;
+      winner.style.fill = CHALLENGER_COLOR;
+    } else if (hud.scoreB > hud.scoreA) {
+      winner.text = `${board.names[1]} wins`;
+      winner.style.fill = KING_COLOR;
+    } else {
+      winner.text = "DRAW";
+      winner.style.fill = CARD_DRAW_COLOR;
+    }
+  };
+
+  return { container, heading, score, winner, apply };
+};
+
 // The mounted stage: the root container to add to the Pixi stage, the two fighters' joint nodes
-// (exposed for display-object assertions), and the scoreboard, plus `apply` — the pure Scene →
-// display projection the player calls every frame.
+// (exposed for display-object assertions), the scoreboard, and the end-of-fight card, plus `apply` —
+// the pure Scene → display projection the player calls every frame.
 export type Stage = {
   root: Container;
   // The tatami ring backdrop, drawn once behind everything (root's first child). Exposed so the wiring
@@ -496,6 +570,8 @@ export type Stage = {
   b: FigureNodes;
   // The top overlay (names · scores · stamina bars · centred tick), on root at full canvas size.
   scoreboard: Scoreboard;
+  // The end-of-fight TIME card, drawn over everything and faded in by the outro. Hidden mid-fight.
+  card: OutroCard;
   // The two impact-flash Graphics (challenger `a`, King `b`), exposed for display-object assertions —
   // positioned + faded per frame by `apply`, hidden when that side has no live score.
   flashes: { a: Graphics; b: Graphics };
@@ -516,6 +592,7 @@ export const createStage = (
   const b = createFigure(KING_COLOR, brands[1], headPx);
 
   const scoreboard = createScoreboard(viewport, board);
+  const card = createOutroCard(viewport, board);
 
   // The impact flashes sit ABOVE the fighters (drawn after them) but below the HUD, and start hidden.
   const flashA = new Graphics();
@@ -549,7 +626,9 @@ export const createStage = (
 
   const root = new Container();
 
-  root.addChild(ring, world, scoreboard.container);
+  // The TIME card sits over everything (drawn last), so the end-of-fight overlay reads above the ring,
+  // the fighters, and the scoreboard.
+  root.addChild(ring, world, scoreboard.container, card.container);
 
   const apply = (scene: Scene): void => {
     applyShadow(shadowA, scene.shadows.a);
@@ -559,6 +638,7 @@ export const createStage = (
     applyFlash(flashA, scene.contact.a);
     applyFlash(flashB, scene.contact.b);
     scoreboard.apply(scene.hud);
+    card.apply(scene.hud, scene.outro.cardAlpha);
   };
 
   return {
@@ -568,6 +648,7 @@ export const createStage = (
     a: a.nodes,
     b: b.nodes,
     scoreboard,
+    card,
     flashes: { a: flashA, b: flashB },
     shadows: { a: shadowA, b: shadowB },
     apply,

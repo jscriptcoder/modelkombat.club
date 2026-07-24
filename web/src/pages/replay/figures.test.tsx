@@ -117,6 +117,48 @@ describe("figures — the Pixi draw layer applies a Scene to display objects", (
     expect(stage.scoreboard.b.fill.scale.x).toBeCloseTo(0.6); // 60 / 100
   });
 
+  it("fades in a TIME card with the final score and winner as the outro completes", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"], {
+      names: ["warden", "vulture"],
+      staminaMax: { a: 100, b: 100 },
+    });
+
+    // Mid-fight (outro 0): the card is hidden.
+    stage.apply(
+      scene([tickOf(0, { points: 3 }, { points: 1 })], 0, VIEWPORT, 0),
+    );
+    expect(stage.card.container.visible).toBe(false);
+
+    // End of the settle (outro 1): the card is fully faded in with the final score + winner.
+    stage.apply(
+      scene([tickOf(0, { points: 7 }, { points: 5 })], 0, VIEWPORT, 1),
+    );
+    expect(stage.card.container.visible).toBe(true);
+    expect(stage.card.container.alpha).toBeCloseTo(1);
+    expect(stage.card.heading.text).toBe("TIME");
+    expect(stage.card.score.text).toMatch(/7\s*–\s*5/);
+    expect(stage.card.winner.text).toBe("warden wins"); // A led ⇒ challenger wins
+
+    // The mirror: B leads ⇒ the King's name is the winner (kills a fixed-side / swapped-branch mutant).
+    stage.apply(
+      scene([tickOf(0, { points: 2 }, { points: 6 })], 0, VIEWPORT, 1),
+    );
+    expect(stage.card.winner.text).toBe("vulture wins");
+  });
+
+  it("declares a draw on the card when the scores are level", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"], {
+      names: ["warden", "vulture"],
+      staminaMax: { a: 0, b: 0 },
+    });
+
+    stage.apply(
+      scene([tickOf(0, { points: 4 }, { points: 4 })], 0, VIEWPORT, 1),
+    );
+
+    expect(stage.card.winner.text).toBe("DRAW");
+  });
+
   it("draws the tatami ring backdrop first, behind the fighters and the HUD", () => {
     // The mat rides root (screen px), not the inset world, so its ground line meets the fighters' feet.
     // It must be root's FIRST child so it strokes behind everything — the geometry is ringLayout's
