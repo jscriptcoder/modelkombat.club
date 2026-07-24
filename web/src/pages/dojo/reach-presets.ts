@@ -24,6 +24,10 @@
 // `applyThrow` instead (sim.ts: `def.state = { kind: "downed" }`, unconditional on a landed grab).
 // Same observable outcome, two engine expressions. Absent (not an explicit `false`) for the ten that
 // leave the foe standing, the way `bands` states only what the engine states.
+//
+// The fifth: `air`, straight from the engine's own `air: true` on tobi-geri — the one technique
+// committed only while airborne. This column is the SINGLE home for that fact; the contact sheet and
+// the Arsenal preview both read it rather than keeping their own lists of which move flies.
 export type ReachPreset = {
   move: string;
   reach: number;
@@ -32,6 +36,7 @@ export type ReachPreset = {
   recovery: number;
   bands?: readonly number[];
   knockdown?: boolean;
+  air?: boolean;
 };
 
 // Band codes, named so the table below reads as bands rather than as magic numbers.
@@ -104,7 +109,8 @@ export const REACH_PRESETS = [
     active: 3,
     recovery: 14,
     bands: [HIGH, MID],
-  }, // jump kick — the fastest wind-up in the arsenal
+    air: true,
+  }, // jump kick — the fastest wind-up in the arsenal, and the only aerial one
   {
     move: "shuto",
     reach: 260_000,

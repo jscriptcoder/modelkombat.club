@@ -117,6 +117,28 @@ describe("REACH_PRESETS — mirrors every engine technique reach, ascending", ()
       ["ushiro-geri", undefined],
     ]);
   });
+
+  it("mirrors which technique is performed in the AIR", () => {
+    // The fifth mirrored field: `air: true` on the engine's tobi-geri spec — the one technique that is
+    // committed only while airborne. This is the SINGLE home for that fact; the contact sheet reads it
+    // here rather than carrying its own list. Absent for the other twelve, the way `bands` and
+    // `knockdown` state only what the engine states.
+    expect(REACH_PRESETS.map((p: ReachPreset) => [p.move, p.air])).toEqual([
+      ["empi", undefined],
+      ["hiza-geri", undefined],
+      ["throw", undefined],
+      ["sweep", undefined],
+      ["uraken", undefined],
+      ["kizami-zuki", undefined],
+      ["gyaku-zuki", undefined],
+      ["tobi-geri", true],
+      ["shuto", undefined],
+      ["mae-geri", undefined],
+      ["mawashi-geri", undefined],
+      ["yoko-geri", undefined],
+      ["ushiro-geri", undefined],
+    ]);
+  });
 });
 
 describe("gap bounds — the slider's travel and the lab's opening distance", () => {

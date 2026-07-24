@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { REACH_PRESETS } from "../dojo/reach-presets";
+import { scene, type Viewport } from "../replay/scene";
 import { contactFrame, loopIndex, moveLoopTape } from "./move-preview";
 
 // move-preview.ts is the Arsenal preview's pure render-model core: it turns ONE move id into a
@@ -13,6 +14,10 @@ import { contactFrame, loopIndex, moveLoopTape } from "./move-preview";
 // WORLD_WIDTH / 2 — the ring midpoint the pair is centered on (mirrors scene.ts's world bound,
 // restated as a literal so this file is independent of production).
 const WORLD_MID = 300_000;
+
+// PreviewStage's DEFAULT_VIEWPORT — the popover's real canvas size, restated so this file stays
+// independent of production (the same discipline WORLD_MID follows).
+const PREVIEW_VIEWPORT: Viewport = { width: 220, height: 168 };
 
 describe("moveLoopTape — one move, looping: an attacker driving a passive target", () => {
   it("spans the move's full engine duration, so the loop plays the whole technique", () => {
@@ -175,6 +180,116 @@ describe("moveLoopTape — the target goes DOWN for the techniques that knock it
         KNOCKDOWN_DURATION,
       );
       expect(tape[tape.length - 1].b.knockdown).toBe(true);
+    }
+  });
+});
+
+describe("moveLoopTape — tobi-geri leaves the ground, kicks at the apex, and lands", () => {
+  // Postures in the engine's own encoding, restated here (web ∉ Stryker): 2 airborne, 0 grounded.
+  const AIR = 2;
+  const GROUND = 0;
+  const TOBI_REACH = 250_000;
+  // tobi-geri is 4 startup / 3 active / 14 recovery = 21 ticks, and the arc lands on tick 7 — so 14
+  // of those ticks are spent grounded in recovery. That is a KNOWN, accepted cost (plan D5/D7), not
+  // an oversight: the recovery is not static, `easeDriven` retracts the foot across it.
+  const GROUNDED_TAIL = 14;
+
+  const attacker = (move: string) => moveLoopTape(move).map((t) => t.a);
+
+  it("lifts the attacker along the engine's jump arc and puts it back down", () => {
+    expect(attacker("tobi-geri").map((a) => a.y)).toEqual([
+      0,
+      12_000,
+      20_000,
+      24_000,
+      24_000,
+      20_000,
+      12_000,
+      ...Array<number>(GROUNDED_TAIL).fill(0),
+    ]);
+  });
+
+  it("reads AIRBORNE on exactly the ticks it is off the ground", () => {
+    expect(attacker("tobi-geri").map((a) => a.posture)).toEqual([
+      GROUND,
+      ...Array<number>(6).fill(AIR),
+      ...Array<number>(GROUNDED_TAIL).fill(GROUND),
+    ]);
+  });
+
+  it("kicks at the APEX — the contact tick is the held top of the arc", () => {
+    // Also acceptance for the reduced-motion still: `contactFrame` is the frame a reduced-motion
+    // preview freezes on, and for the arsenal's one aerial technique that frame has to be airborne.
+    const tape = moveLoopTape("tobi-geri");
+    const contact = contactFrame("tobi-geri");
+
+    expect(contact).toBe(4); // the fastest wind-up in the arsenal
+    expect(tape[contact].a.y).toBe(24_000);
+    expect(tape[contact].a.y).toBe(Math.max(...tape.map((t) => t.a.y)));
+    expect(tape[contact].a.posture).toBe(AIR);
+    expect(tape[contact].a.attackPhase).toBe(2); // and genuinely at contact, not wind-up
+  });
+
+  it("closes the distance in flight — one true reach away exactly when the foot arrives", () => {
+    // The jump-in supplies the closing, not the reach (rules.ts). So the pair opens FURTHER out than
+    // tobi-geri's reach and the leap eats the difference: 250000 + the 40000 closed by contact. The
+    // attacker keeps travelling to touchdown, landing INSIDE reach — past where it kicked, as a real
+    // jump-in does — and then holds there.
+    const gaps = moveLoopTape("tobi-geri").map((t) => t.b.x - t.a.x);
+
+    expect(gaps.slice(0, 8)).toEqual([
+      290_000, 280_000, 270_000, 260_000, 250_000, 240_000, 230_000, 230_000,
+    ]);
+    expect(gaps[4]).toBe(TOBI_REACH); // the criterion, called out on its own
+    expect(gaps.slice(6).every((g) => g === 230_000)).toBe(true); // grounded: no endless slide
+  });
+
+  it("keeps the TARGET planted while the attacker flies", () => {
+    const tape = moveLoopTape("tobi-geri");
+
+    expect(tape.every((t) => t.b.y === 0 && t.b.posture === GROUND)).toBe(true);
+    expect(new Set(tape.map((t) => t.b.x)).size).toBe(1); // the target never moves
+  });
+
+  it("leaves the other twelve techniques grounded at a fixed gap", () => {
+    const grounded = REACH_PRESETS.filter((p) => p.move !== "tobi-geri");
+
+    expect(grounded).toHaveLength(12);
+
+    for (const preset of grounded) {
+      const tape = moveLoopTape(preset.move);
+
+      expect(tape.every((t) => t.a.y === 0 && t.a.posture === GROUND)).toBe(
+        true,
+      );
+      expect(new Set(tape.map((t) => t.b.x - t.a.x))).toEqual(
+        new Set([preset.reach]),
+      );
+    }
+  });
+
+  it("DRAWS the attacker off the mat at the apex and back on it after landing", () => {
+    // The tape assertions above say the arc is in the data; this one says it reaches the screen.
+    // Everything between — scene()'s lift, the AIR stance, the shrinking ground shadow — is machinery
+    // that already shipped, but nothing until now proved the preview actually feeds it. Run the same
+    // tape through the same scene() the popover renders with, at the popover's own viewport.
+    const tape = moveLoopTape("tobi-geri");
+    const drawnY = (tick: number) => scene(tape, tick, PREVIEW_VIEWPORT).a.y;
+
+    expect(drawnY(4)).toBeLessThan(drawnY(0)); // apex is HIGHER on screen (y grows downward)
+    expect(drawnY(7)).toBe(drawnY(0)); // landed back on the exact ground line
+    expect(drawnY(20)).toBe(drawnY(0)); // and stays there through the grounded recovery
+    // The lift is a real, visible displacement rather than a sub-pixel nudge.
+    expect(drawnY(0) - drawnY(4)).toBeGreaterThan(5);
+  });
+
+  it("keeps an unknown move id grounded and still (M7 totality)", () => {
+    for (const id of ["kokoro-nage", ""]) {
+      const tape = moveLoopTape(id);
+
+      expect(tape.every((t) => t.a.y === 0 && t.a.posture === GROUND)).toBe(
+        true,
+      );
     }
   });
 });

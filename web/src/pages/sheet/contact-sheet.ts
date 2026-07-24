@@ -5,7 +5,7 @@ import {
   selectMove,
 } from "../dojo/controls";
 import { buildDojoTape } from "../dojo/dojo-tape";
-import { REACH_PRESETS } from "../dojo/reach-presets";
+import { REACH_PRESETS, type ReachPreset } from "../dojo/reach-presets";
 import { scene, type Figure, type Viewport } from "../replay/scene";
 
 // The contact sheet's DATA layer (S7): the whole arsenal posed side by side, one attacker figure per
@@ -19,27 +19,27 @@ import { scene, type Figure, type Viewport } from "../replay/scene";
 // figure into its cell; only the pose + facing carry over.
 export type ContactCellData = { id: string; placement: Figure };
 
-// The moves the sheet renders from the AIR stance, mirroring how the engine draws them. Only
-// tobi-geri is airborne; rendered grounded it would duplicate mae-geri (both drive footR to the band),
-// so the sheet would flag a look-alike that does not exist on /watch. Posing it airborne — the AIR
-// stance's tucked support foot IS the read — keeps the detector honest. A web-side mirror of an engine
-// fact, kept here (not in the aesthetic descriptor table) because posture is the engine's, not a
-// drawing choice; localised to the sheet, the only place that needs it.
-const AIRBORNE_MOVES: ReadonlySet<string> = new Set(["tobi-geri"]);
+// A technique the engine performs in the air is posed from the AIR stance here too. Rendered grounded,
+// tobi-geri would duplicate mae-geri (both drive footR to the band), so the sheet would flag a
+// look-alike that does not exist on /watch; posing it airborne — the AIR stance's tucked support foot
+// IS the read — keeps the detector honest. WHICH moves those are is the preset table's `air` column,
+// not a list kept here: posture is an engine fact, and an engine fact gets one home.
 const AIR_POSTURE = 2;
 const GROUND_POSTURE = 0;
 
 export const contactSheetCells = (
   figureViewport: Viewport,
 ): ContactCellData[] =>
-  REACH_PRESETS.map((preset) => {
+  // Read through the declared ReachPreset, not the `as const` literal union: `air` is a genuinely
+  // optional key, so only the real type exposes it as absent-or-true rather than "does not exist".
+  REACH_PRESETS.map((preset: ReachPreset) => {
     // Commit the challenger to this technique from the right posture, facing its idle opponent. The
     // opponent sits one true-reach away so the reach-to-target solve extends the driven limb to real
     // contact distance — the same distance the engine fights the move at.
     const attacker = selectMove(
       {
         ...DEFAULT_CHALLENGER_CONTROLS,
-        posture: AIRBORNE_MOVES.has(preset.move) ? AIR_POSTURE : GROUND_POSTURE,
+        posture: preset.air === true ? AIR_POSTURE : GROUND_POSTURE,
       },
       preset.move,
     );
