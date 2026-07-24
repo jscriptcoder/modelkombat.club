@@ -87,6 +87,36 @@ describe("REACH_PRESETS — mirrors every engine technique reach, ascending", ()
       ["ushiro-geri", [3, 2]],
     ]);
   });
+
+  it("mirrors which techniques knock the target DOWN", () => {
+    // The fourth mirrored field: which techniques leave the foe prone. Faithful to the engine, but
+    // transcribed from TWO places rather than one — `sweep` and `hiza-geri` carry a literal
+    // `knockdown: true` on their move specs (rules.ts), while `throw` has no such field and downs its
+    // victim through `applyThrow` instead (sim.ts: `def.state = { kind: "downed" }`, unconditional on
+    // a landed grab). Same observable outcome, two engine expressions — so this column mirrors the
+    // BEHAVIOUR, and the divergence is recorded here rather than left for the next reader to rediscover.
+    //
+    // Absent (rather than an explicit `false`) for the ten that leave the foe standing, matching how
+    // `bands` states only what the engine states. Read through the declared ReachPreset for the same
+    // reason `bands` is: only the real type exposes an absent key as optional.
+    expect(
+      REACH_PRESETS.map((p: ReachPreset) => [p.move, p.knockdown]),
+    ).toEqual([
+      ["empi", undefined],
+      ["hiza-geri", true],
+      ["throw", true],
+      ["sweep", true],
+      ["uraken", undefined],
+      ["kizami-zuki", undefined],
+      ["gyaku-zuki", undefined],
+      ["tobi-geri", undefined],
+      ["shuto", undefined],
+      ["mae-geri", undefined],
+      ["mawashi-geri", undefined],
+      ["yoko-geri", undefined],
+      ["ushiro-geri", undefined],
+    ]);
+  });
 });
 
 describe("gap bounds — the slider's travel and the lab's opening distance", () => {

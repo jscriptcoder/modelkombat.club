@@ -98,6 +98,87 @@ describe("moveLoopTape — one move, looping: an attacker driving a passive targ
   });
 });
 
+describe("moveLoopTape — the target goes DOWN for the techniques that knock it down", () => {
+  // The three knockdown techniques and, for each, how many ticks its target spends upright then
+  // prone. Restated independently of the preset table (the web ∉ Stryker guard): `throw` is 7/2/14
+  // = 23 ticks dropping at 7, `sweep` 7/2/13 = 22 dropping at 7, `hiza-geri` 9/2/16 = 27 dropping
+  // at 9. A shared contact constant, or a boundary shifted either way, fails here.
+  const KNOCKDOWN_MOVES = [
+    ["throw", 7, 16],
+    ["sweep", 7, 15],
+    ["hiza-geri", 9, 18],
+  ] as const;
+
+  const targetKnockdown = (move: string): readonly boolean[] =>
+    moveLoopTape(move).map((t) => t.b.knockdown);
+
+  it("lays the target out from the sweep's contact tick to the end of the loop", () => {
+    // The sweep first, deliberately: it is the move whose ENTIRE payload is the knockdown (score 0),
+    // and starting here rather than on `throw` proves this is a table-driven rule about knockdown
+    // techniques, not a second special case grafted onto the grab.
+    expect(targetKnockdown("sweep")).toEqual([
+      ...Array<boolean>(7).fill(false),
+      ...Array<boolean>(15).fill(true),
+    ]);
+  });
+
+  it("drops the target at each knockdown technique's OWN contact tick", () => {
+    for (const [move, upright, prone] of KNOCKDOWN_MOVES) {
+      expect(targetKnockdown(move)).toEqual([
+        ...Array<boolean>(upright).fill(false),
+        ...Array<boolean>(prone).fill(true),
+      ]);
+    }
+  });
+
+  it("never lays the target down for the ten techniques that leave it standing", () => {
+    const standing = REACH_PRESETS.map((p) => p.move).filter(
+      (move) => !KNOCKDOWN_MOVES.some(([id]) => id === move),
+    );
+
+    expect(standing).toHaveLength(10); // the whole roster is accounted for: 3 down + 10 standing
+
+    for (const move of standing) {
+      expect(targetKnockdown(move)).toEqual(
+        Array<boolean>(moveLoopTape(move).length).fill(false),
+      );
+    }
+  });
+
+  it("leaves the ATTACKER standing through its own knockdown technique", () => {
+    // The knockdown is a cross-fighter effect: it lands on the foe, never on the fighter throwing it.
+    for (const [move] of KNOCKDOWN_MOVES) {
+      expect(moveLoopTape(move).every((t) => t.a.knockdown === false)).toBe(
+        true,
+      );
+    }
+  });
+
+  it("keeps an unknown move's target upright instead of throwing (M7 totality)", () => {
+    for (const id of ["kokoro-nage", ""]) {
+      expect(targetKnockdown(id)).toEqual([false]);
+    }
+  });
+
+  it("ends every knockdown loop before the foe would wake, so no wake-up needs modelling", () => {
+    // rules.ts sets knockdownDuration 18 — a downed foe rises 18 ticks after it drops. Each of the
+    // three tapes ends within that budget (throw 16, sweep 15, hiza-geri 18 — exactly on the edge),
+    // so the target simply stays prone to the loop's end and the preview needs no wake-up. Pinned as
+    // an assertion rather than a comment: a retuned recovery that pushed a tape past the budget would
+    // otherwise silently render a foe still lying down after the engine would have stood it up.
+    const KNOCKDOWN_DURATION = 18;
+
+    for (const [move] of KNOCKDOWN_MOVES) {
+      const tape = moveLoopTape(move);
+
+      expect(tape.length - contactFrame(move)).toBeLessThanOrEqual(
+        KNOCKDOWN_DURATION,
+      );
+      expect(tape[tape.length - 1].b.knockdown).toBe(true);
+    }
+  });
+});
+
 describe("loopIndex — seamless wrap from a fractional playhead to a tape index", () => {
   it("tracks the playhead within the tape", () => {
     expect(loopIndex(0, 24)).toBe(0);

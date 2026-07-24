@@ -17,6 +17,13 @@
 // reads an absent `bands` as EVERY band being legal. The sweep is constrained by hurtbox occupancy
 // instead, and a throw is a grab with no height at all — so there is genuinely nothing to mirror,
 // and inventing a list would put an interpretation in a transcription table.
+//
+// The fourth mirrored field: whether the technique puts the foe on the FLOOR. Faithful to the engine
+// but transcribed from two places rather than one — `sweep` and `hiza-geri` carry a literal
+// `knockdown: true` on their move specs, while `throw` has no such field and downs its victim through
+// `applyThrow` instead (sim.ts: `def.state = { kind: "downed" }`, unconditional on a landed grab).
+// Same observable outcome, two engine expressions. Absent (not an explicit `false`) for the ten that
+// leave the foe standing, the way `bands` states only what the engine states.
 export type ReachPreset = {
   move: string;
   reach: number;
@@ -24,6 +31,7 @@ export type ReachPreset = {
   active: number;
   recovery: number;
   bands?: readonly number[];
+  knockdown?: boolean;
 };
 
 // Band codes, named so the table below reads as bands rather than as magic numbers.
@@ -47,9 +55,24 @@ export const REACH_PRESETS = [
     active: 2,
     recovery: 16,
     bands: [MID],
-  }, // knee
-  { move: "throw", reach: 120_000, startup: 7, active: 2, recovery: 14 }, // grab — no band at all
-  { move: "sweep", reach: 180_000, startup: 7, active: 2, recovery: 13 }, // banded by occupancy, not bandLegal
+    knockdown: true,
+  }, // knee — the only MID-band standing knockdown
+  {
+    move: "throw",
+    reach: 120_000,
+    startup: 7,
+    active: 2,
+    recovery: 14,
+    knockdown: true,
+  }, // grab — no band at all
+  {
+    move: "sweep",
+    reach: 180_000,
+    startup: 7,
+    active: 2,
+    recovery: 13,
+    knockdown: true,
+  }, // banded by occupancy, not bandLegal
   {
     move: "uraken",
     reach: 200_000,

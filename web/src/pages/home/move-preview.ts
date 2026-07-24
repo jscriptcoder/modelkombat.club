@@ -29,6 +29,30 @@ const ATTACKER_BASE: FigureControls = {
   attackMove: "",
 };
 
+// The knockdown a technique lands on its TARGET. Three moves put the foe on the floor at contact
+// (which three is the preset table's `knockdown` column, mirroring the engine), and for two of them
+// it is the whole payload — `sweep` and `hiza-geri` both score 0, so a preview that leaves the target
+// standing shows nothing of what the move actually does. From the contact tick onward the target's
+// frame carries `knockdown`, which `poseFor` already renders as its full-body PRONE pose: no new
+// render mechanism, just the tape telling the truth about the outcome.
+//
+// The foe stays down for the rest of the loop, and that needs no wake-up modelling rather than
+// skipping it — the engine's knockdownDuration is 18 and all three tapes end within that budget
+// (pinned in the test, not assumed here). Cross-fighter by construction: only `b` is rewritten, so a
+// fighter never downs itself. Total — a move with no preset, or one that leaves the foe standing,
+// returns the tape untouched (M7).
+const withTargetKnockdown = (tape: ReplayTape, move: string): ReplayTape => {
+  const preset = presetFor(move);
+
+  if (preset?.knockdown !== true) return tape;
+
+  return tape.map((frame) =>
+    frame.tick < preset.startup
+      ? frame
+      : { ...frame, b: { ...frame.b, knockdown: true } },
+  );
+};
+
 // moveLoopTape: ONE move id → a looping ReplayTape. The attacker (a) is committed to the move via the
 // same `selectMove` the pose lab uses; the target (b) is the dojo's idle DEFAULT_KING, a passive
 // partner facing back. The pair is centered the move's OWN reach apart, so the strike lands at
@@ -40,7 +64,10 @@ export const moveLoopTape = (move: string): ReplayTape => {
   const attacker = controlsToFrame(selectMove(ATTACKER_BASE, move));
   const gap = presetFor(move)?.reach ?? DEFAULT_GAP;
 
-  return buildDojoTape({ a: attacker, b: DEFAULT_KING, gap });
+  return withTargetKnockdown(
+    buildDojoTape({ a: attacker, b: DEFAULT_KING, gap }),
+    move,
+  );
 };
 
 // loopIndex: the seamless wrap from the preview clock's fractional playhead to a tape index in

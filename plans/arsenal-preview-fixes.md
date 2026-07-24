@@ -6,11 +6,11 @@
 
 ## Progress
 
-| Slice | Branch | State |
-| --- | --- | --- |
-| 1 — throw eases | `feat/throw-eases` | branch cut, awaiting AC confirmation |
-| 2 — knockdown target | `feat/preview-knockdown-target` | not started |
-| 3 — airborne tobi-geri | `feat/preview-tobi-geri-airborne` | not started |
+| Slice                  | Branch                            | State                                                 |
+| ---------------------- | --------------------------------- | ----------------------------------------------------- |
+| 1 — throw eases        | `feat/throw-eases`                | ✅ shipped — PR #419, squashed to `main` as `8a98128` |
+| 2 — knockdown target   | `feat/preview-knockdown-target`   | green — awaiting commit approval                      |
+| 3 — airborne tobi-geri | `feat/preview-tobi-geri-airborne` | not started                                           |
 
 ## Goal
 
@@ -20,12 +20,12 @@ the second.
 
 ## Acceptance Criteria
 
-- [ ] A throw is no longer a held still: its hands wind up, grip, and retract across the technique —
+- [x] A throw is no longer a held still: its hands wind up, grip, and retract across the technique —
       on the Arsenal preview, on `/dojo`, and on a real `/watch` throw
-- [ ] A throw's contact frame is unchanged — the grip lands on exactly the point it lands on today
-- [ ] Opening the eye on `throw`, `sweep` or `hiza-geri` shows the dimmed target standing until the
+- [x] A throw's contact frame is unchanged — the grip lands on exactly the point it lands on today
+- [x] Opening the eye on `throw`, `sweep` or `hiza-geri` shows the dimmed target standing until the
       technique's contact tick, then prone for the remainder of the loop
-- [ ] The other ten moves' targets never go prone
+- [x] The other ten moves' targets never go prone
 - [ ] Opening the eye on `tobi-geri` shows the attacker leave the ground, rise, kick at the apex,
       descend, land, and recover grounded — while closing the distance toward the target
 - [ ] The other twelve moves stay grounded at a fixed gap
@@ -48,7 +48,17 @@ the second.
 
 ---
 
-### Slice 1: A throw's hands wind up, grip, and retract instead of holding one frame
+### Slice 1: A throw's hands wind up, grip, and retract instead of holding one frame — ✅ SHIPPED (#419)
+
+> **Landed as designed, with one correction to the shape below.** Deleting the `isGrab` early-return
+> was necessary but _not sufficient_: the engine gives a throw its own `state.kind === "throwing"`,
+> which emits `attacking: false` (`src/engine/sim.ts`), so `strikeHandFor` bailed one line earlier and
+> a throw would still have rendered frozen. The gate became a **commitment** gate reading either
+> signal — `if (!striker.attacking && !isGrab(striker.attackMove)) return null;`. `throwGrabFor` was
+> deleted outright, and the girdle is held square for a grab (rotation models one shoulder swinging
+> ahead of a _resting_ one; a two-handed grab has no resting shoulder). Net **−24 lines** in
+> `scene.ts`. Scan: 11 mutants applied, 10 killed, 1 equivalent survivor (`limb: "handR"` is
+> indistinguishable from `GENERIC_LIMB` under today's data).
 
 **Value**: A spectator watching a `/watch` throw — and a visitor opening the Arsenal `throw` preview —
 sees a technique execute rather than a frozen pose. Today `throwGrabFor` (`scene.ts:925`) never reads
@@ -75,7 +85,8 @@ endpoint ternary writes `handR`, and the grab layer narrows to placing `handL` a
 the **eased** `handR`. The throw stops being a special case and becomes "a move that drives one hand
 to a fixed height, with a second hand riding along."
 
-**Acceptance criteria** — *present and confirm before writing code*:
+**Acceptance criteria** — _present and confirm before writing code_:
+
 1. Scrubbing `throw` in `/dojo` shows the grip hands in three distinct positions across startup /
    active / recovery, where today all 23 ticks are identical
 2. Both hands remain `GRAB_SPREAD` apart at every tick — it still reads as a two-handed grab, never
@@ -93,7 +104,7 @@ both. Add the two-hand-spread invariant across ticks as a second failing case.
 > (`phase !== 1 && !== 2 && !== 3 ? strikeHand`) and should land on today's values untouched. But
 > `driven` becomes non-null, which un-gates the derived **lean** (`scene.ts:483`). Those tests assert
 > hands only, and `handR`/`handL` are written from the solved point independent of lean — so they are
-> *expected* to stay green. Confirm that empirically before treating criterion 3 as met, and check
+> _expected_ to stay green. Confirm that empirically before treating criterion 3 as met, and check
 > whether any other test asserts a throwing figure's shoulder / head / elbow.
 
 **GREEN**: The descriptor entry, the `strikeHandFor` gate deletion, and the narrowed grab layer.
@@ -101,7 +112,7 @@ Nothing more — no recovery waypoint (D2 parks it).
 
 **MUTATE**: `N/A (Stryker)` → scripted scan. Mutants to target explicitly: restoring the `isGrab`
 early-return; dropping `targetY` from the descriptor; `handL` offset sign flip; `handL` derived from
-the *solved* point rather than the *eased* one (the subtle one — invisible at single-tick, visible
+the _solved_ point rather than the _eased_ one (the subtle one — invisible at single-tick, visible
 only across a multi-tick run).
 
 **KILL MUTANTS**: Address survivors; ask when value is ambiguous. A survivor on a condition may mean
@@ -117,6 +128,15 @@ human approves the commit.
 ---
 
 ### Slice 2: The target drops for the three moves that knock it down
+
+> **Two departures from the shape below, both deliberate.** (1) The transform is **not exported** —
+> everything the acceptance criteria describe, totality included, is observable through `moveLoopTape`,
+> and exporting a single-caller helper purely to unit-test it is the anti-pattern the `testing` skill
+> names. (2) The `knockdown` column mirrors the engine's **behaviour**, not one engine field: `sweep`
+> and `hiza-geri` carry a literal `knockdown: true` on their move specs, but `throw` has no such field
+> and downs its victim through `applyThrow` (`sim.ts`: `def.state = { kind: "downed" }`, unconditional
+> on a landed grab). Same outcome, two engine expressions — recorded in the table and its pinning test
+> rather than left for the next reader to rediscover.
 
 **Value**: A visitor opening the eye on `throw`, `sweep` or `hiza-geri` sees the technique's actual
 outcome. `sweep` and `hiza-geri` both **score 0** — the knockdown is their entire payload — so today
@@ -141,7 +161,8 @@ pure transform over a built tape that sets `b.knockdown` from `preset.startup` (
 already what `contactFrame` computes) to the end. Compose it in `moveLoopTape`. No new render
 mechanism — `PRONE` already ships.
 
-**Acceptance criteria** — *present and confirm before writing code*:
+**Acceptance criteria** — _present and confirm before writing code_:
+
 1. For each of `throw`, `sweep`, `hiza-geri`: the target is upright on every tick before contact and
    prone on every tick from contact to the end of the tape
 2. For all ten other moves the target is never prone on any tick
@@ -177,7 +198,7 @@ scoring move, human approves the commit.
 **Value**: A visitor opening the eye on the arsenal's only aerial technique sees it performed in the
 air. Today `ATTACKER_BASE` pins `posture: 0` and `controlsToFrame` pins `y: 0`, so it previews as a
 grounded front kick — and because the descriptor deliberately authors **no chamber** (the AIR stance's
-tucked foot *is* the wind-up), a grounded tobi-geri also has no wind-up at all: `easeDriven` lerps
+tucked foot _is_ the wind-up), a grounded tobi-geri also has no wind-up at all: `easeDriven` lerps
 stance→stance and the figure holds still through startup and recovery.
 
 **Path**: eye control → `moveLoopTape("tobi-geri")` → a pure arc transform writing per-tick `y`, `x`
@@ -202,7 +223,8 @@ that, for an `air` move, writes per-tick `y` from the arc, per-tick `x` closing 
 airborne, and `posture = y > 0 ? 2 : 0`. Open the gap at `reach + total travel` so it closes to
 `reach` at contact. Retire `/sheet`'s `AIRBORNE_MOVES` in favour of the column.
 
-**Acceptance criteria** — *present and confirm before writing code*:
+**Acceptance criteria** — _present and confirm before writing code_:
+
 1. `jumpArc()` reproduces the engine's documented sequence exactly, integrated from the mirrored
    constants (not stored as a literal array)
 2. In a `tobi-geri` preview tape: `y` is 0 at tick 0, rises to the 24000 apex, and is back to exactly
@@ -256,5 +278,6 @@ move, `/sheet` still correct, human approves the commit.
 6. DDD glossary check — `N/A` (project does not use DDD)
 
 ---
-*Delete this file when the plan is complete. Per the standing rule, completed plans are **archived**
-under `docs/archive/` with a README entry, never deleted.*
+
+_Delete this file when the plan is complete. Per the standing rule, completed plans are **archived**
+under `docs/archive/` with a README entry, never deleted._
