@@ -225,6 +225,85 @@ describe("scene — the ring inset transform (fighters shrink into a centred ban
   });
 });
 
+describe("scene — the end-of-fight settle (ease back to neutral)", () => {
+  // A fourth `outro` arg (0..1) eases every fighter's pose from its final frame toward a neutral
+  // stance, so a fight that ends mid-technique relaxes rather than freezing. 0 = no settle
+  // (byte-identical to the 3-arg call); 1 = fully neutral. A knocked-down fighter stays prone.
+  const strike = {
+    attacking: true,
+    attackBand: 2,
+    attackReach: 240_000,
+    attackMove: "kizami-zuki",
+    attackPhase: 2,
+  };
+
+  it("eases a committed strike to its neutral stance by the end of the settle", () => {
+    const strikeTape: ReplayTape = [
+      tickOf(0, { x: 150_000, ...strike }, { x: 450_000 }),
+    ];
+
+    const idlePose = scene(
+      [tickOf(0, { x: 150_000 }, { x: 450_000 })],
+      0,
+      VIEWPORT,
+    ).a.pose;
+
+    const struckHand = scene(strikeTape, 0, VIEWPORT, 0).a.pose.handR.x;
+    const settled = scene(strikeTape, 0, VIEWPORT, 1).a.pose;
+
+    expect(struckHand).toBeGreaterThan(idlePose.handR.x); // the strike reaches out
+    expect(settled).toEqual(idlePose); // fully settled == the neutral stance
+  });
+
+  it("blends partway at a mid outro — relaxing but not yet neutral", () => {
+    const strikeTape: ReplayTape = [
+      tickOf(0, { x: 150_000, ...strike }, { x: 450_000 }),
+    ];
+
+    const struck = scene(strikeTape, 0, VIEWPORT, 0).a.pose.handR.x;
+
+    const idle = scene([tickOf(0, { x: 150_000 }, { x: 450_000 })], 0, VIEWPORT)
+      .a.pose.handR.x;
+
+    const mid = scene(strikeTape, 0, VIEWPORT, 0.3).a.pose.handR.x;
+
+    expect(mid).toBeLessThan(struck); // retracting
+    expect(mid).toBeGreaterThan(idle); // not all the way back yet
+  });
+
+  it("leaves the pose byte-identical at outro 0 (the 3-arg call and outro:0 agree)", () => {
+    const strikeTape: ReplayTape = [
+      tickOf(0, { x: 150_000, ...strike }, { x: 450_000 }),
+    ];
+
+    expect(scene(strikeTape, 0, VIEWPORT, 0).a.pose).toEqual(
+      scene(strikeTape, 0, VIEWPORT).a.pose,
+    );
+  });
+
+  it("keeps a knocked-down fighter prone through the settle (no magic stand-up)", () => {
+    const downTape: ReplayTape = [tickOf(0, { knockdown: true }, {})];
+
+    expect(scene(downTape, 0, VIEWPORT, 1).a.pose).toEqual(
+      scene(downTape, 0, VIEWPORT, 0).a.pose,
+    );
+  });
+
+  it("fades the TIME card in over the tail of the outro", () => {
+    const tape: ReplayTape = [tickOf(0, {}, {})];
+
+    expect(scene(tape, 0, VIEWPORT, 0).outro.cardAlpha).toBe(0);
+    expect(scene(tape, 0, VIEWPORT, 0.4).outro.cardAlpha).toBe(0); // before the fade start
+    // Partway through the fade window (0.45 → 1): strictly between, so a flipped offset that would
+    // read fully-in (or fully-out) here is caught.
+    const midFade = scene(tape, 0, VIEWPORT, 0.725).outro.cardAlpha;
+
+    expect(midFade).toBeGreaterThan(0);
+    expect(midFade).toBeLessThan(1);
+    expect(scene(tape, 0, VIEWPORT, 1).outro.cardAlpha).toBe(1); // fully in at the end
+  });
+});
+
 describe("scene — stamina for the scoreboard", () => {
   // The stamina bar's denominator is each fighter's PEAK stamina across the fight: stamina inits at
   // rules.stamina.max and regen clamps to it (engine), so the tape's max IS the meter's max. A fighter

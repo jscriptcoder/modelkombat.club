@@ -38,97 +38,143 @@ const frame = (overrides: Partial<ReplayFrame> = {}): ReplayFrame => ({
 const tickOf = (tick: number): ReplayTick => ({ tick, a: frame(), b: frame() });
 
 describe("transport — the pure playback clock", () => {
-  it("starts at the first tick, auto-playing (also the restart target)", () => {
-    expect(startTransport()).toEqual({ playhead: 0, playing: true });
+  it("starts at the first tick, auto-playing, no outro (also the restart target)", () => {
+    expect(startTransport()).toEqual({ playhead: 0, playing: true, outro: 0 });
   });
 
-  it("advances the playhead by the frame delta and stays playing", () => {
+  it("advances the playhead by the frame delta and stays playing, outro still 0", () => {
     expect(advance(startTransport(), 3, 100)).toEqual({
       playhead: 3,
       playing: true,
+      outro: 0,
     });
   });
 
-  it("auto-pauses at the last tick — the fight stops cleanly at the end, never running off", () => {
-    const nearEnd: Transport = { playhead: 98, playing: true };
+  it("keeps playing when the playhead reaches the last tick — the settle outro runs before pausing", () => {
+    const nearEnd: Transport = { playhead: 98, playing: true, outro: 0 };
 
-    // 98 + 5 overshoots 100: the playhead clamps to the last tick AND the clock stops there, so the
-    // toggle returns to Play instead of freezing on Pause over the final frame.
-    expect(advance(nearEnd, 5, 100)).toEqual({ playhead: 100, playing: false });
+    // 98 + 5 clamps to 100 (the last tick), but the clock keeps PLAYING to run the end-of-fight settle;
+    // the outro is still 0 this first frame at the end (it ramps on the frames that follow).
+    expect(advance(nearEnd, 5, 100)).toEqual({
+      playhead: 100,
+      playing: true,
+      outro: 0,
+    });
   });
 
-  it("seeks to a tick and pauses there — a scrub stops playback on the chosen frame", () => {
-    expect(seek({ playhead: 10, playing: true }, 40, 100)).toEqual({
-      playhead: 40,
+  it("ramps the outro once the playhead is pinned at the last tick, still playing", () => {
+    // OUTRO_TICKS = 24, so a delta of 12 at the end is half the settle. The playhead holds at the last
+    // tick; only the outro moves.
+    const atEnd: Transport = { playhead: 100, playing: true, outro: 0 };
+
+    expect(advance(atEnd, 12, 100)).toEqual({
+      playhead: 100,
+      playing: true,
+      outro: 0.5,
+    });
+  });
+
+  it("pauses once the settle outro completes (outro clamps to 1)", () => {
+    const settling: Transport = { playhead: 100, playing: true, outro: 0.9 };
+
+    // 0.9 + 12/24 = 1.4 clamps to 1; the settle is done, so the clock finally pauses.
+    expect(advance(settling, 12, 100)).toEqual({
+      playhead: 100,
       playing: false,
+      outro: 1,
     });
+  });
+
+  it("seeks to a tick and pauses there, clearing the outro — a scrub is back inside the fight", () => {
+    expect(seek({ playhead: 100, playing: true, outro: 0.5 }, 40, 100)).toEqual(
+      {
+        playhead: 40,
+        playing: false,
+        outro: 0,
+      },
+    );
   });
 
   it("clamps a seek below the start back to tick 0", () => {
-    expect(seek({ playhead: 10, playing: true }, -5, 100)).toEqual({
+    expect(seek({ playhead: 10, playing: true, outro: 0 }, -5, 100)).toEqual({
       playhead: 0,
       playing: false,
+      outro: 0,
     });
   });
 
   it("clamps a seek past the end back to the last tick", () => {
-    expect(seek({ playhead: 10, playing: true }, 150, 100)).toEqual({
+    expect(seek({ playhead: 10, playing: true, outro: 0 }, 150, 100)).toEqual({
       playhead: 100,
       playing: false,
+      outro: 0,
     });
   });
 
   it("steps forward exactly one tick from an integer playhead, pausing", () => {
-    expect(step({ playhead: 5, playing: true }, 1, 100)).toEqual({
+    expect(step({ playhead: 5, playing: true, outro: 0 }, 1, 100)).toEqual({
       playhead: 6,
       playing: false,
+      outro: 0,
     });
   });
 
   it("steps back exactly one tick from an integer playhead, pausing", () => {
-    expect(step({ playhead: 5, playing: true }, -1, 100)).toEqual({
+    expect(step({ playhead: 5, playing: true, outro: 0 }, -1, 100)).toEqual({
       playhead: 4,
       playing: false,
+      outro: 0,
     });
   });
 
   it("snaps a fractional (mid-play) playhead to round(playhead) ± 1", () => {
     // 5.6 rounds to 6, so a forward step lands on 7 — not 6.6 (drop-round) or 6 (floor).
-    expect(step({ playhead: 5.6, playing: true }, 1, 100)).toEqual({
+    expect(step({ playhead: 5.6, playing: true, outro: 0 }, 1, 100)).toEqual({
       playhead: 7,
       playing: false,
+      outro: 0,
     });
   });
 
   it("stops at tick 0 when stepping back from the first tick", () => {
-    expect(step({ playhead: 0, playing: false }, -1, 100)).toEqual({
+    expect(step({ playhead: 0, playing: false, outro: 0 }, -1, 100)).toEqual({
       playhead: 0,
       playing: false,
+      outro: 0,
     });
   });
 
   it("stops at the last tick when stepping forward from the end", () => {
-    expect(step({ playhead: 100, playing: false }, 1, 100)).toEqual({
+    expect(step({ playhead: 100, playing: false, outro: 0 }, 1, 100)).toEqual({
       playhead: 100,
       playing: false,
+      outro: 0,
     });
   });
 
   it("freezes the tick while paused — a paused clock does not advance", () => {
-    const paused = togglePlaying({ playhead: 5, playing: true });
+    const paused = togglePlaying({ playhead: 5, playing: true, outro: 0 });
 
-    expect(advance(paused, 3, 100)).toEqual({ playhead: 5, playing: false });
+    expect(advance(paused, 3, 100)).toEqual({
+      playhead: 5,
+      playing: false,
+      outro: 0,
+    });
   });
 
   it("resumes from the current tick — play/pause keeps the playhead, never resets to 0", () => {
-    const paused = togglePlaying({ playhead: 5, playing: true }); // → { 5, false }
+    const paused = togglePlaying({ playhead: 5, playing: true, outro: 0 });
 
     expect(advance(paused, 3, 100).playhead).toBe(5); // frozen while paused
 
     const resumed = togglePlaying(paused); // → { 5, true }
 
     // continues from 5 (not 0), and stays playing.
-    expect(advance(resumed, 3, 100)).toEqual({ playhead: 8, playing: true });
+    expect(advance(resumed, 3, 100)).toEqual({
+      playhead: 8,
+      playing: true,
+      outro: 0,
+    });
   });
 
   // The per-frame tick advance the Pixi ticker feeds `advance`. The viewer plays SLOWER than one

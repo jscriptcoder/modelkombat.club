@@ -724,6 +724,9 @@ export type Scene = {
   contact: { a: Mark | null; b: Mark | null };
   // Each fighter's ground shadow, tracking their x on the mat and shrinking when airborne.
   shadows: { a: Shadow; b: Shadow };
+  // The end-of-fight overlay state: `cardAlpha` (0..1) fades in the TIME card over the tail of the
+  // settle. 0 all through the fight (and at outro 0).
+  outro: { cardAlpha: number };
 };
 
 // The canvas the scene is drawn into (supplied by the Pixi layer; fixed in tests for exact maths).
@@ -745,6 +748,12 @@ const GROUND_RATIO = 0.9;
 // shrink range; both eye-tunable.
 const SHADOW_LIFT_SPAN = 1.5;
 const SHADOW_MIN_SCALE = 0.5;
+
+// The end-of-fight settle: the pose reaches its neutral stance by SETTLE_END of the outro (the front
+// 60%), leaving the tail for the TIME card, which fades in over [CARD_FADE_START, 1] of the outro. Both
+// eye-tunable; the outro itself (0..1) is the transport's settle progress.
+const SETTLE_END = 0.6;
+const CARD_FADE_START = 0.45;
 
 // The fighter's body height in world sub-units — the single tunable knob every body dimension
 // derives from (decision 3 / M2). Projected by the SAME pxPerSubunit that positions the fighter, so
@@ -969,6 +978,32 @@ const scalePose = (pose: Skeleton, scale: number): Skeleton => {
   };
 };
 
+// Lerp a whole skeleton toward another, joint by joint, rounding to whole px (like scalePose). Used by
+// the end-of-fight settle to ease a final pose toward its neutral stance; at t=1 it returns `to`
+// exactly (both inputs are already rounded), so a full settle lands precisely on the neutral pose.
+const lerpSkeleton = (from: Skeleton, to: Skeleton, t: number): Skeleton => {
+  const j = (a: Joint, b: Joint): Joint => ({
+    x: Math.round(a.x + (b.x - a.x) * t),
+    y: Math.round(a.y + (b.y - a.y) * t),
+  });
+
+  return {
+    head: j(from.head, to.head),
+    shoulder: j(from.shoulder, to.shoulder),
+    hip: j(from.hip, to.hip),
+    handL: j(from.handL, to.handL),
+    handR: j(from.handR, to.handR),
+    footL: j(from.footL, to.footL),
+    footR: j(from.footR, to.footR),
+    shoulderL: j(from.shoulderL, to.shoulderL),
+    shoulderR: j(from.shoulderR, to.shoulderR),
+    elbowL: j(from.elbowL, to.elbowL),
+    elbowR: j(from.elbowR, to.elbowR),
+    kneeL: j(from.kneeL, to.kneeL),
+    kneeR: j(from.kneeR, to.kneeR),
+  };
+};
+
 // Keep the playhead inside the tape: a value past the last tick shows the final frame, a negative
 // one shows the first. The player never renders a frame off the ends of a real fight.
 const clampPlayhead = (playhead: number, length: number): number =>
@@ -978,10 +1013,22 @@ export const scene = (
   tape: ReplayTape,
   playhead: number,
   viewport: Viewport,
+  outro: number = 0,
 ): Scene => {
   const pxPerSubunit = viewport.width / WORLD_WIDTH;
   const groundY = viewport.height * GROUND_RATIO;
   const scale = bodyScale(viewport);
+
+  // The end-of-fight settle: how far each pose has eased toward its neutral stance (0 → the raw final
+  // frame, 1 → fully neutral). Smoothstepped and reaching 1 by SETTLE_END of the outro, so the fighters
+  // relax over the front of the outro and hold neutral under the card.
+  const settleT = outro <= 0 ? 0 : smoothstep(Math.min(1, outro / SETTLE_END));
+
+  // The TIME card fade, over the tail [CARD_FADE_START, 1] of the outro (0 until then), smoothed.
+  const cardAlpha =
+    outro <= CARD_FADE_START
+      ? 0
+      : smoothstep((outro - CARD_FADE_START) / (1 - CARD_FADE_START));
 
   // Each fighter's pose needs the OTHER's frame: the reach-to-target solves aim the striking hand and
   // the throw grab at the opponent's near edge (strikeHandFor / throwGrabFor). Everything else is a
@@ -991,11 +1038,14 @@ export const scene = (
     frame: ReplayFrame,
     opponent: ReplayFrame,
     run: PhaseRun,
-  ): Figure => ({
-    x: frame.x * pxPerSubunit,
-    y: groundY - frame.y * pxPerSubunit,
-    facing: frame.facing,
-    pose: scalePose(
+  ): Figure => {
+    const placement = {
+      x: frame.x * pxPerSubunit,
+      y: groundY - frame.y * pxPerSubunit,
+      facing: frame.facing,
+    };
+
+    const pose = scalePose(
       poseFor(
         frame,
         strikeHandFor(frame, opponent),
@@ -1003,8 +1053,31 @@ export const scene = (
         run,
       ),
       scale,
-    ),
-  });
+    );
+
+    // No settle, or a downed fighter (prone stays prone — no magic stand-up): the raw pose.
+    if (settleT <= 0 || frame.knockdown) return { ...placement, pose };
+
+    // Ease toward the fighter's NEUTRAL stance: the same frame de-committed (no strike / throw / guard,
+    // standing), so a mid-technique final frame relaxes to a ready stance in place.
+    const neutralFrame: ReplayFrame = {
+      ...frame,
+      posture: 0,
+      attacking: false,
+      throwing: false,
+      guardBand: 0,
+      attackMove: "",
+      attackPhase: 0,
+      attackReach: 0,
+    };
+
+    const neutralPose = scalePose(
+      poseFor(neutralFrame, null, null, run),
+      scale,
+    );
+
+    return { ...placement, pose: lerpSkeleton(pose, neutralPose, settleT) };
+  };
 
   const p = clampPlayhead(playhead, tape.length);
   const at = tape[p];
@@ -1118,5 +1191,6 @@ export const scene = (
       ),
     },
     shadows: { a: shadowFor(figA), b: shadowFor(figB) },
+    outro: { cardAlpha },
   };
 };

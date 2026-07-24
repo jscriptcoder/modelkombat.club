@@ -106,6 +106,8 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
     // Advance the clock ~one engine tick per rendered frame while playing (a paused clock is
     // unchanged), then draw the frame the playhead lands on. Reading the signal each frame picks up
     // pause / restart from the controls; a restart resets the playhead and the next frame draws it.
+    // Past the last tick the clock's `outro` ramps (see transport): it drives the ease-back-to-neutral
+    // + the TIME card fade, so the fight settles to a close rather than freezing on the final frame.
     created.ticker.add((ticker) => {
       const next = advance(
         transport(),
@@ -114,7 +116,7 @@ const ReplayPlayer: Component<ReplayPlayerProps> = (props) => {
       );
 
       setTransport(next);
-      stage.apply(scene(tape, Math.round(next.playhead), viewport));
+      stage.apply(scene(tape, Math.round(next.playhead), viewport, next.outro));
     });
   });
 
