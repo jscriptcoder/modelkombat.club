@@ -130,8 +130,15 @@ describe("ReplayPlayer — scrub transport", () => {
       <ReplayPlayer item={item(2)} viewport={VIEWPORT} />
     ));
 
-    // A 2-tick fight reaches its last tick within a frame or two, then the clock auto-pauses.
-    expect(await findByRole("button", { name: /^play$/i })).toBeTruthy();
+    // A 2-tick fight reaches its last tick within a frame or two, then the clock auto-pauses. Unlike
+    // the other control assertions (which act on the mounted DOM immediately), this one WAITS for real
+    // requestAnimationFrame ticks to drive the clock to the end, so it needs headroom for the async
+    // canvas init + a couple of frames — more so since 1× now advances 0.65 ticks/frame and the
+    // combined browser run starves rAF under load. Generous timeout: a stalled ticker (the real bug
+    // this guards) still fails, a merely slow one does not.
+    expect(
+      await findByRole("button", { name: /^play$/i }, { timeout: 5000 }),
+    ).toBeTruthy();
   });
 });
 
