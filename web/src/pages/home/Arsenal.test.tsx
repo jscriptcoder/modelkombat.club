@@ -171,6 +171,9 @@ const glossOf = (item: HTMLElement): string | null =>
 const descriptorOf = (item: HTMLElement): string | null =>
   item.querySelector(".move-descriptor")?.textContent ?? null;
 
+// The whole roster, flattened — the previews iterate this in S3 (every move gets its own eye).
+const ALL_MOVES = EXPECTED_FAMILIES.flatMap((family) => family.moves);
+
 describe("Arsenal section", () => {
   it("is a labelled region anchored at #arsenal with an orienting lede", () => {
     const { getByRole } = render(() => <Arsenal />);
@@ -348,17 +351,6 @@ const findEye = (findByRole: ReturnType<typeof render>["findByRole"]) =>
   findByRole("button", { name: /preview gyaku-zuki/i });
 
 describe("Arsenal — move preview eye control (S2)", () => {
-  it("adds an eye preview control to the gyaku-zuki row only, as an accessible button", async () => {
-    const { findByRole, queryByRole } = render(() => <Arsenal />);
-
-    // The workhorse move gets the control...
-    expect(await findEye(findByRole)).toBeTruthy();
-
-    // ...and no other move does yet (S3 broadens to the whole roster).
-    expect(queryByRole("button", { name: /preview kizami-zuki/i })).toBeNull();
-    expect(queryByRole("button", { name: /preview mae-geri/i })).toBeNull();
-  });
-
   it("opens the looping preview when the eye control is hovered", async () => {
     const { loadStage } = spyStage();
     const { findByRole } = render(() => <Arsenal loadStage={loadStage} />);
@@ -442,6 +434,7 @@ describe("Arsenal — move preview eye control (S2)", () => {
 
   it("does not load the Pixi preview stage until a preview is first opened", async () => {
     const stage = spyStage();
+
     const { findByRole } = render(() => (
       <Arsenal loadStage={stage.loadStage} />
     ));
@@ -459,6 +452,7 @@ describe("Arsenal — move preview eye control (S2)", () => {
 
   it("plays the gyaku-zuki loop tape through the preview stage", async () => {
     const stage = spyStage();
+
     const { findByRole } = render(() => (
       <Arsenal loadStage={stage.loadStage} />
     ));
@@ -473,6 +467,7 @@ describe("Arsenal — move preview eye control (S2)", () => {
 
   it("loops the technique — the playhead wraps past the final tick back to the start", async () => {
     const stage = spyStage();
+
     const { findByRole } = render(() => (
       <Arsenal loadStage={stage.loadStage} />
     ));
@@ -493,6 +488,7 @@ describe("Arsenal — move preview eye control (S2)", () => {
 
   it("dims the passive target and leaves the attacker at full strength", async () => {
     const stage = spyStage();
+
     const { findByRole } = render(() => (
       <Arsenal loadStage={stage.loadStage} />
     ));
@@ -504,5 +500,88 @@ describe("Arsenal — move preview eye control (S2)", () => {
     // as the subject. The exact fade is eye-tuned — only the relationship is pinned.
     expect(stage.latestAlpha().a).toBe(1);
     expect(stage.latestAlpha().b).toBeLessThan(1);
+  });
+});
+
+// S3 — the eye control broadened to the WHOLE roster, still through the ONE shared renderer. Every
+// move card carries its own always-visible eye; opening any previews THAT move; switching moves
+// re-aims the single Application (never a second one) and restarts the loop from the move's stance.
+// The last two are exactly what a single-move S2 could not observe — they kill the reuse-guard and
+// playhead-reset mutants the S2 manual scan deferred. web ∉ Stryker → exact assertions + manual scan.
+
+// Find a move's eye control by its per-move accessible name (exact, so no id is a substring of
+// another across the 13-move roster).
+const eyeFor = (
+  findByRole: ReturnType<typeof render>["findByRole"],
+  id: string,
+) => findByRole("button", { name: `Preview ${id}` });
+
+describe("Arsenal — move preview across the whole roster (S3)", () => {
+  it("gives every move its own always-visible eye control", async () => {
+    const { findByRole } = render(() => <Arsenal />);
+
+    for (const move of ALL_MOVES) {
+      expect(await eyeFor(findByRole, move.id)).toBeTruthy();
+    }
+  });
+
+  it("previews the move whose eye is opened — each move plays its own loop tape", async () => {
+    const stage = spyStage();
+
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} />
+    ));
+
+    for (const move of ALL_MOVES) {
+      fireEvent.click(await eyeFor(findByRole, move.id));
+
+      // The single renderer receives exactly THIS move's looping tape — not a fixed one.
+      await expect
+        .poll(() => stage.latestTape())
+        .toEqual(moveLoopTape(move.id));
+    }
+  });
+
+  it("switches moves through the same single renderer — never a second Application", async () => {
+    const stage = spyStage();
+
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} />
+    ));
+
+    fireEvent.click(await eyeFor(findByRole, "gyaku-zuki"));
+    // Wait for the FIRST open to finish loading before switching, so a re-aim can't race the load.
+    await body().findByTestId("preview-stage");
+    expect(stage.loads()).toBe(1);
+
+    // Opening a different move re-aims the ONE preview — it must not construct a second stage.
+    fireEvent.click(await eyeFor(findByRole, "mae-geri"));
+    await expect
+      .poll(() => stage.latestTape())
+      .toEqual(moveLoopTape("mae-geri"));
+
+    expect(stage.loads()).toBe(1);
+  });
+
+  it("restarts the loop from the move's stance when switching moves", async () => {
+    const stage = spyStage();
+
+    const { findByRole } = render(() => (
+      <Arsenal loadStage={stage.loadStage} />
+    ));
+
+    fireEvent.click(await eyeFor(findByRole, "gyaku-zuki"));
+    await body().findByTestId("preview-stage");
+
+    // Advance the first move's loop well past its opening frame...
+    stage.pump(5);
+    await expect
+      .poll(() => stage.latestTick())
+      .toBe(loopIndex(5, moveLoopTape("gyaku-zuki").length)); // 5, not the stance
+
+    // ...then open a different move: its clock starts from the stance (tick 0), not mid-loop.
+    fireEvent.click(await eyeFor(findByRole, "mae-geri"));
+
+    await expect.poll(() => stage.latestTick()).toBe(0);
   });
 });
