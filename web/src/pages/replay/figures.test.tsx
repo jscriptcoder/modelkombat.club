@@ -62,6 +62,28 @@ const tickOf = (
 ): ReplayTick => ({ tick, a: frame(a), b: frame(b) });
 
 describe("figures — the Pixi draw layer applies a Scene to display objects", () => {
+  it("plants a soft shadow under each fighter, inside the world and behind them", () => {
+    const stage = createStage(VIEWPORT, ["generic", "generic"]);
+
+    stage.apply(
+      scene(
+        [tickOf(0, { x: 150_000, y: 0 }, { x: 450_000, y: 0 })],
+        0,
+        VIEWPORT,
+      ),
+    );
+
+    // Shadows ride the world container (so they scale + inset with the fighters) and draw BEHIND the
+    // figure roots. Positioned under the fighter's feet, scaled by the scene's shadow scale.
+    expect(stage.world.children).toContain(stage.shadows.a);
+    expect(stage.world.children.indexOf(stage.shadows.a)).toBeLessThan(
+      stage.world.children.indexOf(stage.a.root),
+    );
+    expect(stage.shadows.a.x).toBe(300);
+    expect(stage.shadows.a.y).toBe(540);
+    expect(stage.shadows.a.scale.x).toBe(1);
+  });
+
   it("draws the tatami ring backdrop first, behind the fighters and the HUD", () => {
     // The mat rides root (screen px), not the inset world, so its ground line meets the fighters' feet.
     // It must be root's FIRST child so it strokes behind everything — the geometry is ringLayout's

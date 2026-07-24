@@ -265,6 +265,27 @@ const applyFlash = (flash: Graphics, mark: Scene["contact"]["a"]): void => {
   flash.alpha = flashAlpha(mark.age);
 };
 
+// ─── ground shadows ───────────────────────────────────────────────────────────────────────────────
+// A soft dark ellipse under each fighter, drawn once at a body-proportioned size then moved + scaled
+// per frame by the scene's shadow (position on the mat, scale by height). Sized off the body height so
+// it grows with the figure; low alpha so it reads as a shadow, not a disc. Eye-tuned.
+const SHADOW_COLOR = 0x000000;
+const SHADOW_ALPHA = 0.32;
+const SHADOW_HALF_W_RATIO = 0.26; // ellipse half-width as a fraction of body height
+const SHADOW_HALF_H_RATIO = 0.055; // ellipse half-height
+
+const createShadow = (bodyPx: number): Graphics =>
+  new Graphics()
+    .ellipse(0, 0, SHADOW_HALF_W_RATIO * bodyPx, SHADOW_HALF_H_RATIO * bodyPx)
+    .fill({ color: SHADOW_COLOR, alpha: SHADOW_ALPHA });
+
+// Move a fighter's shadow under their feet and scale it by height (shrinks as they lift off the mat).
+const applyShadow = (shadow: Graphics, mark: Scene["shadows"]["a"]): void => {
+  shadow.x = mark.x;
+  shadow.y = mark.y;
+  shadow.scale.set(mark.scale);
+};
+
 // ─── the tatami ring backdrop ─────────────────────────────────────────────────────────────────────
 // The decorated floor, drawn ONCE behind the fighters. All eye-tuned on a dark canvas (bg 0x0b0e14):
 // muted warm-olive tatami so it never glows, two close tones for the woven panels, faint mat lines, and
@@ -336,6 +357,9 @@ export type Stage = {
   // The two impact-flash Graphics (challenger `a`, King `b`), exposed for display-object assertions —
   // positioned + faded per frame by `apply`, hidden when that side has no live score.
   flashes: { a: Graphics; b: Graphics };
+  // The two ground-shadow Graphics, drawn inside the world container behind the fighters and moved +
+  // scaled under their feet each frame.
+  shadows: { a: Graphics; b: Graphics };
   apply: (scene: Scene) => void;
 };
 
@@ -366,15 +390,21 @@ export const createStage = (
   flashA.visible = false;
   flashB.visible = false;
 
-  // The fighters + flashes ride inside a world container the ring-inset transform down-scales +
-  // centres (slice 2); the HUD is added straight to root so the scoreboard stays full canvas size.
+  // A soft ground shadow per fighter, drawn FIRST inside the world so it sits behind the figures.
+  const shadowPx = bodyHeightPx(viewport);
+  const shadowA = createShadow(shadowPx);
+  const shadowB = createShadow(shadowPx);
+
+  // The shadows + fighters + flashes ride inside a world container the ring-inset transform down-scales
+  // + centres (slice 2); the HUD is added straight to root so the scoreboard stays full canvas size.
+  // Order = z-order: shadows behind, then the figures, then the flashes on top.
   const world = new Container();
   const inset = ringTransform(viewport);
 
   world.scale.set(inset.scale);
   world.x = inset.x;
   world.y = inset.y;
-  world.addChild(a.nodes.root, b.nodes.root, flashA, flashB);
+  world.addChild(shadowA, shadowB, a.nodes.root, b.nodes.root, flashA, flashB);
 
   // The tatami backdrop, drawn once in screen px behind the world container + HUD.
   const ring = new Graphics();
@@ -386,6 +416,8 @@ export const createStage = (
   root.addChild(ring, world, hud);
 
   const apply = (scene: Scene): void => {
+    applyShadow(shadowA, scene.shadows.a);
+    applyShadow(shadowB, scene.shadows.b);
     applyFigure(a, scene.a);
     applyFigure(b, scene.b);
     applyFlash(flashA, scene.contact.a);
@@ -405,6 +437,7 @@ export const createStage = (
     b: b.nodes,
     hud,
     flashes: { a: flashA, b: flashB },
+    shadows: { a: shadowA, b: shadowB },
     apply,
   };
 };

@@ -224,6 +224,46 @@ describe("scene — the ring inset transform (fighters shrink into a centred ban
   });
 });
 
+describe("scene — ground shadows (grounding the fighters on the mat)", () => {
+  // A soft shadow rides the mat under each fighter: it tracks their x, stays on the GROUND LINE even
+  // when they jump, and shrinks with height so a leap reads as lifting off. Pure scene data (drawn in
+  // the world container behind the fighters) — exact where it matters, monotone where it's eye-tuned.
+  it("plants each shadow on the ground line under the fighter, full size when grounded", () => {
+    const s = scene(
+      [tickOf(0, { x: 150_000, y: 0 }, { x: 450_000, y: 0 })],
+      0,
+      VIEWPORT,
+    );
+
+    expect(s.shadows.a).toEqual({ x: 300, y: 540, scale: 1 }); // 150000·0.002, ground 540
+    expect(s.shadows.b).toEqual({ x: 900, y: 540, scale: 1 });
+  });
+
+  it("keeps an airborne fighter's shadow on the ground but shrinks it", () => {
+    const s = scene(
+      [tickOf(0, { x: 150_000, y: 120_000 }, { x: 450_000, y: 0 })],
+      0,
+      VIEWPORT,
+    );
+
+    expect(s.shadows.a.x).toBe(300); // still under the fighter's x
+    expect(s.shadows.a.y).toBe(540); // stays on the ground though the fighter lifted off it
+    expect(s.shadows.a.scale).toBeLessThan(1); // smaller the higher they are
+    expect(s.shadows.a.scale).toBeGreaterThan(0.5);
+    expect(s.shadows.b.scale).toBe(1); // the grounded fighter is unaffected
+  });
+
+  it("floors the shadow scale so a big jump never inverts or vanishes it", () => {
+    const s = scene(
+      [tickOf(0, { x: 150_000, y: 400_000 }, { x: 450_000, y: 0 })],
+      0,
+      VIEWPORT,
+    );
+
+    expect(s.shadows.a.scale).toBe(0.5); // clamped at the floor, not negative
+  });
+});
+
 describe("scene — the tatami ring layout (the decorated backdrop)", () => {
   // The mat is a full-canvas backdrop drawn in SCREEN px behind the inset world container, so its
   // ground line aligns with the fighters' feet (both fixed at 540) and its left/right edges sit on the

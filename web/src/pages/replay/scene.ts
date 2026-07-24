@@ -697,6 +697,11 @@ const phaseRunAt = (
 // while the fighters yame-reset during the fade — not recomputed from the moving current frame.
 export type Mark = { x: number; y: number; age: number };
 
+// A fighter's ground shadow: where it sits on the mat (`x` under the fighter, `y` on the ground line)
+// and how large (`scale` — 1 planted, shrinking toward SHADOW_MIN_SCALE as the fighter lifts off, so a
+// jump reads). Drawn in the world container behind the fighter (figures.ts).
+export type Shadow = { x: number; y: number; scale: number };
+
 export type Scene = {
   a: Figure;
   b: Figure;
@@ -704,6 +709,8 @@ export type Scene = {
   // Per scorer: `a` is where challenger `a`'s strike/throw landed on the King, `b` the mirror. Each
   // side is independent, so a same-tick trade flashes both; `null` when that side has no live score.
   contact: { a: Mark | null; b: Mark | null };
+  // Each fighter's ground shadow, tracking their x on the mat and shrinking when airborne.
+  shadows: { a: Shadow; b: Shadow };
 };
 
 // The canvas the scene is drawn into (supplied by the Pixi layer; fixed in tests for exact maths).
@@ -719,6 +726,12 @@ export const WORLD_WIDTH = 600_000;
 // a jump (worldY > 0) lifts up the screen. The world is isotropic — one sub-unit is the same length
 // on both axes — so x and y share a single px-per-subunit scale and proportions hold.
 const GROUND_RATIO = 0.9;
+
+// The ground shadow shrinks as a fighter lifts off the mat: `scale = 1 − lift / (bodyHeight · SPAN)`,
+// floored so a big jump never inverts or vanishes it. SPAN = 1.5 body-heights of lift spends the full
+// shrink range; both eye-tunable.
+const SHADOW_LIFT_SPAN = 1.5;
+const SHADOW_MIN_SCALE = 0.5;
 
 // The fighter's body height in world sub-units — the single tunable knob every body dimension
 // derives from (decision 3 / M2). Projected by the SAME pxPerSubunit that positions the fighter, so
@@ -1042,17 +1055,34 @@ export const scene = (
     return null;
   };
 
+  const figA = figure(
+    at.a,
+    at.b,
+    phaseRunAt(tape, p, (t) => t.a),
+  );
+
+  const figB = figure(
+    at.b,
+    at.a,
+    phaseRunAt(tape, p, (t) => t.b),
+  );
+
+  // A fighter's ground shadow: on the ground line (`groundY`) under its x, shrinking as it lifts off
+  // (`groundY − fig.y` is the jump height in screen px). Clamped so a big jump floors, not inverts.
+  const shadowFor = (fig: Figure): Shadow => {
+    const lift = Math.max(0, groundY - fig.y);
+
+    const scale = Math.max(
+      SHADOW_MIN_SCALE,
+      1 - lift / (bodyHeightPx(viewport) * SHADOW_LIFT_SPAN),
+    );
+
+    return { x: fig.x, y: groundY, scale };
+  };
+
   return {
-    a: figure(
-      at.a,
-      at.b,
-      phaseRunAt(tape, p, (t) => t.a),
-    ),
-    b: figure(
-      at.b,
-      at.a,
-      phaseRunAt(tape, p, (t) => t.b),
-    ),
+    a: figA,
+    b: figB,
     hud: {
       tick: at.tick,
       scoreA: at.a.points,
@@ -1072,5 +1102,6 @@ export const scene = (
         (t) => t.b.points,
       ),
     },
+    shadows: { a: shadowFor(figA), b: shadowFor(figB) },
   };
 };
