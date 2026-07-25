@@ -2074,3 +2074,65 @@ before parsing — the right fix, since which newline a reading LLM receives is 
 The arc's design trail — `watch-public-decisions.md` (D1–D10) + `watch-public-stories.md` (the S1–S3 split) —
 **stays live in `plans/`**: S2 (newest-3 live fight cards on the home page) and S3 (the 👁 road-to-the-throne
 affordance, the arc's only `src/` touch) are still ahead.
+
+## Open `/watch` to the public — S2: the three most recent fights on the landing page ✅ COMPLETE (2026-07-25)
+
+S1 turned the home page's fights section into a signpost. S2 turns it into a **window**: a first-time
+visitor sees named LLM models that actually fought each other, on the page they land on, without
+clicking anything. Three cards rather than one, because a single card reads as a demo while three
+imply a running ladder (D2). Web-only (`web/`) — \*\*no `src/` change, no `api/` change, `INPUT_HASH`
+
+- `BENCHMARK_VERSION` (`v20`) untouched.\*\* Mutation testing `N/A` (`web/` ∉ Stryker) ⇒ the
+  exact-assertion regime + a manual mutator scan.
+
+One PR (#427, `feat/home-fight-cards`) — the story is already the smallest end-to-end version of
+itself, and splitting it would have produced a horizontal first half ("extract the card", "add the
+loader") with no observable outcome for anyone.
+
+**The cards layer on top of S1's signpost rather than replacing it.** Loading, an empty archive and
+a failed `/replay` all render exactly that signpost (D4), so a visitor who never asked to see fights
+is never shown a red error on a marketing page, and nothing shifts when the cards arrive. `/watch`
+keeps the loud, retryable states — that is where someone who came to watch actually wants them.
+
+**Two planning decisions the story did not settle**, recorded in the plan rather than made silently:
+
+- **P1 — the card became a shared component.** `replay.css` was imported by `ReplayPage.tsx` alone,
+  so the home page had **no** `.replay-card` styling at all: "reuse the `/watch` card look" was never
+  free. `shared/components/FightCard.tsx` + `fight-card.css` now own everything about presenting a
+  fight as a card — the `A vs B` pairing, the flanking brand marks, the permalink it computes itself,
+  and the short-id fragment that disambiguates a rematch. The extraction happened **inside** the
+  slice that needed it, and `ReplayList.test.tsx` passing **all 15 with zero edits** is the
+  preservation evidence that `/watch` is unchanged.
+- **P2 — collisions are marked over the three cards shown**, not the whole archive. A short id
+  fragment exists to tell two on-screen cards apart, and there is nothing else on screen here. A
+  fight can therefore show a fragment on `/watch` and not on the home page: correct, not drift.
+
+**A real defect found while going green:** the section never read the resource's `error`, so a failed
+archive read escaped as an **unhandled rejection** — reaching `window.onunhandledrejection` and
+anything watching it. Consuming the error fixes that and makes "degrade quietly" a decision in the
+code rather than an accident. The suite reported it as 3 errors alongside its passes; it now has its
+own test asserting no `unhandledrejection` event fires.
+
+**Two candidate mutants turned out to be killable rather than acceptable**, and each kill was verified
+by applying the mutant and watching the new test fail: dropping the `data.error` consumption
+(`if (false as boolean)`) and neutralising `markCollisions` (`.map(f => ({...f, collides: false}))`).
+Both reverted by precise rewrite, never `git checkout`. Accepted survivors: `props.load ?? loadList`
+(proving the default binds the real endpoint needs a network — an identical pre-existing gap in
+`ReplayList`) and the `.fights-list` / `.fights-cta` styling.
+
+**Gotchas worth keeping:** the degraded-state tests must flush the microtask queue before asserting,
+or the error case asserts "no alert" before the rejection has even been handled — a false pass. And
+`createClientResource` is what keeps the prerendered no-JS HTML a real link rather than an empty
+section: **S1's `web-ssr` assertions passing untouched is the proof**, so if they ever need editing,
+the fetch is not properly client-deferred.
+
+Visual sign-off on the preview deployment (real `/replay` data): three live fights at desktop width,
+and the layout holds at 390×844. Long names ellipsis-truncate at phone width — the card's existing
+designed behaviour (`min-width: 0` + `text-overflow` + a `title` tooltip), identical on `/watch`, so
+recorded rather than changed.
+
+[watch-public-s2.md](watch-public-s2.md) — the plan, including the P1/P2 decision records and the
+facts about `createClientResource` / `loadList` / `replay.css` that were established by reading the
+code before any slice was written. The arc's design trail (`watch-public-decisions.md` D1–D10 +
+`watch-public-stories.md`) **stays live in `plans/`**: S3 — the 👁 road-to-the-throne affordance and
+the arc's only `src/` touch — is still ahead.

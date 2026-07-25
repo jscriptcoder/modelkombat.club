@@ -40,7 +40,7 @@ The story's eight acceptance examples, all in this one slice:
 - **`Fights.tsx` is currently a pure static frame** — `<section id="fights">`, heading, one
   sentence, `<a class="fights-cta" href={WATCH_PATH}>`. Exactly what ACs 3–5 must degrade to.
 - **`createClientResource`** (`web/src/shared/lib/client-resource.ts`) holds its source signal
-  `false` through SSR *and* the first hydrated paint, flipping true in `onMount`. So the
+  `false` through SSR _and_ the first hydrated paint, flipping true in `onMount`. So the
   prerender renders the **fallback** branch — S1's frame — with no hydration mismatch. **S1's
   `web-ssr` assertions (`href="/watch"` present, no `aria-disabled`, no "in development")
   therefore keep passing unchanged, and that is a guard, not a coincidence.**
@@ -122,7 +122,7 @@ end-to-end version of itself.
 
 ### Slice 1: The home page shows the three most recent fights
 
-**Value**: a first-time visitor sees *named LLM models that actually fought each other* above
+**Value**: a first-time visitor sees _named LLM models that actually fought each other_ above
 the fold-ish, on the page they land on — the "spectacle for newcomers" job (D1). Three rather
 than one, because one reads as a demo and three imply a running ladder (D2).
 
@@ -157,7 +157,7 @@ existing tests as the preservation evidence.
   ready-with-5 (exactly 3 cards, exact `href`s, exact order), ready-with-1 and ready-with-2
   (exactly that many, no placeholders), `empty`, rejected, and never-settling. The three
   degraded states assert **the same** thing: the CTA link is present and no card list rendered
-  — plus explicit absence of `role="alert"` and of any Retry control (AC4 is a *negative*
+  — plus explicit absence of `role="alert"` and of any Retry control (AC4 is a _negative_
   requirement and needs its own assertion, not an inference from "looks like the frame").
 - Card content (AC6): both names, both model logos present; no date, no ordinal. Assert the
   absence of a digit-bearing ordinal/date node rather than eyeballing the markup.
@@ -196,7 +196,7 @@ typecheck/lint/format clean, manual mutator scan recorded, human approves the co
 
 ## Pre-PR Quality Gate
 
-1. **Mutation evidence** — `N/A` (`web/` is outside Stryker). Record the rationale *and* the
+1. **Mutation evidence** — `N/A` (`web/` is outside Stryker). Record the rationale _and_ the
    completed manual mutator scan; a PR without the scan does not go out.
 2. **Refactoring assessment** — run `refactoring` over P1's extraction; record the outcome.
 3. **`npm test` from the repo root** — `node`, `web`, `web-ssr`. `web-ssr` will not resolve from
