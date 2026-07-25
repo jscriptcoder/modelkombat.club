@@ -815,18 +815,16 @@ main,
   color: var(--muted);
 }
 
-/* The replay control is disabled-in-look but stays keyboard-reachable
-   (aria-disabled, not the `disabled` attribute), so the focus ring and the
-   title tooltip both still work. */
-.replay-play {
+/* The way into /watch. Outlined rather than solid: the hero already owns the
+   page's one primary accent CTA, so this reads as a secondary destination. */
+.fights-cta {
+  display: inline-block;
   margin-top: 0.5rem;
   padding: 0.5rem 1.25rem;
-  color: var(--muted);
-  background: transparent;
-  border: 1px solid var(--border);
+  color: var(--fg);
+  border: 1px solid var(--accent);
   border-radius: 6px;
-  font: inherit;
-  cursor: not-allowed;
+  text-decoration: none;
 }
 
 /* The rendered spec page. The fetched markdown is injected as HTML into

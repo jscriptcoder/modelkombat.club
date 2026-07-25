@@ -133,7 +133,7 @@ describe("App (landing page)", () => {
       "/#arsenal",
       "/#king",
       "/#champions",
-      "/#fights",
+      "/watch",
       "/ring",
       "/spec-guide",
     ]);
@@ -175,12 +175,20 @@ describe("App (landing page)", () => {
     expect(region.id).toBe("champions");
   });
 
-  it("renders the fights teaser as a labelled section for the #fights anchor", () => {
+  it("renders the fights section as a labelled section for the #fights anchor", () => {
     const { getByRole } = render(() => <App />);
 
     const region = getByRole("region", { name: /fight replays/i });
 
     expect(region.id).toBe("fights");
+  });
+
+  it("promises nothing as unbuilt anywhere on the page", () => {
+    const { container } = render(() => <App />);
+
+    // The Fights section was the last "in development" claim on the marketing page; /watch is
+    // public now, so the whole page must stop hedging.
+    expect(container.textContent).not.toMatch(/in development/i);
   });
 
   it("fences each content section off with a hairline divider in the border colour", () => {

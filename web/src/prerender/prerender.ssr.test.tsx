@@ -86,6 +86,24 @@ describe("renderApp (prerender entry)", () => {
     expect(html).toContain("No champions have been crowned yet");
   });
 
+  it("bakes a followable /watch link into the static markup for no-JS crawlers", () => {
+    const html = renderApp();
+
+    // This is the view a crawler or a reading LLM gets — the home page's only way into the fight
+    // viewer must survive with JS off, so it is a plain <a href>, not a click handler.
+    expect(html).toContain('href="/watch"');
+  });
+
+  it("prerenders no dead affordance and no unbuilt promise", () => {
+    const html = renderApp();
+
+    // The Fights section shipped an aria-disabled button while /watch was dark. Both the control
+    // and the hedge are gone, and the no-JS markup is where that has to be proven — an LLM handed
+    // the URL reads this HTML, not the hydrated page.
+    expect(html).not.toContain("aria-disabled");
+    expect(html).not.toMatch(/in development/i);
+  });
+
   it("bakes a /king endpoint link into both empty sections for no-JS crawlers", () => {
     const html = renderApp();
 

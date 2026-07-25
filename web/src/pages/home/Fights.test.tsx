@@ -3,41 +3,48 @@ import { describe, expect, it } from "vitest";
 
 import Fights from "./Fights";
 
-describe("Fights teaser", () => {
+// This section used to advertise replays with an `aria-disabled` button, because /watch shipped
+// dark. /watch is public now, so the dead control is gone and the section is a real way in. The
+// three tests that pinned the disabled-button behaviour were REPLACED, not repaired — they
+// characterised exactly what this slice removes.
+//
+// The static frame asserted here is also, deliberately, the fallback S2 will degrade to when its
+// `GET /replay` card fetch is loading, empty, or failed (watch-public-decisions.md D4). Cards layer
+// on top of this; they never replace it.
+describe("Fights section", () => {
   it("is a labelled region anchored at #fights", () => {
     const { getByRole } = render(() => <Fights />);
 
-    // The accessible name comes from the heading; the id is the nav anchor target.
+    // The accessible name comes from the heading; the id is the anchor target that keeps every
+    // pre-existing `/#fights` link resolving even though the nav now points at /watch.
     const region = getByRole("region", { name: /fight replays/i });
 
     expect(region.id).toBe("fights");
-    // AC-1: it describes what's coming — replaying a title fight tick-for-tick.
     expect(region.textContent).toMatch(/tick-for-tick/i);
   });
 
-  it("offers a replay control that is aria-disabled, not natively disabled (AC-A1/A3)", () => {
+  it("offers a real link into the fight viewer", () => {
     const { getByRole } = render(() => <Fights />);
 
-    // AC-A3: named for assistive tech by its exact visible label — not a bare
-    // greyed button, and the decorative ▶ glyph must not leak into the name.
-    const control = getByRole("button", {
-      name: "Replays — in development",
-    });
+    const link = getByRole("link", { name: "Watch the fights" });
 
-    // aria-disabled keeps it focusable/hoverable; a native `disabled` would drop it
-    // from the tab order and suppress the tooltip — the opposite of AC-A1/AC-R3.
-    expect(control.getAttribute("aria-disabled")).toBe("true");
-    expect(control.hasAttribute("disabled")).toBe(false);
+    // Same tab, like every other primary destination; the decorative arrow must not leak into
+    // the accessible name (getByRole matched it exactly above).
+    expect(link.getAttribute("href")).toBe("/watch");
+    expect(link.getAttribute("target")).toBe(null);
   });
 
-  it("carries the in-development state in visible text, with the tooltip as enhancement (AC-R3)", () => {
-    const { getByRole } = render(() => <Fights />);
+  it("offers no dead control — nothing aria-disabled and nothing natively disabled", () => {
+    const { container } = render(() => <Fights />);
 
-    const control = getByRole("button", { name: /in development/i });
+    expect(container.querySelector("[aria-disabled]")).toBeNull();
+    expect(container.querySelector(":disabled")).toBeNull();
+  });
 
-    // Touch devices have no hover: the state must be readable without the tooltip.
-    expect(control.textContent).toMatch(/in development/i);
-    // The title is a progressive enhancement, never the sole signal.
-    expect(control.getAttribute("title")).toBeTruthy();
+  it("no longer describes replays as unbuilt", () => {
+    const { container } = render(() => <Fights />);
+
+    expect(container.textContent).not.toMatch(/in development/i);
+    expect(container.textContent).not.toMatch(/coming soon/i);
   });
 });
