@@ -2205,3 +2205,87 @@ landed on that fight with the switcher offering the siblings.
 archived alongside it: [watch-public-decisions.md](watch-public-decisions.md) (D1–D10, resolved via
 `grill-me`) and [watch-public-stories.md](watch-public-stories.md) (the three-story split). `plans/`
 is empty again.
+
+## One champions section, with the King at its centre ✅ COMPLETE (PR #431, 2026-07-25)
+
+Not a story split out of an arc — three presentation changes the user asked for together, planned as
+one slice because splitting them would have produced a horizontal first half with nothing observable.
+
+The landing page **said the champions twice.** The standalone `Current King` section rendered the same
+champion The Arena already shows as its gold step — logo, name, model, handle, `King` badge and 👁 link
+all already there. Reading the code before planning is what settled it: the card's _only_ unique
+contribution was a bigger brand mark (`3rem` vs the podium step's `2.25rem`), which meant "the
+reigning champion is still visible" was satisfied by **existing code, not new code** — the removal
+needed no compensating work. So the section is deleted, and The Arena becomes the one champions
+section: **silver left, gold centre, bronze right**, each step's 👁 pinned to the card's **top-right
+corner**.
+
+**The centring is CSS `order`, never a DOM reorder.** The podium is an `<ol>`, so source order _is_
+rank; moving gold to second in the markup would hand every screen reader, every no-CSS reader and the
+prerendered HTML the wrong first place — a real regression bought purely for a visual arrangement. The
+`order` values are scoped to `@media (min-width: 481px)`, the exact complement of the existing
+`max-width: 480px` stacking rule, so the one-column stack needs **no override at all** and there is no
+specificity fight between `.podium-step.gold` and `.podium-step`.
+
+**Placement belongs to the card, appearance to the component.** `road-to-throne.css` keeps the glyph's
+look (quiet opacity, hover brighten, `em` sizing, reduced-motion opt-out); `.podium-step` becomes the
+positioned ancestor and owns the offsets. Making the component itself absolutely positioned would put a
+hidden requirement — "your parent must be positioned" — on every future consumer.
+
+Two knock-on breakages the request did not mention, both found by reading rather than by a failing
+page: the nav's `King` entry and `/ring`'s "See the throne" both pointed at `/#king`, which no longer
+exists. Both moved to `/#champions`, and the nav entry was **dropped** rather than repointed, since
+`Champions` was already the same destination and two adjacent links to one section is noise. The
+prerendered no-JS HTML went from **two** `href="/king"` pointers to one. `Champion` — the `GET /king`
+contract mirror — moved out of the deleted view into its own `champion.ts`: `App` owns the fetch and
+`Podium` renders the payload, so neither view should own the shape.
+
+### The test-environment trap this slice uncovered
+
+**The `web` browser project runs at Vitest's default 414×896 viewport — _below_ the podium's 480px
+breakpoint.** So the podium renders single-column in every other browser test in the repo, and the
+three-across arrangement is **unobservable** unless a test widens the window itself. The arrangement
+tests call `page.viewport()` (from **`vitest/browser`** — `@vitest/browser/context` still resolves but
+warns as deprecated on vitest 4.1) and hand the default back in `afterEach`, because the viewport is
+per-iframe and persists across tests in a file. Without that, a later test silently inherits the wide
+layout. `Podium.test.tsx` also had to start importing `shared/app.css`, which it never did before —
+geometry assertions need real CSS.
+
+Geometry is asserted **relationally** (which step is left of which; which quadrant the glyph sits in;
+is it inside the card's bounds) rather than as pixel values, so the tests pin the behaviour and not the
+design.
+
+### Mutation: two survivors, one of them a lesson worth repeating
+
+`web/` is not Stryker-reachable, so the established substitute applies — and all **8 mutant classes**
+over the diff were **injected for real and confirmed to fail a test**, not reasoned about. Two survived
+the first pass:
+
+1. **`min-width: 481px` → `480px`** survived because the stacking test ran at **360px — a width where
+   both readings behave identically.** At exactly 480px the mutant stacks the column _silver-first_.
+   The test now asserts at **480px, the last width that stacks**, which is strictly stronger than any
+   comfortably-narrow width. _Assert layout at the exact breakpoint boundary, not somewhere safe._
+2. **`margin-top: 0`** on the pinned glyph survived as an **equivalent** mutant — removing it shifts
+   the glyph 8px _within the same quadrant_, so no honest assertion can see it. Rather than pin a pixel
+   value to kill it, the **cause** was removed: `road-to-throne.css` no longer carries the
+   `margin-top: 0.5rem` it needed for an in-flow placement **no consumer uses any more**, so the
+   override that existed to cancel it is gone too. Same computed result, one fewer declaration, no
+   equivalent mutant. This is the same lesson as the `/watch` S3 guard-deletion: **when a survivor is
+   equivalent, delete the unobservable declaration instead of testing around it.**
+
+The 👁 move being _placement-only_ is proven by `Podium`'s existing href / accessible-name /
+omitted-when-unreachable tests passing **with no edits**.
+
+Verified at 1280px and 380px against the real built bundle with a stubbed `/king` — worth knowing that
+the visual-check script must live **inside the repo**, since running it from a scratch directory fails
+to resolve `playwright`.
+
+**Process note recorded here because it will bite again:** `npm run format` is `prettier --write .` and
+rewrites the **whole repo** — it silently reformatted 12 unrelated files and introduced 2 eslint errors
+in a file the slice never touched. All reverted. `main` is not prettier-clean
+(`web/src/shared/components/Footer.tsx` fails `--check` on `main` too), so `npm run format:check`
+cannot serve as a gate; scope prettier to the changed files.
+
+[home-arena-only.md](home-arena-only.md) — the plan, carrying its ACs, the three planning decisions
+(P1 type relocation, P2 placement-vs-appearance, P3 `order`-not-reorder) and the completed evidence
+record. `plans/` is empty again.

@@ -1,7 +1,7 @@
 # Plan: The home page has one champions section, with the King at its centre
 
 **Branch**: `feat/home-arena-only` (one slice, one PR)
-**Status**: Complete — AC1–AC11 met, all gates green (awaiting PR)
+**Status**: ✅ SHIPPED — AC1–AC11 met, squash-merged as PR #431 (2026-07-25); archived
 **Story**: none — a direct user request (three home-page presentation changes, deliberately batched)
 
 ## Goal
