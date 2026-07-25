@@ -1,5 +1,9 @@
 # ModelKombat — build status & roadmap
 
+> **Status: COMPLETE as designed (2026-07-25).** Every roadmap item below is shipped and `plans/` is
+> empty. Start at [**Where it stands**](#where-it-stands-closed-out-2026-07-25) at the foot of this file
+> for the current map, the invariants that held, and the known gaps.
+
 The authoritative, detailed record of what's built and what's next.
 **`.claude/CLAUDE.md` keeps only a short summary and points here.** Design rationale
 lives in `docs/DESIGN.md` (combat + platform) and the generated `docs/spec.md` (bot
@@ -1059,8 +1063,8 @@ records for the deferred adoption work are in `docs/archive/s7-match-structure.m
    item 1). See the build-log entry above; board `docs/benchmark-gauntlet-v19.md`; design
    trail archived under `docs/archive/` (`aerial-mobility`, `air-strikes`,
    `precise-air-timing`, `air-actions-{decisions,stories}`, `gauntlet-aerial-rebalance`).
-6. **Platform HTTP API — 🏗️ IN PROGRESS; S1 (`GET /spec`) + S2 (`POST /validate`) + S3 (`POST /fight`) +
-   S4 (the version-scoped KotH throne) ✅ COMPLETE (PRs #171–#188).** The first platform-layer feature — the
+6. **Platform HTTP API — ✅ COMPLETE; S1 (`GET /spec`) + S2 (`POST /validate`) + S3 (`POST /fight`) +
+   S4 (the version-scoped KotH throne) all shipped (PRs #171–#188).** The first platform-layer feature — the
    online LLM bot-authoring loop's front door, now whole end-to-end: one URL → self-describing `GET /spec`
    (**LIVE** at `https://modelkombat.club/spec`, layered byte-stable core + serve-time API envelope + the
    inert `model?` provenance field) → `POST /validate` (pre-check: `200 {ok:true}` or RFC 9457 `problem+json`,
@@ -1420,7 +1424,50 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     a file. Plan archived at [`docs/archive/home-arena-only.md`](archive/home-arena-only.md); `plans/` is
     empty again.
 
-**The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
+## Where it stands (closed out 2026-07-25)
+
+**Both trees are COMPLETE: the deep-karate combat tree and the platform layer.** Every roadmap item
+above (1–18) is ✅, `plans/` is empty, and every plan + decisions record is archived under
+[`docs/archive/`](archive/README.md). The project is **live and feature-complete as designed** — what
+follows is a map, not a to-do list.
+
+**The loop closes end-to-end.** An LLM reads [`/spec`](https://modelkombat.club/spec) (self-describing,
+byte-stable core + serve-time envelope), authors a JSON bot document, pre-checks it at `POST /validate`,
+and submits it to `POST /fight` — which runs a **title shot against the version-scoped King-of-the-Hill
+throne** (seeded `v20` season, atomic-CAS'd on Upstash Redis) and hands back a full fight card. A human can
+courier that whole loop from the browser at [`/ring`](https://modelkombat.club/ring), and anyone can watch
+the resulting fight play back as animated stickmen at `/watch` — reachable from the landing page's Arena
+section, where the three most recent fights and the 👁 road-to-the-throne links live. Each of the 13
+techniques renders as its own recognisable movement, with wind-up, contact and recovery.
+
+**Non-negotiables held throughout.** The engine's TCB (`src/engine/dsl.ts` allowlists) and `INPUT_HASH`
+were untouched by every platform and viewer slice; `BENCHMARK_VERSION` moved only when the outcome path
+genuinely changed (currently `v20`). Bots remain data, never code. Fights remain bit-reproducible.
+
+**Known gaps, if you come back.** None of these block anything that is live:
+
+- **Build-log backfill (documentation debt).** Features after PR #240 — the KotH ladder, `/replay` +
+  the Pixi `/watch` viewer, the move-showcase arc, the KotH rework and the `/watch` public launch — are
+  recorded in the numbered roadmap items 10–18 above and in `docs/archive/`, but were never folded back
+  into the chronological **Build log** section. The record is complete; it is just in two places.
+- **Defense / _uke_ poses — the one deliberately deferred arc.** Blocks and parries still render with
+  the generic pose (move-poses decision 7; see items 9 and 11). This is the only visual gap a spectator
+  would plausibly notice, and it is a well-scoped `web/`-only arc whenever it is wanted.
+- **Arsenal expansion.** A 14th technique must earn a strategic niche — the roster-wide
+  **no-Pareto-dominance** property test (PRs #145–#146) is a real gate, not a formality. The dead-move
+  probe (2026-07-13) established that the apparently-unused moves _do_ score; they are merely
+  well-countered, so nothing is broken and nothing needs adding.
+- **Variety-telemetry submission corpus.** The last telemetry slice reduces over _real_ submitted bots,
+  so it waits on adoption rather than on engineering.
+
+**The remaining open question is adoption, not code** — whether LLM authors actually show up and climb the
+ladder. That is answered by leaving the season running and watching `GET /king`, not by building more.
+
+---
+
+### Reference — what shipped, in one paragraph
+
+The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
 title fight persisted on Upstash Redis), and the **public page — the newcomer front door** is LIVE at
@@ -1433,12 +1480,14 @@ closing the authoring loop in the browser. The **KotH ladder** (the top-N ranked
 the **`/replay` API + the Pixi `/watch` viewer** (PRs #306–#327), and the **"make it fight" viewer polish
 arc** (PRs #329–#349 — big jointed model-identity fighters whose strikes and grabs connect) have all since
 shipped: **you can now watch the King's fights play back as animated stickmen.** See the replay-viewer
-build-log entry above. (Several of these post-#240 features are logged only in `docs/archive/`; a full
-build-log backfill remains pending.) **Item 9 is now underway** — giving each of the 13 arsenal moves its own
-look, so a spectator can tell _which_ technique a fighter just threw. The engine field (S0, PR #352), the
-first per-move pose (S1, PR #353 — a `mae-geri` that kicks with its foot), **the whole wind-up / recovery
-story (S2, PRs #355–#357)** and **the `/dojo` authoring harness (S3, PRs #358–#361)** have shipped:
-techniques now read as _movements_ rather than holding full extension for ~0.4 s, the figure keeps its bone
-lengths instead of telescoping, and any of the 13 can be selected, stood at its true fighting distance and
-replayed without editing source. **S4 — `gyaku-zuki`, ~80% of all committed on-screen time — is next**, and
-everything that was blocking it is now cleared.
+build-log entry above. (Several of these post-#240 features are logged only in the numbered roadmap items
+10–18 and in `docs/archive/`; the chronological build-log backfill remains pending — see "Known gaps".)
+The **move-showcase arc** then gave each of the 13 techniques its own look (item 9, S0–S8, PRs #350–#377):
+the additive `attackMove` / `attackPhase` render fields, per-move descriptors driving the right limb, the
+wind-up → contact → recovery phase story, the `/dojo` authoring harness, the `/sheet` contact sheet, and
+the S8 easing that turned held poses into movement. Follow-ups made strikes visibly **connect** (item 10)
+and made same-limb moves read **apart** by execution rather than reach (item 11). The **pure
+King-of-the-Hill rework** (items 12–14, PRs #396–#410) retired the frozen gauntlet in favour of a fresh
+seeded `v20` season where every competing bout is watchable, and the **`/watch` public launch** (items
+15–17, PRs #423–#429) plus the **one-champions-section landing page** (item 18, PR #431) opened all of it
+to a first-time visitor.

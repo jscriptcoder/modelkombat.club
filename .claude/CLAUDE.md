@@ -12,13 +12,17 @@ The project is the **"go deep" karate** design. The canonical design lives in
 technique-specific *uke* defense, on-contact cancel combos, WKF **points-only**
 scoring with *yame* resets, king-of-the-hill ladder, all-TS platform) and
 the generated **`docs/spec.md`** (the bot API). All engine code is built **from the
-resolved design via TDD** under a single top-level **`src/`** (no `packages/` nesting). The
-**walking skeleton is done** (headless validate → fight → byte-identical replay,
-with 1D approach + one *mid* strike that can score / block / trade); the deep-karate
-**combat tree is now complete**, and the **platform layer** is underway (the HTTP API —
-`/spec` · `/validate` · `/fight` · the S4 KotH throne — is built; the KotH ladder,
-`/replay`, and the Pixi viewer remain). See **Status & roadmap** below (full build log +
-what's next in **`docs/STATUS.md`**).
+resolved design via TDD** under a single top-level **`src/`** (no `packages/` nesting).
+
+**The project is COMPLETE as designed (closed out 2026-07-25) and live at
+`https://modelkombat.club/`.** Both trees are finished: the deep-karate **combat
+tree** (13 techniques, full WKF officiating, air actions) and the **platform layer**
+(the HTTP API `/spec` · `/validate` · `/fight`, the KotH throne + ranked ladder on a
+seeded `v20` season, `/replay` + the Pixi `/watch` viewer, and the public site
+including `/ring`). `plans/` is empty and every plan is archived. See **Status &
+roadmap** below — read **`docs/STATUS.md` § Where it stands** first; it carries the
+current map, the invariants that held, and the known gaps (chiefly the deferred
+defense / *uke* pose arc and a chronological build-log backfill).
 
 ## Non-negotiable invariants
 
@@ -49,13 +53,14 @@ engine; do not violate them when generating code, and flag any change that would
 
 ## Status & roadmap
 
-The full capability-by-capability build log and the **"Next in the pipeline"**
-roadmap live in **`docs/STATUS.md`** — that is the authoritative status record. Keep
-this file lean; update `docs/STATUS.md` when a slice lands. Every completed
-vertical-slice **plan** + its design records (resolved decisions + acceptance criteria)
-is archived under **`docs/archive/`** (indexed by its `README.md`).
+The full capability-by-capability build log, the numbered roadmap (all items shipped)
+and the closing **"Where it stands"** section live in **`docs/STATUS.md`** — that is
+the authoritative status record. Keep this file lean; update `docs/STATUS.md` when a
+slice lands. Every completed vertical-slice **plan** + its design records (resolved
+decisions + acceptance criteria) is archived under **`docs/archive/`** (indexed by its
+`README.md`).
 
-Flow for the next build — **the rest of the platform layer**: `grill-me` →
+Nothing is queued. **If work resumes**, the same flow applies: `grill-me` →
 `story-splitting` → `planning` → TDD, **PR per slice**. The §11
 combat-resolution spine (two-phase compute-then-apply, `strike > throw > guard`) is
 pinned in `docs/DESIGN.md` for any future combat work.
