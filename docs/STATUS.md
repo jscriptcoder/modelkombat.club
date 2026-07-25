@@ -1391,12 +1391,42 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     [`watch-public-decisions.md`](archive/watch-public-decisions.md),
     [`watch-public-stories.md`](archive/watch-public-stories.md) — leaving `plans/` empty.
 
+18. **One champions section, with the King at its centre ✅ COMPLETE (PR #431).** The landing page said the
+    champions **twice**: the standalone `Current King` section rendered the same champion The Arena already
+    shows as its gold step — logo, name, model, handle, `King` badge and 👁 link all already there. Its only
+    unique contribution was a bigger brand mark. So it is **deleted**, and The Arena now reads like a real
+    podium: **silver left, gold centre, bronze right**, with each step's 👁 pinned to the card's **top-right
+    corner** instead of sitting under the champion's identity competing with it. The centring is CSS `order`
+    scoped to `@media (min-width: 481px)` and **never a DOM reorder** — the podium is an `<ol>`, so source
+    order _is_ rank, and demoting gold to second in the markup would hand every screen reader, every no-CSS
+    reader and the prerendered HTML the wrong first place; scoping to the wide layout means the ≤480px stack
+    still reads gold-first with no override and no specificity fight. Two links pointed at the now-dead
+    `/#king` anchor and both moved to `/#champions`: the nav entry was **dropped** (`Champions` was already
+    the same destination) and `/ring`'s "See the throne" repointed. The prerendered no-JS HTML now carries
+    **one** `href="/king"` pointer instead of two. `Champion` — the `GET /king` contract mirror — moved out
+    of the deleted view into its own `web/src/pages/home/champion.ts`, since `App` owns the fetch and
+    `Podium` renders it and neither should own the shape. **Web-only: no `src/`, no `api/`, engine + TCB
+    untouched, `INPUT_HASH` + `BENCHMARK_VERSION` (`v20`) unchanged**; `GET /king` itself is untouched, only
+    how its payload is rendered. Mutation `N/A` (`web/` is outside Stryker) ⇒ the substitute regime, with all
+    **8 mutant classes injected and confirmed to fail a test** rather than reasoned about. Two survived the
+    first pass and both were fixed: `min-width: 481px` → `480px` slipped through because the stacking test
+    ran at 360px, **a width where both readings behave identically** — it now asserts at **exactly 480px**,
+    the last width that stacks; and a `margin-top: 0` override survived as an _equivalent_ mutant (an 8px
+    shift inside the same quadrant), killed by **deleting the dead in-flow margin it existed to cancel**
+    rather than pinning a pixel value. The test-environment trap worth carrying forward: the browser project
+    runs at Vitest's **default 414×896 viewport, below the podium's 480px breakpoint**, so the podium renders
+    single-column in every other browser test and a wide-layout arrangement is unobservable unless a test
+    sets `page.viewport()` itself — and hands it back afterwards, since the viewport persists across tests in
+    a file. Plan archived at [`docs/archive/home-arena-only.md`](archive/home-arena-only.md); `plans/` is
+    empty again.
+
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
 title fight persisted on Upstash Redis), and the **public page — the newcomer front door** is LIVE at
-`https://modelkombat.club/` (PRs #195–#213; a face-off hero + Current King + Hall of Kings on the new
-identity-only **`GET /king`** reads + an honest fights "coming soon" teaser). The **`/ring` browser
+`https://modelkombat.club/` (PRs #195–#213; a face-off hero + the champions podium on the new identity-only
+**`GET /king`** reads + an honest fights "coming soon" teaser — the podium shipped as a separate Current King
+card plus a Hall of Kings, since consolidated into the one Arena section by #431). The **`/ring` browser
 bot-submit loop** is now LIVE too (PRs #237–#240): a human courier pastes LLM-authored JSON, POSTs it to
 the live `/fight`, reads the full fight card, and hands the raw result back to the LLM to iterate —
 closing the authoring loop in the browser. The **KotH ladder** (the top-N ranked arena, PRs #251–#266),
