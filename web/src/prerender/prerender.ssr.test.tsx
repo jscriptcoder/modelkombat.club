@@ -94,6 +94,16 @@ describe("renderApp (prerender entry)", () => {
     expect(html).toContain('href="/watch"');
   });
 
+  it("bakes no per-fight permalink into the static markup", () => {
+    const html = renderApp();
+
+    // Every `/watch/{id}` on this page — a fight card, a champion's road to the throne — comes
+    // from a fetch that only runs after hydration. A permalink appearing here would mean the
+    // prerender awaited data it must not have, and the ids are content-hashed and evictable,
+    // so a stale one would be baked into the static HTML until the next deploy.
+    expect(html).not.toMatch(/href="\/watch\/[^"]/);
+  });
+
   it("prerenders no dead affordance and no unbuilt promise", () => {
     const html = renderApp();
 

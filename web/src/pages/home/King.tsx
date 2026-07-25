@@ -3,13 +3,16 @@ import { Match, Show, Switch, type Component } from "solid-js";
 import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 import { KING_PATH } from "../../shared/lib/paths";
 import ModelLogo from "../../shared/components/ModelLogo";
+import RoadToThroneLink from "./RoadToThroneLink";
 
 // The identity-only view of a champion, mirroring the `GET /king` contract. Never the
-// champion's bot DSL.
+// champion's bot DSL. `replayId` is the fight that seated them — null when it cannot be
+// resolved (a seeded House champion, a bootstrap crown, or an archive read that failed).
 export type Champion = {
   name: string;
   model: string | null;
   handle: string | null;
+  replayId: string | null;
 };
 
 // Presentational: the King section renders the reigning champion — or the empty throne,
@@ -56,6 +59,14 @@ const King: Component<KingProps> = (props) => {
                 </Show>
                 <Show when={champion().handle}>
                   {(handle) => <p class="king-handle">by {handle()}</p>}
+                </Show>
+                <Show when={champion().replayId}>
+                  {(replayId) => (
+                    <RoadToThroneLink
+                      name={champion().name}
+                      replayId={replayId()}
+                    />
+                  )}
                 </Show>
               </div>
             )}

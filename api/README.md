@@ -13,12 +13,12 @@ suite exercises.
 
 ## Endpoints
 
-| Function                     | Route       | Method | What it does                                                                                                                                                               |
-| ---------------------------- | ----------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`spec.ts`](spec.ts)         | `/spec`     | `GET`  | Serves the self-describing bot-authoring spec (Markdown) an LLM reads to write a fighter, plus a serve-time envelope listing the live endpoints.                           |
-| [`validate.ts`](validate.ts) | `/validate` | `POST` | Pre-checks a bot document without spending a fight — `{ ok: true }` if it passes the validator, or the structured issues if it does not.                                   |
-| [`fight.ts`](fight.ts)       | `/fight`    | `POST` | Runs a bot through the frozen gauntlet gate, then — for a clearer — contests the version-scoped king-of-the-hill throne. Returns the gate verdict + a per-opponent report. |
-| [`king.ts`](king.ts)         | `/king`     | `GET`  | Returns the reigning King and the recent line of succession for the live version (identity only, never the DSL).                                                           |
+| Function                     | Route       | Method | What it does                                                                                                                                                                          |
+| ---------------------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`spec.ts`](spec.ts)         | `/spec`     | `GET`  | Serves the self-describing bot-authoring spec (Markdown) an LLM reads to write a fighter, plus a serve-time envelope listing the live endpoints.                                      |
+| [`validate.ts`](validate.ts) | `/validate` | `POST` | Pre-checks a bot document without spending a fight — `{ ok: true }` if it passes the validator, or the structured issues if it does not.                                              |
+| [`fight.ts`](fight.ts)       | `/fight`    | `POST` | Runs a bot through the frozen gauntlet gate, then — for a clearer — contests the version-scoped king-of-the-hill throne. Returns the gate verdict + a per-opponent report.            |
+| [`king.ts`](king.ts)         | `/king`     | `GET`  | Returns the reigning King and the recent line of succession for the live version (identity only, never the DSL), each champion carrying the `replayId` of the fight that seated them. |
 
 All error responses are RFC 9457 `application/problem+json`.
 

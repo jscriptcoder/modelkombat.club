@@ -1,0 +1,26 @@
+/* The 👁 link on a champion's card. Quiet by default — it is a secondary affordance next to the
+   champion's identity, not a call to action — and it brightens on hover/focus so it reads as
+   something you can follow. Sized in em so it tracks whichever card it sits on. */
+
+.road-to-throne {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-size: 1.1em;
+  line-height: 1;
+  text-decoration: none;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.road-to-throne:hover,
+.road-to-throne:focus-visible {
+  opacity: 1;
+  outline-offset: 3px;
+}
+
+/* Respect a reduced-motion preference: the fade is decorative, so drop it rather than time it. */
+@media (prefers-reduced-motion: reduce) {
+  .road-to-throne {
+    transition: none;
+  }
+}

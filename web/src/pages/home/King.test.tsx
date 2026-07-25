@@ -10,6 +10,8 @@ const champion = (overrides?: Partial<Champion>): Champion => ({
   name: "reigning-king",
   model: "claude-opus-4-8",
   handle: "grandmaster",
+  // Most cases don't care how this champion got here; the ones that do override it.
+  replayId: null,
   ...overrides,
 });
 
@@ -115,6 +117,29 @@ describe("King section", () => {
 
     // The Retry button drives the shared /king refetch owned by the parent (App).
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("links the reigning champion to the fight that seated them", () => {
+    const { getByRole } = render(() => (
+      <King current={champion({ name: "warden", replayId: "abc123" })} />
+    ));
+
+    // The affordance is a real link with a real accessible name — never a bare emoji, which
+    // would announce as "eye" and tell a screen-reader user nothing about where it goes.
+    const link = getByRole("link", { name: /warden.*road to the throne/i });
+
+    expect(link.getAttribute("href")).toBe("/watch/abc123");
+  });
+
+  it("renders no road-to-the-throne affordance when that fight is unreachable", () => {
+    const { queryByRole, container } = render(() => (
+      <King current={champion({ replayId: null })} />
+    ));
+
+    expect(queryByRole("link", { name: /road to the throne/i })).toBeNull();
+    // Nothing at all — not a disabled control, which would advertise a fight nobody can watch.
+    expect(container.querySelector("[aria-disabled]")).toBeNull();
+    expect(container.querySelector('a[href^="/watch/"]')).toBeNull();
   });
 
   it("never shows the empty-throne CTA on a fetch failure", () => {
