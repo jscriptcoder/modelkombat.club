@@ -1327,6 +1327,26 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     exact-assertion browser tests + a manual mutator scan. **The pure-KotH arc is COMPLETE** — the S3 plan is archived
     at [`docs/archive/pure-koth-s3.md`](archive/pure-koth-s3.md) and the whole design trail (`pure-koth-decisions.md` +
     `pure-koth-stories.md`, D1–D20) is archived alongside it; no pure-koth files remain in `plans/`.
+15. **Open `/watch` to the public — S1 reach the fight viewer from anywhere on the site ✅ COMPLETE (story 1 of 3,
+    PRs #423–#425).** `/watch` had shipped **dark** since the replay-viewer arc — a complete, permalinkable Pixi
+    viewer that nothing linked to, no crawler was told about, and no reading LLM could discover, while the home page
+    still advertised replays with an `aria-disabled` "in development" button. **S1.1 (#423)** — the fight index states
+    the fights shown are the **current season's** and that earlier seasons are archived and not browsable yet; the note
+    lives **outside the `<Switch>`** so it also explains the _empty_ list after a season wipe, and names no version
+    string so it cannot go stale on the next bump. Shipped first, so the page is honest before it is advertised.
+    **S1.2 (#424)** — the nav's **Fights** item becomes a real `<a href="/watch">` that self-marks with
+    `aria-current="page"`, and the home section's dead button becomes a live CTA, keeping `id="fights"` so every
+    `/#fights` link still resolves; asserted in the `web-ssr` project too, so the **prerendered no-JS** HTML carries
+    the link and neither `aria-disabled` nor "in development". **S1.3 (#425)** — `sitemap.xml` gains `/watch` and only
+    `/watch` (a `/watch/{id}` permalink is a content hash of an evictable bout, so indexing them would publish links
+    that rot into 404s), and `llms.txt` gains **`GET /replay`** under _API endpoints_ under both public URL forms —
+    _behavior only, never the bot DSL_, plus the ~100–300 KB payload caveat — with `/watch` under _Optional_ as the
+    human viewer; the internal `?id=` rewrite target is deliberately never advertised. Web-only (`web/`) — **no `src/`
+    change, no `api/` change, no new fetch, `INPUT_HASH` + `BENCHMARK_VERSION` (`v20`) untouched**. Mutation testing
+    `N/A` on every slice (`web/` is outside Stryker) ⇒ exhaustive exact-assertion tests + a manual mutator scan per PR.
+    The S1 plan is archived at [`docs/archive/watch-public-s1.md`](archive/watch-public-s1.md); the arc's design trail
+    (`watch-public-decisions.md` D1–D10 + `watch-public-stories.md`) **stays live in `plans/`** — **S2** (newest-3 live
+    fight cards on the home page) and **S3** (the 👁 road-to-the-throne affordance, the arc's only `src/` touch) remain.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
