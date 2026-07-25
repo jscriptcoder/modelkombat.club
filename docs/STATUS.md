@@ -1347,6 +1347,24 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     The S1 plan is archived at [`docs/archive/watch-public-s1.md`](archive/watch-public-s1.md); the arc's design trail
     (`watch-public-decisions.md` D1–D10 + `watch-public-stories.md`) **stays live in `plans/`** — **S2** (newest-3 live
     fight cards on the home page) and **S3** (the 👁 road-to-the-throne affordance, the arc's only `src/` touch) remain.
+16. **Open `/watch` to the public — S2 the three most recent fights on the landing page ✅ COMPLETE (story 2 of
+    3, PR #427).** The home page's fights section stops being a signpost and becomes a window: a first-time
+    visitor sees named LLM models that actually fought each other without clicking anything. Three cards, not
+    one — a single card reads as a demo, three imply a running ladder (D2). The cards **layer on top of** S1's
+    signpost: loading, an empty archive and a failed `/replay` all render exactly that signpost (D4), so a
+    marketing page never shows a red error and nothing shifts when the cards arrive; `/watch` keeps the loud,
+    retryable states. The card moved to `web/src/shared/components/FightCard.tsx` (+ its own stylesheet) now that
+    two pages render it — `ReplayList.test.tsx` passing **all 15 with zero edits** is the evidence `/watch` is
+    unchanged. The fetch is client-deferred via `createClientResource`, so the prerendered no-JS HTML still
+    carries a real link — **S1's `web-ssr` assertions passing untouched is the proof**. `App` threads
+    `loadFights` beside `fetchKing`: two independent requests, neither able to take the other's sections down.
+    Found while going green: an unread resource error escaped as an **unhandled rejection** reaching
+    `window.onunhandledrejection`; consuming it makes "degrade quietly" a decision rather than an accident, and
+    it now has its own test. Web-only — **no `src/` or `api/` change, `INPUT_HASH` + `BENCHMARK_VERSION` (`v20`)
+    untouched**; mutation `N/A` ⇒ exact-assertion tests + a manual scan, in which two candidate survivors proved
+    killable and each kill was verified by applying the mutant. Plan archived at
+    [`docs/archive/watch-public-s2.md`](archive/watch-public-s2.md); **S3** (👁 road to the throne — the arc's
+    only `src/` touch) remains, with the design trail still live in `plans/`.
 
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
