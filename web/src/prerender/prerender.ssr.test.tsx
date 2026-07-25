@@ -15,46 +15,29 @@ import {
   stripScripts,
 } from "./inject-body";
 import { CANONICAL_ORIGIN } from "../shared/lib/config";
-import King from "../pages/home/King";
 import Podium from "../pages/home/Podium";
 import SpecPage from "../pages/spec-guide/SpecPage";
 
-// When the page is prerendered at build time there is no browser and no network. The
-// two dynamic sections must therefore server-render their *empty* fallback — the empty
-// throne / empty hall — never a loading spinner (which would mean the fetch ran on the
-// server) and never a fabricated champion. The client fetch is driven by `onMount`,
-// which never runs during SSR, so asserting the fallback branch here *is* the
-// "does not fetch on the server" guarantee that lets the client's first hydrated frame
-// match the prerendered markup.
+// When the page is prerendered at build time there is no browser and no network. The one
+// dynamic champions section must therefore server-render its *empty* fallback — the empty
+// arena — never a loading spinner (which would mean the fetch ran on the server) and never
+// a fabricated champion. The client fetch is driven by `onMount`, which never runs during
+// SSR, so asserting the fallback branch here *is* the "does not fetch on the server"
+// guarantee that lets the client's first hydrated frame match the prerendered markup.
 describe("server-rendered dynamic sections", () => {
-  it("prerenders the King section as the empty throne, not a loading spinner", () => {
-    const html = renderToString(() => <King />);
-
-    expect(html).toContain("The throne awaits");
-    // The loading branch would mean the /king fetch ran on the server — it must not.
-    expect(html).not.toContain("Summoning");
-  });
-
-  it("prerenders a no-JS pointer to the live /king endpoint in the empty throne", () => {
-    // The empty fallback is the only King markup a no-JS crawler sees, so it must carry a
-    // followable link to the live standings, with the origin spelled out in the text.
-    // (The exact absolute link text is pinned by the browser-mode accessible-name test;
-    // hydratable SSR splits the `{CANONICAL_ORIGIN}/king` text with hydration markers, so
-    // the raw HTML here is asserted at the followable-href + origin-text level.)
-    const html = renderToString(() => <King />);
-
-    expect(html).toContain('href="/king"');
-    expect(html).toContain(CANONICAL_ORIGIN);
-  });
-
-  it("prerenders the Hall of Kings as the empty hall, not a loading spinner", () => {
+  it("prerenders The Arena as the empty arena, not a loading spinner", () => {
     const html = renderToString(() => <Podium />);
 
     expect(html).toContain("No champions have been crowned yet");
     expect(html).not.toContain("Gathering");
   });
 
-  it("prerenders a no-JS pointer to the live /king endpoint in the empty hall", () => {
+  it("prerenders a no-JS pointer to the live /king endpoint in the empty arena", () => {
+    // The empty fallback is the only champions markup a no-JS crawler sees, so it must carry a
+    // followable link to the live standings, with the origin spelled out in the text.
+    // (The exact absolute link text is pinned by the browser-mode accessible-name test;
+    // hydratable SSR splits the `{CANONICAL_ORIGIN}/king` text with hydration markers, so
+    // the raw HTML here is asserted at the followable-href + origin-text level.)
     const html = renderToString(() => <Podium />);
 
     expect(html).toContain('href="/king"');
@@ -78,12 +61,13 @@ describe("renderApp (prerender entry)", () => {
     expect(html).toContain("Challenge the King");
   });
 
-  it("prerenders the dynamic sections as their empty fallback, not fetched data", () => {
+  it("prerenders the dynamic section as its empty fallback, not fetched data", () => {
     const html = renderApp();
 
-    // King + Hall of Kings show their empty state — they fetch only after hydration.
-    expect(html).toContain("The throne awaits");
+    // The Arena shows its empty state — it fetches only after hydration. The deleted King
+    // card's empty copy must not survive anywhere in the static markup.
     expect(html).toContain("No champions have been crowned yet");
+    expect(html).not.toContain("The throne awaits");
   });
 
   it("bakes a followable /watch link into the static markup for no-JS crawlers", () => {
@@ -114,14 +98,23 @@ describe("renderApp (prerender entry)", () => {
     expect(html).not.toMatch(/in development/i);
   });
 
-  it("bakes a /king endpoint link into both empty sections for no-JS crawlers", () => {
+  it("bakes exactly one /king endpoint link into the empty arena for no-JS crawlers", () => {
     const html = renderApp();
 
-    // Both empty fallbacks (King + Hall of Kings) carry the pointer, so the static page a
-    // crawler fetches without JS has the live endpoint in two self-describing landmarks.
+    // The Arena's empty fallback carries the pointer, so the static page a crawler fetches
+    // without JS has the live endpoint in a self-describing landmark. Exactly one now: this
+    // was two while the standalone King section carried its own copy of the same link.
     const links = html.match(/href="\/king"/g) ?? [];
 
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(1);
+  });
+
+  it("bakes no link to the removed Current King anchor", () => {
+    const html = renderApp();
+
+    // The nav used to offer `/#king`. With the section gone that anchor resolves nowhere, so a
+    // no-JS reader following it would land on an unscrolled page.
+    expect(html).not.toContain('href="/#king"');
   });
 });
 

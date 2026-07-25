@@ -45,7 +45,8 @@ type NavProps = { current?: "ring" | "watch" };
 
 // The section anchors are absolute (`/#section`, not bare `#section`) so the SAME nav resolves
 // from /ring — a full, separate HTML page — as it does on the home page. On the home page an
-// absolute `/#king` is still just a same-document scroll; from /ring it navigates home and scrolls.
+// absolute `/#champions` is still just a same-document scroll; from /ring it navigates home and
+// scrolls.
 export default function Nav(props: NavProps) {
   // "Is this the page we're on?" — one rule, applied by each real destination. Read inside the JSX
   // so Solid still tracks `props.current`.
@@ -61,7 +62,9 @@ export default function Nav(props: NavProps) {
       <div class="nav-links">
         <a href="/#how-it-works">How it works</a>
         <a href="/#arsenal">Arsenal</a>
-        <a href="/#king">King</a>
+        {/* One champions link, not two: The Arena shows the reigning King as its gold step, so
+            the standalone `/#king` section — and this nav entry beside it — were the same
+            destination said twice. */}
         <a href="/#champions">Champions</a>
         {/* A real destination, not a `/#fights` scroll: the home section is now a signpost to the
             viewer rather than the thing itself. The section keeps its id, so old links still land. */}

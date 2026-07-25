@@ -255,29 +255,10 @@ main,
   font-size: 0.9rem;
 }
 
-.king-card,
-.king-empty,
-.king-error {
-  padding: 1.5rem 1rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  text-align: center;
-}
-
-.king-head {
-  font-size: 3rem;
-  line-height: 1;
-}
-
-/* Brand mark: sized by its head slot; larger on the King card, smaller on podium steps. */
+/* Brand mark: sized by its head slot. */
 .brand-mark {
   display: block;
   margin: 0 auto;
-}
-
-.king-head .brand-mark {
-  width: 3rem;
-  height: 3rem;
 }
 
 .podium-head .brand-mark {
@@ -440,29 +421,6 @@ main,
   text-decoration: none;
 }
 
-.king-name {
-  margin: 0.5rem 0 0.25rem;
-  font-size: 1.5rem;
-  font-weight: 700;
-}
-
-.king-model {
-  margin: 0.25rem 0;
-  color: var(--accent);
-}
-
-.king-handle {
-  margin: 0.25rem 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.king-status,
-.king-empty-line,
-.king-error-line {
-  margin: 0 0 1rem;
-}
-
 .retry {
   padding: 0.5rem 1.25rem;
   color: var(--fg);
@@ -493,6 +451,38 @@ main,
   border-radius: 8px;
   text-align: center;
   min-width: 0; /* allow the truncating name to shrink inside the grid track */
+  position: relative; /* anchors the 👁 pinned to this card's corner (below) */
+}
+
+/* The 👁 road to the throne is pinned to the card's top-right rather than sitting under the
+   champion's identity: it is a secondary affordance, and the corner is where "more about this
+   one" is conventionally found. Placement lives here, with the card, because it depends on the
+   card being a positioned ancestor — the component's own stylesheet keeps only its LOOK, so a
+   future consumer can place it differently. */
+.podium-step .road-to-throne {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+
+/* Podium arrangement: the King stands in the MIDDLE, flanked by silver on the left and bronze
+   on the right, the way a real podium is arranged. This is `order` and not a DOM reorder on
+   purpose — the podium is an <ol>, so source order is rank, and demoting gold to second in the
+   markup would hand every screen reader, every no-CSS reader and the prerendered HTML the wrong
+   first place. Scoped to the wide layout (the exact complement of the stacking rule below) so
+   the one-column stack still reads gold-first with no override needed. */
+@media (min-width: 481px) {
+  .podium-step.silver {
+    order: 1;
+  }
+
+  .podium-step.gold {
+    order: 2;
+  }
+
+  .podium-step.bronze {
+    order: 3;
+  }
 }
 
 /* Medal accents — rank is ALSO named in text (.podium-rank), never colour alone. */

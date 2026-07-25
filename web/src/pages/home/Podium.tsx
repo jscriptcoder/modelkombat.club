@@ -2,7 +2,7 @@ import { For, Match, Show, Switch, type Component } from "solid-js";
 
 import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 import { KING_PATH } from "../../shared/lib/paths";
-import { type Champion } from "./King";
+import { type Champion } from "./champion";
 import ModelLogo from "../../shared/components/ModelLogo";
 import RoadToThroneLink from "./RoadToThroneLink";
 

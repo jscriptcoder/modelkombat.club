@@ -488,7 +488,7 @@ describe("RingPage — the fight card", () => {
       within(region)
         .getByRole("link", { name: /throne/i })
         .getAttribute("href"),
-    ).toBe("/#king");
+    ).toBe("/#champions");
 
     // ...and the headline names the dethrone (the House seed guarantees a non-empty board — there
     // is no "first King / you fought no one" case).
@@ -911,7 +911,7 @@ describe("RingPage — claiming the throne", () => {
     expect(await ui.findByText(/new champion/i)).toBeTruthy();
     expect(
       (await ui.findByRole("link", { name: /throne/i })).getAttribute("href"),
-    ).toBe("/#king");
+    ).toBe("/#champions");
     // ...and the claim button is gone (already claimed).
     expect(ui.queryByRole("button", { name: /take the throne/i })).toBeNull();
 

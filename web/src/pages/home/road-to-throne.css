@@ -1,10 +1,11 @@
-/* The 👁 link on a champion's card. Quiet by default — it is a secondary affordance next to the
+/* The 👁 link on a champion's card. Quiet by default — it is a secondary affordance beside the
    champion's identity, not a call to action — and it brightens on hover/focus so it reads as
-   something you can follow. Sized in em so it tracks whichever card it sits on. */
+   something you can follow. Sized in em so it tracks whichever card it sits on.
+   This is the glyph's LOOK only: where it sits belongs to the card that pins it (see the
+   `.podium-step .road-to-throne` rule in app.css), so it carries no margin of its own. */
 
 .road-to-throne {
   display: inline-block;
-  margin-top: 0.5rem;
   font-size: 1.1em;
   line-height: 1;
   text-decoration: none;

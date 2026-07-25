@@ -4,7 +4,7 @@
 //   - Site pages — the HTML routes a visitor navigates to (home, ring, the rendered spec).
 //   - API endpoints — the routes the UI fetches at runtime (the throne, a fight, raw spec).
 //
-// In-page section anchors (`/#king`, `/#how-it-works`, …) are deliberately NOT here: they
+// In-page section anchors (`/#champions`, `/#how-it-works`, …) are deliberately NOT here: they
 // are same-document scroll fragments, not routes, and each is used in exactly one place.
 
 // --- Site pages ---

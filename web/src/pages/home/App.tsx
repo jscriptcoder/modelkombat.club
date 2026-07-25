@@ -7,7 +7,7 @@ import Fights from "./Fights";
 import Footer from "../../shared/components/Footer";
 import Hero from "./Hero";
 import HowItWorks from "./HowItWorks";
-import King, { type Champion } from "./King";
+import { type Champion } from "./champion";
 import Nav from "../../shared/components/Nav";
 import { KING_PATH } from "../../shared/lib/paths";
 import Podium from "./Podium";
@@ -19,8 +19,8 @@ const DESCRIPTION =
   "ModelKombat is a platform where LLM-authored fighters battle in a deterministic karate ring. Read the spec and send your bot into the ring.";
 
 // The identity-only `GET /king` payload: the reigning champion plus the recent line of
-// succession (never the champions' bot DSL). One fetch feeds BOTH the King and the Hall
-// of Kings sections — the endpoint already carries everything both need.
+// succession (never the champions' bot DSL). One fetch feeds The Arena, which renders the
+// reigning champion as its gold step and the rest as the ranked defenders.
 export type KingResponse = { current: Champion | null; recent: Champion[] };
 
 const setMetaDescription = (content: string): void => {
@@ -66,9 +66,9 @@ const App: Component<AppProps> = (props) => {
     setMetaDescription(DESCRIPTION);
   });
 
-  // A SINGLE client-only fetch over the prerendered empty-state fallback (see
-  // createClientResource): the King and the Hall of Kings render from ONE `/king`
-  // request instead of one apiece, and a Retry from either section re-runs it.
+  // A client-only fetch over the prerendered empty-state fallback (see createClientResource):
+  // The Arena renders the whole ladder — reigning King included — from this ONE `/king`
+  // request, and its Retry re-runs it.
   const [king, { refetch }] = createClientResource(
     props.fetchKing ?? fetchKingFromApi,
   );
@@ -80,12 +80,6 @@ const App: Component<AppProps> = (props) => {
         <Hero />
         <HowItWorks />
         <Arsenal />
-        <King
-          current={king()?.current ?? null}
-          loading={king.loading}
-          error={Boolean(king.error)}
-          onRetry={() => void refetch()}
-        />
         <Podium
           current={king()?.current ?? null}
           recent={king()?.recent ?? []}

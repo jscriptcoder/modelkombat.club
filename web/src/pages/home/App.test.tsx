@@ -2,7 +2,7 @@ import { fireEvent, render, within } from "@solidjs/testing-library";
 import { describe, expect, it } from "vitest";
 
 import App, { type KingResponse } from "./App";
-import { type Champion } from "./King";
+import { type Champion } from "./champion";
 import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 import type { ReplayListLoad } from "../replay/replay-loader";
 
@@ -133,7 +133,6 @@ describe("App (landing page)", () => {
       "/#top",
       "/#how-it-works",
       "/#arsenal",
-      "/#king",
       "/#champions",
       "/watch",
       "/ring",
@@ -149,21 +148,22 @@ describe("App (landing page)", () => {
     expect(region.id).toBe("arsenal");
   });
 
-  it("places the Arsenal between How it works and the King", () => {
+  it("places the Arsenal between How it works and The Arena", () => {
     const { getByRole } = render(() => <App />);
 
     const howItWorks = getByRole("region", { name: "How it works" });
     const arsenal = getByRole("region", { name: "The Arsenal" });
-    const king = getByRole("region", { name: "Current King" });
+    const arena = getByRole("region", { name: "The Arena" });
 
     // Arsenal follows How it works in document order...
     expect(
       howItWorks.compareDocumentPosition(arsenal) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    // ...and precedes the King (the Gauntlet section between them was dropped in S2).
+    // ...and precedes the champions (the Gauntlet section between them was dropped in S2,
+    // and the standalone Current King card that used to sit here is gone too).
     expect(
-      king.compareDocumentPosition(arsenal) & Node.DOCUMENT_POSITION_PRECEDING,
+      arena.compareDocumentPosition(arsenal) & Node.DOCUMENT_POSITION_PRECEDING,
     ).toBeTruthy();
   });
 
@@ -247,20 +247,64 @@ describe("App (landing page)", () => {
   });
 });
 
-describe("App — single /king fetch feeding both throne sections", () => {
-  it("shows both sections' loading state while the shared fetch is in flight", async () => {
-    // A fetch that never settles holds the single shared resource in its loading state.
+describe("App — the /king fetch feeding the one champions section", () => {
+  it("says the champions once — the reigning King heads The Arena, with no section of his own", async () => {
+    const fetchKing = (): Promise<KingResponse> =>
+      Promise.resolve({
+        current: champ({ name: "reigning-king", replayId: "king-fight" }),
+        recent: [champ({ name: "silver-king", replayId: "silver-fight" })],
+      });
+
+    const { getByRole, queryByRole, queryAllByRole } = render(() => (
+      <App fetchKing={fetchKing} />
+    ));
+
+    const arena = getByRole("region", { name: "The Arena" });
+
+    // The reigning champion is still on the landing page — as The Arena's gold step, badged
+    // as King and carrying his own road to the throne. Nothing about him is lost.
+    expect(await within(arena).findByText("reigning-king")).toBeTruthy();
+    expect(
+      within(arena).getByText("King", { selector: ".podium-king-badge" }),
+    ).toBeTruthy();
+    expect(
+      within(arena)
+        .getByRole("link", { name: /reigning-king.*road to the throne/i })
+        .getAttribute("href"),
+    ).toBe("/watch/king-fight");
+
+    // A defender keeps its own fight, so the id still travels per champion.
+    expect(
+      within(arena)
+        .getByRole("link", { name: /silver-king.*road to the throne/i })
+        .getAttribute("href"),
+    ).toBe("/watch/silver-fight");
+
+    // ...and he is said exactly ONCE: the standalone Current King section is gone, so the
+    // page no longer renders the same champion twice under two headings.
+    expect(queryByRole("region", { name: "Current King" })).toBeNull();
+    expect(queryAllByRole("heading", { name: /current king/i })).toHaveLength(
+      0,
+    );
+    expect(within(arena).getAllByText("reigning-king")).toHaveLength(1);
+  });
+
+  it("shows one loading state while the fetch is in flight", async () => {
+    // A fetch that never settles holds the resource in its loading state.
     const pending = (): Promise<KingResponse> =>
       new Promise<KingResponse>(() => {});
 
-    const { findByText } = render(() => <App fetchKing={pending} />);
+    const { findAllByText, queryByText } = render(() => (
+      <App fetchKing={pending} />
+    ));
 
-    // The one in-flight request drives BOTH sections' loading copy at once.
-    expect(await findByText(/summoning the reigning champion/i)).toBeTruthy();
-    expect(await findByText(/gathering the champions/i)).toBeTruthy();
+    // The Arena announces the in-flight request — once, not once per section.
+    expect(await findAllByText(/gathering the champions/i)).toHaveLength(1);
+    // The deleted King card's loading copy must not survive anywhere.
+    expect(queryByText(/summoning the reigning champion/i)).toBeNull();
   });
 
-  it("fetches /king once and feeds `current` to the King and `recent` to the Hall of Kings", async () => {
+  it("fetches /king once, feeding `current` to gold and `recent` to the defenders", async () => {
     let calls = 0;
 
     const fetchKing = (): Promise<KingResponse> => {
@@ -268,62 +312,26 @@ describe("App — single /king fetch feeding both throne sections", () => {
 
       return Promise.resolve({
         current: champ({ name: "reigning-king" }),
-        recent: [champ({ name: "gold-king" }), champ({ name: "silver-king" })],
+        recent: [
+          champ({ name: "silver-king" }),
+          champ({ name: "bronze-king" }),
+        ],
       });
     };
 
     const { getByRole } = render(() => <App fetchKing={fetchKing} />);
 
-    // The King section renders the reigning champion...
-    const king = getByRole("region", { name: "Current King" });
+    const arena = getByRole("region", { name: "The Arena" });
 
-    expect(await within(king).findByText("reigning-king")).toBeTruthy();
+    expect(await within(arena).findByText("reigning-king")).toBeTruthy();
+    expect(within(arena).getByText("silver-king")).toBeTruthy();
+    expect(within(arena).getByText("bronze-king")).toBeTruthy();
 
-    // ...and The Arena renders the ranked defenders...
-    const hall = getByRole("region", { name: "The Arena" });
-
-    expect(await within(hall).findByText("gold-king")).toBeTruthy();
-    expect(within(hall).getByText("silver-king")).toBeTruthy();
-
-    // ...from ONE shared request, not one fetch per section (the King now also heads The
-    // Arena as gold, so scope the section reads rather than counting bare occurrences).
+    // One request, not one per rendered champion.
     expect(calls).toBe(1);
   });
 
-  it("gives the King the same road to the throne in both sections it appears in", async () => {
-    const fetchKing = (): Promise<KingResponse> =>
-      Promise.resolve({
-        current: champ({ name: "reigning-king", replayId: "king-fight" }),
-        recent: [champ({ name: "silver-king", replayId: "silver-fight" })],
-      });
-
-    const { getByRole } = render(() => <App fetchKing={fetchKing} />);
-
-    const king = getByRole("region", { name: "Current King" });
-    const arena = getByRole("region", { name: "The Arena" });
-
-    // The reigning champion heads BOTH the King card and the podium as gold. Same champion,
-    // same fight — from the same payload, so the two must never disagree.
-    const fromKingCard = await within(king).findByRole("link", {
-      name: /reigning-king.*road to the throne/i,
-    });
-
-    const fromPodium = await within(arena).findByRole("link", {
-      name: /reigning-king.*road to the throne/i,
-    });
-
-    expect(fromKingCard.getAttribute("href")).toBe("/watch/king-fight");
-    expect(fromPodium.getAttribute("href")).toBe("/watch/king-fight");
-
-    // And a defender keeps its own, so the id travels per champion and not per section.
-    expect(
-      within(arena)
-        .getByRole("link", { name: /silver-king.*road to the throne/i })
-        .getAttribute("href"),
-    ).toBe("/watch/silver-fight");
-  });
-
-  it("shows the shared error in both sections, and a single Retry recovers both", async () => {
+  it("shows one error whose single Retry re-runs the fetch", async () => {
     let calls = 0;
 
     const flaky = (): Promise<KingResponse> => {
@@ -341,29 +349,27 @@ describe("App — single /king fetch feeding both throne sections", () => {
       <App fetchKing={flaky} />
     ));
 
-    // Both sections surface the shared failure — two error copies, two Retry buttons.
-    const errors = await findAllByText(/couldn't reach the ring/i);
+    // One section surfaces the failure — one error copy, one Retry button, not two of each.
+    expect(await findAllByText(/couldn't reach the ring/i)).toHaveLength(1);
 
-    expect(errors).toHaveLength(2);
+    const retries = await findAllByRole("button", { name: /retry/i });
 
-    // Retrying from ONE section re-runs the single shared fetch and refills both.
-    const [retry] = await findAllByRole("button", { name: /retry/i });
+    expect(retries).toHaveLength(1);
 
-    fireEvent.click(retry);
+    fireEvent.click(retries[0]);
 
-    // One shared refetch refills BOTH the King (hero) and The Arena (its defender).
-    const king = getByRole("region", { name: "Current King" });
+    // The refetch refills The Arena — both the King and his defender.
     const arena = getByRole("region", { name: "The Arena" });
 
-    expect(await within(king).findByText("recovered-king")).toBeTruthy();
-    expect(await within(arena).findByText("recovered-defender")).toBeTruthy();
+    expect(await within(arena).findByText("recovered-king")).toBeTruthy();
+    expect(within(arena).getByText("recovered-defender")).toBeTruthy();
     expect(calls).toBe(2);
   });
 });
 
-// The landing page makes TWO independent requests: /king feeds the King and Arena sections, and
-// /replay feeds the fight cards. Neither may be able to take the other down — a throne-store
-// outage must not blank the fights, and an archive outage must not blank the champions.
+// The landing page makes TWO independent requests: /king feeds The Arena, and /replay feeds the
+// fight cards. Neither may be able to take the other down — a throne-store outage must not blank
+// the fights, and an archive outage must not blank the champions.
 describe("App — the throne and the fight archive fail independently", () => {
   const kingPayload = (): KingResponse => ({
     current: champ({ name: "sitting-king" }),
@@ -411,10 +417,9 @@ describe("App — the throne and the fight archive fail independently", () => {
       />
     ));
 
-    const king = getByRole("region", { name: "Current King" });
     const arena = getByRole("region", { name: "The Arena" });
 
-    expect(await within(king).findByText("sitting-king")).toBeTruthy();
-    expect(await within(arena).findByText("recent-defender")).toBeTruthy();
+    expect(await within(arena).findByText("sitting-king")).toBeTruthy();
+    expect(within(arena).getByText("recent-defender")).toBeTruthy();
   });
 });
