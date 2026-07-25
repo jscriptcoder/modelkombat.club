@@ -38,7 +38,10 @@ worth building: do people click through, and do LLMs start pulling `/replay`?
 
 ---
 
-## S1 — A visitor can reach the fight viewer from anywhere on the site
+## S1 — A visitor can reach the fight viewer from anywhere on the site ✅ SHIPPED
+
+**Shipped 2026-07-25** — PRs #423–#425, all 8 acceptance examples met. Plan archived at
+`docs/archive/watch-public-s1.md`.
 
 **Value:** the fight viewer stops being a URL you have to be told about. Humans get a nav
 entry and a real link where a dead button used to be; crawlers get a sitemap entry; reading
@@ -83,7 +86,10 @@ states exist yet — that is S2. No 👁 — that is S3. Cross-version browsing 
 
 ---
 
-## S2 — A visitor sees the three most recent fights without leaving the home page
+## S2 — A visitor sees the three most recent fights without leaving the home page ✅ SHIPPED
+
+**Shipped 2026-07-25** — PR #427, all 8 acceptance examples met in one PR. Plan archived at
+`docs/archive/watch-public-s2.md`.
 
 **Depends on S1** — this story's loading, empty, and error states are _literally_ S1's static
 frame (D4). If the order is ever flipped, S2 has to build that frame itself.
@@ -123,7 +129,9 @@ identities-only decision); no thumbnails or animated previews; no pagination; no
 
 ---
 
-## S3 — A visitor can jump from a champion to the fight that put them on the board
+## S3 — A visitor can jump from a champion to the fight that put them on the board ⏳ IN PROGRESS
+
+**Planned** — `plans/watch-public-s3.md`, one slice on `feat/king-road-to-throne`.
 
 **Value:** answers "who did this King actually beat?" in one click, from the most-read part of
 the home page. One id per champion is enough — the player's existing matchup switcher exposes
@@ -206,6 +214,11 @@ Carried from `plans/watch-public-decisions.md`:
 
 ## Next step
 
-Load `planning` for **S1** to turn it into PR-sized implementation slices. Every
-implementation slice must load `tdd`, `testing`, `mutation-testing`, and `refactoring` and
-complete RED → GREEN → MUTATE → KILL MUTANTS → REFACTOR before the next slice starts.
+S1 and S2 are shipped and archived. **S3 is planned** in `plans/watch-public-s3.md` — one
+slice, deliberately unsplit, and the arc's only `src/` touch, so it carries the full mutation
+regime rather than the `web/`-only substitute. Implement it by loading `tdd`, `testing`,
+`mutation-testing`, and `refactoring`, then completing RED → GREEN → MUTATE → KILL MUTANTS →
+REFACTOR.
+
+When S3 merges, archive its plan **and** this file plus `watch-public-decisions.md` under
+`docs/archive/` — S3 is their last consumer.
