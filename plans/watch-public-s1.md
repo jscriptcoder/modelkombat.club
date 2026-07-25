@@ -2,7 +2,7 @@
 
 **Branches**: one per slice, per repo convention — Slice 1 `feat/watch-season-note`,
 Slice 2 `feat/watch-public-links`, Slice 3 `feat/watch-discovery`
-**Status**: Active — Slice 1 in progress
+**Status**: Active — Slices 1–2 done, Slice 3 next
 **Story**: `plans/watch-public-stories.md` § S1 · **Decisions**: `plans/watch-public-decisions.md` D1–D10
 
 ## Goal
@@ -20,12 +20,12 @@ this plan sequences them, it does not re-open them.
 
 The story's eight ACs, mapped to slices:
 
-- [ ] AC8 — `/watch` states the fights shown are the current season's, and that older seasons are archived and not currently browsable → **Slice 1**
-- [ ] AC1 — the nav's **Fights** item navigates to `/watch` (a real `<a href>`, not a scroll anchor) → **Slice 2**
-- [ ] AC2 — on `/watch`, the nav's **Fights** item carries `aria-current="page"` → **Slice 2**
-- [ ] AC3 — the **prerendered** home HTML contains a link to `/watch` and no `aria-disabled` element → **Slice 2**
-- [ ] AC4 — the home Fights section still carries `id="fights"`, so `/#fights` resolves → **Slice 2**
-- [ ] AC5 — the string "in development" appears nowhere on the home page → **Slice 2**
+- [x] AC8 — `/watch` states the fights shown are the current season's, and that older seasons are archived and not currently browsable → **Slice 1** (#423)
+- [x] AC1 — the nav's **Fights** item navigates to `/watch` (a real `<a href>`, not a scroll anchor) → **Slice 2**
+- [x] AC2 — on `/watch`, the nav's **Fights** item carries `aria-current="page"` → **Slice 2**
+- [x] AC3 — the **prerendered** home HTML contains a link to `/watch` and no `aria-disabled` element → **Slice 2**
+- [x] AC4 — the home Fights section still carries `id="fights"`, so `/#fights` resolves → **Slice 2**
+- [x] AC5 — the string "in development" appears nowhere on the home page → **Slice 2**
 - [ ] AC6 — `sitemap.xml` lists `https://modelkombat.club/watch`, and no `/watch/{id}` → **Slice 3**
 - [ ] AC7 — `llms.txt` documents `GET /replay` (both public URL forms + size caveat) and `/watch` → **Slice 3**
 

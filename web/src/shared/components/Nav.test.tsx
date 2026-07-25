@@ -52,6 +52,17 @@ describe("Nav", () => {
     expect(ring.getAttribute("target")).toBe(null);
   });
 
+  it("links Fights to the fight viewer in the same tab", () => {
+    const { getByRole } = render(() => <Nav />);
+
+    const fights = getByRole("link", { name: "Fights" });
+
+    // /watch is a primary destination in its own right — a full page, navigated in the same tab
+    // like Ring. It is no longer the `/#fights` scroll to a home-page teaser.
+    expect(fights.getAttribute("href")).toBe("/watch");
+    expect(fights.getAttribute("target")).toBe(null);
+  });
+
   it("points every nav link home absolutely so the same nav works from any page", () => {
     const { getByRole } = render(() => <Nav />);
 
@@ -68,7 +79,7 @@ describe("Nav", () => {
       "/#arsenal",
       "/#king",
       "/#champions",
-      "/#fights",
+      "/watch",
       "/ring",
       "/spec-guide",
     ]);
@@ -77,9 +88,13 @@ describe("Nav", () => {
   it("marks no link as the current page by default (the home nav)", () => {
     const { getByRole } = render(() => <Nav />);
 
-    // On the home page nothing is the "current page" — the sections are in-page anchors.
+    // On the home page nothing is the "current page" — the sections are in-page anchors, and the
+    // two real destinations (Fights, Ring) are elsewhere.
     expect(
       getByRole("link", { name: "Ring" }).getAttribute("aria-current"),
+    ).toBe(null);
+    expect(
+      getByRole("link", { name: "Fights" }).getAttribute("aria-current"),
     ).toBe(null);
   });
 
@@ -91,6 +106,21 @@ describe("Nav", () => {
     expect(
       getByRole("link", { name: "Ring" }).getAttribute("aria-current"),
     ).toBe("page");
+    // ...and only that one — a second marked link would be ambiguous.
+    expect(
+      getByRole("link", { name: "Fights" }).getAttribute("aria-current"),
+    ).toBe(null);
+  });
+
+  it("marks the Fights link as the current page when told it is on /watch", () => {
+    const { getByRole } = render(() => <Nav current="watch" />);
+
+    expect(
+      getByRole("link", { name: "Fights" }).getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      getByRole("link", { name: "Ring" }).getAttribute("aria-current"),
+    ).toBe(null);
   });
 
   it("keeps the move-variety board out of the primary nav (a caveated diagnostic, not a primary destination)", () => {
