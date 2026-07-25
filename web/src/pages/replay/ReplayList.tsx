@@ -50,6 +50,13 @@ const ReplayList: Component<ReplayListProps> = (props) => {
   return (
     <>
       <h1 class="replay-title">Watch the King's title fights</h1>
+      {/* Deliberately outside the <Switch>: the archive is scoped to the running season, and the
+          state that most needs saying so is the EMPTY one — right after a season wipe this is the
+          sentence that explains an empty list. Naming no version keeps it true across bumps. */}
+      <p class="replay-season">
+        These are the current season's title fights. Earlier seasons are
+        archived and not browsable yet.
+      </p>
 
       <Switch>
         <Match when={data.loading}>
