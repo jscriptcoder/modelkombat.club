@@ -11,11 +11,19 @@ const champ = (overrides?: Partial<Champion>): Champion => ({
   name: "champion",
   model: "claude-opus-4-8",
   handle: "grandmaster",
+  // Most cases don't care how this champion got here; the ones that do override it.
+  replayId: null,
   ...overrides,
 });
 
 const stepOf = (container: HTMLElement, rank: string): Element | null =>
   container.querySelector(`.podium-step.${rank}`);
+
+// Where one podium step's road-to-the-throne link points, or null when it has none.
+const watchHrefOf = (container: HTMLElement, rank: string): string | null =>
+  stepOf(container, rank)
+    ?.querySelector('a[href^="/watch/"]')
+    ?.getAttribute("href") ?? null;
 
 describe("The Arena podium", () => {
   it("shows an accessible loading state while the arena is being fetched", () => {
@@ -235,6 +243,66 @@ describe("The Arena podium", () => {
 
     expect(getByText(/couldn't reach the ring/i)).toBeTruthy();
     expect(queryByText(/no champions have been crowned/i)).toBeNull();
+  });
+
+  it("links every step of the podium to the fight that seated that champion", () => {
+    const { container } = render(() => (
+      <Podium
+        current={champ({ name: "opus", replayId: "gold-id" })}
+        recent={[
+          champ({ name: "sonnet", replayId: "silver-id" }),
+          champ({ name: "haiku", replayId: "bronze-id" }),
+        ]}
+      />
+    ));
+
+    // Each step points at its OWN champion's fight — a single shared id would pass a
+    // "some link exists" check and still send every visitor to the same bout.
+    expect(watchHrefOf(container, "gold")).toBe("/watch/gold-id");
+    expect(watchHrefOf(container, "silver")).toBe("/watch/silver-id");
+    expect(watchHrefOf(container, "bronze")).toBe("/watch/bronze-id");
+  });
+
+  it("names each podium link after the champion it belongs to", () => {
+    const { getByRole } = render(() => (
+      <Podium
+        current={champ({ name: "opus", replayId: "gold-id" })}
+        recent={[champ({ name: "sonnet", replayId: "silver-id" })]}
+      />
+    ));
+
+    // Three identical "watch" links would be useless to a screen-reader user scanning by link.
+    expect(
+      getByRole("link", { name: /opus.*road to the throne/i }).getAttribute(
+        "href",
+      ),
+    ).toBe("/watch/gold-id");
+    expect(
+      getByRole("link", { name: /sonnet.*road to the throne/i }).getAttribute(
+        "href",
+      ),
+    ).toBe("/watch/silver-id");
+  });
+
+  it("omits the affordance on exactly the steps whose fight is unreachable", () => {
+    const { container } = render(() => (
+      <Podium
+        current={champ({ name: "opus", replayId: "gold-id" })}
+        recent={[
+          champ({ name: "seeded-house", replayId: null }),
+          champ({ name: "haiku", replayId: "bronze-id" }),
+        ]}
+      />
+    ));
+
+    // Mixed on purpose: a component that linked everything, or nothing, fails this.
+    expect(watchHrefOf(container, "gold")).toBe("/watch/gold-id");
+    expect(watchHrefOf(container, "silver")).toBeNull();
+    expect(watchHrefOf(container, "bronze")).toBe("/watch/bronze-id");
+    // And the silver step shows no disabled stand-in either.
+    expect(
+      stepOf(container, "silver")?.querySelector("[aria-disabled]") ?? null,
+    ).toBeNull();
   });
 
   it("is a labelled landmark region named The Arena for the #champions anchor", () => {

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
+import { boutReplayIds } from "./handle-replay.js";
 import { handleKing } from "./handle-king.js";
 import {
   inMemoryThroneStore,
   type ArenaMember,
   type ArenaRecord,
+  type ReproRecord,
   type ThroneStore,
 } from "./throne-store.js";
 import type { BotDoc } from "../engine/dsl.js";
@@ -100,15 +102,66 @@ const failingStore = (): ThroneStore => ({
   commitArena: () => Promise.reject(new Error("unused in /king")),
 });
 
-type Champion = { name: string; model: string | null; handle: string | null };
+// A ranked arena record from members already in rank order (`[0]` = the King).
+const arenaOf = (members: ArenaMember[]): ArenaRecord => ({
+  members,
+  generation: 1,
+  nextSeniority: members.length + 1,
+});
+
+// A reproduction record: one champion's entry run captured as replay raw material — the
+// challenger doc, the exact defenders it fought in board order (`[0]` = the then-King), the frozen
+// seeds, and `memberSeniority`, the pin key tying the record to the arena member it seated (null
+// for a non-placer). Distinct challenger names produce distinct content hashes, so two records
+// built from this factory never collide.
+const reproRecord = (overrides?: Partial<ReproRecord>): ReproRecord => ({
+  challenger: champion({ name: "challenger" }),
+  defenders: [champion({ name: "then-king" })],
+  seeds: [7],
+  version: VERSION,
+  memberSeniority: 1,
+  ...overrides,
+});
+
+// A store serving a fixed arena + a fixed archive. Hand-rolled rather than driven through
+// `inMemoryThroneStore`'s commit path because these tests pin the JOIN, not the pin-and-retain
+// rule — an arbitrary (record, member) pairing is exactly what the join must be proven against.
+const storeWith = (
+  arena: ArenaRecord | undefined,
+  archive: ReproRecord[],
+): ThroneStore => ({
+  readArena: () => Promise.resolve(arena),
+  readArchive: () => Promise.resolve(archive),
+  commitArena: () => Promise.resolve({ ok: false, reason: "moved" }),
+});
+
+// A store whose ARENA reads fine but whose ARCHIVE is unreachable — the best-effort case: the
+// champions must still be served, only their road to the throne is lost.
+const archiveFailingStore = (arena: ArenaRecord): ThroneStore => ({
+  readArena: () => Promise.resolve(arena),
+  readArchive: () => Promise.reject(new Error("archive unreachable")),
+  commitArena: () => Promise.resolve({ ok: false, reason: "moved" }),
+});
+
+const readKing = (store: ThroneStore, seed?: ArenaRecord): Promise<Response> =>
+  handleKing(kingRequest(), { store, version: VERSION, seed });
+
+type Champion = {
+  name: string;
+  model: string | null;
+  handle: string | null;
+  replayId: string | null;
+};
 
 type KingBody = {
   current: null | Champion;
   recent: Champion[];
 };
 
-// The public identity fields — no `generation` (the throne CAS token left the contract in S3).
-const IDENTITY_KEYS = ["handle", "model", "name"] as const;
+// The public member fields: the champion's identity plus the id of the fight that seated them
+// (`replayId`, null when unresolvable) — no `generation` (the throne CAS token left the contract
+// in S3) and never the bot document.
+const MEMBER_KEYS = ["handle", "model", "name", "replayId"] as const;
 
 describe("GET /king — the version-scoped ranked-arena read", () => {
   it("returns the King's identity (name, model, handle) — and no generation", async () => {
@@ -131,6 +184,8 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
       name: "reigning-king",
       model: "claude-opus-4-8",
       handle: "grandmaster",
+      // No archived record pins this seniority, so the road to the throne is unresolvable.
+      replayId: null,
     });
     // The throne CAS token must NOT leak into the public read (dropped in S3).
     expect(body.current).not.toHaveProperty("generation");
@@ -177,7 +232,7 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
     const body = (await res.json()) as KingBody;
 
     // Exactly the three identity fields — no `rules`, no `version`, no `default`, no `generation`.
-    expect(Object.keys(body.current ?? {}).sort()).toEqual([...IDENTITY_KEYS]);
+    expect(Object.keys(body.current ?? {}).sort()).toEqual([...MEMBER_KEYS]);
 
     // Defense in depth: no DSL token survives anywhere in the serialized payload.
     const raw = JSON.stringify(body);
@@ -197,7 +252,7 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
 
     expect(body.recent).toHaveLength(1);
     body.recent.forEach((entry) => {
-      expect(Object.keys(entry).sort()).toEqual([...IDENTITY_KEYS]);
+      expect(Object.keys(entry).sort()).toEqual([...MEMBER_KEYS]);
       expect(entry).not.toHaveProperty("generation");
     });
 
@@ -265,6 +320,8 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
       name: "grappler",
       model: "House",
       handle: "Gauntlet",
+      // A seeded House champion fought nobody to get here — no entry bout to watch (AC2).
+      replayId: null,
     });
     // recent is the two House defenders below the King, in rank order.
     expect(body.recent.map((c) => c.name)).toEqual(["sweeper", "rekka"]);
@@ -285,7 +342,7 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
 
     const body = (await res.json()) as KingBody;
 
-    expect(Object.keys(body.current ?? {}).sort()).toEqual([...IDENTITY_KEYS]);
+    expect(Object.keys(body.current ?? {}).sort()).toEqual([...MEMBER_KEYS]);
 
     const raw = JSON.stringify(body);
 
@@ -335,12 +392,14 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
       name: "new~king",
       model: "opusx",
       handle: "heir",
+      replayId: null,
     });
     // ...and so is the defender (every entry, not just current).
     expect(body.recent[0]).toEqual({
       name: "kata master",
       model: "claudeopus",
       handle: "grand",
+      replayId: null,
     });
   });
 
@@ -364,6 +423,7 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
       name: "Grand Master <script>alert(1)</script>",
       model: "claude-opus-4-8",
       handle: "kata-master",
+      replayId: null,
     });
   });
 
@@ -426,5 +486,216 @@ describe("GET /king — the version-scoped ranked-arena read", () => {
     });
 
     expect(down.headers.get("cache-control")).toBeNull();
+  });
+});
+
+// Each champion carries the id of the fight that seated them, so a visitor can jump from a name
+// on the podium to the bout that put it there. The id is resolved server-side by joining the
+// reproduction archive onto the arena on SENIORITY — the pin key — and the join is best-effort:
+// an unreachable archive costs the links, never the champions.
+describe("GET /king — each champion's road to the throne", () => {
+  it("resolves every member's replayId to the entry bout of the record pinned to their seniority", async () => {
+    const kingRecord = reproRecord({
+      challenger: champion({ name: "warden" }),
+      memberSeniority: 4,
+    });
+
+    const defenderRecord = reproRecord({
+      challenger: champion({ name: "vulture" }),
+      memberSeniority: 9,
+    });
+
+    // Archive order is deliberately NOT arena order: the join is by seniority, so a positional
+    // pairing (archive[i] ↔ members[i]) would swap these two and fail.
+    const store = storeWith(
+      arenaOf([
+        arenaMember("warden", { seniority: 4 }),
+        arenaMember("vulture", { seniority: 9 }),
+      ]),
+      [defenderRecord, kingRecord],
+    );
+
+    const body = (await (await readKing(store)).json()) as KingBody;
+
+    expect(body.current?.replayId).toBe(boutReplayIds(kingRecord)[0]);
+    // Resolved for the defenders too, not only the King.
+    expect(body.recent[0]?.replayId).toBe(boutReplayIds(defenderRecord)[0]);
+    expect(body.current?.replayId).not.toBe(body.recent[0]?.replayId);
+  });
+
+  it("targets the bout against the then-King — the record's FIRST bout, not a later one", async () => {
+    const record = reproRecord({
+      memberSeniority: 4,
+      defenders: [
+        champion({ name: "then-king" }),
+        champion({ name: "silver" }),
+        champion({ name: "bronze" }),
+      ],
+      seeds: [7, 8, 9],
+    });
+
+    const ids = boutReplayIds(record);
+
+    // The record really does carry later bouts that could be picked by mistake.
+    expect(ids).toHaveLength(3);
+
+    const store = storeWith(
+      arenaOf([arenaMember("warden", { seniority: 4 })]),
+      [record],
+    );
+
+    const body = (await (await readKing(store)).json()) as KingBody;
+
+    expect(body.current?.replayId).toBe(ids[0]);
+    expect(body.current?.replayId).not.toBe(ids[1]);
+    expect(body.current?.replayId).not.toBe(ids[2]);
+  });
+
+  it("resolves null for a member no archived record is pinned to", async () => {
+    const store = storeWith(
+      arenaOf([arenaMember("orphan", { seniority: 7 })]),
+      [reproRecord({ memberSeniority: 1 })],
+    );
+
+    const body = (await (await readKing(store)).json()) as KingBody;
+
+    // The whole projection, so an OMITTED key fails too: a dropped `?? null` would serialize to
+    // no `replayId` at all, which reads to the client as "field missing", not "no fight".
+    expect(body.current).toEqual({
+      name: "orphan",
+      model: "claude-opus-4-8",
+      handle: null,
+      replayId: null,
+    });
+  });
+
+  it("resolves null for a member whose record captured no bouts (a bootstrap crown)", async () => {
+    const bootstrap = reproRecord({
+      memberSeniority: 4,
+      defenders: [],
+      seeds: [],
+    });
+
+    // A first champion fought nobody — there is no addressable bout to link to.
+    expect(boutReplayIds(bootstrap)).toEqual([]);
+
+    const store = storeWith(arenaOf([arenaMember("first", { seniority: 4 })]), [
+      bootstrap,
+    ]);
+
+    const body = (await (await readKing(store)).json()) as KingBody;
+
+    expect(body.current?.replayId).toBeNull();
+  });
+
+  it("never matches a non-placer's record, even when its challenger shares the member's name", async () => {
+    // An unplaced submission still archives a record — with `memberSeniority: null`, since it
+    // seated nobody. It must never be mistaken for a member's entry run.
+    const store = storeWith(
+      arenaOf([arenaMember("warden", { seniority: 4 })]),
+      [
+        reproRecord({
+          challenger: champion({ name: "warden" }),
+          memberSeniority: null,
+        }),
+      ],
+    );
+
+    const body = (await (await readKing(store)).json()) as KingBody;
+
+    expect(body.current?.replayId).toBeNull();
+  });
+
+  it("joins on seniority, never on name — two champions can share a name", async () => {
+    const elder = reproRecord({
+      challenger: champion({ name: "warden" }),
+      memberSeniority: 4,
+    });
+
+    const younger = reproRecord({
+      challenger: champion({ name: "warden" }),
+      defenders: [champion({ name: "the-elder-warden" })],
+      memberSeniority: 9,
+    });
+
+    const store = storeWith(
+      arenaOf([
+        arenaMember("warden", { seniority: 4 }),
+        arenaMember("warden", { seniority: 9 }),
+      ]),
+      [elder, younger],
+    );
+
+    const body = (await (await readKing(store)).json()) as KingBody;
+
+    // Same name, different fights: a name-based join would give both the same id.
+    expect(body.current?.replayId).toBe(boutReplayIds(elder)[0]);
+    expect(body.recent[0]?.replayId).toBe(boutReplayIds(younger)[0]);
+    expect(body.current?.replayId).not.toBe(body.recent[0]?.replayId);
+  });
+
+  it("still returns 200 with every replayId null when the ARCHIVE is unreachable", async () => {
+    const store = archiveFailingStore(
+      arenaOf([
+        arenaMember("warden", { handle: "human", seniority: 4 }),
+        arenaMember("vulture", { seniority: 9 }),
+      ]),
+    );
+
+    const res = await readKing(store);
+
+    // Best-effort: /king feeds the home page's King and Arena sections, so an archive outage
+    // must cost the links only — never the champions (which a 503 would blank).
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe(
+      "application/json; charset=utf-8",
+    );
+
+    const body = (await res.json()) as KingBody;
+
+    expect(body.current).toEqual({
+      name: "warden",
+      model: "claude-opus-4-8",
+      handle: "human",
+      replayId: null,
+    });
+    expect(body.recent.map((c) => c.name)).toEqual(["vulture"]);
+    expect(body.recent.map((c) => c.replayId)).toEqual([null]);
+  });
+
+  it("still returns 503 when the ARENA is unreachable but the archive reads fine", async () => {
+    const store: ThroneStore = {
+      readArena: () => Promise.reject(new Error("upstash unreachable")),
+      readArchive: () => Promise.resolve([reproRecord()]),
+      commitArena: () => Promise.resolve({ ok: false, reason: "moved" }),
+    };
+
+    const res = await readKing(store);
+
+    // The champions themselves are unreadable — that is still an outage, not an empty throne.
+    expect(res.status).toBe(503);
+
+    const body = (await res.json()) as { type: string };
+
+    expect(body.type).toBe("/problems/throne-unavailable");
+  });
+
+  it("gives the House seed no replayId even when unplaced submissions have been archived", async () => {
+    // The seed surfaces when nobody has PLACED this season — but the archive can still hold
+    // non-placers' records by then. None of them seated a House champion.
+    const store = storeWith(undefined, [
+      reproRecord({ memberSeniority: null }),
+      reproRecord({
+        challenger: champion({ name: "another" }),
+        memberSeniority: null,
+      }),
+    ]);
+
+    const body = (await (
+      await readKing(store, houseSeed())
+    ).json()) as KingBody;
+
+    expect(body.current?.replayId).toBeNull();
+    expect(body.recent.map((c) => c.replayId)).toEqual([null, null]);
   });
 });

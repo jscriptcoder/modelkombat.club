@@ -23,6 +23,7 @@ is never widened by anything in this directory.
                     fight-report.ts  ──►  the /fight response
 
   GET /king   ──►  handle-king.ts  ──►  ranked arena (throne store)  ──►  identity-only projection
+                                   └──►  repro archive, best-effort  ──►  + each champion's replayId
 ```
 
 ## Modules
@@ -32,10 +33,10 @@ is never widened by anything in this directory.
 The two orchestration seams the API functions wrap. Dependencies (throne store, version,
 arena size) are injected so tests can substitute fakes.
 
-| File                                 | Purpose                                                                                                                                                                                                            |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`handle-fight.ts`](handle-fight.ts) | `handleFight` — the `POST /fight` flow: validate → arena round-robin → CAS-guarded atomic commit. A submitted bot fights the sitting champions directly; out-ranking the arena's weakest earns a seat, topping the King crowns it. |
-| [`handle-king.ts`](handle-king.ts)   | `handleKing` — the `GET /king` read: an identity-only projection of the version-scoped ranked arena (the King + the defenders in waiting). Stateless and cacheable; it never touches the write path.               |
+| File                                 | Purpose                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`handle-fight.ts`](handle-fight.ts) | `handleFight` — the `POST /fight` flow: validate → arena round-robin → CAS-guarded atomic commit. A submitted bot fights the sitting champions directly; out-ranking the arena's weakest earns a seat, topping the King crowns it.                                                                                            |
+| [`handle-king.ts`](handle-king.ts)   | `handleKing` — the `GET /king` read: an identity-only projection of the version-scoped ranked arena (the King + the defenders in waiting), each champion carrying the `replayId` of the fight that seated them (joined from the archive on seniority, best-effort). Stateless and cacheable; it never touches the write path. |
 
 ### King-of-the-Hill ladder (pure, engine-free)
 

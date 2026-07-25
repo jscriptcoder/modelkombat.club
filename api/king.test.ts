@@ -22,15 +22,23 @@ describe("GET /king — the endpoint wrapper", () => {
     );
 
     const body = (await res.json()) as {
-      current: { name: string; model: string | null; handle: string | null };
+      current: {
+        name: string;
+        model: string | null;
+        handle: string | null;
+        replayId: string | null;
+      };
       recent: Array<{ name: string }>;
     };
 
     // Empty store → the seeded House board: grappler crowned, credited [Gauntlet] / model House.
+    // No archive on a cold store, so no road to the throne — and the wrapper still reads it
+    // without throwing, which is what wires the best-effort archive join in production.
     expect(body.current).toEqual({
       name: "grappler",
       model: "House",
       handle: "Gauntlet",
+      replayId: null,
     });
     expect(body.recent.map((c) => c.name)).toEqual(["sweeper", "rekka"]);
   });

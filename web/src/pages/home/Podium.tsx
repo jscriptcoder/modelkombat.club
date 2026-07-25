@@ -4,6 +4,7 @@ import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 import { KING_PATH } from "../../shared/lib/paths";
 import { type Champion } from "./King";
 import ModelLogo from "../../shared/components/ModelLogo";
+import RoadToThroneLink from "./RoadToThroneLink";
 
 // The three podium ranks, gold → bronze. A slot is filled from the ranked arena, or shown
 // as a dimmed placeholder when the arena is smaller (never a fabricated champion).
@@ -95,6 +96,14 @@ const Podium: Component<PodiumProps> = (props) => {
                             <Show when={present().handle}>
                               {(handle) => (
                                 <p class="podium-handle">by {handle()}</p>
+                              )}
+                            </Show>
+                            <Show when={present().replayId}>
+                              {(replayId) => (
+                                <RoadToThroneLink
+                                  name={present().name}
+                                  replayId={replayId()}
+                                />
                               )}
                             </Show>
                           </div>

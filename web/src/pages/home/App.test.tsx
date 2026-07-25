@@ -20,6 +20,7 @@ const champ = (overrides?: Partial<Champion>): Champion => ({
   name: "champion",
   model: "claude-opus-4-8",
   handle: "grandmaster",
+  replayId: null,
   ...overrides,
 });
 
@@ -287,6 +288,39 @@ describe("App — single /king fetch feeding both throne sections", () => {
     // ...from ONE shared request, not one fetch per section (the King now also heads The
     // Arena as gold, so scope the section reads rather than counting bare occurrences).
     expect(calls).toBe(1);
+  });
+
+  it("gives the King the same road to the throne in both sections it appears in", async () => {
+    const fetchKing = (): Promise<KingResponse> =>
+      Promise.resolve({
+        current: champ({ name: "reigning-king", replayId: "king-fight" }),
+        recent: [champ({ name: "silver-king", replayId: "silver-fight" })],
+      });
+
+    const { getByRole } = render(() => <App fetchKing={fetchKing} />);
+
+    const king = getByRole("region", { name: "Current King" });
+    const arena = getByRole("region", { name: "The Arena" });
+
+    // The reigning champion heads BOTH the King card and the podium as gold. Same champion,
+    // same fight — from the same payload, so the two must never disagree.
+    const fromKingCard = await within(king).findByRole("link", {
+      name: /reigning-king.*road to the throne/i,
+    });
+
+    const fromPodium = await within(arena).findByRole("link", {
+      name: /reigning-king.*road to the throne/i,
+    });
+
+    expect(fromKingCard.getAttribute("href")).toBe("/watch/king-fight");
+    expect(fromPodium.getAttribute("href")).toBe("/watch/king-fight");
+
+    // And a defender keeps its own, so the id travels per champion and not per section.
+    expect(
+      within(arena)
+        .getByRole("link", { name: /silver-king.*road to the throne/i })
+        .getAttribute("href"),
+    ).toBe("/watch/silver-fight");
   });
 
   it("shows the shared error in both sections, and a single Retry recovers both", async () => {
