@@ -2136,3 +2136,72 @@ facts about `createClientResource` / `loadList` / `replay.css` that were establi
 code before any slice was written. The arc's design trail (`watch-public-decisions.md` D1–D10 +
 `watch-public-stories.md`) **stays live in `plans/`**: S3 — the 👁 road-to-the-throne affordance and
 the arc's only `src/` touch — is still ahead.
+
+## Opening `/watch` to the public — S3: road to the throne (PR #429)
+
+The story that closed the arc, and its only `src/` touch. "Who did this King actually beat?" was
+unanswerable from the most-read part of the site: the fights were archived and watchable, but
+nothing connected a name on the podium to the bout that put it there. Every champion now carries a
+👁 link to it — on the Current King card and all three Arena steps.
+
+`GET /king`'s member projection gains `replayId: string | null`, joined from the reproduction
+archive **on `seniority`, never on name**. That is the load-bearing decision: bot names are not
+unique, so a name-based join would silently resolve to the wrong fight with no way for anyone to
+notice. The target is the record's **first** bout — the one against the then-King — because the
+player's matchup switcher already exposes the siblings of that gauntlet run, so one id per champion
+is enough (D6).
+
+The read is **best-effort by design**. `/king` feeds both the King and Arena sections, so an
+archive outage costs the links and nothing else: every `replayId` comes back `null` and the
+response stays **200**. An unreachable _arena_ still 503s — that is the endpoint's actual subject.
+Three cases resolve to `null` and none is distinguishable to a caller: a seeded House champion, a
+bootstrap crown that fought nobody, and a failed read. A `null` renders **no icon at all**, never a
+disabled one — a disabled control would advertise a fight nobody can watch.
+
+**Kept vertical on purpose.** The tempting split — "`/king` returns `replayId`", then "cards render
+👁" — would have made the first half a component story with no observable outcome. One PR.
+
+**Decisions taken by reading the code, not assuming:**
+
+- **`replayId` is composed in `handle-king.ts`, not in `memberIdentity`.** That shaper is shared
+  with `handle-fight`, whose board rows carry their own `replayId` from the fight just fought;
+  widening it would have put an unresolvable field on `/fight`'s title block. `handle-fight`'s tests
+  passing untouched is the preservation evidence.
+- **The 👁 is one home-local component used twice.** Two consumers on one page, so it lives in
+  `pages/home/` — `FightCard` established that `shared/` means cross-page reuse. Its accessible-name
+  rule lives there once: a bare 👁 announces as "eye" and says nothing about where it leads, so the
+  champion's name is part of the link's name and the glyph is decorative.
+
+**The mutation lesson worth carrying forward.** The first Stryker run scored **89.13%** with five
+survivors, all on one guard:
+
+```ts
+record.memberSeniority === null || entry === undefined ? [] : [[...]]
+```
+
+All five were equivalent — and that _was_ the finding. A non-placer's `null` key can never be looked
+up, because a member's seniority is always a number; a bootstrap crown's missing value coalesces to
+`null` at the `?? null` lookup anyway. The guard bought nothing observable. The fix was **deleting
+it** and typing the map `Map<number | null, string | undefined>` so both dead shapes are absorbed —
+which is exactly what `retainArchive` already does with its pin set, so the code now follows a house
+pattern instead of inventing a second one. Score: **100.00%, 37/37 killed, 0 survived**, and the
+three behaviour tests specifying those cases pass unchanged. When survivors are equivalent, prefer
+deleting the unobservable code over testing it.
+
+`web/` is not Stryker-reachable, so its evidence is the established substitute: exact-assertion
+tests plus a manual scan in which three mutants — always-render, a dropped id, and a label without
+the champion's name — were each applied for real and confirmed killed. One accepted equivalent:
+`aria-hidden="true"` on the glyph cannot change the accessible name while `aria-label` is present.
+
+Two acceptance criteria the codebase demanded that the story did not state: `/fight`'s title block
+byte-unchanged, and **no `/watch/{id}` href in the prerendered HTML** — those ids are content-hashed
+and evictable, so a baked one would go stale until the next deploy.
+
+Verified end-to-end on the preview against real data: all three champions resolved, each id
+addressing its _own_ entry bout (Mushin beat Patient Shuto, who beat grappler), and clicking through
+landed on that fight with the switcher offering the siblings.
+
+[watch-public-s3.md](watch-public-s3.md) — the plan. With the arc closed, its whole design trail is
+archived alongside it: [watch-public-decisions.md](watch-public-decisions.md) (D1–D10, resolved via
+`grill-me`) and [watch-public-stories.md](watch-public-stories.md) (the three-story split). `plans/`
+is empty again.
