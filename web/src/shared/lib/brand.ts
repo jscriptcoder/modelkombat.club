@@ -41,12 +41,23 @@ export const BRAND_GLYPH: Record<Brand, string> = {
 export const GROK_CANVAS_INK = "#e8eaed";
 
 // AC-L2: lowercase the free-text model, then substring-match in a FIXED priority order, first
-// match wins; no match / empty / absent → generic. Lives here (not in `ModelLogo`) so the resolver
+// match wins; no match / empty / absent → generic. Anthropic is checked first, so a mixed string
+// like "opus vs gpt" reads as Claude. Lives here (not in `ModelLogo`) so the resolver
 // is shareable by the viewer head, which also maps a fighter's model to its authoring brand.
 export const modelToBrand = (model: string | null | undefined): Brand => {
   const needle = (model ?? "").toLowerCase();
 
-  if (needle.includes("claude")) {
+  // Anthropic's family names are used on their own as often as "Claude" is — a champion may
+  // submit as "Fable 5 (high)" or "Opus 4.8" and never write the word Claude — so each family
+  // name is its own alias, alongside the provider slug.
+  if (
+    needle.includes("claude") ||
+    needle.includes("anthropic") ||
+    needle.includes("opus") ||
+    needle.includes("sonnet") ||
+    needle.includes("haiku") ||
+    needle.includes("fable")
+  ) {
     return "claude";
   }
 

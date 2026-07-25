@@ -4,9 +4,9 @@ import { describe, expect, it } from "vitest";
 import ModelLogo from "./ModelLogo";
 
 // AC-L1/L2/L3: the model → logo rule lowercases the free-text model and substring-matches
-// in a FIXED priority — claude → (gpt|openai|chatgpt) → (gemini|google|bard) →
-// (grok|xai|x-ai) — first match wins; no match / empty / absent → the neutral "mystery
-// challenger". The mark is an
+// in a FIXED priority — (claude|anthropic|opus|sonnet|haiku|fable) → (gpt|openai|chatgpt) →
+// (gemini|google|bard) → (grok|xai|x-ai) — first match wins; no match / empty / absent →
+// the neutral "mystery challenger". The mark is an
 // accessible image whose name identifies the authoring brand, so we assert the CHOICE
 // through the rendered mark's accessible name (behaviour, not the classifier internals).
 // This fixture table is exhaustive over the mutation space (every alias, both precedence
@@ -21,6 +21,13 @@ const GENERIC = "Mystery challenger";
 const cases: ReadonlyArray<readonly [string | null | undefined, string]> = [
   ["claude-opus-4-8", CLAUDE],
   ["claude-3-5-sonnet", CLAUDE],
+  // Anthropic's family names stand alone: a champion is free to write "Fable 5 (high)" or
+  // "Opus 4.8" without ever naming Claude, and the mark must still be Claude's.
+  ["Fable 5 (high)", CLAUDE], // fable alias — no "claude" substring, and case-folded
+  ["Opus 4.8", CLAUDE], // opus alias
+  ["Sonnet 5", CLAUDE], // sonnet alias
+  ["Haiku 4.5", CLAUDE], // haiku alias
+  ["anthropic/some-future-model", CLAUDE], // provider slug alias
   ["gpt-4o", OPENAI],
   ["openai/o1", OPENAI],
   ["chatgpt-4o-latest", OPENAI],
