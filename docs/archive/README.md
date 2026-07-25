@@ -2021,3 +2021,56 @@ Known accepted costs, recorded rather than silently fixed: ~67% of tobi-geri's l
 [arsenal-preview-fixes.md](arsenal-preview-fixes.md) — the plan, kept live in `plans/` across all three
 slices, annotated in place with each shape correction as it was found.
 [arsenal-preview-fixes-decisions.md](arsenal-preview-fixes-decisions.md) — the D1–D9 grilling record.
+
+## Open `/watch` to the public — S1: reach the fight viewer from anywhere on the site ✅ COMPLETE (2026-07-25)
+
+`/watch` had shipped **dark** since the replay-viewer arc — a complete, permalinkable Pixi fight viewer that
+nothing on the site linked to, that no crawler was told about, and that no reading LLM could discover. The
+home page still advertised replays with an `aria-disabled` "in development" button. This story ends the dark
+launch: `/watch` becomes a first-class destination for people **and** for machines. Web-only (`web/`) — **no
+`src/` change, no `api/` change, no new fetch, no `INPUT_HASH` / `BENCHMARK_VERSION` (`v20`) / TCB change.**
+`web/` is outside the Node-only Stryker scope ⇒ mutation testing is `N/A` on every slice and the substitute
+is exhaustive **exact-assertion** tests (exact strings, exact `href`s — a loose `/season/i` matcher survives
+the very string mutant public-facing copy exists to prevent) plus a **manual mutator scan** per PR.
+
+- **S1.1 — the fight index says which season it is showing** (PR #423, `feat/watch-season-note`) — `/watch`
+  gains a note stating the fights shown are the **current season's** and that earlier seasons are _archived
+  and not browsable yet_ (not "deleted", not "lost"). Shipped **first**, so the page is honest _before_ it is
+  advertised. The note sits beside the `<h1>` **outside the `<Switch>`** — structurally, not incidentally: the
+  state that most needs the sentence is the **empty** one, since right after a season wipe this is what
+  explains an empty list. An `it.each` sweep of all four load states (loading / ready / empty / error) is what
+  proves it, and would fail the moment anyone moved it under a `<Match>`. The copy names **no** version
+  string, so it cannot go stale on the next season bump (`web/src` never imports `src/`, so it cannot read
+  `BENCHMARK_VERSION` anyway — the copy is version-agnostic by design).
+- **S1.2 — the nav and the home page lead to the fight viewer** (PR #424, `feat/watch-public-links`) — the
+  headline. The nav's **Fights** item stops scrolling to a teaser and becomes a real `<a href="/watch">`,
+  self-marking with `aria-current="page"` on the viewer (`NavProps["current"]` widens `"ring"` →
+  `"ring" | "watch"`); the home section's dead disabled button becomes a live CTA. The section keeps
+  `id="fights"`, so every pre-existing `/#fights` link still resolves. Deliberately **one** PR: shipping the
+  nav pointing at `/watch` while the same page still rendered "Replays — in development" would have been an
+  incoherent intermediate state. The three tests pinning the disabled-button behaviour were **replaced, not
+  repaired** — they characterised exactly what this slice removes. Asserted in the `web-ssr` project too, so
+  the **prerendered no-JS** HTML — the crawler's and the reading LLM's view — carries the link and neither
+  `aria-disabled` nor "in development". `.replay-play`'s `cursor: not-allowed` styling was retired in the same
+  pass: left behind, it would have made the newly-working link still _look_ dead.
+- **S1.3 — the sitemap and llms.txt point machines at the fight archive** (PR #425, `feat/watch-discovery`) —
+  `sitemap.xml` gains `/watch`, **and only** `/watch`: a `/watch/{id}` permalink is a content hash of the bout
+  and the archive is bounded, so an evicted fight takes its URL with it and indexing permalinks would publish
+  links that rot into 404s. `llms.txt` gains **`GET /replay`** under _API endpoints_ naming both public forms
+  (`/replay`, `/replay/{id}`), stating what the archive can and cannot return — _behavior only, never the bot
+  DSL_, so a model can scout the sitting King without seeing how it was written — plus the ~100–300 KB payload
+  caveat; and `/watch` under _Optional_ as the human viewer. The internal `?id=` form (a `vercel.json` rewrite
+  **target**) is deliberately absent: publishing it would freeze an implementation detail into contract with
+  every LLM that reads the file. Tested through a real `fetch` of the served files with the browser's own
+  `DOMParser` (a `parsererror` check on every read), with the two **negative** cases standing alone — both
+  passed before the change and exist so GREEN could not introduce either.
+
+**Gotcha worth keeping:** `llms.txt` is **not** LF-pinned in `.gitattributes`, so a Windows checkout with
+`core.autocrlf` serves it CRLF while Vercel serves the LF original. A section parser splitting on `\n## ` fails
+with "llms.txt has no `## API endpoints` section" on a file that plainly has one. The test normalises newlines
+before parsing — the right fix, since which newline a reading LLM receives is not the behavior under test.
+
+[watch-public-s1.md](watch-public-s1.md) — the single plan, kept live in `plans/` across all three slices.
+The arc's design trail — `watch-public-decisions.md` (D1–D10) + `watch-public-stories.md` (the S1–S3 split) —
+**stays live in `plans/`**: S2 (newest-3 live fight cards on the home page) and S3 (the 👁 road-to-the-throne
+affordance, the arc's only `src/` touch) are still ahead.
