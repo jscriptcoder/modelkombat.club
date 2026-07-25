@@ -1,16 +1,8 @@
-import {
-  createResource,
-  For,
-  Match,
-  Show,
-  Switch,
-  type Component,
-} from "solid-js";
+import { createResource, For, Match, Switch, type Component } from "solid-js";
 
-import ModelLogo from "../../shared/components/ModelLogo";
-import { RING_PATH, WATCH_PATH } from "../../shared/lib/paths";
+import FightCard from "../../shared/components/FightCard";
+import { RING_PATH } from "../../shared/lib/paths";
 import { markCollisions } from "./collisions";
-import type { Fighter } from "./replay-contract";
 import { loadList, type ReplayListLoad } from "./replay-loader";
 
 // The /watch index: the King's title fights as a newest-first card list. Each card is a plain
@@ -23,20 +15,6 @@ type ReplayListProps = {
   // GET /replay list fetch. Mirrors how ReplayFight/RingPage inject their loaders.
   load?: () => Promise<ReplayListLoad>;
 };
-
-// One fighter's identity in a card. The model is a separate chip, shown only when present — a bot
-// document always carries a model, but the wire is treated defensively, so an absent/empty model
-// renders name-only rather than an empty chip.
-const FighterIdentity: Component<{ fighter: Fighter }> = (props) => (
-  <span class="replay-card-fighter">
-    <span class="replay-card-name" title={props.fighter.name}>
-      {props.fighter.name}
-    </span>
-    <Show when={props.fighter.model}>
-      {(model) => <span class="replay-card-model">{model()}</span>}
-    </Show>
-  </span>
-);
 
 const ReplayList: Component<ReplayListProps> = (props) => {
   const [data, { refetch }] = createResource(() => (props.load ?? loadList)());
@@ -82,25 +60,7 @@ const ReplayList: Component<ReplayListProps> = (props) => {
               <For each={markCollisions(items())}>
                 {(fight) => (
                   <li>
-                    <a class="replay-card" href={`${WATCH_PATH}/${fight.id}`}>
-                      {/* Each fighter is flanked by their authoring brand's mark: the challenger's
-                          on the outer left, the King's on the outer right — logos mirror the "A vs B"
-                          symmetry so each mark hugs its own side of the card. */}
-                      <span class="replay-card-side">
-                        <ModelLogo model={fight.fighters[0].model} />
-                        <FighterIdentity fighter={fight.fighters[0]} />
-                      </span>
-                      <span class="replay-card-vs">vs</span>
-                      <Show when={fight.collides}>
-                        <span class="replay-card-id">
-                          {fight.id.slice(0, 6)}
-                        </span>
-                      </Show>
-                      <span class="replay-card-side replay-card-side-right">
-                        <FighterIdentity fighter={fight.fighters[1]} />
-                        <ModelLogo model={fight.fighters[1].model} />
-                      </span>
-                    </a>
+                    <FightCard fight={fight} />
                   </li>
                 )}
               </For>
