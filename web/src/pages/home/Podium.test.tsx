@@ -1,8 +1,10 @@
 import { fireEvent, render } from "@solidjs/testing-library";
-import { describe, expect, it, vi } from "vitest";
+import { page } from "vitest/browser";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import "../../shared/app.css";
 import Podium from "./Podium";
-import { type Champion } from "./King";
+import { type Champion } from "./champion";
 import { CANONICAL_ORIGIN } from "../../shared/lib/config";
 
 // A resolved champion. Overrides let a test rename or null out model/handle without
@@ -18,6 +20,39 @@ const champ = (overrides?: Partial<Champion>): Champion => ({
 
 const stepOf = (container: HTMLElement, rank: string): Element | null =>
   container.querySelector(`.podium-step.${rank}`);
+
+// The laid-out box of one step, for the tests that are about arrangement rather than content.
+// Throws rather than asserting non-null so a missing step reads as a broken test, not as a
+// confusing geometry failure.
+const boxOf = (container: HTMLElement, rank: string): DOMRect => {
+  const step = stepOf(container, rank);
+
+  if (!(step instanceof HTMLElement)) {
+    throw new Error(`expected a ${rank} podium step`);
+  }
+
+  return step.getBoundingClientRect();
+};
+
+// One step's box paired with the box of the 👁 link pinned inside it.
+const boxesOf = (
+  container: HTMLElement,
+  rank: string,
+): { step: DOMRect; glyph: DOMRect } => {
+  const step = stepOf(container, rank);
+  const glyph = step?.querySelector(".road-to-throne");
+
+  if (!(step instanceof HTMLElement) || !(glyph instanceof HTMLElement)) {
+    throw new Error(
+      `expected a ${rank} step carrying a road-to-the-throne link`,
+    );
+  }
+
+  return {
+    step: step.getBoundingClientRect(),
+    glyph: glyph.getBoundingClientRect(),
+  };
+};
 
 // Where one podium step's road-to-the-throne link points, or null when it has none.
 const watchHrefOf = (container: HTMLElement, rank: string): string | null =>
@@ -311,5 +346,118 @@ describe("The Arena podium", () => {
     const region = getByRole("region", { name: "The Arena" });
 
     expect(region.id).toBe("champions");
+  });
+});
+
+// A real podium puts the winner in the middle and raises no one above the two beside them in
+// reading order. These tests are about ARRANGEMENT, so they need real CSS (this file imports
+// `app.css`) and a real width: the browser project's default viewport is 414px — narrower than
+// the podium's 480px stacking breakpoint — so the wide layout is invisible unless a test asks
+// for it, and must be handed back afterwards so later tests still see the default.
+describe("The Arena podium — arrangement", () => {
+  const DEFAULT_VIEWPORT = { width: 414, height: 896 } as const;
+
+  const fullPodium = () => (
+    <Podium
+      current={champ({ name: "gold-king" })}
+      recent={[champ({ name: "silver-king" }), champ({ name: "bronze-king" })]}
+    />
+  );
+
+  afterEach(async () => {
+    await page.viewport(DEFAULT_VIEWPORT.width, DEFAULT_VIEWPORT.height);
+  });
+
+  it("stands the King between the two defenders — silver, gold, bronze — on one row when there is room", async () => {
+    await page.viewport(1280, 800);
+
+    const { container } = render(fullPodium);
+
+    const [silver, gold, bronze] = [
+      boxOf(container, "silver"),
+      boxOf(container, "gold"),
+      boxOf(container, "bronze"),
+    ];
+
+    // Left to right: silver, then the King, then bronze.
+    expect(silver.left).toBeLessThan(gold.left);
+    expect(gold.left).toBeLessThan(bronze.left);
+
+    // One row, not a staircase — they are peers on a podium, so they share a top edge.
+    expect(gold.top).toBe(silver.top);
+    expect(bronze.top).toBe(silver.top);
+  });
+
+  it("keeps the ranked reading order gold → silver → bronze whatever the visual arrangement", () => {
+    const { container } = render(fullPodium);
+
+    // The podium is an ordered list, so source order IS rank: a screen reader, a reader with
+    // no CSS, and the prerendered HTML must all still get first place first. Centring gold
+    // visually must never be bought by demoting it in the DOM.
+    const order = [...container.querySelectorAll(".podium-step")].map(
+      (step) => step.querySelector(".podium-rank")?.textContent,
+    );
+
+    expect(order).toEqual(["Gold", "Silver", "Bronze"]);
+  });
+
+  it("stacks the steps gold-first in one column at the widest stacking width", async () => {
+    // 480px exactly: the last width that stacks. Asserting at the boundary rather than at some
+    // comfortably narrow width is what catches an off-by-one in the breakpoint pair — at 480 a
+    // centring rule that started one pixel early would stack the column silver-first.
+    await page.viewport(480, 800);
+
+    const { container } = render(fullPodium);
+
+    const [gold, silver, bronze] = [
+      boxOf(container, "gold"),
+      boxOf(container, "silver"),
+      boxOf(container, "bronze"),
+    ];
+
+    // Stacked top to bottom in rank order — the centring must not leak into this layout and
+    // push the King into the middle of a vertical list.
+    expect(gold.top).toBeLessThan(silver.top);
+    expect(silver.top).toBeLessThan(bronze.top);
+
+    // One column: every step starts at the same left edge, and nothing scrolls sideways.
+    expect(silver.left).toBe(gold.left);
+    expect(bronze.left).toBe(gold.left);
+  });
+});
+
+// The 👁 road to the throne is a secondary affordance, so it moves out of the card body and
+// into the card's corner — where a "more about this one" control is conventionally found —
+// instead of sitting under the champion's identity competing with it.
+describe("The Arena podium — where the road-to-the-throne link sits", () => {
+  it("pins each step's link to the top-right corner of that step, inside its bounds", () => {
+    const { container } = render(() => (
+      <Podium
+        current={champ({ name: "gold-king", replayId: "gold-id" })}
+        recent={[champ({ name: "silver-king", replayId: "silver-id" })]}
+      />
+    ));
+
+    // Both a filled gold step and a filled defender step — the placement is a property of the
+    // card, so it cannot be right for the King and wrong for a defender.
+    for (const rank of ["gold", "silver"]) {
+      const { step, glyph } = boxesOf(container, rank);
+
+      // Top-right quadrant: right of the card's centre line...
+      expect(glyph.left + glyph.width / 2).toBeGreaterThan(
+        step.left + step.width / 2,
+      );
+      // ...and above it.
+      expect(glyph.top + glyph.height / 2).toBeLessThan(
+        step.top + step.height / 2,
+      );
+
+      // Still inside the card it belongs to — a corner affordance that overhangs the border
+      // reads as belonging to the page, or to the neighbouring step.
+      expect(glyph.left).toBeGreaterThanOrEqual(step.left);
+      expect(glyph.right).toBeLessThanOrEqual(step.right);
+      expect(glyph.top).toBeGreaterThanOrEqual(step.top);
+      expect(glyph.bottom).toBeLessThanOrEqual(step.bottom);
+    }
   });
 });

@@ -607,7 +607,10 @@ const RingPage: Component<RingPageProps> = (props) => {
               {(t) => (
                 <section class="ring-title-fight" aria-label="Title fight">
                   <Show when={t().linksToThrone}>
-                    <a class="ring-throne-link" href="/#king">
+                    {/* The Arena is where the throne is shown — the reigning King is its gold
+                        step. (This pointed at the standalone `/#king` section until that section
+                        was removed as a duplicate.) */}
+                    <a class="ring-throne-link" href="/#champions">
                       See the throne
                     </a>
                   </Show>

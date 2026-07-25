@@ -77,7 +77,8 @@ describe("Nav", () => {
       "/#top",
       "/#how-it-works",
       "/#arsenal",
-      "/#king",
+      // No `/#king`: the standalone Current King section was removed, so `/#champions` — The
+      // Arena, which shows the reigning King as its gold step — is the only champions anchor.
       "/#champions",
       "/watch",
       "/ring",
