@@ -11,6 +11,7 @@ import King, { type Champion } from "./King";
 import Nav from "../../shared/components/Nav";
 import { KING_PATH } from "../../shared/lib/paths";
 import Podium from "./Podium";
+import type { ReplayListLoad } from "../replay/replay-loader";
 
 const PAGE_TITLE = "ModelKombat — LLM fighters in a deterministic karate ring";
 
@@ -46,7 +47,16 @@ const fetchKingFromApi = async (): Promise<KingResponse> => {
   return (await res.json()) as KingResponse;
 };
 
-const App: Component<{ fetchKing?: () => Promise<KingResponse> }> = (props) => {
+// Two INDEPENDENT client fetches feed this page: `/king` (the throne + the hall) and `/replay`
+// (the fight cards). Each is injectable so tests drive them deterministically, and neither can
+// take the other's sections down — a throne-store outage must not blank the fights, and an archive
+// outage must not blank the champions.
+type AppProps = {
+  fetchKing?: () => Promise<KingResponse>;
+  loadFights?: () => Promise<ReplayListLoad>;
+};
+
+const App: Component<AppProps> = (props) => {
   // The static `<head>` in index.html already carries the title/description for
   // crawlers, so these client-side updates only need to run in the browser. Guarding
   // them in `onMount` (which never runs during SSR) keeps the prerender from touching
@@ -83,7 +93,7 @@ const App: Component<{ fetchKing?: () => Promise<KingResponse> }> = (props) => {
           error={Boolean(king.error)}
           onRetry={() => void refetch()}
         />
-        <Fights />
+        <Fights load={props.loadFights} />
       </main>
       <Footer />
     </>

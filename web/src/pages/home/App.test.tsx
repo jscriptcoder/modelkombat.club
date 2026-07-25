@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import App, { type KingResponse } from "./App";
 import { type Champion } from "./King";
 import { CANONICAL_ORIGIN } from "../../shared/lib/config";
+import type { ReplayListLoad } from "../replay/replay-loader";
 
 const isDark = (color: string): boolean => {
   const channels = color.match(/\d+/g)?.map(Number) ?? [];
@@ -323,5 +324,63 @@ describe("App — single /king fetch feeding both throne sections", () => {
     expect(await within(king).findByText("recovered-king")).toBeTruthy();
     expect(await within(arena).findByText("recovered-defender")).toBeTruthy();
     expect(calls).toBe(2);
+  });
+});
+
+// The landing page makes TWO independent requests: /king feeds the King and Arena sections, and
+// /replay feeds the fight cards. Neither may be able to take the other down — a throne-store
+// outage must not blank the fights, and an archive outage must not blank the champions.
+describe("App — the throne and the fight archive fail independently", () => {
+  const kingPayload = (): KingResponse => ({
+    current: champ({ name: "sitting-king" }),
+    recent: [champ({ name: "recent-defender" })],
+  });
+
+  const fightsPayload = () =>
+    Promise.resolve<ReplayListLoad>({
+      kind: "ready",
+      items: [
+        {
+          id: "fight-1",
+          fighters: [
+            { name: "challenger", model: "claude" },
+            { name: "king", model: "claude" },
+          ],
+        },
+      ],
+    });
+
+  it("still shows the fights when /king is down", async () => {
+    const { container, findAllByText } = render(() => (
+      <App
+        fetchKing={() => Promise.reject(new Error("throne store unreachable"))}
+        loadFights={fightsPayload}
+      />
+    ));
+
+    await findAllByText(/couldn't reach the ring/i);
+
+    const fightLinks = [...container.querySelectorAll("a")].filter((link) =>
+      link.getAttribute("href")?.startsWith("/watch/"),
+    );
+
+    expect(fightLinks.map((link) => link.getAttribute("href"))).toEqual([
+      "/watch/fight-1",
+    ]);
+  });
+
+  it("still shows the champions when the fight archive is down", async () => {
+    const { getByRole } = render(() => (
+      <App
+        fetchKing={() => Promise.resolve(kingPayload())}
+        loadFights={() => Promise.reject(new Error("archive unreachable"))}
+      />
+    ));
+
+    const king = getByRole("region", { name: "Current King" });
+    const arena = getByRole("region", { name: "The Arena" });
+
+    expect(await within(king).findByText("sitting-king")).toBeTruthy();
+    expect(await within(arena).findByText("recent-defender")).toBeTruthy();
   });
 });

@@ -218,8 +218,9 @@
   text-decoration: underline;
 }
 
-/* The /watch index: the King's fights as a newest-first list of link cards. Each card pits the two
-   fighters' identities against each other ("A vs B") and navigates to that fight's permalink. */
+/* The /watch index: the King's fights as a newest-first list of link cards. The card itself is
+   shared with the home page's fights section — see shared/components/fight-card.css; this is only
+   the list that stacks them. */
 .replay-list {
   list-style: none;
   margin: 0;
@@ -227,86 +228,4 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-}
-
-.replay-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.25rem;
-  color: var(--fg);
-  text-decoration: none;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.replay-card:hover,
-.replay-card:focus-visible {
-  border-color: var(--accent);
-  outline: none;
-}
-
-/* Each side pairs a fighter's identity with their brand mark; the pair grows to fill its half of
-   the card so the marks pin to the outer edges. */
-.replay-card-side {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  flex: 1;
-  /* Let the inner name truncate: the shrinking chain needs min-width:0 at every flex level. */
-  min-width: 0;
-}
-
-.replay-card-side .brand-mark {
-  width: 1.6rem;
-  height: 1.6rem;
-  flex: none;
-}
-
-.replay-card-fighter {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  /* Let the name truncate: a flex child needs min-width:0 for `text-overflow: ellipsis` to bite. */
-  min-width: 0;
-  flex: 1;
-}
-
-.replay-card-side-right .replay-card-fighter {
-  align-items: flex-end;
-  text-align: right;
-}
-
-.replay-card-name {
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.replay-card-model {
-  font-size: 0.8rem;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.replay-card-vs {
-  flex-shrink: 0;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-/* Disambiguator for repeat-challenge cards (same challenger↔King name pair): a short id fragment,
-   muted and monospaced so it reads as a technical tag beside the "vs", never competing with the
-   fighter identities. Rendered only on colliding cards (see markCollisions). */
-.replay-card-id {
-  flex-shrink: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.75rem;
-  color: var(--muted);
 }
