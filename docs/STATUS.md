@@ -1366,6 +1366,31 @@ stories}.md`; finished S1–S4 plans archived under `docs/archive/platform-http-
     [`docs/archive/watch-public-s2.md`](archive/watch-public-s2.md); **S3** (👁 road to the throne — the arc's
     only `src/` touch) remains, with the design trail still live in `plans/`.
 
+17. **Open `/watch` to the public — S3 road to the throne ✅ COMPLETE (story 3 of 3, PR #429) — CLOSES THE ARC.**
+    "Who did this King actually beat?" was unanswerable from the home page: the fights were archived and
+    watchable, but nothing connected a name on the podium to the bout that put it there. Every champion now
+    carries a 👁 link to it — on the Current King card and all three Arena steps. **`GET /king`'s member
+    projection gains `replayId: string | null`**, resolved server-side by joining the reproduction archive onto
+    the arena **on `seniority`, never on name** (names are not unique; a name-based join would silently resolve
+    to the wrong fight with no way to detect it), taking the record's **first** bout — the one against the
+    then-King. One id per champion suffices because the player's matchup switcher already exposes the siblings
+    of that gauntlet run (D6). The archive read is **best-effort**: `/king` feeds both the King and Arena
+    sections, so an unreachable archive costs the links only and the response stays **200**, while an
+    unreachable _arena_ still 503s. A `null` renders **no icon at all**, never a disabled one — three cases
+    resolve to null and none is distinguishable to a caller (a seeded House champion, a bootstrap crown that
+    fought nobody, a failed read). `replayId` is composed in `handle-king.ts`, **not** in `memberIdentity`,
+    which `/fight` also uses for board rows carrying their own `replayId`; `handle-fight`'s tests passing
+    untouched is the proof. The arc's **only `src/` touch**, so it carried the full mutation regime: the first
+    run scored 89.13% with 5 survivors on a `memberSeniority === null || entry === undefined` guard, **all
+    equivalent** — the fix was _deleting_ the guard and typing the map `Map<number | null, string | undefined>`
+    so a non-placer's null key is unhittable and a bootstrap crown's undefined coalesces at the lookup, exactly
+    as `retainArchive` already does with its pin set (**100.00%, 37/37**). `llms.txt` + `api/README.md` now
+    describe the widened payload. **Engine + TCB untouched; `INPUT_HASH` + `BENCHMARK_VERSION` (`v20`)
+    unchanged.** With this the arc is done and **the whole `/watch` design trail is archived** —
+    [`docs/archive/watch-public-s3.md`](archive/watch-public-s3.md),
+    [`watch-public-decisions.md`](archive/watch-public-decisions.md),
+    [`watch-public-stories.md`](archive/watch-public-stories.md) — leaving `plans/` empty.
+
 **The deep-karate combat tree is COMPLETE, and the platform layer is well underway.** The HTTP API's
 **`GET /spec` (S1) + `POST /validate` (S2) + `POST /fight` (S3) + the KotH throne (S4)** are all shipped
 (PRs #171–#188; `/spec` LIVE at `https://modelkombat.club/spec`, `/fight` advertised + rate-limited, the
