@@ -22,7 +22,41 @@ const summary = (overrides: Partial<ReplaySummary> = {}): ReplaySummary => ({
 const ready = (items: ReplaySummary[]) => (): Promise<ReplayListLoad> =>
   Promise.resolve({ kind: "ready", items });
 
+// The exact season note, spelled out here rather than imported: a test that asserted against the
+// component's own string would pass no matter how that string changed, which defeats the point of
+// pinning public-facing copy.
+const SEASON_NOTE =
+  "These are the current season's title fights. Earlier seasons are archived and not browsable yet.";
+
+// Every load state, so the note can be proven to survive all four. The empty state is the one that
+// matters most — after a season wipe this sentence is what explains why there is nothing to watch.
+const loadStates: ReadonlyArray<[string, () => Promise<ReplayListLoad>]> = [
+  ["loading", () => new Promise<ReplayListLoad>(() => {})],
+  ["ready", ready([summary()])],
+  ["empty", () => Promise.resolve<ReplayListLoad>({ kind: "empty" })],
+  ["error", () => Promise.reject<ReplayListLoad>(new Error("down"))],
+];
+
 describe("ReplayList — the /watch fight index", () => {
+  it.each(loadStates)(
+    "says which season's fights it shows, and that earlier ones are archived, in the %s state",
+    async (_state, load) => {
+      const { findByText } = render(() => <ReplayList load={load} />);
+
+      expect(await findByText(SEASON_NOTE)).toBeTruthy();
+    },
+  );
+
+  it("names no engine version, so the copy cannot go stale on the next season bump", async () => {
+    const { container, findByText } = render(() => (
+      <ReplayList load={ready([summary()])} />
+    ));
+
+    await findByText(SEASON_NOTE);
+
+    expect(container.textContent).not.toMatch(/\bv\d+\b/);
+  });
+
   it("shows an accessible loading state while the list is being fetched", () => {
     // A loader that never settles holds the view in its loading state.
     const load = () => new Promise<ReplayListLoad>(() => {});
